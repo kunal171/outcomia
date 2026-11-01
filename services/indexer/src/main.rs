@@ -8,10 +8,12 @@ mod backfill;
 mod config;
 mod decoder;
 mod events;
+mod health;
 mod live;
 mod processor;
 mod reporter;
 mod rpc;
+mod shutdown;
 mod storage;
 mod subscription;
 
@@ -28,6 +30,7 @@ use std::{
 
 use backfill::{run_backfill, BackfillConfig, BackfillOutcome};
 use config::Config;
+use health::HealthState;
 use live::{recover_live_gap, LiveCatchupOutcome, LiveGapConfig};
 use solana_commitment_config::CommitmentConfig;
 use solana_pubkey::Pubkey;
@@ -35,6 +38,7 @@ use solana_rpc_client::rpc_client::RpcClient;
 use sqlx::PgPool;
 use storage::connect;
 use subscription::{run_log_subscription, ReconnectBackoff};
+use tokio::net::TcpListener;
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
@@ -79,6 +83,13 @@ async fn main() -> Result<(), BoxError> {
     println!("Program: {program_id}");
     println!("PostgreSQL connected; pool size={}", pool.size());
 
+    let health_state = HealthState::new(pool.clone());
+    let health_listener = TcpListener::bind(&config.health_address).await?;
+
+    println!("Health endpoint: {}", config.health_address);
+
+    let _health_server = tokio::spawn(health::serve(health_listener, health_state.clone()));
+
     // Reuse one client for signature and transaction RPC calls so its HTTP
     // connection pool survives historical bootstrap and every live recovery.
     let client = Arc::new(RpcClient::new_with_commitment(
@@ -109,6 +120,8 @@ async fn main() -> Result<(), BoxError> {
     let mut backoff = ReconnectBackoff::new(INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY)?;
 
     loop {
+        health_state.mark_not_ready();
+
         let observed_wakeup = Arc::new(AtomicBool::new(false));
         let wakeup_progress = Arc::clone(&observed_wakeup);
 
@@ -122,6 +135,7 @@ async fn main() -> Result<(), BoxError> {
                 let client = Arc::clone(&client);
                 let pool = pool.clone();
                 let program_id = program_id.to_owned();
+                let health_state = health_state.clone();
 
                 async move {
                     recover_and_report(
@@ -131,7 +145,11 @@ async fn main() -> Result<(), BoxError> {
                         live_config,
                         "subscription-ready",
                     )
-                    .await
+                    .await?;
+
+                    health_state.mark_ready();
+
+                    Ok(())
                 }
             },
             |wakeup| {
@@ -171,9 +189,9 @@ async fn main() -> Result<(), BoxError> {
                     Err(error) => error,
                 }
             }
-            signal = tokio::signal::ctrl_c() => {
-                signal?;
-                println!("Shutdown signal received; indexer stopped cleanly.");
+            signal = shutdown::wait_for_shutdown() => {
+                let signal = signal?;
+                println!("{signal} received; indexer stopped cleanly.");
                 return Ok(());
             }
         };
@@ -190,9 +208,9 @@ async fn main() -> Result<(), BoxError> {
 
         tokio::select! {
             () = tokio::time::sleep(delay) => {}
-            signal = tokio::signal::ctrl_c() => {
-                signal?;
-                println!("Shutdown signal received during reconnect delay.");
+            signal = shutdown::wait_for_shutdown() => {
+                let signal = signal?;
+                println!("{signal} received during reconnect delay.");
                 return Ok(());
             }
         }
