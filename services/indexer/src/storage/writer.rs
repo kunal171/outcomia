@@ -7,8 +7,12 @@ use crate::{decoder::DecodedEventLog, rpc::TransactionRecord};
 
 use super::models::{EventInsert, StorageModelError, TransactionInsert};
 
+// Version the stored interpretation independently from SQL migrations. A
+// future decoder can write a new version while retaining original logs and
+// Base64 payloads for controlled replay.
 const SOURCE_SCHEMA_VERSION: i32 = 1;
 
+/// Source conversion, database, and replay-consistency failures.
 #[derive(Debug, Error)]
 pub enum StorageError {
     #[error(transparent)]
@@ -44,16 +48,21 @@ pub async fn persist_transaction(
 
     let mut database_transaction = pool.begin().await?;
 
+    // The no-op UPDATE is deliberate. PostgreSQL reports one affected row for
+    // both a new insert and an exact replay, while the WHERE clause reports
+    // zero for the same signature carrying different immutable source data.
+    // That turns a uniqueness conflict into an explicit consistency check.
     let transaction_result = sqlx::query(
         r#"
         INSERT INTO chain_transactions (
             signature,
             slot,
+            transaction_index,
             block_time,
             raw_logs,
             schema_version
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (signature) DO UPDATE
         SET signature = EXCLUDED.signature
         WHERE chain_transactions.slot = EXCLUDED.slot
@@ -61,10 +70,13 @@ pub async fn persist_transaction(
               IS NOT DISTINCT FROM EXCLUDED.block_time
           AND chain_transactions.raw_logs = EXCLUDED.raw_logs
           AND chain_transactions.schema_version = EXCLUDED.schema_version
+          AND chain_transactions.transaction_index
+            IS NOT DISTINCT FROM EXCLUDED.transaction_index
         "#,
     )
     .bind(&transaction_insert.signature)
     .bind(transaction_insert.slot)
+    .bind(transaction_insert.transaction_index)
     .bind(transaction_insert.block_time)
     .bind(&transaction_insert.raw_logs)
     .bind(SOURCE_SCHEMA_VERSION)
@@ -78,6 +90,10 @@ pub async fn persist_transaction(
     }
 
     for event in event_inserts {
+        // Event replay follows the same pattern using (signature, log_index)
+        // as identity. Any payload, type, schema, or decoded-JSON difference
+        // aborts the surrounding database transaction, including its parent
+        // transaction insert and all preceding event rows.
         let event_result = sqlx::query(
             r#"
             INSERT INTO chain_events (
@@ -131,6 +147,7 @@ mod tests {
             slot,
             block_time: Some(1_700_000_000),
             logs: vec!["Program data: payload".to_owned()],
+            transaction_index: Some(0),
         }
     }
 
@@ -190,6 +207,20 @@ mod tests {
             persist_transaction(
                 &pool,
                 &conflicting_transaction,
+                std::slice::from_ref(&source_event),
+            )
+            .await,
+            Err(StorageError::TransactionConflict { .. })
+        ));
+
+        let conflicting_transaction_index = TransactionRecord {
+            transaction_index: Some(1),
+            ..source_transaction.clone()
+        };
+        assert!(matches!(
+            persist_transaction(
+                &pool,
+                &conflicting_transaction_index,
                 std::slice::from_ref(&source_event),
             )
             .await,

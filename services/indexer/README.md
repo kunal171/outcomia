@@ -17,23 +17,26 @@ independently from the on-chain program.
 - Writes each transaction and its events atomically.
 - Treats exact replay as success and rejects conflicting source data.
 - Advances the checkpoint only after every successful record in a page commits.
+- Subscribes to finalized program logs, then closes the startup gap over HTTP.
+- Recovers over HTTP after every wake-up and reconnect with capped backoff.
 
-The service currently performs historical backfill. Live subscriptions,
-read-optimized projections, reconciliation, and APIs remain separate phases.
+Historical backfill and recoverable live source ingestion are complete.
+Read-optimized projections, reconciliation, and APIs remain separate phases.
 
 ## Runtime structure
 
 ```text
-main -> backfill -> processor -> reporter
-          |            |
-          |            `-> strict event decoder -> source storage
-          `-> Solana RPC pages -> durable checkpoint
+main
+ |-- backfill -> HTTP RPC -> processor -> decoder -> source storage
+ `-- subscription -> wake-up -> HTTP gap recovery -> processor
+                                      `-> durable live checkpoint
 ```
 
-`main` only constructs configuration, RPC, and database dependencies.
-`backfill` owns bounded pagination and checkpoint order. `processor` fetches,
-decodes, and persists one transaction. `reporter` keeps human-readable event
-output outside ingestion control flow.
+`main` owns bootstrap, reconnect timing, and Ctrl+C shutdown. `backfill` owns
+bounded historical pagination. `subscription` establishes finalized log
+wake-ups but never persists their payloads. `live` reloads the durable boundary
+and recovers complete transactions through HTTP. `processor` fetches, decodes,
+and persists one transaction; `reporter` keeps diagnostics outside control flow.
 
 ## Run locally
 
@@ -50,9 +53,10 @@ set +a
 cargo run --manifest-path services/indexer/Cargo.toml
 ```
 
-The local database uses `127.0.0.1:5433` because port `5432` is already used by
-the host PostgreSQL service. `DATABASE_URL` is required, and pending migrations
-run automatically before RPC ingestion.
+The local database uses `127.0.0.1:5434` because ports `5432` and `5433` are
+already used by other local PostgreSQL services. `DATABASE_URL` is required.
+`SOLANA_RPC_URL`, `SOLANA_WS_URL`, and `TIDEBOOK_PROGRAM_ID` have devnet
+defaults. Pending migrations run automatically before ingestion.
 
 Useful database commands:
 
@@ -75,7 +79,7 @@ cargo clippy --manifest-path services/indexer/Cargo.toml --all-targets -- -D war
 Run the isolated PostgreSQL integration tests with:
 
 ```bash
-DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5433/postgres \
+DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5434/postgres \
   cargo test --manifest-path services/indexer/Cargo.toml -- --ignored
 ```
 
@@ -88,11 +92,20 @@ DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5433/postgres \
 - Conflicts roll back the complete transaction and event batch.
 - A transaction, decoder, or storage error leaves the page checkpoint unchanged.
 - A terminal empty page retains the last historical cursor for auditing.
-- Each run stops after a configured page cap and can resume safely.
+- Live subscription starts before HTTP catch-up, so startup notifications are
+  buffered instead of falling into a subscribe-after-catch-up race.
+- WebSocket logs are wake-ups only; HTTP finalized transactions remain the
+  authoritative persisted source.
+- Disconnects trigger capped exponential backoff, resubscription, and another
+  checkpoint-based HTTP recovery.
+- An incomplete live gap is not partially processed when it exceeds the page
+  cap; operators must increase the bound or investigate the lag.
+- Callbacks run serially, favoring deterministic checkpoint order over maximum
+  notification throughput. Yellowstone remains a later scaling option.
+- Ctrl+C stops both an active subscription and a reconnect delay cleanly.
 
 ## Next
 
-1. WebSocket live sync with a separate newest-signature high-water mark and
-   checkpoint-based gap recovery.
-2. Read-optimized projections and an API.
-3. Account reconciliation and operational monitoring.
+1. Read-optimized projections and an API.
+2. Account reconciliation and operational monitoring.
+3. Yellowstone evaluation only if standard RPC becomes the measured bottleneck.

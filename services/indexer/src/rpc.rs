@@ -19,22 +19,43 @@ use solana_transaction_status_client_types::{
 /// execution data must still be loaded through `getTransaction`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureRecord {
+    /// Base58 transaction signature used to fetch complete execution metadata.
     pub signature: String,
+
+    /// Finalized slot reported by the signature-list RPC response.
     pub slot: u64,
+
+    /// Validator-estimated Unix timestamp, when the RPC node supplies one.
     pub block_time: Option<i64>,
+
+    /// Execution position within the slot, when supplied by the RPC node.
+    ///
+    /// This disambiguates finalized transactions that share a slot and lets
+    /// live synchronization advance its high-water mark deterministically.
+    pub transaction_index: Option<u32>,
 }
 
 /// Immutable source data retained for a successfully finalized transaction.
 ///
 /// Keeping logs in their original order is essential: multiple Anchor events
 /// may be emitted by one transaction and their position becomes the stable
-/// `event_index` used for idempotent database writes.
+/// `log_index` used for idempotent database writes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionRecord {
+    /// Stable transaction identity and parent key for decoded events.
     pub signature: String,
+
+    /// Authoritative slot returned with the complete transaction response.
     pub slot: u64,
+
+    /// Optional finalized block timestamp supplied by RPC.
     pub block_time: Option<i64>,
+
+    /// Complete runtime log sequence retained for audit and future re-decoding.
     pub logs: Vec<String>,
+
+    /// Execution position within the finalized slot, when supplied by RPC.
+    pub transaction_index: Option<u32>,
 }
 
 /// One deterministic page of finalized transaction signatures.
@@ -50,18 +71,50 @@ pub struct SignaturePage {
 /// Fetches one page of finalized signatures involving `program_id`.
 ///
 /// Solana returns signatures newest-first. The indexer reverses successful
-/// records so state is replayed chronologically.
+/// records only within this page. Successive `before` pages still move toward
+/// older history, so global chronological projection replay is a later,
+/// explicit source-storage operation.
 pub fn fetch_signature_page(
     client: &RpcClient,
     program_id: &Pubkey,
     before: Option<&Signature>,
     limit: usize,
 ) -> Result<SignaturePage, Box<dyn Error + Send + Sync>> {
+    fetch_signature_page_with_bounds(client, program_id, before, None, limit)
+}
+
+/// Fetches one live-recovery page newer than `until`.
+///
+/// `before` continues a gap that spans multiple RPC pages. Callers must gather
+/// every page before processing them in reverse page order because pagination
+/// discovers the newest chunk first.
+pub fn fetch_live_signature_page(
+    client: &RpcClient,
+    program_id: &Pubkey,
+    before: Option<&Signature>,
+    until: &Signature,
+    limit: usize,
+) -> Result<SignaturePage, Box<dyn Error + Send + Sync>> {
+    fetch_signature_page_with_bounds(client, program_id, before, Some(until), limit)
+}
+
+/// Fetches one finalized signature page between optional pagination bounds.
+///
+/// Historical ingestion supplies only `before` and walks toward genesis. Live
+/// recovery additionally supplies `until`, preventing the RPC node from
+/// returning transactions already covered by the durable high-water mark.
+fn fetch_signature_page_with_bounds(
+    client: &RpcClient,
+    program_id: &Pubkey,
+    before: Option<&Signature>,
+    until: Option<&Signature>,
+    limit: usize,
+) -> Result<SignaturePage, Box<dyn Error + Send + Sync>> {
     let entries = client.get_signatures_for_address_with_config(
         program_id,
         GetConfirmedSignaturesForAddress2Config {
             before: before.cloned(),
-            until: None,
+            until: until.cloned(),
             limit: Some(limit),
             commitment: Some(CommitmentConfig::finalized()),
         },
@@ -91,6 +144,7 @@ fn build_signature_page(
             signature: entry.signature,
             slot: entry.slot,
             block_time: entry.block_time,
+            transaction_index: entry.transaction_index,
         })
         .collect::<Vec<_>>();
 
@@ -144,6 +198,7 @@ pub fn fetch_transaction(
         slot: transaction.slot,
         block_time: transaction.block_time,
         logs,
+        transaction_index: signature_record.transaction_index,
     }))
 }
 
@@ -178,6 +233,7 @@ mod tests {
     fn signature_entry(
         signature: Signature,
         slot: u64,
+        transaction_index: Option<u32>,
         failed: bool,
     ) -> RpcConfirmedTransactionStatusWithSignature {
         let err = failed.then(|| {
@@ -192,7 +248,7 @@ mod tests {
             memo: None,
             block_time: Some(slot as i64),
             confirmation_status: None,
-            transaction_index: None,
+            transaction_index,
         }
     }
 
@@ -203,9 +259,9 @@ mod tests {
         let oldest = signature(1);
 
         let page = build_signature_page(vec![
-            signature_entry(newest, 30, false),
-            signature_entry(middle, 20, false),
-            signature_entry(oldest, 10, false),
+            signature_entry(newest, 30, Some(2), false),
+            signature_entry(middle, 20, Some(1), false),
+            signature_entry(oldest, 10, Some(0), false),
         ])
         .expect("valid signature page must normalize");
 
@@ -217,6 +273,13 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![10, 20, 30]
         );
+        assert_eq!(
+            page.records
+                .iter()
+                .map(|record| record.transaction_index)
+                .collect::<Vec<_>>(),
+            vec![Some(0), Some(1), Some(2)]
+        );
     }
 
     #[test]
@@ -226,9 +289,9 @@ mod tests {
         let failed_boundary = signature(1);
 
         let page = build_signature_page(vec![
-            signature_entry(newest, 30, false),
-            signature_entry(successful_oldest, 20, false),
-            signature_entry(failed_boundary, 10, true),
+            signature_entry(newest, 30, Some(2), false),
+            signature_entry(successful_oldest, 20, Some(1), false),
+            signature_entry(failed_boundary, 10, Some(0), true),
         ])
         .expect("valid signature page must normalize");
 
