@@ -68,6 +68,9 @@ sqlx migrate run
 docker compose -f compose.yaml stop
 ```
 
+For the local Kind deployment, resource relationships, health checks, and
+recovery procedure, see [`infra/kubernetes/README.md`](infra/kubernetes/README.md).
+
 ## Verify
 
 ```bash

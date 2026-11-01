@@ -7,3 +7,6 @@ resources:
   - namespace.yaml
   - postgres-service.yaml
   - postgres-statefulset.yaml
+  - indexer-configmap.yaml
+  - indexer-service.yaml
+  - indexer-deployment.yaml
