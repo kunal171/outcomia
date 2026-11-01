@@ -18,10 +18,11 @@ use std::{error::Error, str::FromStr};
 
 use backfill::{run_backfill, BackfillConfig, BackfillOutcome};
 use config::Config;
+use live::{run_live_catchup, LiveCatchupOutcome, LiveGapConfig};
 use solana_commitment_config::CommitmentConfig;
 use solana_pubkey::Pubkey;
 use solana_rpc_client::rpc_client::RpcClient;
-use storage::{connect, load_live_checkpoint, LiveCheckpoint};
+use storage::{connect, load_or_initialize_live_checkpoint};
 
 // Conservative development defaults bound both RPC pressure per request and
 // total work per process invocation. Durable cursors make stopping at the cap
@@ -60,21 +61,47 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Ok(());
     }
 
-    let live_checkpoint: Option<LiveCheckpoint> = load_live_checkpoint(&pool, &program_id).await?;
+    let Some(checkpoint) = load_or_initialize_live_checkpoint(&pool, &program_id).await? else {
+        println!(
+            "No persisted source transaction exists; \
+            live sync cannot establish an HTTP boundary yet."
+        );
+        return Ok(());
+    };
 
-    match live_checkpoint {
-        Some(checkpoint) => {
+    println!(
+        "Live checkpoint: slot={} signature={} transaction_index={:?}",
+        checkpoint.slot, checkpoint.signature, checkpoint.transaction_index,
+    );
+
+    let live_outcome = run_live_catchup(
+        &client,
+        &pool,
+        &program_id,
+        &checkpoint,
+        LiveGapConfig {
+            signature_page_limit: SIGNATURE_PAGE_LIMIT,
+            max_pages: MAX_PAGES_PER_RUN,
+        },
+    )
+    .await?;
+
+    match live_outcome {
+        LiveCatchupOutcome::CaughtUp { processed } => {
             println!(
-                "Live checkpoint: slot={} signature={} transaction_index={:?}",
-                checkpoint.slot, checkpoint.signature, checkpoint.transaction_index,
+                "Startup live catch-up completed; \
+                processed={processed}"
             );
         }
-        None => {
-            println!("Live checkpoint is not initialized; startup catch-up must establish it.");
+
+        LiveCatchupOutcome::PageLimitReached => {
+            println!(
+                "Startup live gap exceeded the page cap; \
+                no partial newest pages were processed."
+            );
+            return Ok(());
         }
     }
-
-    println!("Historical backfill status: {backfill_outcome:?}");
 
     Ok(())
 }
