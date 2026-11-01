@@ -19,7 +19,7 @@ pub struct Config {
     /// PostgreSQL connection string; deliberately has no embedded default.
     pub database_url: String,
 
-
+    /// WebSocket endpoint used only to wake finalized HTTP gap recovery.
     pub websocket_url: String,
 }
 
@@ -35,10 +35,7 @@ impl Config {
                 .unwrap_or_else(|_| DEFAULT_PROGRAM_ID.to_owned()),
             database_url: env::var("DATABASE_URL").map_err(ConfigError::DatabaseUrl)?,
             websocket_url: env::var("SOLANA_WS_URL")
-                .unwrap_or_else(|_| {
-                    DEFAULT_WEBSOCKET_URL.to_owned()
-                }
-            ),
+                .unwrap_or_else(|_| DEFAULT_WEBSOCKET_URL.to_owned()),
         })
     }
 }

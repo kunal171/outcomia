@@ -134,7 +134,50 @@ decoding, persistence, and recovery can each be reviewed independently.
 5. `feature/indexer-backfill` adds signature pagination and durable finalized
    checkpoints for complete historical replay. This slice is complete.
 6. `feature/indexer-live-sync` adds WebSocket log ingestion and resumes from the
-   durable checkpoint after every disconnect so gaps are backfilled.
+   durable checkpoint after every disconnect so gaps are backfilled. This slice
+   is complete for the standard-RPC prototype.
+
+### Live synchronization behavior and tradeoffs
+
+The live path deliberately separates notification from ingestion:
+
+```text
+historical backfill complete
+          |
+          v
+subscribe to finalized logs
+          |
+          +--> HTTP catch-up from durable checkpoint
+          |
+          `--> buffered/new notification
+                         |
+                         v
+                 HTTP gap recovery
+                         |
+                         v
+              persist source transaction
+                         |
+                         v
+               advance live checkpoint
+
+disconnect/error -> capped backoff -> resubscribe -> HTTP catch-up
+```
+
+The subscription is established before the first catch-up. Notifications that
+arrive during catch-up remain buffered, avoiding the classic race where a
+transaction lands after an HTTP scan but before WebSocket registration.
+WebSocket payloads are never decoded or stored directly: they are ephemeral,
+at-least-once wake-ups. Complete finalized transactions are fetched over HTTP,
+written idempotently, and checkpointed only after persistence.
+
+This standard-RPC design is inexpensive and easy to operate, but it trades raw
+throughput for simple recovery semantics. Wake-ups are handled serially so the
+checkpoint order is deterministic. Reconnect delays grow from one to thirty
+seconds and reset after successful notification recovery. A gap larger than
+the configured page cap fails closed without processing a partial newest slice;
+an operator must raise the bound or investigate extended downtime. Yellowstone
+becomes useful only when measured notification volume or HTTP recovery latency
+outgrows this model.
 
 The foundation's fixed batch of at most 20 signatures is diagnostic. It is not
 described as historical backfill until pagination and checkpoints exist.
@@ -438,13 +481,13 @@ mainnet liquidity acquisition.
 
 ## Recommended next milestone
 
-Start `feature/indexer-live-sync`. Historical RPC pagination now resumes from a
-durable backward cursor, stores source records idempotently, preserves the
-terminal cursor, and stops safely at a configured page cap. Live ingestion
-should add a separate newest finalized signature or slot high-water mark,
-subscribe through standard Solana WebSocket RPC, and backfill every reconnect
-gap before accepting the stream as current. Yellowstone remains a later scaling
-option after standard RPC recovery semantics are proven.
+Start read-optimized projections on top of the append-only source tables. Replay
+events in deterministic `(slot, transaction_index, signature, log_index)` order
+into market, order, fill, fee, and balance views, then expose the first narrow
+read API. Keep source records immutable so projection bugs and schema changes
+can be rebuilt without re-fetching chain history. Add account reconciliation
+after the first projections are queryable. Yellowstone remains a later scaling
+option after standard RPC throughput is measured.
 
 ## References
 

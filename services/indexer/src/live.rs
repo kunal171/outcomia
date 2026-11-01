@@ -9,8 +9,8 @@ use sqlx::PgPool;
 
 use crate::{
     processor::process_signature,
-    rpc::{fetch_live_signature_page, SignaturePage, SignatureRecord},
-    storage::{save_live_checkpoint, LiveCheckpoint},
+    rpc::{fetch_live_signature_page, fetch_signature_page, SignaturePage, SignatureRecord},
+    storage::{load_or_initialize_live_checkpoint, save_live_checkpoint, LiveCheckpoint},
 };
 
 type BoxError = Box<dyn Error + Send + Sync>;
@@ -132,17 +132,24 @@ pub async fn run_live_catchup(
     client: &RpcClient,
     pool: &PgPool,
     program_id: &Pubkey,
-    checkpoint: &LiveCheckpoint,
+    checkpoint: Option<&LiveCheckpoint>,
     config: LiveGapConfig,
 ) -> Result<LiveCatchupOutcome, BoxError> {
     let gap = collect_gap_pages(config, |before, limit| {
-        fetch_live_signature_page(
-            client,
-            program_id,
-            before.as_ref(),
-            &checkpoint.signature,
-            limit,
-        )
+        if let Some(checkpoint) = checkpoint {
+            fetch_live_signature_page(
+                client,
+                program_id,
+                before.as_ref(),
+                &checkpoint.signature,
+                limit,
+            )
+        } else {
+            // A fresh program can have no source row when the subscription is
+            // established. Walk the currently available finalized history so
+            // a transaction landing in that startup window is not skipped.
+            fetch_signature_page(client, program_id, before.as_ref(), limit)
+        }
     })?;
 
     process_gap_records(
@@ -155,6 +162,22 @@ pub async fn run_live_catchup(
         },
     )
     .await
+}
+
+/// Reloads the durable boundary and recovers every finalized transaction after it.
+///
+/// The boundary is loaded for each wake-up rather than cached in memory. This
+/// makes reconnects and process restarts converge on PostgreSQL as the source
+/// of progress, while an initially empty database remains a valid state.
+pub async fn recover_live_gap(
+    client: &RpcClient,
+    pool: &PgPool,
+    program_id: &Pubkey,
+    config: LiveGapConfig,
+) -> Result<LiveCatchupOutcome, BoxError> {
+    let checkpoint = load_or_initialize_live_checkpoint(pool, program_id).await?;
+
+    run_live_catchup(client, pool, program_id, checkpoint.as_ref(), config).await
 }
 
 #[cfg(test)]
