@@ -359,6 +359,37 @@ pub async fn save_live_checkpoint(
     Ok(())
 }
 
+/// Loads durable live progress or bootstraps it from persisted source data.
+///
+/// Existing live progress always wins. Source storage may be ahead when the
+/// process crashed after persisting a transaction but before checkpointing it;
+/// starting from the older checkpoint allows that transaction to replay safely.
+pub async fn load_or_initialize_live_checkpoint(
+    pool: &PgPool,
+    program_id: &Pubkey,
+) -> Result<Option<LiveCheckpoint>, LiveCheckpointError> {
+    if let Some(checkpoint) =
+        load_live_checkpoint(pool, program_id).await?
+    {
+        return Ok(Some(checkpoint));
+    }
+
+    let Some(source_position) =
+        load_latest_source_position(pool).await?
+    else {
+        return Ok(None);
+    };
+
+    save_live_checkpoint(
+        pool,
+        program_id,
+        &source_position,
+    )
+    .await?;
+
+    Ok(Some(source_position))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
