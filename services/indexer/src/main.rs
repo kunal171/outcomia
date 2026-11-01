@@ -13,6 +13,7 @@ mod processor;
 mod reporter;
 mod rpc;
 mod storage;
+mod subscription;
 
 use std::{error::Error, str::FromStr};
 
