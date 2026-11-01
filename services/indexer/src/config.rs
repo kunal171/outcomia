@@ -5,6 +5,7 @@ use thiserror::Error;
 
 const DEFAULT_RPC_URL: &str = "https://api.devnet.solana.com";
 const DEFAULT_PROGRAM_ID: &str = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL";
+const DEFAULT_WEBSOCKET_URL: &str = "wss://api.devnet.solana.com";
 
 /// Environment-derived endpoints and identity required by one indexer run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +18,9 @@ pub struct Config {
 
     /// PostgreSQL connection string; deliberately has no embedded default.
     pub database_url: String,
+
+
+    pub websocket_url: String,
 }
 
 impl Config {
@@ -30,6 +34,11 @@ impl Config {
             program_id: env::var("TIDEBOOK_PROGRAM_ID")
                 .unwrap_or_else(|_| DEFAULT_PROGRAM_ID.to_owned()),
             database_url: env::var("DATABASE_URL").map_err(ConfigError::DatabaseUrl)?,
+            websocket_url: env::var("SOLANA_WS_URL")
+                .unwrap_or_else(|_| {
+                    DEFAULT_WEBSOCKET_URL.to_owned()
+                }
+            ),
         })
     }
 }

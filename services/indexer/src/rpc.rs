@@ -88,10 +88,6 @@ pub fn fetch_signature_page(
 /// `before` continues a gap that spans multiple RPC pages. Callers must gather
 /// every page before processing them in reverse page order because pagination
 /// discovers the newest chunk first.
-#[expect(
-    dead_code,
-    reason = "the next live-sync milestone consumes this RPC boundary"
-)]
 pub fn fetch_live_signature_page(
     client: &RpcClient,
     program_id: &Pubkey,

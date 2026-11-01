@@ -6,10 +6,6 @@ use sqlx::PgPool;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by the staged live-checkpoint writer")
-)]
 enum UpdateDecision {
     Keep,
     Replace,
@@ -30,13 +26,6 @@ pub struct LiveCheckpoint {
 
 /// Failures while loading or decoding durable live progress.
 #[derive(Debug, Error)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "write-only variants become reachable with the live consumer"
-    )
-)]
 pub enum LiveCheckpointError {
     #[error(transparent)]
     Database(#[from] sqlx::Error),
@@ -155,13 +144,6 @@ pub async fn load_live_checkpoint(
 /// indices sort ahead of missing metadata within the newest slot. The
 /// signature provides a deterministic final tie-breaker and an exact RPC
 /// `until` boundary.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "startup checkpoint bootstrap is the next milestone"
-    )
-)]
 pub async fn load_latest_source_position(
     pool: &PgPool,
 ) -> Result<Option<LiveCheckpoint>, LiveCheckpointError> {
@@ -185,10 +167,6 @@ pub async fn load_latest_source_position(
     row.map(LiveCheckpoint::try_from).transpose()
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by the staged live-checkpoint writer")
-)]
 fn decide_update(
     stored: &LiveCheckpoint,
     incoming: &LiveCheckpoint,
@@ -257,13 +235,6 @@ fn decide_update(
 /// A transaction-scoped advisory lock serializes writers even when the program
 /// has no checkpoint row yet. A row lock alone cannot protect that initial
 /// missing-row case.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the next live-consumer milestone will call this writer"
-    )
-)]
 pub async fn save_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,
@@ -364,10 +335,6 @@ pub async fn save_live_checkpoint(
 /// Existing live progress always wins. Source storage may be ahead when the
 /// process crashed after persisting a transaction but before checkpointing it;
 /// starting from the older checkpoint allows that transaction to replay safely.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "startup wiring is the next milestone")
-)]
 pub async fn load_or_initialize_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,

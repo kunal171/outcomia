@@ -16,10 +16,6 @@ use crate::{
 type BoxError = Box<dyn Error + Send + Sync>;
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "runtime live catch-up is the next milestone")
-)]
 pub struct LiveGapConfig {
     /// Maximum signatures requested from one RPC page.
     pub signature_page_limit: usize,
@@ -29,10 +25,6 @@ pub struct LiveGapConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "runtime live catch-up is the next milestone")
-)]
 pub enum LiveGapOutcome {
     /// The checkpoint boundary was reached and records are globally oldest-first.
     CaughtUp(Vec<SignatureRecord>),
@@ -42,10 +34,6 @@ pub enum LiveGapOutcome {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "runtime wiring is the next milestone")
-)]
 pub enum LiveCatchupOutcome {
     CaughtUp { processed: usize },
     PageLimitReached,
@@ -57,10 +45,6 @@ pub enum LiveCatchupOutcome {
 /// exposed until an empty terminal page confirms the `until` boundary, which
 /// prevents callers from advancing past older transactions that were not yet
 /// fetched.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "runtime live catch-up is the next milestone")
-)]
 fn collect_gap_pages<Fetch>(
     config: LiveGapConfig,
     mut fetch_page: Fetch,
@@ -144,7 +128,6 @@ where
     Ok(LiveCatchupOutcome::CaughtUp { processed })
 }
 
-#[expect(dead_code, reason = "runtime wiring is the next milestone")]
 pub async fn run_live_catchup(
     client: &RpcClient,
     pool: &PgPool,
