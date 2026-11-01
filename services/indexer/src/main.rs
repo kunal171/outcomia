@@ -12,6 +12,7 @@ mod live;
 mod processor;
 mod reporter;
 mod rpc;
+mod shutdown;
 mod storage;
 mod subscription;
 
@@ -171,9 +172,9 @@ async fn main() -> Result<(), BoxError> {
                     Err(error) => error,
                 }
             }
-            signal = tokio::signal::ctrl_c() => {
-                signal?;
-                println!("Shutdown signal received; indexer stopped cleanly.");
+            signal = shutdown::wait_for_shutdown() => {
+                let signal = signal?;
+                println!("{signal} received; indexer stopped cleanly.");
                 return Ok(());
             }
         };
@@ -190,9 +191,9 @@ async fn main() -> Result<(), BoxError> {
 
         tokio::select! {
             () = tokio::time::sleep(delay) => {}
-            signal = tokio::signal::ctrl_c() => {
-                signal?;
-                println!("Shutdown signal received during reconnect delay.");
+            signal = shutdown::wait_for_shutdown() => {
+                let signal = signal?;
+                println!("{signal} received during reconnect delay.");
                 return Ok(());
             }
         }
