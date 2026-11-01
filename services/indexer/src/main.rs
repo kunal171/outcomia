@@ -8,6 +8,7 @@ mod backfill;
 mod config;
 mod decoder;
 mod events;
+mod health;
 mod live;
 mod processor;
 mod reporter;
@@ -36,6 +37,8 @@ use solana_rpc_client::rpc_client::RpcClient;
 use sqlx::PgPool;
 use storage::connect;
 use subscription::{run_log_subscription, ReconnectBackoff};
+use health::HealthState;
+use tokio::net::TcpListener;
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
@@ -80,6 +83,18 @@ async fn main() -> Result<(), BoxError> {
     println!("Program: {program_id}");
     println!("PostgreSQL connected; pool size={}", pool.size());
 
+    let health_state = HealthState::new(pool.clone());
+    let health_listener = TcpListener::bind(&config.health_address).await?;
+
+    println!("Health endpoint: {}", config.health_address);
+
+    let _health_server = tokio::spawn(health::serve(
+        health_listener,
+        health_state.clone(),
+    ));
+
+
+
     // Reuse one client for signature and transaction RPC calls so its HTTP
     // connection pool survives historical bootstrap and every live recovery.
     let client = Arc::new(RpcClient::new_with_commitment(
@@ -110,6 +125,8 @@ async fn main() -> Result<(), BoxError> {
     let mut backoff = ReconnectBackoff::new(INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY)?;
 
     loop {
+        health_state.mark_not_ready();
+
         let observed_wakeup = Arc::new(AtomicBool::new(false));
         let wakeup_progress = Arc::clone(&observed_wakeup);
 
@@ -123,6 +140,7 @@ async fn main() -> Result<(), BoxError> {
                 let client = Arc::clone(&client);
                 let pool = pool.clone();
                 let program_id = program_id.to_owned();
+                let health_state = health_state.clone();
 
                 async move {
                     recover_and_report(
@@ -132,7 +150,11 @@ async fn main() -> Result<(), BoxError> {
                         live_config,
                         "subscription-ready",
                     )
-                    .await
+                    .await?;
+
+                    health_state.mark_ready();
+
+                    Ok(())
                 }
             },
             |wakeup| {

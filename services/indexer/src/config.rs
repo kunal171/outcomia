@@ -6,6 +6,7 @@ use thiserror::Error;
 const DEFAULT_RPC_URL: &str = "https://api.devnet.solana.com";
 const DEFAULT_PROGRAM_ID: &str = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL";
 const DEFAULT_WEBSOCKET_URL: &str = "wss://api.devnet.solana.com";
+const DEFAULT_HEALTH_ADDRESS: &str = "0.0.0.0:8080";
 
 /// Environment-derived endpoints and identity required by one indexer run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +22,9 @@ pub struct Config {
 
     /// WebSocket endpoint used only to wake finalized HTTP gap recovery.
     pub websocket_url: String,
+
+    /// Address used by container liveness and readiness probes.
+    pub health_address: String,
 }
 
 impl Config {
@@ -36,6 +40,8 @@ impl Config {
             database_url: env::var("DATABASE_URL").map_err(ConfigError::DatabaseUrl)?,
             websocket_url: env::var("SOLANA_WS_URL")
                 .unwrap_or_else(|_| DEFAULT_WEBSOCKET_URL.to_owned()),
+            health_address: env::var("HEALTH_ADDRESS")
+                .unwrap_or_else(|_| DEFAULT_HEALTH_ADDRESS.to_owned()),
         })
     }
 }
