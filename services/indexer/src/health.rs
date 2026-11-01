@@ -8,13 +8,7 @@ use std::{
     },
 };
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
 use tokio::net::TcpListener;

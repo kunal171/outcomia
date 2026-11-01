@@ -30,6 +30,7 @@ use std::{
 
 use backfill::{run_backfill, BackfillConfig, BackfillOutcome};
 use config::Config;
+use health::HealthState;
 use live::{recover_live_gap, LiveCatchupOutcome, LiveGapConfig};
 use solana_commitment_config::CommitmentConfig;
 use solana_pubkey::Pubkey;
@@ -37,7 +38,6 @@ use solana_rpc_client::rpc_client::RpcClient;
 use sqlx::PgPool;
 use storage::connect;
 use subscription::{run_log_subscription, ReconnectBackoff};
-use health::HealthState;
 use tokio::net::TcpListener;
 
 type BoxError = Box<dyn Error + Send + Sync>;
@@ -88,12 +88,7 @@ async fn main() -> Result<(), BoxError> {
 
     println!("Health endpoint: {}", config.health_address);
 
-    let _health_server = tokio::spawn(health::serve(
-        health_listener,
-        health_state.clone(),
-    ));
-
-
+    let _health_server = tokio::spawn(health::serve(health_listener, health_state.clone()));
 
     // Reuse one client for signature and transaction RPC calls so its HTTP
     // connection pool survives historical bootstrap and every live recovery.
