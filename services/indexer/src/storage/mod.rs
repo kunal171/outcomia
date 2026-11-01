@@ -8,12 +8,13 @@ mod writer;
 
 pub use checkpoint::{load_backfill_checkpoint, save_backfill_checkpoint};
 pub use connection::connect;
-// The write API is intentionally exposed with the read API before the live
-// consumer is wired in the next milestone. Remove this narrow allowance once
-// runtime ingestion calls `save_live_checkpoint`.
+// The staged live APIs are exposed before startup consumes all of them. Remove
+// this narrow allowance when checkpoint bootstrap and catch-up are wired.
 #[allow(
     unused_imports,
-    reason = "save_live_checkpoint is consumed by the next live-sync milestone"
+    reason = "staged live-checkpoint APIs are consumed by the next milestone"
 )]
-pub use live_checkpoint::{load_live_checkpoint, save_live_checkpoint, LiveCheckpoint};
+pub use live_checkpoint::{
+    load_latest_source_position, load_live_checkpoint, save_live_checkpoint, LiveCheckpoint,
+};
 pub use writer::persist_transaction;

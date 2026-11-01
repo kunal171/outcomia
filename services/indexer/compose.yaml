@@ -8,9 +8,9 @@ services:
       POSTGRES_USER: tidebook
       POSTGRES_PASSWORD: tidebook_dev
     ports:
-      # Port 5432 is already used by the host PostgreSQL service. Bind the
-      # development database only to localhost on the free port 5433.
-      - "127.0.0.1:5433:5432"
+      # Ports 5432 and 5433 are already used by other local PostgreSQL
+      # services. Keep Tidebook isolated on loopback port 5434.
+      - "127.0.0.1:5434:5432"
     volumes:
       - tidebook_postgres_data:/var/lib/postgresql
     healthcheck:

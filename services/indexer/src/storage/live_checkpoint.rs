@@ -148,6 +148,43 @@ pub async fn load_live_checkpoint(
     row.map(LiveCheckpoint::try_from).transpose()
 }
 
+/// Loads the newest transaction already present in append-only source storage.
+///
+/// This position bootstraps live synchronization after historical backfill has
+/// completed but before a dedicated live checkpoint exists. Known transaction
+/// indices sort ahead of missing metadata within the newest slot. The
+/// signature provides a deterministic final tie-breaker and an exact RPC
+/// `until` boundary.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "startup checkpoint bootstrap is the next milestone"
+    )
+)]
+pub async fn load_latest_source_position(
+    pool: &PgPool,
+) -> Result<Option<LiveCheckpoint>, LiveCheckpointError> {
+    let row = sqlx::query_as::<_, LiveCheckpointRow>(
+        r#"
+        SELECT
+            signature AS latest_finalized_signature,
+            slot AS latest_finalized_slot,
+            transaction_index
+        FROM chain_transactions
+        ORDER BY
+            slot DESC,
+            transaction_index DESC NULLS LAST,
+            signature DESC
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    row.map(LiveCheckpoint::try_from).transpose()
+}
+
 #[cfg_attr(
     not(test),
     expect(dead_code, reason = "used by the staged live-checkpoint writer")
@@ -428,5 +465,54 @@ mod tests {
             .expect("checkpoint must exist");
 
         assert_eq!(stored, higher_slot);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires a PostgreSQL server supplied through DATABASE_URL"]
+    async fn latest_source_position_prefers_slot_then_known_transaction_index(pool: PgPool) {
+        assert_eq!(
+            load_latest_source_position(&pool)
+                .await
+                .expect("empty source-position load must succeed"),
+            None
+        );
+
+        let candidates = [
+            checkpoint(1, 10, Some(9)),
+            checkpoint(2, 11, None),
+            checkpoint(3, 11, Some(2)),
+            checkpoint(4, 11, Some(3)),
+        ];
+
+        for candidate in &candidates {
+            sqlx::query(
+                r#"
+                INSERT INTO chain_transactions (
+                    signature,
+                    slot,
+                    transaction_index,
+                    raw_logs
+                )
+                VALUES ($1, $2, $3, '[]'::jsonb)
+                "#,
+            )
+            .bind(candidate.signature.to_string())
+            .bind(i64::try_from(candidate.slot).expect("test slot must fit BIGINT"))
+            .bind(
+                candidate
+                    .transaction_index
+                    .map(|index| i32::try_from(index).expect("test index must fit INTEGER")),
+            )
+            .execute(&pool)
+            .await
+            .expect("source candidate insert must succeed");
+        }
+
+        let latest = load_latest_source_position(&pool)
+            .await
+            .expect("source-position load must succeed")
+            .expect("source position must exist");
+
+        assert_eq!(latest, candidates[3]);
     }
 }

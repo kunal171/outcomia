@@ -50,9 +50,9 @@ set +a
 cargo run --manifest-path services/indexer/Cargo.toml
 ```
 
-The local database uses `127.0.0.1:5433` because port `5432` is already used by
-the host PostgreSQL service. `DATABASE_URL` is required, and pending migrations
-run automatically before RPC ingestion.
+The local database uses `127.0.0.1:5434` because ports `5432` and `5433` are
+already used by other local PostgreSQL services. `DATABASE_URL` is required,
+and pending migrations run automatically before RPC ingestion.
 
 Useful database commands:
 
@@ -75,7 +75,7 @@ cargo clippy --manifest-path services/indexer/Cargo.toml --all-targets -- -D war
 Run the isolated PostgreSQL integration tests with:
 
 ```bash
-DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5433/postgres \
+DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5434/postgres \
   cargo test --manifest-path services/indexer/Cargo.toml -- --ignored
 ```
 
