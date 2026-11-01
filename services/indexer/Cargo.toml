@@ -2,7 +2,7 @@
 name = "tidebook-indexer"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.89.0"
+rust-version = "1.97.1"
 
 # The off-chain service intentionally owns a separate dependency graph. This
 # allows its RPC client to advance without forcing the Anchor/LiteSVM program
