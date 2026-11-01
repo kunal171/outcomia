@@ -15,6 +15,7 @@ pub use connection::connect;
     reason = "staged live-checkpoint APIs are consumed by the next milestone"
 )]
 pub use live_checkpoint::{
-    load_latest_source_position,load_or_initialize_live_checkpoint, load_live_checkpoint, save_live_checkpoint, LiveCheckpoint,
+    load_latest_source_position, load_live_checkpoint, load_or_initialize_live_checkpoint,
+    save_live_checkpoint, LiveCheckpoint,
 };
 pub use writer::persist_transaction;

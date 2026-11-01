@@ -364,28 +364,23 @@ pub async fn save_live_checkpoint(
 /// Existing live progress always wins. Source storage may be ahead when the
 /// process crashed after persisting a transaction but before checkpointing it;
 /// starting from the older checkpoint allows that transaction to replay safely.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "startup wiring is the next milestone")
+)]
 pub async fn load_or_initialize_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,
 ) -> Result<Option<LiveCheckpoint>, LiveCheckpointError> {
-    if let Some(checkpoint) =
-        load_live_checkpoint(pool, program_id).await?
-    {
+    if let Some(checkpoint) = load_live_checkpoint(pool, program_id).await? {
         return Ok(Some(checkpoint));
     }
 
-    let Some(source_position) =
-        load_latest_source_position(pool).await?
-    else {
+    let Some(source_position) = load_latest_source_position(pool).await? else {
         return Ok(None);
     };
 
-    save_live_checkpoint(
-        pool,
-        program_id,
-        &source_position,
-    )
-    .await?;
+    save_live_checkpoint(pool, program_id, &source_position).await?;
 
     Ok(Some(source_position))
 }
@@ -400,6 +395,30 @@ mod tests {
             slot,
             transaction_index: index,
         }
+    }
+
+    async fn insert_source_position(pool: &PgPool, position: &LiveCheckpoint) {
+        sqlx::query(
+            r#"
+            INSERT INTO chain_transactions (
+                signature,
+                slot,
+                transaction_index,
+                raw_logs
+            )
+            VALUES ($1, $2, $3, '[]'::jsonb)
+            "#,
+        )
+        .bind(position.signature.to_string())
+        .bind(i64::try_from(position.slot).expect("test slot must fit BIGINT"))
+        .bind(
+            position
+                .transaction_index
+                .map(|index| i32::try_from(index).expect("test index must fit INTEGER")),
+        )
+        .execute(pool)
+        .await
+        .expect("source-position insert must succeed");
     }
 
     #[test]
@@ -516,27 +535,7 @@ mod tests {
         ];
 
         for candidate in &candidates {
-            sqlx::query(
-                r#"
-                INSERT INTO chain_transactions (
-                    signature,
-                    slot,
-                    transaction_index,
-                    raw_logs
-                )
-                VALUES ($1, $2, $3, '[]'::jsonb)
-                "#,
-            )
-            .bind(candidate.signature.to_string())
-            .bind(i64::try_from(candidate.slot).expect("test slot must fit BIGINT"))
-            .bind(
-                candidate
-                    .transaction_index
-                    .map(|index| i32::try_from(index).expect("test index must fit INTEGER")),
-            )
-            .execute(&pool)
-            .await
-            .expect("source candidate insert must succeed");
+            insert_source_position(&pool, candidate).await;
         }
 
         let latest = load_latest_source_position(&pool)
@@ -545,5 +544,68 @@ mod tests {
             .expect("source position must exist");
 
         assert_eq!(latest, candidates[3]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires a PostgreSQL server supplied through DATABASE_URL"]
+    async fn checkpoint_bootstrap_returns_none_when_source_storage_is_empty(pool: PgPool) {
+        let program_id = Pubkey::new_from_array([31; 32]);
+
+        let checkpoint = load_or_initialize_live_checkpoint(&pool, &program_id)
+            .await
+            .expect("empty checkpoint bootstrap must succeed");
+
+        assert_eq!(checkpoint, None);
+        assert_eq!(
+            load_live_checkpoint(&pool, &program_id)
+                .await
+                .expect("checkpoint verification load must succeed"),
+            None
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires a PostgreSQL server supplied through DATABASE_URL"]
+    async fn checkpoint_bootstrap_persists_latest_source_position(pool: PgPool) {
+        let program_id = Pubkey::new_from_array([32; 32]);
+        let source_position = checkpoint(5, 20, Some(4));
+        insert_source_position(&pool, &source_position).await;
+
+        let initialized = load_or_initialize_live_checkpoint(&pool, &program_id)
+            .await
+            .expect("source checkpoint bootstrap must succeed");
+
+        assert_eq!(initialized, Some(source_position.clone()));
+        assert_eq!(
+            load_live_checkpoint(&pool, &program_id)
+                .await
+                .expect("persisted checkpoint load must succeed"),
+            Some(source_position)
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires a PostgreSQL server supplied through DATABASE_URL"]
+    async fn checkpoint_bootstrap_preserves_existing_older_progress(pool: PgPool) {
+        let program_id = Pubkey::new_from_array([33; 32]);
+        let existing = checkpoint(6, 20, Some(4));
+        let newer_source = checkpoint(7, 21, Some(0));
+
+        insert_source_position(&pool, &newer_source).await;
+        save_live_checkpoint(&pool, &program_id, &existing)
+            .await
+            .expect("existing checkpoint setup must succeed");
+
+        let loaded = load_or_initialize_live_checkpoint(&pool, &program_id)
+            .await
+            .expect("existing checkpoint bootstrap must succeed");
+
+        assert_eq!(loaded, Some(existing.clone()));
+        assert_eq!(
+            load_live_checkpoint(&pool, &program_id)
+                .await
+                .expect("existing checkpoint verification load must succeed"),
+            Some(existing)
+        );
     }
 }
