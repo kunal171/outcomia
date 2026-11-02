@@ -11,3 +11,13 @@ app/.env
 test-ledger
 .yarn
 .surfpool
+
+# Terraform working data and local inputs
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+crash.*.log
