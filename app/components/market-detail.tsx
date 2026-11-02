@@ -20,7 +20,6 @@ import {
   accountExplorerUrl,
   decodeMarketKind,
   decodeMarketStatus,
-  deriveAdminRecordPda,
   deriveMarketFeesPda,
   deriveMarketMetadataPda,
   deriveTestFaucetAuthorityPda,
@@ -153,13 +152,6 @@ export function MarketDetail({ address }: { address: string }) {
   const [feePending, setFeePending] = useState(false);
   const [feeError, setFeeError] = useState<string | null>(null);
   const [feeSignature, setFeeSignature] = useState<string | null>(null);
-  const [metadataBaseSymbol, setMetadataBaseSymbol] = useState("");
-  const [metadataQuoteSymbol, setMetadataQuoteSymbol] = useState("");
-  const [metadataDisplayName, setMetadataDisplayName] = useState("");
-  const [metadataKind, setMetadataKind] = useState<"spot" | "other">("spot");
-  const [metadataPending, setMetadataPending] = useState(false);
-  const [metadataError, setMetadataError] = useState<string | null>(null);
-  const [metadataSignature, setMetadataSignature] = useState<string | null>(null);
   const marketAddress = useMemo(() => {
     try {
       return new PublicKey(address);
@@ -220,13 +212,6 @@ export function MarketDetail({ address }: { address: string }) {
       setMarketFees(fees);
       setTestFaucet(faucet);
       setMarketMetadata(metadata);
-      if (metadata) {
-        setMetadataBaseSymbol(metadata.baseSymbol);
-        setMetadataQuoteSymbol(metadata.quoteSymbol);
-        setMetadataDisplayName(metadata.displayName);
-        const kind = decodeMarketKind(metadata.kind);
-        if (kind !== "prediction") setMetadataKind(kind);
-      }
 
       if (!account) {
         setBidLevels([]);
@@ -825,62 +810,6 @@ export function MarketDetail({ address }: { address: string }) {
     }
   };
 
-  const saveMarketMetadata = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!signedProgram || !wallet || !marketAddress) return;
-
-    setMetadataPending(true);
-    setMetadataError(null);
-    setMetadataSignature(null);
-
-    try {
-      const baseSymbol = metadataBaseSymbol.trim();
-      const quoteSymbol = metadataQuoteSymbol.trim();
-      const displayName = metadataDisplayName.trim();
-
-      if (!/^[A-Za-z0-9._-]{1,16}$/.test(baseSymbol)) {
-        throw new Error("Base symbol must contain 1-16 letters, digits, '.', '-' or '_'");
-      }
-      if (!/^[A-Za-z0-9._-]{1,16}$/.test(quoteSymbol)) {
-        throw new Error("Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'");
-      }
-      if (!displayName || displayName.length > 64) {
-        throw new Error("Display name must contain 1-64 characters");
-      }
-
-      const commonAccounts = {
-        authority: wallet.publicKey,
-        adminRecord: deriveAdminRecordPda(wallet.publicKey),
-        market: marketAddress,
-        marketMetadata: deriveMarketMetadataPda(marketAddress),
-      };
-      const signature = marketMetadata
-        ? await signedProgram.methods
-            .updateMarketMetadata(baseSymbol, quoteSymbol, displayName)
-            .accounts(commonAccounts)
-            .rpc()
-        : await signedProgram.methods
-            .initializeMarketMetadata(
-              baseSymbol,
-              quoteSymbol,
-              displayName,
-              metadataKind === "other" ? { other: {} } : { spot: {} },
-            )
-            .accounts({
-              ...commonAccounts,
-              systemProgram: SystemProgram.programId,
-            })
-            .rpc();
-
-      setMetadataSignature(signature);
-      await loadMarket();
-    } catch (cause) {
-      setMetadataError(getErrorMessage(cause));
-    } finally {
-      setMetadataPending(false);
-    }
-  };
-
   const manageMarket = async (action: "pause" | "unpause" | "close") => {
     if (!signedProgram || !wallet || !marketAddress || !market) return;
     if (
@@ -1079,7 +1008,17 @@ export function MarketDetail({ address }: { address: string }) {
                   atomically at the resting maker price.
                 </p>
               </div>
-              <span className={`role-badge market-${status}`}>{status}</span>
+              <div className="market-detail-heading-actions">
+                <span className={`role-badge market-${status}`}>{status}</span>
+                {canManageMetadata && (
+                  <Link
+                    className="market-open-link"
+                    href={`/markets/${marketAddress.toBase58()}/settings`}
+                  >
+                    Manage market
+                  </Link>
+                )}
+              </div>
             </div>
 
             <div className="market-detail-layout">
@@ -1404,112 +1343,6 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
               </section>
             </div>
-
-            {canManageMetadata && (
-              <section className="admin-card market-balance-card">
-                <div className="card-label">Market identity</div>
-                <h2>
-                  {marketMetadata ? "Update market labels" : "Add market metadata"}
-                </h2>
-                <p>
-                  Labels are presentation data. The market address and mint pair
-                  remain the canonical on-chain identity.
-                </p>
-                <form className="market-create-form" onSubmit={saveMarketMetadata}>
-                  <label>
-                    Base symbol
-                    <input
-                      value={metadataBaseSymbol}
-                      onChange={(event) =>
-                        setMetadataBaseSymbol(event.target.value)
-                      }
-                      placeholder="tSOL"
-                      maxLength={16}
-                      autoComplete="off"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Quote symbol
-                    <input
-                      value={metadataQuoteSymbol}
-                      onChange={(event) =>
-                        setMetadataQuoteSymbol(event.target.value)
-                      }
-                      placeholder="tUSDC"
-                      maxLength={16}
-                      autoComplete="off"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Display name
-                    <input
-                      value={metadataDisplayName}
-                      onChange={(event) =>
-                        setMetadataDisplayName(event.target.value)
-                      }
-                      placeholder="Tidebook SOL / USDC"
-                      maxLength={64}
-                      autoComplete="off"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Market type
-                    <select
-                      value={metadataKind}
-                      disabled={marketMetadata !== null}
-                      onChange={(event) =>
-                        setMetadataKind(event.target.value as "spot" | "other")
-                      }
-                    >
-                      <option value="spot">Spot</option>
-                      <option value="other">Other (experimental)</option>
-                      <option value="prediction" disabled>
-                        Prediction (coming later)
-                      </option>
-                    </select>
-                    {marketMetadata && (
-                      <small>Market type is immutable after initialization.</small>
-                    )}
-                  </label>
-                  <button
-                    className="primary-button"
-                    type="submit"
-                    disabled={
-                      metadataPending ||
-                      !metadataBaseSymbol.trim() ||
-                      !metadataQuoteSymbol.trim() ||
-                      !metadataDisplayName.trim()
-                    }
-                  >
-                    {metadataPending
-                      ? "Saving metadata…"
-                      : marketMetadata
-                        ? "Update labels"
-                        : "Initialize metadata"}
-                  </button>
-                </form>
-                {metadataError && (
-                  <div className="transaction-message transaction-error">
-                    {metadataError}
-                  </div>
-                )}
-                {metadataSignature && (
-                  <div className="transaction-message transaction-success">
-                    Market metadata saved.{" "}
-                    <a
-                      href={transactionExplorerUrl(metadataSignature)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View transaction ↗
-                    </a>
-                  </div>
-                )}
-              </section>
-            )}
 
             <section className="admin-card order-book-card">
               <div className="order-book-heading">
