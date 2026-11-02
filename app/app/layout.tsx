@@ -4,8 +4,9 @@ import "./globals.css";
 import { SolanaProvider } from "@/components/solana-provider";
 
 export const metadata: Metadata = {
-  title: "Tidebook",
-  description: "A research-driven on-chain order book for Solana.",
+  title: "Tidebook | On-chain limit order book",
+  description:
+    "A working central limit order book on Solana with FIFO matching and atomic settlement.",
 };
 
 export default function RootLayout({
