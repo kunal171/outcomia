@@ -6,6 +6,18 @@ use anchor_lang::prelude::*;
 #[constant]
 pub const MARKET_SEED: &[u8] = b"market";
 
+/// Namespace for the human-readable metadata attached to one market.
+///
+/// PDA: ["market_metadata", market]
+#[constant]
+pub const MARKET_METADATA_SEED: &[u8] = b"market_metadata";
+
+/// Maximum UTF-8 byte length accepted for base and quote symbols.
+pub const MARKET_SYMBOL_MAX_LENGTH: usize = 16;
+
+/// Maximum UTF-8 byte length accepted for a market display name.
+pub const MARKET_DISPLAY_NAME_MAX_LENGTH: usize = 64;
+
 /// Namespace for market-local orders keyed by their monotonic order ID.
 #[constant]
 pub const ORDER_SEED: &[u8] = b"order";

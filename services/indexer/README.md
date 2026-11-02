@@ -1,6 +1,6 @@
 # Tidebook Indexer
 
-Rust service that reads finalized Tidebook transactions, decodes all 18 Anchor
+Rust service that reads finalized Tidebook transactions, decodes all 21 Anchor
 event types, and stores replayable source records in PostgreSQL. It is a
 separate Cargo workspace so its RPC and database dependencies can evolve
 independently from the on-chain program.

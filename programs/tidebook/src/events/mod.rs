@@ -10,6 +10,7 @@ mod faucet;
 mod fee;
 mod fill;
 mod market;
+mod metadata;
 mod order;
 
 pub use admin::*;
@@ -18,4 +19,5 @@ pub use faucet::*;
 pub use fee::*;
 pub use fill::*;
 pub use market::*;
+pub use metadata::*;
 pub use order::*;

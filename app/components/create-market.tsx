@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BN } from "@anchor-lang/core";
+import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import {
   deriveAdminRecordPda,
   deriveMarketFeesPda,
+  deriveMarketMetadataPda,
   deriveMarketPda,
   deriveVaultAuthorityPda,
   deriveVaultPda,
@@ -50,6 +51,10 @@ export function CreateMarket() {
   const [result, setResult] = useState<{ signature: string; market: PublicKey } | null>(null);
   const [priceTickSize, setPriceTickSize] = useState("");
   const [quantityLotSize, setQuantityLotSize] = useState("");
+  const [baseSymbol, setBaseSymbol] = useState("");
+  const [quoteSymbol, setQuoteSymbol] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [marketKind, setMarketKind] = useState<"spot" | "other">("spot");
 
   const program = useMemo(
     () => (wallet ? getTidebookProgram(connection, wallet) : null),
@@ -73,6 +78,19 @@ export function CreateMarket() {
       }
       const tickSize = parsePositiveU64(priceTickSize, "Price tick size");
       const lotSize = parsePositiveU64(quantityLotSize, "Quantity lot size");
+      const normalizedBaseSymbol = baseSymbol.trim();
+      const normalizedQuoteSymbol = quoteSymbol.trim();
+      const normalizedDisplayName = displayName.trim();
+
+      if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedBaseSymbol)) {
+        throw new Error("Base symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+      }
+      if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedQuoteSymbol)) {
+        throw new Error("Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+      }
+      if (!normalizedDisplayName || normalizedDisplayName.length > 64) {
+        throw new Error("Display name must contain 1-64 characters");
+      }
 
       // Derive the same canonical account graph enforced by Anchor. The market,
       // fee accumulator, and both vaults are created atomically.
@@ -81,7 +99,8 @@ export function CreateMarket() {
       const vaultAuthority = deriveVaultAuthorityPda(market);
       const baseVault = deriveVaultPda(market, base);
       const quoteVault = deriveVaultPda(market, quote);
-      const signature = await program.methods
+      const marketMetadata = deriveMarketMetadataPda(market);
+      const marketInstruction = await program.methods
         .initializeMarket(tickSize, lotSize)
         .accounts({
           authority: wallet.publicKey,
@@ -96,7 +115,26 @@ export function CreateMarket() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
-        .rpc();
+        .instruction();
+      const metadataInstruction = await program.methods
+        .initializeMarketMetadata(
+          normalizedBaseSymbol,
+          normalizedQuoteSymbol,
+          normalizedDisplayName,
+          marketKind === "other" ? { other: {} } : { spot: {} },
+        )
+        .accounts({
+          authority: wallet.publicKey,
+          adminRecord: deriveAdminRecordPda(wallet.publicKey),
+          market,
+          marketMetadata,
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      const provider = program.provider as AnchorProvider;
+      const signature = await provider.sendAndConfirm(
+        new Transaction().add(marketInstruction, metadataInstruction),
+      );
 
       setResult({ signature, market });
     } catch (cause) {
@@ -147,6 +185,54 @@ export function CreateMarket() {
               />
             </label>
             <label>
+              Base symbol
+              <input
+                value={baseSymbol}
+                onChange={(event) => setBaseSymbol(event.target.value)}
+                placeholder="tSOL"
+                maxLength={16}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <label>
+              Quote symbol
+              <input
+                value={quoteSymbol}
+                onChange={(event) => setQuoteSymbol(event.target.value)}
+                placeholder="tUSDC"
+                maxLength={16}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <label>
+              Display name
+              <input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Tidebook SOL / USDC"
+                maxLength={64}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <label>
+              Market type
+              <select
+                value={marketKind}
+                onChange={(event) =>
+                  setMarketKind(event.target.value as "spot" | "other")
+                }
+              >
+                <option value="spot">Spot</option>
+                <option value="other">Other (experimental)</option>
+                <option value="prediction" disabled>
+                  Prediction (coming later)
+                </option>
+              </select>
+            </label>
+            <label>
               Price tick size
               <input
                 inputMode="numeric"
@@ -177,6 +263,9 @@ export function CreateMarket() {
                 !quoteMint.trim() ||
                 !priceTickSize.trim() ||
                 !quantityLotSize.trim() ||
+                !baseSymbol.trim() ||
+                !quoteSymbol.trim() ||
+                !displayName.trim() ||
                 pending
               }
             >

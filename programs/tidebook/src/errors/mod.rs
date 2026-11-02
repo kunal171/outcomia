@@ -10,6 +10,7 @@ pub mod faucet;
 pub mod fee;
 pub mod market;
 pub mod matching;
+pub mod metadata;
 pub mod order;
 
 mod catalog;

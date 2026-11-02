@@ -16,6 +16,7 @@ import { PROGRAM_ID } from "./solana";
 export const PROTOCOL_CONFIG_SEED = "protocol_config";
 export const ADMIN_SEED = "admin";
 export const MARKET_SEED = "market";
+export const MARKET_METADATA_SEED = "market_metadata";
 export const MARKET_FEES_SEED = "market_fees";
 export const ORDER_SEED = "order";
 export const PRICE_LEVEL_SEED = "price_level";
@@ -46,6 +47,7 @@ export type ProtocolRole =
 
 export type AdminStatus = "active" | "disabled";
 export type MarketStatus = "active" | "paused";
+export type MarketKind = "spot" | "prediction" | "other";
 
 export type OrderSide = "bid" | "ask";
 export type OrderStatus = "open" | "filled" | "canceled";
@@ -107,6 +109,15 @@ export interface MarketAccount {
 
 export interface MarketView extends MarketAccount {
   address: PublicKey;
+}
+
+export interface MarketMetadataAccount {
+  market: PublicKey;
+  baseSymbol: string;
+  quoteSymbol: string;
+  displayName: string;
+  kind: { spot?: object; prediction?: object; other?: object };
+  bump: number;
 }
 
 export interface PriceLevelAccount {
@@ -184,6 +195,7 @@ interface TidebookAccounts {
   protocolConfig: AccountClient<ProtocolConfigAccount>;
   adminRecord: AccountClient<AdminRecordAccount>;
   market: AccountClient<MarketAccount>;
+  marketMetadata: AccountClient<MarketMetadataAccount>;
   marketFees: AccountClient<MarketFeesAccount>;
   testFaucet: AccountClient<TestFaucetAccount>;
   priceLevel: AccountClient<PriceLevelAccount>;
@@ -245,6 +257,13 @@ export function deriveAdminRecordPda(authority: PublicKey) {
 export function deriveMarketPda(baseMint: PublicKey, quoteMint: PublicKey) {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(MARKET_SEED), baseMint.toBuffer(), quoteMint.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveMarketMetadataPda(market: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(MARKET_METADATA_SEED), market.toBuffer()],
     PROGRAM_ID,
   )[0];
 }
@@ -585,6 +604,14 @@ export function decodeMarketStatus(
   status: MarketAccount["status"],
 ): MarketStatus {
   return "paused" in status ? "paused" : "active";
+}
+
+export function decodeMarketKind(
+  kind: MarketMetadataAccount["kind"],
+): MarketKind {
+  if ("prediction" in kind) return "prediction";
+  if ("other" in kind) return "other";
+  return "spot";
 }
 
 export function decodeOrderSide(side: OrderAccount["side"]): OrderSide {

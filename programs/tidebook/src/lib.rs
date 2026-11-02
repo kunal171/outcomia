@@ -41,6 +41,43 @@ pub mod tidebook {
         )
     }
 
+    /// Attaches immutable classification and mutable labels to a market.
+    pub fn initialize_market_metadata(
+        ctx: Context<InitializeMarketMetadata>,
+        base_symbol: String,
+        quote_symbol: String,
+        display_name: String,
+        kind: MarketKind,
+    ) -> Result<()> {
+        crate::instructions::market_metadata::handle_initialize_market_metadata(
+            ctx,
+            base_symbol,
+            quote_symbol,
+            display_name,
+            kind,
+        )
+    }
+
+    /// Updates market labels while preserving its original classification.
+    pub fn update_market_metadata(
+        ctx: Context<UpdateMarketMetadata>,
+        base_symbol: String,
+        quote_symbol: String,
+        display_name: String,
+    ) -> Result<()> {
+        crate::instructions::market_metadata::handle_update_market_metadata(
+            ctx,
+            base_symbol,
+            quote_symbol,
+            display_name,
+        )
+    }
+
+    /// Reclaims metadata rent before the authority closes a paused market.
+    pub fn close_market_metadata(ctx: Context<CloseMarketMetadata>) -> Result<()> {
+        crate::instructions::market_metadata::handle_close_market_metadata(ctx)
+    }
+
     /// Stops new order placement while preserving cancellation access.
     pub fn pause_market(ctx: Context<PauseMarket>) -> Result<()> {
         crate::instructions::pause::handle_pause_market(ctx)

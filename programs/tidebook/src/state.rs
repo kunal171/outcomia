@@ -30,6 +30,44 @@ pub struct Market {
     pub bump: u8,
 }
 
+/// Selects the settlement model associated with a market.
+///
+/// Variant order is serialized state. Append future variants instead of
+/// inserting them between existing variants.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
+pub enum MarketKind {
+    /// Existing base/quote SPL-token markets.
+    Spot,
+    /// Reserved for collateral-backed binary markets with internal positions.
+    Prediction,
+    /// Explicitly experimental market models.
+    Other,
+}
+
+/// Human-readable labels and classification kept outside critical book state.
+///
+/// Separating this account from `Market` lets existing markets opt in without
+/// reallocating or migrating their matching-engine account.
+#[account]
+#[derive(InitSpace)]
+pub struct MarketMetadata {
+    /// Market described by this canonical metadata PDA.
+    pub market: Pubkey,
+    /// Short base-asset label such as "SOL" or "tSOL".
+    #[max_len(16)]
+    pub base_symbol: String,
+    /// Short quote-asset label such as "USDC" or "tUSDC".
+    #[max_len(16)]
+    pub quote_symbol: String,
+    /// Client-facing name, independent of the market's immutable address.
+    #[max_len(64)]
+    pub display_name: String,
+    /// Immutable classification selected when metadata is initialized.
+    pub kind: MarketKind,
+    /// Canonical metadata PDA bump.
+    pub bump: u8,
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub enum MarketStatus {
     Active,
@@ -264,6 +302,13 @@ mod tests {
         // Market + quote mint + accrued u64 fees + PDA bump. Excludes the
         // 8-byte Anchor account discriminator.
         assert_eq!(MarketFees::INIT_SPACE, 73);
+    }
+
+    #[test]
+    fn market_metadata_account_size_is_stable() {
+        // Market key, three length-prefixed bounded strings, enum tag, and
+        // bump. Excludes Anchor's 8-byte account discriminator.
+        assert_eq!(MarketMetadata::INIT_SPACE, 142);
     }
 
     #[test]

@@ -78,6 +78,35 @@ pub fn report_event(decoded: &DecodedEventLog) {
                     event.market, event.authority, event.base_mint, event.quote_mint,
                 );
             }
+            MarketEvent::MetadataInitialized(event) => {
+                println!(
+                    "    MarketMetadataInitialized metadata={} market={} authority={} pair={}/{} display_name={:?} kind={:?}",
+                    event.metadata,
+                    event.market,
+                    event.authority,
+                    event.base_symbol,
+                    event.quote_symbol,
+                    event.display_name,
+                    event.kind,
+                );
+            }
+            MarketEvent::MetadataUpdated(event) => {
+                println!(
+                    "    MarketMetadataUpdated metadata={} market={} authority={} pair={}/{} display_name={:?}",
+                    event.metadata,
+                    event.market,
+                    event.authority,
+                    event.base_symbol,
+                    event.quote_symbol,
+                    event.display_name,
+                );
+            }
+            MarketEvent::MetadataClosed(event) => {
+                println!(
+                    "    MarketMetadataClosed metadata={} market={} authority={} kind={:?}",
+                    event.metadata, event.market, event.authority, event.kind,
+                );
+            }
         },
         TidebookEvent::Order(event) => match event {
             OrderEvent::Placed(event) => {

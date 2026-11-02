@@ -209,6 +209,23 @@ program ID. Reversing the pair produces a different address.
 | `best_ask`          | Price of the first ask level, or `None`; sorted advancement is not implemented |
 | `bump`              | Canonical market PDA bump                                                      |
 
+### Market-metadata PDA
+
+```text
+seeds = ["market_metadata", market]
+```
+
+Market labels live outside the matching account so existing markets can add a
+name without reallocating `Market`. The account stores the market address,
+base and quote symbols, a display name, an immutable `MarketKind`, and its bump.
+
+`Spot` is the normal base/quote model. `Other` is available for explicit
+experiments. `Prediction` is serialized but initialization rejects it until
+collateral, position, resolution, and payout rules exist on-chain. Active
+administrators may initialize metadata and update its three labels; no update
+instruction accepts `kind`. The market authority closes metadata before closing
+a paused market so the separate PDA does not retain orphaned rent.
+
 ### Market vault topology
 
 Each market is created with one PDA authority and two canonical SPL Token
@@ -339,6 +356,9 @@ FIFO-head and best-level removal, while a partial maker remains at the head.
 | `remove_admin`              | Super-admin               | Signer matches config; target is disabled                                                                                                                                                                                      | Closes the admin record                                                                                                                                                                   |
 | `set_taker_fee`             | Super-admin               | Signer matches config; rate is at most 1,000 bps                                                                                                                                                                               | Updates the global fee rate used by subsequent fills                                                                                                                                      |
 | `initialize_market`         | Active admin              | Admin record belongs to signer, is canonical and active; both accounts deserialize as SPL mints; base and quote differ; tick and lot sizes are nonzero; market, fee accumulator, vault authority, and vault PDAs are canonical | Atomically creates an active market, zeroed fee accumulator, and empty base/quote SPL Token vaults                                                                                        |
+| `initialize_market_metadata` | Active admin             | Admin record is canonical and active; metadata PDA belongs to the supplied market; labels use bounded printable ASCII; kind is not `Prediction`                                                                              | Creates the market's canonical metadata account with immutable classification                                                                                                            |
+| `update_market_metadata`    | Active admin              | Admin record is canonical and active; metadata belongs to the supplied market; labels remain valid                                                                                                                             | Updates base symbol, quote symbol, and display name without changing kind                                                                                                                 |
+| `close_market_metadata`     | Market authority          | Market authority matches; market is paused; metadata PDA belongs to the market                                                                                                                                                | Closes metadata and returns its rent before market shutdown                                                                                                                               |
 | `pause_market`              | Market authority          | `has_one = authority`; market is active                                                                                                                                                                                        | `Active -> Paused`                                                                                                                                                                        |
 | `unpause_market`            | Market authority          | `has_one = authority`; market is paused                                                                                                                                                                                        | `Paused -> Active`                                                                                                                                                                        |
 | `close_market`              | Market authority          | Market is paused; `open_order_count` and accrued fees are zero; both canonical vaults are empty; canonical faucet PDA has no data                                                                                              | Closes both vaults, the fee accumulator, and market atomically, returning their rent to the authority                                                                                     |
@@ -365,6 +385,7 @@ validated mutations and CPIs complete:
 | Add, enable, disable, or remove an administrator | `AdminAddedEvent`, `AdminStatusChangedEvent`, or `AdminRemovedEvent`         |
 | Change the global taker fee                      | `TakerFeeUpdatedEvent`                                                       |
 | Initialize, pause, unpause, or close a market    | `MarketInitializedEvent`, `MarketStatusChangedEvent`, or `MarketClosedEvent` |
+| Initialize, update, or close market metadata     | `MarketMetadataInitializedEvent`, `MarketMetadataUpdatedEvent`, or `MarketMetadataClosedEvent` |
 | Initialize a trader ledger, deposit, or withdraw | `TraderBalanceInitializedEvent`, `DepositEvent`, or `WithdrawalEvent`        |
 | Insert or append an order                        | `OrderPlacedEvent`                                                           |
 | Cancel an order                                  | `OrderCanceledEvent`                                                         |
@@ -410,6 +431,11 @@ Create Market PDA as Active
    |-- create empty base SPL Token vault
    |-- create empty quote SPL Token vault
    `-- set both token-account authorities to the vault-authority PDA
+
+The web client normally appends `initialize_market_metadata` to the same
+transaction. Both the market and its human-readable identity therefore succeed
+or fail together. Existing markets can initialize metadata later from their
+detail page.
 ```
 
 ### Test-faucet flow
