@@ -28,6 +28,8 @@ npm run build
 - Create markets as an active protocol administrator.
 - Create named spot or experimental markets atomically, attach labels to older
   markets, and update symbols or display names without changing market type.
+- Open a dedicated administrator settings page from each market detail route to
+  initialize or update its human-readable metadata.
 - Submit bids and asks that either cross up to three best-price FIFO makers in
   one atomic transaction or rest as collateralized limit orders, including
   empty, best, middle, worst, and same-price FIFO insertion paths.
