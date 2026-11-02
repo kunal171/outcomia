@@ -1,8 +1,7 @@
 # Devnet Address Registry
 
-This file records the shared Solana devnet addresses used while developing and
-testing Tidebook. These accounts have no mainnet value and must not be reused as
-production configuration.
+Public addresses and transaction signatures from the shared devnet setup. None
+of these accounts should be used as production configuration.
 
 ## Program and governance
 
@@ -14,13 +13,13 @@ production configuration.
 | Protocol config PDA    | `433qRcpUj1dizPRRp5Cghr6h3sfje8S6HXq4kkAxScmG` | Initialized; seeds: `["protocol_config"]`                                    |
 | Super-admin record PDA | `9S5PMZmbnm3YvAsi3quKGChE16qJaMS1uAbUnkJ5a5xg` | Initialized; seeds: `["admin", upgrade_authority]`                           |
 
-The governance accounts above were verified on devnet. Record the fresh
-initialization transaction here when it is recovered from deployment history.
+The governance accounts above were checked on devnet. The initialization
+transaction has not yet been added to this file.
 
 ## Server-backed public test faucet
 
-The shared valueless `tBTC/tUSDT` pair uses a dedicated server-held devnet
-authority. The private key is intentionally absent from this registry and Git.
+The `tBTC/tUSDT` test pair uses a server-held devnet authority. Its private key
+does not belong in this file or in Git.
 
 | Item                     | Address/value                                  | Transaction                                                                                |
 | ------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -33,8 +32,8 @@ authority. The private key is intentionally absent from this registry and Git.
 | End-to-end smoke claim   | `10 tBTC` and `1,000 tUSDT`                    | `45wd1t6mziwiZdqnJgi9V5JsSo11FiioAeXfvNqzf9Rt7ztcoVTyo1wcCLFTNj6tw6tH1pNdW1fpaVKST6XHyx3P` |
 
 The web route permits one claim per wallet and five per hashed IP address per
-hour. Vercel must use durable Upstash counters. These controls reduce casual
-abuse but do not provide Sybil resistance.
+hour. Vercel uses Upstash for shared counters. These limits are not Sybil
+resistance.
 
 ## Test token mints
 
@@ -119,8 +118,8 @@ above belong to the previous full-feature devnet deployment.
 
 Program `Honq7kkNfptR6XF5H4zn2jWqSmNRsteCpGwB8iG393cR` and market
 `DMkKmZ44C8rvA4z2PeGDYmj73HHeCfXbBCVDPqCA9ecb` use the earlier market account
-layout. They are retained only as devnet research history and are unsupported by
-the current application IDL.
+layout. They are kept as devnet history and are not supported by the current
+IDL.
 
 ## Maintenance rules
 

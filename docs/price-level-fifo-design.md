@@ -1,240 +1,134 @@
-# Price-Level Index and FIFO Queue Design
+# Price Levels and FIFO Queues
 
-## Status and scope
+Tidebook orders follow price-time priority:
 
-Status: **Sorted price levels, FIFO queues, and indexed removal implemented.**
+1. Higher bids come before lower bids.
+2. Lower asks come before higher asks.
+3. Orders at the same price are filled in arrival order.
 
-This milestone organizes resting orders by price and arrival time. It does not
-match orders, partially fill them, or settle trades. Placement and cancellation
-must keep the index correct before matching logic is allowed to depend on it.
+The implementation uses one PDA for each active price and a doubly linked FIFO
+queue of orders at that price.
 
-The following matching milestone will use the bounded crankless model described
-in [`crankless-settlement-design.md`](crankless-settlement-design.md). That later
-instruction will require clients to supply the relevant levels, FIFO orders,
-and maker balance PDAs. Consequently, every link established here is a security
-boundary and must be validated rather than treated as trusted client input.
-
-## Required ordering
-
-Tidebook uses price-time priority:
-
-1. bids with higher prices have priority over lower bids;
-2. asks with lower prices have priority over higher asks;
-3. orders at the same price are processed first in, first out (FIFO).
-
-For example, if bid orders A and B arrive at price 100, followed by C at 99,
-the priority order is A, B, C. A later order at 101 moves ahead of all three
-because price priority is evaluated before arrival time.
-
-## Chosen account model
-
-Each active `(market, side, price)` combination has a deterministic
-`PriceLevel` PDA:
+## Accounts
 
 ```text
 PriceLevel = ["price_level", market, side_seed, price.to_le_bytes()]
 ```
 
-`side_seed` must use explicit stable bytes (`"bid"` or `"ask"`), rather than a
-Rust enum's in-memory discriminant. This keeps PDA derivation stable across the
-Rust program, tests, and TypeScript client.
+`side_seed` is the stable byte string `bid` or `ask`. It does not depend on a
+Rust enum's memory layout.
 
-Implemented `PriceLevel` fields:
-
-| Field | Meaning |
+| `PriceLevel` field | Use |
 | --- | --- |
-| `market` | Market that owns the level |
-| `side` | Bid or ask |
-| `price` | Tick-aligned raw price shared by every queued order |
-| `better_price` | Adjacent price with higher matching priority |
-| `worse_price` | Adjacent price with lower matching priority |
-| `first_order` | Oldest open order at this price |
-| `last_order` | Newest open order at this price |
-| `total_remaining_quantity` | Sum of remaining base quantity at this level |
-| `order_count` | Number of open queued orders |
-| `rent_payer` | Recipient of rent when the empty level closes |
-| `bump` | Canonical PDA bump |
+| `market`, `side`, `price` | Identity of the level |
+| `better_price` | Adjacent price with higher priority |
+| `worse_price` | Adjacent price with lower priority |
+| `first_order` | Oldest order at this price |
+| `last_order` | Newest order at this price |
+| `total_remaining_quantity` | Open base quantity at this price |
+| `order_count` | Number of open orders |
+| `rent_payer` | Receives rent when the level closes |
+| `bump` | PDA bump |
 
-`better_price` and `worse_price` are preferred over `previous` and `next`
-because bid and ask prices sort in opposite numeric directions.
+Each `Order` stores its level plus `previous_order` and `next_order`. The market
+stores `best_bid` and `best_ask`, which are the entry points to the two price
+lists. A best level has no `better_price`.
 
-The existing `Order` account includes:
+## Insert a new price
 
-| Field | Meaning |
+`insert_limit_order` handles four positions:
+
+- Empty side: no neighboring levels.
+- New best: the old best is supplied as `worse`.
+- Middle: both adjacent levels are supplied.
+- New worst: the terminal better level is supplied.
+
+The program checks canonical PDAs, reciprocal links, side, market, and price
+ordering before changing anything. Bids descend through `worse_price`; asks
+ascend.
+
+Level creation, first-order creation, collateral locking, neighbor updates, and
+market counters are one atomic instruction. A level is never created in a
+separate transaction because that could leave an empty level in the active
+index.
+
+## Append at an existing price
+
+`append_limit_order` receives the level and its current tail. The program
+requires:
+
+- the level matches the market, side, and price;
+- the supplied order is `level.last_order`;
+- the tail is open and has no successor;
+- the trader has enough free collateral.
+
+It links the new order behind the tail and updates the level quantity, order
+count, market counters, and trader balance together.
+
+## Remove an order
+
+Cancellation receives the stored older and newer FIFO neighbors. Both must link
+back to the order being removed.
+
+If other orders remain, the program joins the two FIFO neighbors. If the final
+order is removed, it also receives the adjacent price levels, repairs the price
+list, updates the market best pointer, refunds the recorded rent payer, and
+closes the empty level.
+
+Matching uses the same removal rules, but it can remove only the FIFO head at
+the best opposing price. A partial fill stays at the head.
+
+## Invariants
+
+- A level PDA is derived from its market, side, and price.
+- Every queued order matches the level's market, side, and price.
+- Active levels are non-empty.
+- The head has no older order and the tail has no newer order.
+- Every supplied neighbor links back to the account being changed.
+- Price links are strict and contain no duplicate price.
+- `best_bid` is the highest bid and `best_ask` is the lowest ask.
+- Counts and aggregate quantity use checked arithmetic.
+- Queue changes, level changes, collateral movement, and market counters commit
+  or roll back together.
+
+## Why the client supplies neighbors
+
+A Solana program cannot scan arbitrary PDAs during execution. The client walks
+from the current best level and supplies the accounts needed for the mutation.
+Those accounts are hints, not trusted data. The program derives and validates
+them again because the book may have changed after the RPC reads.
+
+The web client checks for cycles, broken reciprocal links, wrong markets or
+sides, and invalid price ordering before submitting. An indexer can make this
+lookup faster later without changing the instruction contract.
+
+Optional neighbor accounts keep each mutation atomic but enlarge Anchor's
+generated account parser. Large optional accounts are boxed to stay below
+Solana's stack-frame limit.
+
+## Tradeoffs
+
+| Design | Result |
 | --- | --- |
-| `price_level` | Canonical level containing the order |
-| `previous_order` | Older order at the same price, if one exists |
-| `next_order` | Newer order at the same price, if one exists |
+| Linked `PriceLevel` PDAs | Easy to inspect and allocate independently, but cost rent and require neighbor accounts |
+| Doubly linked orders | O(1) removal with supplied neighbors, but more writable accounts |
+| Close empty levels | Avoids stale empty state, but may allocate the same level again later |
+| Writable `Market` counters | Simple IDs and accounting, but the market remains a contention point |
 
-The market's existing `best_bid` and `best_ask` fields become the entry points
-to the two sorted level lists. A best level always has `better_price = None`.
+A growing vector inside `Market` was rejected because it needs reallocations or
+a fixed limit and makes the shared market account larger. A slab or crit-bit
+tree may be cheaper at scale, but it adds fixed-capacity planning and custom
+memory management. Tidebook keeps the PDA layout until benchmarks show that the
+account overhead is the limiting factor.
 
-## Queue mutations
+## Test coverage
 
-### Place at an existing level
+The LiteSVM suite covers:
 
-The client supplies the canonical price level and its current tail order. The
-program validates the tail against `price_level.last_order`, links the old tail
-to the new order, sets the new order's `previous_order`, and updates the level's
-quantity and count. All collateral and queue mutations remain in one atomic
-instruction.
-
-This path is implemented by `append_limit_order`. Integration tests cover bid
-and ask append, a three-order FIFO chain, stale-tail and opposite-side level
-rejection, paused-market rejection, insufficient collateral, and atomic
-preservation of links, aggregates, counters, order accounts, and trader balances
-after failure.
-
-### Place at a new level
-
-`insert_limit_order` owns both first-level creation and sorted new-level
-insertion. For an empty side, the client supplies no neighbors. New-best insertion supplies
-only the canonical current best as the worse neighbor. Middle insertion supplies
-two canonical levels whose reciprocal links prove adjacency. New-worst insertion
-supplies only the terminal better level, whose worse link must be empty. Bid
-prices must strictly descend and ask prices must strictly ascend across every
-link. The instruction rewires the supplied neighbors atomically with a
-free-to-locked balance move, level creation, order creation, and market counters.
-
-Creating the level separately from the order is rejected because it permits an
-empty active level if the later order transaction never succeeds.
-
-### Cancel an order
-
-The client supplies the order's optional older and newer neighbors. The program
-validates reciprocal links before unlinking the order. Head, middle, tail, and
-only-order removal are distinct cases and require dedicated tests.
-
-If the final order leaves a level, the client also supplies its adjacent price
-levels and stored `rent_payer`. The program unlinks and closes the empty level,
-updates `best_bid` or `best_ask` when necessary, and refunds the level's rent.
-Collateral refund and index mutation succeed or roll back together.
-
-## Security invariants
-
-1. A level PDA is derived from its stored market, side, and price.
-2. Every queued order belongs to the same market, side, and price as its level.
-3. A non-empty level has both `first_order` and `last_order`; an empty level is
-   closed before the instruction completes.
-4. The first order has no older neighbor and the last order has no newer
-   neighbor.
-5. Every supplied adjacent order or level must link back to the account being
-   changed.
-6. Level prices are strictly ordered with no duplicate PDA for the same
-   `(market, side, price)` tuple.
-7. `order_count` changes by exactly one on placement or cancellation.
-8. `total_remaining_quantity` uses checked arithmetic and equals the aggregate
-   quantity represented by successful mutations.
-9. `best_bid` points to the highest non-empty bid level; `best_ask` points to the
-   lowest non-empty ask level.
-10. The level index, order queue, collateral movement, and market counters are
-    updated atomically.
-
-## Solana account-list boundary
-
-An on-chain program cannot discover arbitrary PDAs or scan all orders by
-itself. The client therefore supplies neighboring accounts. Those accounts are
-untrusted hints: the program must derive canonical addresses and validate
-prices and reciprocal links before mutation.
-
-Optional neighbor accounts keep placement and cancellation atomic without
-loosely typed `remaining_accounts`, but they make the account contract larger.
-Cancellation may deserialize two order neighbors and two level neighbors; these
-accounts are boxed so Anchor's generated parser stays below Solana's 4 KiB
-stack-frame limit. This spends a small amount of program heap to retain a single
-auditable instruction and explicit generated-client accounts.
-
-The current web client locates a missing price level by walking from the
-market's best price through canonical `worse_price` links. It rejects cycles,
-cross-market or cross-side links, PDA/price mismatches, broken reciprocal links,
-and non-strict ordering before constructing the instruction. This O(levels)
-RPC walk improves diagnostics but is not a security boundary: the program
-repeats all canonical-address and neighbor checks atomically because another
-transaction may mutate the book after the client reads it. A later indexer may
-provide the same better/worse accounts more efficiently without changing the
-instruction contract.
-
-## Tradeoffs and rejected alternatives
-
-| Approach | Benefits | Costs and reason for decision |
-| --- | --- | --- |
-| Growing `Vec` in `Market` | Simple lookup and serialization | Requires bounded capacity or reallocations, makes one large hot account, and increases write contention; rejected |
-| One PDA per price level with linked levels | Deterministic, independently sized, best price available in O(1) | Costs rent per active price and requires clients to supply validated neighbors; chosen |
-| Doubly linked orders | O(1) append and removal when neighbors are supplied | Mutates adjacent accounts and expands cancellation account lists; chosen because owner cancellation must not require scanning |
-| Singly linked orders | Smaller order state | Removing a middle or tail order requires traversal or a trusted predecessor; rejected |
-| Keep empty levels for reuse | Avoids repeated allocation | Empty-level accumulation enables rent/state griefing and makes finding the next non-empty best price unbounded; rejected |
-| Separate level-creation transaction | Simpler placement branches | Can leave an empty indexed level and introduces an avoidable race between transactions; rejected |
-| Fixed slab or crit-bit tree | Compact, fast structure used by mature order books | Considerably more complex memory management and fixed-capacity planning; deferred until measurements justify it |
-
-The chosen PDA layout is not presented as more efficient than a Phoenix-style
-in-account tree. It is selected because each state transition is inspectable and
-testable during this research phase. Its account-list, rent, and contention
-costs must be measured before treating it as a production architecture.
-
-## Concurrency and cost
-
-Orders at different existing price levels can mutate separate level accounts,
-but the current market account remains writable for `next_order_id` and
-`open_order_count`. The market is therefore still a global write-contention
-point. Removing that bottleneck would require a later order-ID and accounting
-redesign and is outside this milestone.
-
-New-level insertion and final-level removal also lock adjacent level accounts.
-This is a deliberate cost of maintaining a trustless sorted index without an
-unbounded central account.
-
-The trader pays rent when a new price level is created. The level records that
-wallet as `rent_payer`; its lamports return to the same address when the final
-order removes and closes the level. Order-account rent reclamation remains a
-separate future decision.
-
-## Required test matrix
-
-Current coverage:
-
-- first bid and first ask create canonical best levels;
-- an empty bid or ask side accepts no-neighbor insertion and rejects an unexpected neighbor;
-- omitting the current-best neighbor on a non-empty side is rejected without
-  changing pointers, counters, or accounts;
-- better, middle, and worse bid and ask levels preserve strict ordering and
-  reciprocal links;
-- malformed, stale, cross-market, cross-side, and noncanonical neighbor hints
-  roll back without changing links, counters, orders, or trader balances;
-- a second bid at the same price appends behind the FIFO tail and updates level
-  aggregates atomically;
-- bid and ask append paths preserve the same queue invariants;
-- three bids preserve reciprocal `A <-> B <-> C` FIFO links;
-- stale tails, opposite-side levels, paused markets, and insufficient collateral
-  are rejected without mutating state or trader balances.
-
-Indexed-cancellation coverage now includes:
-
-- head, middle, tail, and only-order cancellation with reciprocal FIFO repair;
-- checked level-count and aggregate-quantity updates;
-- final cancellation closing the empty level;
-- best, middle, and worst level removal with adjacent-link and best-pointer repair;
-- atomic rejection when a required order or level neighbor is omitted;
-- exact locked-to-free collateral release, repeated-cancellation prevention, and paused-market
-  cancellation;
-- market shutdown remaining impossible while indexed orders are open.
-
-Additional adversarial account substitutions and explicit rent-recipient
-rejection remain useful hardening tests before matching relies on the index.
-
-## Implementation sequence
-
-1. ~~Add stable price-level seed helpers and account layouts.~~
-2. ~~Add derivation and serialization tests.~~
-3. ~~Create the first bid/ask level and append a second same-price bid.~~
-4. ~~Complete same-price FIFO failure paths and ask-side coverage.~~
-5. ~~Add sorted better, middle, and worse level insertion.~~
-6. <del>Extend cancellation for order unlinking.</del>
-7. <del>Close and unlink empty levels, including best-price updates.</del>
-8. ~~Update the checked-in IDL and web client for sorted insertion.~~
-9. <del>Update the architecture diagram and invariant list after indexed
-   cancellation is complete.</del>
-
-Matching starts only after this matrix passes and the index can be treated as a
-trusted program-maintained structure. "Trusted" here means maintained by the
-program; a matching instruction must still revalidate the supplied traversal
-path because clients may submit stale or malicious accounts.
+- first, best, middle, and worst bid/ask insertion;
+- same-price FIFO append and three-order chains;
+- head, middle, tail, and only-order removal;
+- best-pointer repair and empty-level closure;
+- collateral and aggregate updates;
+- stale, missing, noncanonical, cross-market, and cross-side neighbors;
+- rollback after any failed validation.

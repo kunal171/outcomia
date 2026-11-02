@@ -1,20 +1,18 @@
 # Devnet Deployment
 
-## Current deployment
+## Current program
 
-| Property                      | Value                                          |
-| ----------------------------- | ---------------------------------------------- |
-| Cluster                       | Solana devnet                                  |
-| Program ID                    | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` |
-| ProgramData address           | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` |
-| Upgrade authority             | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` |
-| Last verified deployment slot | `505480906`                                    |
+| Property | Value |
+| --- | --- |
+| Cluster | Solana devnet |
+| Program ID | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` |
+| ProgramData | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` |
+| Upgrade authority | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` |
+| Last recorded deployment slot | `505480906` |
 
-[Open the program in Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+[View the program in Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
 
-## Deploying updates
-
-Build and verify before every upgrade:
+## Upgrade the program
 
 ```bash
 anchor build
@@ -22,58 +20,45 @@ anchor test --skip-deploy
 anchor program deploy --no-idl
 ```
 
-Bare `anchor test` deploys to the provider cluster before executing the test
-script. Use `--skip-deploy` for the LiteSVM-only local verification workflow.
+`target/deploy/tidebook-keypair.json` determines the program ID. It is ignored
+by Git and must be backed up securely. Replacing it creates a different program
+address.
 
-The deployment keypair at `target/deploy/tidebook-keypair.json` determines the
-program address. It is intentionally excluded from Git and must be preserved
-securely; replacing it would create a different program ID.
+The `--no-idl` flag avoids a failure in the separate Anchor metadata upload.
+The deployed program is valid; the app uses the local IDL from `anchor build`.
 
-## Public test-faucet bootstrap
+## Web faucet
 
-The web faucet uses a dedicated server-side devnet keypair as the mint authority
-for one configured pair. The route mints fixed amounts directly to the
-requester's associated token accounts and pays their creation rent when needed.
-Never use this design for valuable or mainnet assets.
+The devnet faucet is a Next.js server route. Its key controls the two valueless
+test mints and stays in server-side environment configuration.
 
-Required server-only variables are listed in `app/.env.example`. Store
-`FAUCET_AUTHORITY_SECRET_KEY` only in encrypted Vercel environment settings.
-Vercel also requires `UPSTASH_REDIS_REST_URL` and
-`UPSTASH_REDIS_REST_TOKEN`; without them the endpoint reports itself disabled
-and rejects claims. `FAUCET_ALLOW_IN_MEMORY_RATE_LIMIT=true` is permitted only
-for local testing.
+Setup:
 
-Bootstrap order:
+1. Create a faucet keypair and fund it with a small amount of devnet SOL.
+2. Configure the mint addresses, claim amounts, and claim window from
+   `app/.env.example`.
+3. Transfer both mint authorities to the faucet public key.
+4. Store `FAUCET_AUTHORITY_SECRET_KEY` in encrypted Vercel settings.
+5. Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+6. Deploy the app and make a claim from a test wallet.
+7. Repeat the claim and confirm that rate limiting returns HTTP `429`.
 
-1. Generate a dedicated keypair and fund it with a small amount of devnet SOL.
-2. Configure the fixed mint addresses, atomic claim amounts, and claim window.
-3. Transfer both devnet mint authorities to the dedicated public key.
-4. Configure durable Upstash credentials in Vercel.
-5. Deploy the web application and open a market using that exact ordered mint
-   pair.
-6. Connect a wallet and use **Claim test tokens**. The server creates missing
-   associated token accounts and atomically mints both configured assets.
-7. Confirm that a repeated request is rejected with HTTP `429`.
+The production Vercel route fails closed without Redis. The in-memory limiter
+is only for local development.
 
-The current shared pair, public authority, and authority-transfer transactions
-are recorded in `docs/devnet-addresses.md`. The secret authority bytes must
-never be copied into that registry.
+Public mint and transaction addresses belong in
+[`devnet-addresses.md`](devnet-addresses.md). Never put a seed phrase or private
+key in that file.
 
-The on-chain `TestFaucet` PDA remains available as a separate research path.
-It must not be initialized for mints already controlled by the server faucet.
+The on-chain `TestFaucet` PDA is a separate experiment. A mint can be controlled
+by the server faucet or the PDA faucet, not both.
 
-## IDL metadata limitation
+## IDL upload issue
 
-The first `anchor deploy` invocation successfully deployed the executable but
-failed during the separate IDL metadata step. Anchor invokes the latest
-`@solana-program/program-metadata` CLI through `npx`. Version `0.9.4` requires
-`@solana/kit` as a peer dependency, but it was absent from the temporary npx
-environment, producing `Cannot find module '@solana/kit'`.
+Anchor deploys the executable before running its metadata upload. The metadata
+step currently invokes `@solana-program/program-metadata` without its required
+`@solana/kit` peer dependency and fails with `Cannot find module
+'@solana/kit'`.
 
-The program deployment itself is valid and independently verified with
-`solana program show`. Until the upstream packaging path is fixed, upgrades use
-`--no-idl`, and the frontend uses the IDL generated locally by `anchor build`.
-
-No matching open issue was found in the program-metadata repository at the time
-of the initial deployment. This is a candidate for a focused upstream report or
-contribution after a minimal standalone reproduction is prepared.
+Until that packaging issue is fixed, deploy with `--no-idl` and use the IDL
+generated locally.

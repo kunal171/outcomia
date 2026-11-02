@@ -1,428 +1,221 @@
-# Crankless Matching and Settlement Design
+# Matching and Settlement
 
-## Status
+Tidebook settles the order book and trader balances in the same Solana
+transaction. There is no later crank that finishes a maker's balance update.
 
-Status: **In progress.** One instruction atomically settles one partial or full
-maker, and the web client plans and batches up to three such instructions in one
-transaction. The planner supports same-level FIFO continuation, multi-level
-traversal, complete rollback if a later step fails, and atomic insertion or
-append of a valid non-crossing remainder.
+One program instruction processes one maker. The web client can place up to
+three matching instructions in one transaction and can append a safe remainder
+placement after them.
 
-This document explains why Tidebook is targeting bounded crankless settlement,
-how that differs from Phoenix and older OpenBook designs, and which accounts a
-matching instruction must read and write. The first implementation slice proves
-maker-price settlement, price-time priority, and safe queue removal.
+## What settlement means here
 
-## The problem in plain language
-
-Suppose Alice has an ask to sell 2 BTC at 100 USDT and Bob submits a bid to buy
-1 BTC at 100 USDT. A complete trade must make all of these changes together:
-
-1. remove 1 BTC from Alice's locked amount;
-2. give Alice a claim to 100 USDT;
-3. remove 100 USDT from Bob's locked amount;
-4. give Bob a claim to 1 BTC;
-5. reduce Alice's resting order from 2 BTC to 1 BTC;
-6. record that Bob's incoming order is filled;
-7. update the price level's aggregate quantity.
-
-If only some changes commit, tokens or accounting can be lost. Tidebook must
-therefore make the book mutation and balance mutation in one Solana transaction.
-On failure, the entire transaction rolls back.
-
-The difficult part is not the arithmetic. A Solana instruction must declare all
-accounts that it may modify before execution. The program cannot find a maker
-order during matching and then turn an undeclared maker account into a writable
-account.
-
-## What "settlement" means
-
-Tidebook distinguishes two operations:
-
-- **ledger settlement** changes who owns the claim to tokens already held in
-  the market vaults;
-- **withdrawal** transfers a trader's free claim from a market vault to the
-  trader's SPL Token account.
-
-Crankless atomic settlement means ledger settlement completes in the same
-transaction as matching. It does not require every fill to transfer tokens to
-both traders' wallet token accounts immediately.
-
-This distinction keeps the matching account list bounded. A maker does not need
-to be online, and the taker does not need to know the maker's preferred wallet
-token accounts. The program credits the maker's canonical on-chain balance
-record instead.
-
-## Phoenix: centralized market state
-
-Phoenix places the bids, asks, and registered traders' internal balances inside
-one fixed-capacity market account. Its matching instruction can therefore:
+Tokens are already held in the market vaults. A match changes each trader's
+claim on those tokens:
 
 ```text
-load one writable market
-  -> find the best opposing orders
-  -> update each maker's internal balance
-  -> update the taker's balance or token transfer
-  -> commit every change together
+maker locked balance -> maker/taker free balances
+order quantity       -> reduced or filled
+price level          -> reduced or removed
 ```
 
-No later transaction is required to make a maker's exchange balance correct.
-Phoenix may emit events, but those events are for observation and indexing; they
-are not a queue of unfinished balance changes.
+Withdrawal is separate. It moves a free balance from a vault to the owner's SPL
+Token account.
 
-This state layout provides a small, predictable account list and synchronous
-composability. Its costs are a large rent-funded market account, fixed capacity,
-specialized in-account data structures, and a shared writable hotspot for all
-activity in one market.
+This keeps wallet token accounts out of matching, lets makers remain offline,
+and keeps the account list bounded.
 
-## Older OpenBook: distributed trader state and deferred work
+## Phoenix and OpenBook
 
-Older OpenBook/Serum-style markets keep each trader's state in a separate
-`OpenOrders` account. During matching, an incoming taker can cross orders owned
-by makers whose `OpenOrders` accounts were not supplied to the instruction.
+Phoenix keeps orders and registered trader balances inside one market account.
+A matching instruction can find makers and update all balances in that account.
+This gives a small account list but requires a large fixed-capacity account and
+makes the market a shared writable hotspot.
 
-The architecture handles this by recording fills in an event queue:
+Older Serum/OpenBook designs keep trader state in separate `OpenOrders`
+accounts. A match may not receive every maker account, so it writes fill events
+to a queue. A later `ConsumeEvents` crank updates maker balances.
+
+Tidebook keeps separate order, level, and trader PDAs but requires the client to
+supply the maker path up front:
+
+| Concern | Phoenix | Older OpenBook | Tidebook |
+| --- | --- | --- | --- |
+| Book storage | Inside market account | Shared book accounts | Price-level and order PDAs |
+| Trader state | Inside market account | `OpenOrders` accounts | `TraderBalance` PDAs |
+| Maker settlement | Immediate | Event queue and crank | Immediate |
+| Capacity limit | Preallocated market | Queue and account capacity | Transaction accounts and compute |
+
+Tidebook's storage is not as compact as Phoenix. It was chosen because the PDA
+transitions are easier to inspect while the design is still being studied.
+
+## Trader balances
 
 ```text
-taker order matches
-  -> fill event enters event queue
-  -> a cranker later supplies maker OpenOrders accounts
-  -> ConsumeEvents updates maker balances
-  -> maker later withdraws with SettleFunds
+TraderBalance = ["trader_balance", market, owner]
 ```
-
-This separates user state and allows capacity to be distributed across many
-accounts, but correct and timely maker accounting depends on event consumption.
-It also introduces queue capacity, crank incentives, monitoring, and recovery
-as protocol concerns.
-
-## Tidebook decision: bounded crankless PDA matching
-
-Tidebook will keep its educational PDA-based order book instead of immediately
-adopting Phoenix's fixed slab. It will add canonical per-trader balance PDAs and
-require the client to supply a bounded matching path.
-
-This is Phoenix-like in settlement semantics but not in storage layout:
-
-| Concern | Phoenix | Tidebook target |
-| --- | --- | --- |
-| Book storage | Trees inside one market account | Price-level and order PDAs |
-| Trader balances | Entries inside the market account | One PDA per market and trader |
-| Matching accounts | Primarily the market and vault context | Client-supplied levels, orders, and maker balances |
-| Settlement | Atomic internal ledger update | Atomic internal ledger update |
-| Crank | Not required | Not required for completed matches |
-| Capacity bound | Fixed market allocation | Per-instruction account and compute budget |
-
-"Bounded" means one instruction processes at most a configured number of
-resting orders. If a large taker order needs more work, the client submits
-another transaction with the next matching path. Every successfully processed
-chunk is final and settled; there is no event waiting for a cranker.
-
-## TraderBalance PDA
-
-Each `(market, trader)` pair has one deterministic account:
-
-```text
-TraderBalance = ["trader_balance", market, trader]
-```
-
-Fields:
 
 | Field | Meaning |
 | --- | --- |
-| `market` | Market whose vaults back this balance |
-| `owner` | Wallet allowed to deposit, place orders, cancel, and withdraw |
-| `base_free` | Base atoms available to withdraw or reuse |
-| `base_locked` | Base atoms reserved by open asks |
-| `quote_free` | Quote atoms available to withdraw or reuse |
-| `quote_locked` | Quote atoms reserved by open bids |
-| `bump` | Canonical PDA bump |
+| `base_free` | Base available to withdraw or place as an ask |
+| `base_locked` | Base reserved by open asks |
+| `quote_free` | Quote available to withdraw or place as a bid |
+| `quote_locked` | Quote reserved by open bids |
 
-The balance account is an accounting claim. The actual SPL tokens remain in
-the market's canonical base and quote vaults.
-
-For each mint, this conservation relationship must hold across all traders:
+Vault accounting must satisfy:
 
 ```text
-vault amount = sum(free balances) + sum(locked balances) + protocol fees
+base vault  = sum(base_free + base_locked)
+quote vault = sum(quote_free + quote_locked) + accrued_quote_fees
 ```
 
-For base, `protocol fees` is always zero. For quote, the term is the canonical
-`MarketFees.accrued_quote_fees` claim. Fee tokens are not moved during a match;
-they remain in the quote vault until a super-admin withdrawal. Integration
-tests enforce both forms after custody and book transitions, including partial
-and complete matching, bounded batches, automatic remainder posting, fee
-withdrawal, and failed-transaction rollback.
+The quote fee is an accounting claim in `MarketFees`. The tokens remain in the
+quote vault until the super-admin withdraws them.
 
-The global fee rate is stored in `ProtocolConfig.taker_fee_bps` and is capped at
-1,000 bps (10%). Each fill independently charges:
-
-```text
-fee = ceil(fill_quote_quantity * taker_fee_bps / 10,000)
-```
-
-A bid taker spends gross quote plus the fee. An ask taker receives gross quote
-minus the fee. Makers always settle at the full resting-price gross amount.
-Per-fill ceiling prevents fee avoidance by fragmenting a trade into tiny fills,
-but can charge proportionally more when a fill contains very few quote atoms.
-
-## Order lifecycle under this model
+## Order lifecycle
 
 ### Deposit
 
-The trader transfers SPL tokens into the canonical market vault. The same
-instruction increases the corresponding free balance:
+Deposit transfers tokens into a market vault and credits the matching free
+balance in the same instruction.
+
+### Place
+
+An ask locks base quantity:
 
 ```text
-wallet base account --10 base--> base vault
-TraderBalance.base_free: 0 -> 10
+base_free   -= quantity
+base_locked += quantity
 ```
 
-The token transfer and balance credit must be atomic.
-
-### Place a resting ask
-
-An ask reserves base:
+A bid locks quote notional:
 
 ```text
-base_free:   10 -> 8
-base_locked:  0 -> 2
+quote = price * quantity / 10^base_decimals
+quote_free   -= quote
+quote_locked += quote
 ```
 
-The order records 2 base atoms of remaining quantity. The price-level and FIFO
-links are updated in the same instruction.
-
-### Place a resting bid
-
-A bid reserves its maximum quote notional:
-
-```text
-required quote = limit price * quantity / base scale
-quote_free    -= required quote
-quote_locked  += required quote
-```
-
-Checked integer arithmetic and the market's existing fixed-point price rules
-remain mandatory.
+Placement does not call the Token Program.
 
 ### Match
 
-For a trade of quantity `Q` at resting price `P`:
+The fill price is the resting maker price. For quantity `Q` and maker price
+`P`:
 
 ```text
-quote paid = P * Q / base scale
+gross quote = P * Q / 10^base_decimals
+fee         = ceil(gross quote * taker_fee_bps / 10_000)
 ```
 
-If the resting order is an ask:
+When the maker is an ask:
 
 ```text
-maker.base_locked  -= Q
-maker.quote_free   += quote paid
-taker.quote_free   -= quote paid
-taker.base_free    += Q
+maker.base_locked -= Q
+maker.quote_free  += gross quote
+taker.quote_free  -= gross quote + fee
+taker.base_free   += Q
 ```
 
-If the resting order is a bid, the assets move in the opposite direction:
+When the maker is a bid:
 
 ```text
-maker.quote_locked -= quote paid
-maker.base_free    += Q
-taker.base_free    -= Q
-taker.quote_free   += quote paid
+maker.quote_locked -= gross quote
+maker.base_free     += Q
+taker.base_free     -= Q
+taker.quote_free    += gross quote - fee
 ```
 
-The order's remaining quantity, locked collateral, price-level aggregate, FIFO
-links, market counters, and both traders' balances change atomically.
+The fee is added to `MarketFees.accrued_quote_fees`. Makers always receive or
+spend the full maker-price amount.
 
-### Better execution for a taker
+A partial maker remains at the FIFO head. A full maker becomes `Filled`; its
+successor becomes the head, or the empty level is removed and the next price
+becomes best.
 
-A bid may specify a limit of 105 but match a resting ask at 100. The taker owes
-only 100 because the current bounded instruction debits free balance directly
-at the maker price. It does not create or lock an incoming taker order first.
-If the taker is larger than the bounded crossing path, only actual fills are
-debited at maker prices. Once the planner proves the next price does not cross
-or the opposing book is exhausted, it atomically posts a valid remainder at the
-taker limit price. A cap-blocked or zero-notional remainder stays free.
+### Cancel and withdraw
 
-### Cancel
+Cancellation moves the order's remaining collateral from locked back to free
+and repairs the queue. It remains available while the market is paused.
 
-Cancellation removes the order from its FIFO queue and moves its remaining
-collateral from locked back to free. It does not need an SPL Token transfer:
+Withdrawal can move only free balance and requires the owner to sign.
 
-```text
-ask: base_locked  -> base_free
-bid: quote_locked -> quote_free
-```
+## Building a matching transaction
 
-Cancellation remains allowed while the market is paused. Withdrawal is a
-separate owner-authorized operation.
+For a bid, the client starts at `best_ask`. For an ask, it starts at
+`best_bid`. It follows price and FIFO links and collects at most three makers.
 
-### Withdraw
+Each matching instruction receives:
 
-The owner chooses an SPL Token account with the correct mint. The vault
-authority PDA transfers at most the requested free amount and the program
-decreases the corresponding free balance in the same instruction. Locked funds
-can never be withdrawn.
+- the current best opposing level;
+- its FIFO head order;
+- the maker and taker balance PDAs;
+- the successor or worse level needed if the maker is removed;
+- the stored rent recipient when a level may close.
 
-## How a matching transaction is constructed
+The program checks every supplied account:
 
-The off-chain client reads the program-maintained index, beginning at
-`market.best_ask` for an incoming bid or `market.best_bid` for an incoming ask.
-It collects at most three makers for one client transaction:
+- canonical PDA derivation;
+- market, side, and price;
+- current best level and FIFO head;
+- reciprocal links;
+- maker balance owner;
+- crossing price;
+- distinct maker and taker.
 
-1. opposing price-level PDAs in price-priority order;
-2. resting order PDAs in FIFO order;
-3. canonical `TraderBalance` PDAs for the makers;
-4. the taker's canonical `TraderBalance` PDA;
-5. the exact successor, worse-level, and rent-recipient accounts required by
-   each planned transition.
+If any later instruction sees stale state, Solana rolls back the complete
+transaction, including earlier fills.
 
-These accounts are hints, not trusted truth. The on-chain program must verify:
+## Remainders
 
-- every PDA is derived canonically;
-- each level belongs to the market and expected side;
-- the first level is the market's current best opposing level;
-- level links follow strict price priority;
-- order links follow FIFO order;
-- each order belongs to its level and is `Open`;
-- each maker balance belongs to the order owner and market;
-- prices cross the taker's limit;
-- no order or level in the supplied path is skipped, duplicated, or
-  substituted. One canonical maker balance may legitimately serve several
-  orders owned by the same maker.
+After the planned fills, three cases are possible:
 
-If the client built its path from stale state, validation fails and all changes
-roll back. The client refreshes the market and retries. This is normal optimistic
-concurrency, not a reason to trust the client.
+1. The taker is fully filled: nothing is posted.
+2. The book is exhausted or the next price does not cross: a valid remainder is
+   inserted or appended in the same transaction.
+3. More crossing liquidity exists beyond the three-maker cap: the remainder
+   stays free for another attempt.
 
-## Matching algorithm boundary
+A bid remainder whose notional rounds to zero also stays free. Quantity is
+never silently dropped.
 
-For an incoming bid with limit price 105:
+## Why the match count is capped
 
-```text
-start at best ask
-while capacity remains:
-  stop if best ask price > 105
-  take the oldest order at that price
-  fill min(incoming remaining, resting remaining)
-  update balances and quantities
-  remove a completely filled order
-  remove an empty price level
-  stop when incoming order is filled or supplied accounts are exhausted
-```
+The fixed cap limits:
 
-An incoming ask is symmetric and stops when the best bid is below its limit.
+- transaction account metadata;
+- compute use;
+- stale-state exposure;
+- the number of queue and level mutations in one transaction.
 
-The program instruction deliberately supplies one maker. The client composes up
-to three instructions into one transaction and passes the decreasing taker
-remainder to each step. If the client cap is reached while the incoming request still has quantity and
-another crossing maker remains:
+The cost is more RPC traversal and retries for deep orders. Benchmarks should
+decide whether to raise the cap or replace the PDA layout.
 
-- all processed fills confirm together or all roll back together;
-- the remainder stays in the taker's free internal balance;
-- the web client retains the remainder in its form so the trader can match the
-  next bounded path after refreshing the book.
+## Rules
 
-The fixed cap is a conservative research choice. It bounds legacy transaction
-size, writable account metadata, compute, and stale-state exposure. The cost is
-extra RPC discovery and explicit retries for deeper books. If the planned path
-exhausts the opposing book or reaches a non-crossing price, the client appends
-the existing insert-or-append instruction for a valid remainder to the same
-transaction. A stale match or placement account rolls back the entire sequence.
-The current behavior never silently drops quantity or leaves collateral without
-a balance claim.
+- Book and balance changes commit together.
+- A fill consumes only recorded locked collateral.
+- Free and locked arithmetic is checked.
+- Only the best opposing FIFO head can match.
+- A maker does not sign; its open order is standing consent.
+- A partial maker keeps its FIFO position.
+- A filled order has zero quantity and zero locked collateral.
+- Pausing blocks placement and matching, but not cancellation or withdrawal.
+- Events describe completed transitions; they do not finish settlement.
+- Failed transactions are ignored by event consumers.
+- Base and quote vaults must continue to back all trader and fee claims.
 
-## Events and indexers
+## Costs of this design
 
-Tidebook emits typed events for governance, market lifecycle, trader-ledger,
-order-lifecycle, and fill transitions. These events support history and UI
-indexing but do not authorize or complete a balance transition. If an indexer
-is offline, the on-chain order book and trader balances remain correct and
-withdrawals remain possible.
+- Clients must discover and supply the matching path.
+- Stale transactions need a refresh and retry.
+- More PDAs mean more rent and account metadata.
+- Linked structures require strict reciprocal-link checks.
+- The market and vaults remain writable contention points.
 
-Consumers process events only from successful transactions. A failed
-transaction can retain diagnostic logs from an earlier instruction even though
-Solana rolls back the complete account transition.
-
-This is the defining difference from an event queue containing deferred
-settlement work.
-
-## Failure and safety rules
-
-1. Book state and balance state must never be committed separately.
-2. A fill can consume only collateral already recorded as locked.
-3. Free and locked balances use checked arithmetic.
-4. Only the balance owner can withdraw or intentionally place/cancel orders.
-5. A maker need not sign a match; its prior open order is standing consent.
-6. The program derives every maker balance from the resting order's owner.
-7. Vault amounts must continue to back all recorded claims.
-8. A filled order has zero remaining quantity and zero locked collateral.
-9. A partially filled order remains in its original FIFO position.
-10. A canceled order cannot later be matched.
-11. Pausing blocks new placement and matching but not cancellation or withdrawal.
-12. Events are never used as unfinished settlement state.
-13. Each match reads the canonical global fee rate and accrues its fee in the
-    canonical market accumulator.
-14. Quote-vault conservation includes both trader claims and unwithdrawn
-    protocol fees.
-15. Only the super-admin can withdraw accrued fees, and only to a token account
-    for the market quote mint. Withdrawal is allowed while active or paused.
-
-## Tradeoffs accepted by Tidebook
-
-### Benefits
-
-- no external cranker is required for maker balances to become correct;
-- every processed fill is final when its transaction confirms;
-- makers can remain offline;
-- PDA state is easier to inspect and teach than a custom zero-copy slab;
-- matching work has an explicit per-transaction bound.
-
-### Costs
-
-- the client must discover and provide the matching path;
-- more account metadata is needed than in Phoenix;
-- stale clients may need to refresh and retry;
-- transaction account and compute limits bound matches per instruction;
-- linked PDA mutation requires extensive reciprocal-link validation;
-- writable market and vault accounts remain contention points;
-- rent grows with traders, orders, and active price levels.
-
-This is a research-oriented correctness design. If benchmarks later show that
-PDA and account-list overhead dominate, a versioned future market can adopt a
-Phoenix-style fixed-capacity slab without pretending the two layouts are
-compatible in place.
-
-## Implementation sequence
-
-The safe order is:
-
-1. ~~Finish and test price-level/FIFO maintenance without matching.~~
-2. ~~specify and add `TraderBalance` accounts;~~
-3. ~~add atomic deposits and withdrawals;~~
-4. ~~move placement and cancellation collateral accounting through free/locked
-   balances;~~
-5. ~~Define and implement the one-maker matching account contract and explicit
-   free-balance remainder policy.~~
-6. ~~Add partial- and full-maker tests before multi-fill behavior.~~
-7. ~~Add bounded multi-maker and multi-level client planning with atomic
-   rollback tests.~~
-8. ~~Atomically post a non-crossing remainder when safe.~~
-9. ~~Emit informational events for every successful state transition.~~
-10. ~~Add broader asset-conservation tests.~~
-11. ~~Add fee accounting and extend conservation with protocol-fee claims.~~
-12. ~~Add super-admin fee-rate control and accrued-fee withdrawal.~~
-13. **Next:** benchmark account count, compute use, contention, and retry rate before
-   considering a slab-based redesign.
-
-Every future expansion must preserve the existing atomic balance and book
-invariants under success, stale-account failure, and arithmetic failure.
-
-## Primary implementation references
+## References
 
 - [Phoenix repository](https://github.com/Ellipsis-Labs/phoenix-v1)
 - [Phoenix FIFO market](https://github.com/Ellipsis-Labs/phoenix-v1/blob/master/src/state/markets/fifo.rs)
-- [Phoenix new-order processing](https://github.com/Ellipsis-Labs/phoenix-v1/blob/master/src/program/processor/new_order.rs)
-- [Phoenix trader balances](https://github.com/Ellipsis-Labs/phoenix-v1/blob/master/src/state/trader_state.rs)
+- [Phoenix order processing](https://github.com/Ellipsis-Labs/phoenix-v1/blob/master/src/program/processor/new_order.rs)
 - [OpenBook instruction model](https://github.com/openbook-dex/program/blob/master/dex/src/instruction.rs)
-- [OpenBook accounts and event consumption](https://github.com/openbook-dex/program/blob/master/dex/src/state.rs)
+- [OpenBook state and event consumption](https://github.com/openbook-dex/program/blob/master/dex/src/state.rs)

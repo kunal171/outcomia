@@ -1,188 +1,71 @@
-# Future Enhancements
+# Roadmap
 
-## Purpose
-
-This document records Tidebook's planned evolution beyond the current
-fee-aware central limit order book. It is a roadmap, not a description of
-implemented behavior. Each phase should be developed on a separate feature
-branch and merged only after its account model, failure paths, frontend, and
-documentation are complete.
-
-The target is a hybrid market with independently testable data, pricing,
-liquidity, and execution responsibilities:
+The CLOB, web client, and finalized-source indexer are working. The remaining
+work is split into independent phases so infrastructure, read models, pricing,
+and liquidity can be tested separately.
 
 ```text
-External price feeds ---> Reference-price service ---> Offchain market maker
-                                                              |
-                                                              v
-Next.js + monitoring <--- Indexer API <--- Tidebook CLOB <--- Smart router ---> Tidebook AMM
+price feeds --> market maker --> Tidebook CLOB
+                     |                |
+                     |                v
+                     +----------> indexer --> API --> web app
+
+optional later path: router --> CLOB + AMM
 ```
 
-An oracle reports an external reference price. It does not create liquidity or
-force Tidebook's executable price to follow another venue. The market maker
-creates CLOB liquidity around that reference, while arbitrage aligns executable
-prices. The optional AMM supplies backstop liquidity when the order book is
-thin.
+An oracle is a reference price, not the execution price. Tidebook orders still
+execute at maker prices. A market maker supplies liquidity around the reference.
+An AMM may later provide a separate fallback venue.
 
-## Design principles
+## 1. Cloud deployment
 
-1. The oracle is a reference and safety input, not the execution-price engine.
-2. Existing limit orders continue to execute at the resting maker price.
-3. CLOB custody, AMM reserves, and protocol fees remain separately auditable.
-4. Every route has an explicit maximum spend or minimum receive.
-5. A stale or uncertain oracle must fail safely and visibly.
-6. Offchain discovery and quoting are untrusted; onchain instructions validate
-   every account and state transition.
-7. Hybrid execution must remain atomic: a failed later leg rolls back earlier
-   CLOB fills and AMM swaps.
-8. Architecture changes are chosen from measurements, not assumptions.
-9. The indexer accelerates discovery and analytics but never authorizes a
-   transaction or replaces canonical onchain state.
+Current work:
 
-## Phase 0: clean devnet baseline
+- Docker image for the Rust indexer;
+- liveness and readiness endpoints;
+- local Kind deployment;
+- PostgreSQL StatefulSet and persistent volume;
+- pod and database recovery checks.
 
-Deploy the current fee-accounting program with fresh state before introducing
-oracle or AMM accounts. The research project currently favors a clean redeploy
-over migration of incompatible development accounts.
+Next:
 
-Deliverables:
+1. Provision OCI networking and OKE with Terraform.
+2. Use persistent OCI storage for PostgreSQL.
+3. Publish versioned multi-architecture images to GHCR.
+4. Add GitHub Actions for checks, image publishing, and deployment.
+5. Test pod replacement, node replacement, database persistence, and rollback.
 
-- initialize protocol governance and a fresh BTC/USDT research market;
-- execute deposit, placement, matching, cancellation, fee accrual, fee
-  withdrawal, and safe market closure;
-- record addresses and transactions in `devnet-addresses.md`;
-- capture compute units, transaction size, account count, and RPC latency for
-  the current CLOB baseline.
+Cloud work must use explicit limits and avoid creating paid resources without a
+reviewed plan.
 
-Done when the existing fee-aware CLOB completes its full lifecycle on devnet.
+## 2. Indexer projections and API
 
-## Phase 1: indexer foundation
+The indexer already stores finalized source transactions and all 18 event
+types. It also handles historical backfill, live wake-ups, reconnect recovery,
+and durable checkpoints.
 
-Foundation branch: `feature/indexer-foundation`.
-
-Tidebook already emits typed events for governance, markets, balances, orders,
-fills, and fees. The indexer should turn those finalized events into searchable
-history and read-optimized projections before the oracle, market maker, and AMM
-add more data volume.
-
-Suggested service boundary:
+The next data phase builds tables meant for reads:
 
 ```text
-Solana HTTP + WebSocket RPC
-            |
-            v
-Rust indexer
-  |-- finalized backfill
-  |-- live log subscription
-  |-- Anchor event decoder
-  |-- projection processor
-  `-- account reconciler
-            |
-            v
-PostgreSQL ---> Axum API ---> Next.js, monitoring, and market-maker clients
+markets
+orders
+fills
+trader_balances
+market_fees
+admin_records
 ```
 
-Use standard Solana RPC first. Backfill program transactions with
-`getSignaturesForAddress` and `getTransaction`; subscribe to live program logs
-with `logsSubscribe`. Every live reconnect must backfill from the last durable
-finalized checkpoint so a WebSocket gap cannot silently lose history.
-Yellowstone/Geyser streaming is a later scaling option, not an initial
-dependency.
+Projection rules:
 
-Store append-only source records before building projections:
+- Keep source records immutable.
+- Replay events in deterministic chain order.
+- Make every projection update idempotent.
+- Rebuild projections from source after a schema or logic change.
+- Compare projections with periodic on-chain account snapshots.
+- Report a mismatch before trying to repair it.
+- Use indexed data for reads and transaction planning, never authorization.
 
-```text
-chain_transactions  primary key (signature)
-chain_events        unique (signature, event_index)
-indexer_checkpoints finalized slot and signature cursor
-```
-
-Keep the raw event payload beside the decoded representation so schema changes
-can be replayed. Derived tables may include markets, orders, price levels,
-trader balances, fills, market fees, and administrator records. Later analytics
-can add candles, volume, spread, depth, wallet activity, and oracle deviation.
-
-Safety and recovery rules:
-
-- ingest only successful transactions; failed transactions may contain logs
-  even though their state changes rolled back;
-- make every processor idempotent so replaying a signature changes nothing;
-- preserve event order within each transaction;
-- initially index only `finalized` data to avoid provisional fork rollback;
-- periodically compare projections with `getProgramAccounts` snapshots;
-- report reconciliation differences before attempting any automatic repair;
-- use indexed state only for discovery, display, and planning;
-- refetch security-sensitive accounts and book links from RPC before building
-  or submitting a transaction.
-
-### Delivery slices
-
-The indexer is intentionally divided into small branches so RPC ingestion,
-decoding, persistence, and recovery can each be reviewed independently.
-
-1. `feature/indexer-foundation` establishes the independent Rust workspace,
-   fetches a recent finalized transaction batch, rejects rolled-back execution,
-   preserves raw logs, and extracts only Tidebook-owned `Program data:` entries
-   across nested CPI calls.
-2. `feature/indexer-event-decoding` establishes strict Base64, discriminator,
-   and Borsh decoding; preserves raw source data; and implements the market and
-   order event families.
-3. `feature/indexer-event-catalog` adds the admin, balance, faucet, fee, and
-   fill families so all 18 currently emitted event types are decoded.
-4. `feature/indexer-storage` introduces append-only PostgreSQL transaction and
-   event tables plus atomic, idempotent writes. This slice is complete.
-5. `feature/indexer-backfill` adds signature pagination and durable finalized
-   checkpoints for complete historical replay. This slice is complete.
-6. `feature/indexer-live-sync` adds WebSocket log ingestion and resumes from the
-   durable checkpoint after every disconnect so gaps are backfilled. This slice
-   is complete for the standard-RPC prototype.
-
-### Live synchronization behavior and tradeoffs
-
-The live path deliberately separates notification from ingestion:
-
-```text
-historical backfill complete
-          |
-          v
-subscribe to finalized logs
-          |
-          +--> HTTP catch-up from durable checkpoint
-          |
-          `--> buffered/new notification
-                         |
-                         v
-                 HTTP gap recovery
-                         |
-                         v
-              persist source transaction
-                         |
-                         v
-               advance live checkpoint
-
-disconnect/error -> capped backoff -> resubscribe -> HTTP catch-up
-```
-
-The subscription is established before the first catch-up. Notifications that
-arrive during catch-up remain buffered, avoiding the classic race where a
-transaction lands after an HTTP scan but before WebSocket registration.
-WebSocket payloads are never decoded or stored directly: they are ephemeral,
-at-least-once wake-ups. Complete finalized transactions are fetched over HTTP,
-written idempotently, and checkpointed only after persistence.
-
-This standard-RPC design is inexpensive and easy to operate, but it trades raw
-throughput for simple recovery semantics. Wake-ups are handled serially so the
-checkpoint order is deterministic. Reconnect delays grow from one to thirty
-seconds and reset after successful notification recovery. A gap larger than
-the configured page cap fails closed without processing a partial newest slice;
-an operator must raise the bound or investigate extended downtime. Yellowstone
-becomes useful only when measured notification volume or HTTP recovery latency
-outgrows this model.
-
-The foundation's fixed batch of at most 20 signatures is diagnostic. It is not
-described as historical backfill until pagination and checkpoints exist.
-
-Initial API surface:
+Initial API:
 
 ```text
 GET /health
@@ -195,32 +78,13 @@ GET /wallets/:owner/orders
 GET /wallets/:owner/activity
 ```
 
-Required tests:
+This phase is done when a new database can rebuild the same projections from
+stored finalized history and the API can serve the web app.
 
-- decode every Tidebook event type;
-- ignore events from failed transactions;
-- preserve multiple-event transaction order;
-- replay transactions and backfill ranges idempotently;
-- resume after a simulated subscription disconnect;
-- roll back a database transaction when projection processing fails;
-- update partial and complete fills correctly;
-- reconcile deliberately corrupted order, balance, and fee projections;
-- detect accounts closed onchain but still active in PostgreSQL.
+## 3. Oracle adapter
 
-Done when a new database can be deterministically rebuilt from finalized
-history, live ingestion can recover gaps after restart, and the API serves
-markets, order books, trades, and wallet orders without becoming part of
-onchain correctness.
-
-## Phase 2: oracle compatibility and account design
-
-Proposed branch: `feature/oracle-foundation`.
-
-Pyth is the initial provider candidate. Before adding it to production
-instructions, verify its current Solana receiver SDK against Tidebook's Anchor,
-Solana SDK, and LiteSVM dependency graph. The provider must stay behind a small
-Tidebook-owned interface so a dependency or provider change does not spread
-through the matching engine.
+Pyth is the first provider to evaluate. Keep it behind a small Tidebook-owned
+interface so provider SDK changes do not spread through matching code.
 
 Proposed account:
 
@@ -228,170 +92,116 @@ Proposed account:
 MarketOracle = ["market_oracle", market]
 ```
 
-Candidate state:
-
-| Field | Purpose |
+| Field | Use |
 | --- | --- |
-| `market` | Canonical Tidebook market |
-| `provider` | Validated oracle-provider variant |
-| `base_feed_id` | Base/USD feed identifier |
-| `quote_feed_id` | Quote/USD feed identifier |
-| `max_age_seconds` | Maximum accepted update age |
-| `max_confidence_bps` | Maximum confidence interval relative to price |
-| `max_deviation_bps` | Optional safety threshold for monitoring or guards |
-| `enabled` | Governance-controlled integration state |
-| `bump` | Canonical PDA bump |
+| `provider` | Oracle implementation |
+| `base_feed_id`, `quote_feed_id` | Pair used to derive the market reference |
+| `max_age_seconds` | Freshness limit |
+| `max_confidence_bps` | Confidence limit |
+| `max_deviation_bps` | Alert or guard threshold |
+| `enabled` | Governance switch |
 
-For BTC/USDT, the reference price should be composed as:
+For BTC/USDT:
 
 ```text
 BTC/USDT = BTC/USD / USDT/USD
 ```
 
-The implementation must normalize signed oracle exponents with checked
-integer arithmetic. It must not assume that USDT is always exactly one USD.
+Do not assume a stablecoin is exactly one dollar. Normalize oracle exponents
+with checked integer arithmetic.
 
-Required tests:
+Tests must cover stale data, wrong feeds, wrong owners, nonpositive prices,
+confidence limits, exponent boundaries, overflow, and deterministic mock feeds.
 
-- correct feed and decimal normalization;
-- stale update rejection;
-- wrong feed ID or oracle program owner;
-- zero or negative price;
-- excessive confidence interval;
-- exponent, multiplication, and division boundaries;
-- deterministic mock oracle accounts under LiteSVM.
+The first oracle release should be read-only: display reference price and raise
+alerts without changing matching rules.
 
-Done when a pure oracle adapter and its failure paths are fully tested without
-changing order execution.
+## 4. Market information in the app
 
-## Phase 3: reference-price UI and market health
+Show these values separately:
 
-Expose reference data on each market page:
-
-- oracle price and update age;
-- confidence interval;
-- best bid and best ask;
+- oracle reference and update age;
+- oracle confidence interval;
+- best bid and ask;
 - CLOB midpoint;
-- last traded price from confirmed fill events;
-- midpoint-to-oracle and last-trade-to-oracle deviation.
+- last Tidebook fill;
+- midpoint and last-fill deviation from the oracle.
 
-These values must retain distinct names. "Market price" is ambiguous because
-the external reference, midpoint, and most recent Tidebook execution can differ.
+Do not label all of them “market price.” They measure different things.
 
-The first release should use oracle data for display and alerts only. A hard
-onchain price band is deferred until devnet data shows appropriate freshness
-and deviation thresholds. A hard band protects against extreme execution but
-can also halt valid price discovery when an oracle is stale.
+A hard on-chain oracle band should wait until devnet data shows sensible
+freshness and deviation settings. A band can block bad trades, but it can also
+stop valid price discovery when the feed is stale.
 
-Done when users can understand both external reference conditions and actual
-Tidebook liquidity without changing matching semantics.
+## 5. Reference market maker
 
-## Phase 4: reference market-maker service
-
-Proposed branch: `feature/reference-market-maker`.
-
-Build a separate TypeScript service under `services/market-maker/`. A Solana
-program cannot react to price changes by itself; an offchain actor must observe
-prices and submit transactions.
+Run the market maker as a separate service. A Solana program cannot react to a
+new price until someone submits a transaction.
 
 The service should:
 
-1. consume oracle updates;
-2. read Tidebook levels and its own open orders;
+1. read oracle updates;
+2. read its open orders and current Tidebook levels;
 3. calculate inventory-adjusted bid and ask quotes;
-4. cancel stale quotes and submit replacements;
-5. maintain multiple bounded price levels;
-6. persist transaction state and recover after restart;
-7. stop quoting when its oracle, RPC, inventory, or transaction health limits
-   are violated.
+4. cancel stale orders and place replacements;
+5. persist transaction state across restarts;
+6. stop when price, RPC, inventory, or transaction limits fail.
 
-Mandatory controls:
+Required controls:
 
-- dedicated limited-funds signer;
-- maximum base inventory and quote exposure;
-- maximum order size and number of live orders;
-- oracle freshness and confidence limits;
-- maximum CLOB/oracle deviation;
+- a dedicated signer with limited funds;
+- maximum inventory, exposure, order size, and live-order count;
+- oracle age and confidence limits;
+- maximum book/oracle deviation;
 - self-trade prevention;
 - retry and priority-fee limits;
-- heartbeat, alerting, and manual kill switch.
+- heartbeat, alerts, and a manual kill switch.
 
-Efficient quoting may justify bounded `cancel_orders`, `replace_order`, or
-`cancel_all_orders` instructions. These should be introduced only after the
-single-order service exposes a measured transaction bottleneck.
+Only add batch cancel or replace instructions after measurements show that
+single-order transactions are the bottleneck.
 
-Done when the bot maintains two-sided devnet liquidity, safely cancels stale
-quotes, and recovers without duplicating orders after restart.
+## 6. Monitoring
 
-## Phase 5: monitoring and circuit breakers
+Track:
 
-Add an event consumer or indexer for fills, fees, oracle observations, spreads,
-inventory, transaction failures, and retries. Dashboards should distinguish
-protocol state from derived analytics.
+- indexer lag and reconnects;
+- RPC and transaction failures;
+- order-book spread and depth;
+- fills, fees, and volume;
+- oracle age, confidence, and deviation;
+- market-maker inventory and quote age;
+- PostgreSQL and Kubernetes health.
 
-Initial circuit breakers belong in the market-maker service:
+Circuit breakers should first live in the market maker. If on-chain breakers
+are added later, cancellation and withdrawal must remain available.
 
-- stop quoting on stale or uncertain oracle data;
-- stop quoting when deviation exceeds a configured threshold;
-- stop quoting when inventory or loss limits are reached;
-- require deliberate operator recovery after a severe fault.
+## 7. Standalone AMM
 
-Onchain circuit breakers may be added later for protocol-wide protection, but
-they must preserve cancellation and withdrawal exits while trading is halted.
+Design and test an AMM as an independent venue before combining it with the
+order book.
 
-## Phase 6: standalone AMM design
-
-Proposed design branch: `design/hybrid-amm`.
-
-The first AMM should use a constant-product curve:
+The first model can use constant product:
 
 ```text
 base_reserve * quote_reserve = k
 spot_price = quote_reserve / base_reserve
 ```
 
-The oracle may validate the initial reserve ratio and detect dangerous
-deviation. It must not rewrite reserves or guarantee the AMM price; trades and
-arbitrage move the pool price.
-
-Proposed accounts:
+Use separate vaults from the CLOB:
 
 ```text
 AmmPool       = ["amm_pool", market]
-AmmAuthority  = ["amm_authority", amm_pool]
-AmmBaseVault  = ["amm_vault", amm_pool, base_mint]
-AmmQuoteVault = ["amm_vault", amm_pool, quote_mint]
-LpPosition    = ["lp_position", amm_pool, provider]
+AmmAuthority  = ["amm_authority", pool]
+AmmBaseVault  = ["amm_vault", pool, base_mint]
+AmmQuoteVault = ["amm_vault", pool, quote_mint]
+LpPosition    = ["lp_position", pool, provider]
 ```
 
-AMM vaults must not be shared with CLOB vaults. Separate custody preserves
-simple conservation equations and limits the blast radius of accounting bugs.
+The design must specify LP shares, minimum locked liquidity, swap rounding,
+fees, slippage, deadlines, pause behavior, safe closure, and checked arithmetic.
+Property tests should cover the formulas before token CPIs are added.
 
-The design must specify:
-
-- initial and subsequent LP-share calculation;
-- minimum locked liquidity;
-- exact-input swap formulas and rounding direction;
-- LP fee and protocol-fee allocation;
-- slippage and deadline checks;
-- checked `u128` intermediate arithmetic;
-- pause, emergency exit, and safe closure;
-- Token Program and future Token-2022 boundaries;
-- oracle validation during initialization.
-
-Done when the formulas, invariants, attacks, account sizes, and test matrix are
-documented and exercised by pure Rust property tests.
-
-## Phase 7: standalone AMM implementation
-
-Suggested feature sequence:
-
-1. `feature/amm-pool-foundation`
-2. `feature/amm-liquidity`
-3. `feature/amm-swaps`
-4. `feature/amm-fees`
-
-Expected instructions:
+Likely instruction sequence:
 
 ```text
 initialize_amm_pool
@@ -404,99 +214,61 @@ collect_amm_protocol_fees
 close_amm_pool
 ```
 
-Integration tests must cover proportional liquidity, both swap directions,
-rounding, invariant preservation, fees, slippage, incorrect accounts, paused
-behavior, arithmetic limits, token CPI failure, and global asset conservation.
+## 8. Hybrid routing
 
-Done when the AMM operates safely as an independent devnet venue before any
-hybrid route is introduced.
+Start with an off-chain router. It compares executable CLOB liquidity with AMM
+price impact and fees.
 
-## Phase 8: hybrid CLOB and AMM routing
-
-Implement an offchain smart-order router before coupling AMM logic directly to
-`match_limit_order`. The router compares:
-
-- executable CLOB prices and quantities;
-- AMM marginal price and price impact;
-- taker, swap, and protocol fees;
-- transaction account and compute limits.
-
-A route may atomically sequence:
+A transaction may contain:
 
 ```text
-match best CLOB maker
+match CLOB maker
 match next CLOB maker
-swap the safe remainder through the AMM
+swap the remainder through the AMM
 ```
 
-Required guarantees:
+Rules:
 
-- no execution violates the user's limit price;
-- exact maximum spend or minimum receive is enforced;
-- quote simulation and execution use identical rounding;
-- a remainder is never silently discarded;
-- failure of any leg rolls back the entire route;
-- CLOB and AMM fees remain separately attributable;
-- stale CLOB or reserve state fails safely and can be replanned.
+- Respect the user's maximum spend or minimum receive.
+- Use the same rounding in simulation and execution.
+- Never discard a remainder.
+- Roll back every leg if one leg fails.
+- Keep CLOB and AMM fees separately auditable.
+- Replan stale book or reserve state instead of accepting worse execution.
 
-Only benchmarks should decide whether a later combined onchain routing
-instruction is worth its larger account contract and audit surface.
+Build a combined on-chain router only if benchmarks show that composing the
+existing instructions is not enough.
 
-## Phase 9: benchmarking and hardening
+## 9. Benchmarking and hardening
 
-Measure each component independently and in hybrid transactions:
+Measure:
 
-- compute units and loaded-account data;
-- serialized transaction size;
-- signer, readonly, and writable account counts;
-- maximum safe CLOB fills plus an AMM swap;
-- oracle update and verification overhead;
+- compute units;
+- transaction size and account count;
+- maximum safe fills per transaction;
+- oracle verification cost;
 - Address Lookup Table benefit;
 - RPC traversal and confirmation latency;
 - stale-state retry rate;
 - writable-account contention;
 - market-maker cancellation latency.
 
-Fuzz and property-test arithmetic and conservation rules. Before mainnet,
-complete threat modeling, operational runbooks, key separation, monitoring,
-incident response, and an independent security audit.
+Before any mainnet discussion, add threat models, operational runbooks, key
+separation, monitoring, incident response, fuzz/property tests, and an external
+security review.
 
-## Estimated research effort
+## Data-source scaling
 
-| Milestone | Focused effort |
-| --- | ---: |
-| Indexer foundation, projections, reconciliation, and API | 30-50 hours |
-| Oracle compatibility and design | 8-16 hours |
-| Oracle accounts, validation, tests, and UI | 16-24 hours |
-| Reference market-maker service | 24-40 hours |
-| Monitoring and price model | 8-16 hours |
-| AMM design and mathematical tests | 12-20 hours |
-| AMM liquidity, swaps, and fees | 24-40 hours |
-| Hybrid router | 16-32 hours |
-| Benchmarking and hardening | 12-24 hours |
-
-The complete research prototype is approximately 130-230 focused hours. This
-estimate does not include production operations, an independent audit, or
-mainnet liquidity acquisition.
-
-## Recommended next milestone
-
-Start read-optimized projections on top of the append-only source tables. Replay
-events in deterministic `(slot, transaction_index, signature, log_index)` order
-into market, order, fill, fee, and balance views, then expose the first narrow
-read API. Keep source records immutable so projection bugs and schema changes
-can be rebuilt without re-fetching chain history. Add account reconciliation
-after the first projections are queryable. Yellowstone remains a later scaling
-option after standard RPC throughput is measured.
+Use standard Solana HTTP and WebSocket RPC until measurements show a problem.
+Yellowstone/Geyser is useful when notification volume or recovery latency
+outgrows the current model; it should not be added only because it is available.
 
 ## References
 
-- [Pyth real-time data on Solana](https://docs.pyth.network/price-feeds/core/use-real-time-data/pull-integration/solana)
-- [Pyth price feeds and feed identifiers](https://docs.pyth.network/price-feeds/core/price-feeds)
+- [Pyth Solana integration](https://docs.pyth.network/price-feeds/core/use-real-time-data/pull-integration/solana)
+- [Pyth price feeds](https://docs.pyth.network/price-feeds/core/price-feeds)
 - [Solana program model](https://solana.com/docs/core/programs)
-- [Solana program execution](https://solana.com/docs/core/programs/program-execution)
-- [Solana markets and atomic composability](https://solana.com/docs/defi)
-- [Solana program log subscriptions](https://solana.com/docs/rpc/websocket/logssubscribe)
-- [Solana transaction-signature pagination](https://solana.com/docs/rpc/http/getsignaturesforaddress)
-- [Solana program-account queries](https://solana.com/docs/rpc/http/getprogramaccounts)
+- [Solana log subscriptions](https://solana.com/docs/rpc/websocket/logssubscribe)
+- [Solana signature pagination](https://solana.com/docs/rpc/http/getsignaturesforaddress)
+- [Solana program accounts](https://solana.com/docs/rpc/http/getprogramaccounts)
 - [Yellowstone gRPC](https://github.com/rpcpool/yellowstone-grpc)
