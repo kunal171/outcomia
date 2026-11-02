@@ -1135,6 +1135,15 @@ footer {
   font-family: "DM Mono", monospace;
 }
 
+.market-address-caption,
+.market-pair small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+}
+
 .market-active {
   color: var(--mint);
 }
@@ -1194,6 +1203,11 @@ footer {
 
 .market-metadata dd {
   margin: 0;
+}
+
+.market-metadata .metadata-kind {
+  color: var(--mint);
+  text-transform: capitalize;
 }
 
 .market-explorer-link {

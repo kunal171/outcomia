@@ -3,7 +3,7 @@
 use anchor_lang::prelude::Pubkey;
 
 use crate::{
-    constants::{MARKET_FEES_SEED, PRICE_LEVEL_SEED, TRADER_BALANCE_SEED},
+    constants::{MARKET_FEES_SEED, MARKET_METADATA_SEED, PRICE_LEVEL_SEED, TRADER_BALANCE_SEED},
     state::OrderSide,
 };
 
@@ -52,6 +52,13 @@ pub fn derive_trader_balance_pda(
 /// ["market_fees", market]
 pub fn derive_market_fees_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[MARKET_FEES_SEED, market.as_ref()], program_id)
+}
+
+/// Derives the optional human-readable identity attached to a market.
+///
+/// Seeds: ["market_metadata", market]
+pub fn derive_market_metadata_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[MARKET_METADATA_SEED, market.as_ref()], program_id)
 }
 
 #[cfg(test)]
@@ -160,6 +167,23 @@ mod tests {
         let first = derive_market_fees_pda(&program_id, &first_market);
         let second = derive_market_fees_pda(&program_id, &second_market);
 
+        assert_ne!(first.0, second.0);
+    }
+
+    #[test]
+    fn market_metadata_pda_is_canonical_and_market_specific() {
+        let program_id = Pubkey::new_unique();
+        let first_market = Pubkey::new_unique();
+        let second_market = Pubkey::new_unique();
+
+        let first = derive_market_metadata_pda(&program_id, &first_market);
+        let expected = Pubkey::find_program_address(
+            &[MARKET_METADATA_SEED, first_market.as_ref()],
+            &program_id,
+        );
+        let second = derive_market_metadata_pda(&program_id, &second_market);
+
+        assert_eq!(first, expected);
         assert_ne!(first.0, second.0);
     }
 }

@@ -51,6 +51,46 @@ pub struct MarketClosedEvent {
     pub quote_vault: Pubkey,
 }
 
+/// On-chain market classification. Variant order mirrors the Anchor program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub enum MarketKind {
+    Spot,
+    Prediction,
+    Other,
+}
+
+/// Records the first human-readable identity attached to a market.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MarketMetadataInitializedEvent {
+    pub metadata: Pubkey,
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub base_symbol: String,
+    pub quote_symbol: String,
+    pub display_name: String,
+    pub kind: MarketKind,
+}
+
+/// Records mutable market-label changes. Classification is intentionally absent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MarketMetadataUpdatedEvent {
+    pub metadata: Pubkey,
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub base_symbol: String,
+    pub quote_symbol: String,
+    pub display_name: String,
+}
+
+/// Records metadata cleanup before its paused market is closed.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MarketMetadataClosedEvent {
+    pub metadata: Pubkey,
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub kind: MarketKind,
+}
+
 /// Side of a resting order.
 ///
 /// Borsh encodes `Bid` as `0` and `Ask` as `1`. Variant order must remain

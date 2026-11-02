@@ -729,6 +729,71 @@
       "args": []
     },
     {
+      "name": "close_market_metadata",
+      "docs": [
+        "Reclaims metadata rent before the authority closes a paused market."
+      ],
+      "discriminator": [
+        106,
+        132,
+        72,
+        241,
+        210,
+        243,
+        78,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market",
+          "relations": [
+            "market_metadata"
+          ]
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_test_faucet",
       "docs": [
         "Permanently disables a market's test faucet before safe market closure."
@@ -1308,6 +1373,114 @@
         {
           "name": "quantity_lot_size",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_market_metadata",
+      "docs": [
+        "Attaches immutable classification and mutable labels to a market."
+      ],
+      "discriminator": [
+        197,
+        48,
+        215,
+        104,
+        131,
+        46,
+        165,
+        171
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "base_symbol",
+          "type": "string"
+        },
+        {
+          "name": "quote_symbol",
+          "type": "string"
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "MarketKind"
+            }
+          }
         }
       ]
     },
@@ -2289,6 +2462,104 @@
       "args": []
     },
     {
+      "name": "update_market_metadata",
+      "docs": [
+        "Updates market labels while preserving its original classification."
+      ],
+      "discriminator": [
+        28,
+        237,
+        190,
+        65,
+        132,
+        24,
+        133,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "relations": [
+            "market_metadata"
+          ]
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "base_symbol",
+          "type": "string"
+        },
+        {
+          "name": "quote_symbol",
+          "type": "string"
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "withdraw",
       "docs": [
         "Withdraws free base or quote tokens to the caller's token account."
@@ -2655,6 +2926,19 @@
       ]
     },
     {
+      "name": "MarketMetadata",
+      "discriminator": [
+        12,
+        16,
+        109,
+        58,
+        31,
+        252,
+        133,
+        8
+      ]
+    },
+    {
       "name": "Order",
       "discriminator": [
         134,
@@ -2810,6 +3094,45 @@
         143,
         45,
         25
+      ]
+    },
+    {
+      "name": "MarketMetadataClosedEvent",
+      "discriminator": [
+        229,
+        192,
+        37,
+        211,
+        210,
+        185,
+        186,
+        153
+      ]
+    },
+    {
+      "name": "MarketMetadataInitializedEvent",
+      "discriminator": [
+        11,
+        220,
+        65,
+        132,
+        82,
+        252,
+        105,
+        161
+      ]
+    },
+    {
+      "name": "MarketMetadataUpdatedEvent",
+      "discriminator": [
+        185,
+        71,
+        148,
+        82,
+        13,
+        111,
+        45,
+        98
       ]
     },
     {
@@ -3426,6 +3749,26 @@
       "code": 6093,
       "name": "FaucetMustBeClosed",
       "msg": "The market test faucet must be closed before closing the market"
+    },
+    {
+      "code": 6094,
+      "name": "InvalidMarketSymbol",
+      "msg": "Market symbols must be 1-16 ASCII letters, digits, '.', '-' or '_'"
+    },
+    {
+      "code": 6095,
+      "name": "InvalidMarketDisplayName",
+      "msg": "Market display name must be 1-64 printable ASCII characters without outer whitespace"
+    },
+    {
+      "code": 6096,
+      "name": "PredictionMarketUnavailable",
+      "msg": "Prediction market metadata is unavailable until prediction settlement is implemented"
+    },
+    {
+      "code": 6097,
+      "name": "MarketMetadataMismatch",
+      "msg": "Market metadata belongs to a different market"
     }
   ],
   "types": [
@@ -3910,6 +4253,198 @@
           {
             "name": "quantity_lot_size",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketKind",
+      "docs": [
+        "Selects the settlement model associated with a market.",
+        "",
+        "Variant order is serialized state. Append future variants instead of",
+        "inserting them between existing variants."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Spot"
+          },
+          {
+            "name": "Prediction"
+          },
+          {
+            "name": "Other"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketMetadata",
+      "docs": [
+        "Human-readable labels and classification kept outside critical book state.",
+        "",
+        "Separating this account from `Market` lets existing markets opt in without",
+        "reallocating or migrating their matching-engine account."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "docs": [
+              "Market described by this canonical metadata PDA."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "base_symbol",
+            "docs": [
+              "Short base-asset label such as \"SOL\" or \"tSOL\"."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "quote_symbol",
+            "docs": [
+              "Short quote-asset label such as \"USDC\" or \"tUSDC\"."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "display_name",
+            "docs": [
+              "Client-facing name, independent of the market's immutable address."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "kind",
+            "docs": [
+              "Immutable classification selected when metadata is initialized."
+            ],
+            "type": {
+              "defined": {
+                "name": "MarketKind"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Canonical metadata PDA bump."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketMetadataClosedEvent",
+      "docs": [
+        "Records rent-reclaiming metadata cleanup before its market is closed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "metadata",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "MarketKind"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketMetadataInitializedEvent",
+      "docs": [
+        "Records the first human-readable identity attached to a market."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "metadata",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_symbol",
+            "type": "string"
+          },
+          {
+            "name": "quote_symbol",
+            "type": "string"
+          },
+          {
+            "name": "display_name",
+            "type": "string"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "MarketKind"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketMetadataUpdatedEvent",
+      "docs": [
+        "Records mutable label changes while deliberately omitting `kind`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "metadata",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_symbol",
+            "type": "string"
+          },
+          {
+            "name": "quote_symbol",
+            "type": "string"
+          },
+          {
+            "name": "display_name",
+            "type": "string"
           }
         ]
       }
@@ -4698,6 +5233,16 @@
       ],
       "type": "bytes",
       "value": "[109, 97, 114, 107, 101, 116, 95, 102, 101, 101, 115]"
+    },
+    {
+      "name": "MARKET_METADATA_SEED",
+      "docs": [
+        "Namespace for the human-readable metadata attached to one market.",
+        "",
+        "PDA: [\"market_metadata\", market]"
+      ],
+      "type": "bytes",
+      "value": "[109, 97, 114, 107, 101, 116, 95, 109, 101, 116, 97, 100, 97, 116, 97]"
     },
     {
       "name": "MARKET_SEED",

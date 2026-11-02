@@ -9,10 +9,11 @@ use serde::Serialize;
 use thiserror::Error;
 pub use types::{
     AdminAddedEvent, AdminRemovedEvent, AdminStatusChangedEvent, DepositEvent, FillEvent,
-    MarketClosedEvent, MarketInitializedEvent, MarketStatusChangedEvent, OrderCanceledEvent,
-    OrderPlacedEvent, ProtocolFeesWithdrawnEvent, ProtocolInitializedEvent, TakerFeeUpdatedEvent,
-    TestFaucetClaimedEvent, TestFaucetClosedEvent, TestFaucetInitializedEvent,
-    TraderBalanceInitializedEvent, WithdrawalEvent,
+    MarketClosedEvent, MarketInitializedEvent, MarketMetadataClosedEvent,
+    MarketMetadataInitializedEvent, MarketMetadataUpdatedEvent, MarketStatusChangedEvent,
+    OrderCanceledEvent, OrderPlacedEvent, ProtocolFeesWithdrawnEvent, ProtocolInitializedEvent,
+    TakerFeeUpdatedEvent, TestFaucetClaimedEvent, TestFaucetClosedEvent,
+    TestFaucetInitializedEvent, TraderBalanceInitializedEvent, WithdrawalEvent,
 };
 
 /// Anchor prefixes every serialized event body with an eight-byte
@@ -25,6 +26,9 @@ pub const EVENT_DISCRIMINATOR_BYTES: usize = 8;
 const MARKET_INITIALIZED_DISCRIMINATOR: [u8; 8] = [70, 173, 96, 202, 100, 143, 45, 25];
 const MARKET_STATUS_CHANGED_DISCRIMINATOR: [u8; 8] = [189, 57, 199, 130, 179, 34, 39, 53];
 const MARKET_CLOSED_DISCRIMINATOR: [u8; 8] = [64, 193, 117, 138, 19, 11, 84, 44];
+const MARKET_METADATA_INITIALIZED_DISCRIMINATOR: [u8; 8] = [11, 220, 65, 132, 82, 252, 105, 161];
+const MARKET_METADATA_UPDATED_DISCRIMINATOR: [u8; 8] = [185, 71, 148, 82, 13, 111, 45, 98];
+const MARKET_METADATA_CLOSED_DISCRIMINATOR: [u8; 8] = [229, 192, 37, 211, 210, 185, 186, 153];
 const ORDER_PLACED_DISCRIMINATOR: [u8; 8] = [245, 198, 202, 247, 110, 231, 254, 156];
 const ORDER_CANCELED_DISCRIMINATOR: [u8; 8] = [10, 31, 133, 147, 181, 32, 34, 30];
 const FILL_EVENT_DISCRIMINATOR: [u8; 8] = [13, 89, 41, 228, 105, 178, 45, 112];
@@ -102,6 +106,9 @@ pub enum MarketEvent {
     Initialized(MarketInitializedEvent),
     StatusChanged(MarketStatusChangedEvent),
     Closed(MarketClosedEvent),
+    MetadataInitialized(MarketMetadataInitializedEvent),
+    MetadataUpdated(MarketMetadataUpdatedEvent),
+    MetadataClosed(MarketMetadataClosedEvent),
 }
 
 /// Observable order lifecycle transitions outside trade execution.
@@ -216,6 +223,24 @@ pub fn decode_event(raw_event: &RawEventLog) -> Result<DecodedEventLog, EventDec
             &envelope.body,
             "MarketClosedEvent",
         )?)),
+
+        MARKET_METADATA_INITIALIZED_DISCRIMINATOR => {
+            TidebookEvent::Market(MarketEvent::MetadataInitialized(decode_body(
+                &envelope.body,
+                "MarketMetadataInitializedEvent",
+            )?))
+        }
+
+        MARKET_METADATA_UPDATED_DISCRIMINATOR => {
+            TidebookEvent::Market(MarketEvent::MetadataUpdated(decode_body(
+                &envelope.body,
+                "MarketMetadataUpdatedEvent",
+            )?))
+        }
+
+        MARKET_METADATA_CLOSED_DISCRIMINATOR => TidebookEvent::Market(MarketEvent::MetadataClosed(
+            decode_body(&envelope.body, "MarketMetadataClosedEvent")?,
+        )),
         ORDER_PLACED_DISCRIMINATOR => TidebookEvent::Order(OrderEvent::Placed(decode_body(
             &envelope.body,
             "OrderPlacedEvent",
@@ -318,6 +343,9 @@ impl TidebookEvent {
                 MarketEvent::Initialized(_) => "MarketInitializedEvent",
                 MarketEvent::StatusChanged(_) => "MarketStatusChangedEvent",
                 MarketEvent::Closed(_) => "MarketClosedEvent",
+                MarketEvent::MetadataInitialized(_) => "MarketMetadataInitializedEvent",
+                MarketEvent::MetadataUpdated(_) => "MarketMetadataUpdatedEvent",
+                MarketEvent::MetadataClosed(_) => "MarketMetadataClosedEvent",
             },
             Self::Order(event) => match event {
                 OrderEvent::Placed(_) => "OrderPlacedEvent",
@@ -344,7 +372,7 @@ impl TidebookEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::types::{AdminStatus, MarketStatus, OrderSide};
+    use crate::decoder::types::{AdminStatus, MarketKind, MarketStatus, OrderSide};
     use solana_pubkey::Pubkey;
 
     // Fixtures are assembled byte by byte instead of serializing the same
@@ -427,6 +455,93 @@ mod tests {
         };
 
         (body, expected)
+    }
+
+    fn append_borsh_string(body: &mut Vec<u8>, value: &str) {
+        let length = u32::try_from(value.len()).expect("fixture string length fits u32");
+        body.extend_from_slice(&length.to_le_bytes());
+        body.extend_from_slice(value.as_bytes());
+    }
+
+    fn market_metadata_initialized_fixture() -> (Vec<u8>, MarketMetadataInitializedEvent) {
+        let metadata = Pubkey::new_from_array([31; 32]);
+        let market = Pubkey::new_from_array([32; 32]);
+        let authority = Pubkey::new_from_array([33; 32]);
+        let base_symbol = "tSOL".to_owned();
+        let quote_symbol = "tUSDC".to_owned();
+        let display_name = "Tidebook SOL / USDC".to_owned();
+
+        let mut body = Vec::new();
+        body.extend_from_slice(metadata.as_ref());
+        body.extend_from_slice(market.as_ref());
+        body.extend_from_slice(authority.as_ref());
+        append_borsh_string(&mut body, &base_symbol);
+        append_borsh_string(&mut body, &quote_symbol);
+        append_borsh_string(&mut body, &display_name);
+        body.push(0); // MarketKind::Spot
+
+        (
+            body,
+            MarketMetadataInitializedEvent {
+                metadata,
+                market,
+                authority,
+                base_symbol,
+                quote_symbol,
+                display_name,
+                kind: MarketKind::Spot,
+            },
+        )
+    }
+
+    fn market_metadata_updated_fixture() -> (Vec<u8>, MarketMetadataUpdatedEvent) {
+        let metadata = Pubkey::new_from_array([34; 32]);
+        let market = Pubkey::new_from_array([35; 32]);
+        let authority = Pubkey::new_from_array([36; 32]);
+        let base_symbol = "SOL".to_owned();
+        let quote_symbol = "USD".to_owned();
+        let display_name = "Updated market".to_owned();
+
+        let mut body = Vec::new();
+        body.extend_from_slice(metadata.as_ref());
+        body.extend_from_slice(market.as_ref());
+        body.extend_from_slice(authority.as_ref());
+        append_borsh_string(&mut body, &base_symbol);
+        append_borsh_string(&mut body, &quote_symbol);
+        append_borsh_string(&mut body, &display_name);
+
+        (
+            body,
+            MarketMetadataUpdatedEvent {
+                metadata,
+                market,
+                authority,
+                base_symbol,
+                quote_symbol,
+                display_name,
+            },
+        )
+    }
+
+    fn market_metadata_closed_fixture() -> (Vec<u8>, MarketMetadataClosedEvent) {
+        let metadata = Pubkey::new_from_array([37; 32]);
+        let market = Pubkey::new_from_array([38; 32]);
+        let authority = Pubkey::new_from_array([39; 32]);
+        let mut body = Vec::with_capacity(97);
+        body.extend_from_slice(metadata.as_ref());
+        body.extend_from_slice(market.as_ref());
+        body.extend_from_slice(authority.as_ref());
+        body.push(2); // MarketKind::Other
+
+        (
+            body,
+            MarketMetadataClosedEvent {
+                metadata,
+                market,
+                authority,
+                kind: MarketKind::Other,
+            },
+        )
     }
 
     fn market_status_changed_body(status_variant: u8) -> (Vec<u8>, Pubkey, Pubkey) {
@@ -1056,6 +1171,34 @@ mod tests {
     }
 
     #[test]
+    fn decodes_market_metadata_events() {
+        let (initialized_body, initialized) = market_metadata_initialized_fixture();
+        let initialized_payload =
+            encoded_event(MARKET_METADATA_INITIALIZED_DISCRIMINATOR, &initialized_body);
+        let initialized_raw = raw_event(&initialized_payload, 32);
+        assert_eq!(
+            decode_event(&initialized_raw).unwrap().event,
+            TidebookEvent::Market(MarketEvent::MetadataInitialized(initialized)),
+        );
+
+        let (updated_body, updated) = market_metadata_updated_fixture();
+        let updated_payload = encoded_event(MARKET_METADATA_UPDATED_DISCRIMINATOR, &updated_body);
+        let updated_raw = raw_event(&updated_payload, 33);
+        assert_eq!(
+            decode_event(&updated_raw).unwrap().event,
+            TidebookEvent::Market(MarketEvent::MetadataUpdated(updated)),
+        );
+
+        let (closed_body, closed) = market_metadata_closed_fixture();
+        let closed_payload = encoded_event(MARKET_METADATA_CLOSED_DISCRIMINATOR, &closed_body);
+        let closed_raw = raw_event(&closed_payload, 34);
+        assert_eq!(
+            decode_event(&closed_raw).unwrap().event,
+            TidebookEvent::Market(MarketEvent::MetadataClosed(closed)),
+        );
+    }
+
+    #[test]
     fn decodes_both_order_placed_sides() {
         for (variant, side) in [(0, OrderSide::Bid), (1, OrderSide::Ask)] {
             let (body, expected) = order_placed_fixture(variant, side);
@@ -1363,6 +1506,9 @@ mod tests {
         let (market_initialized, _) = market_initialized_fixture();
         let (market_status_changed, _, _) = market_status_changed_body(0);
         let (market_closed, _) = market_closed_fixture();
+        let (market_metadata_initialized, _) = market_metadata_initialized_fixture();
+        let (market_metadata_updated, _) = market_metadata_updated_fixture();
+        let (market_metadata_closed, _) = market_metadata_closed_fixture();
         let (order_placed, _) = order_placed_fixture(0, OrderSide::Bid);
         let (order_canceled, _) = order_canceled_fixture(false);
         let (fill, _) = fill_fixture(0, OrderSide::Bid);
@@ -1394,6 +1540,21 @@ mod tests {
                 MARKET_CLOSED_DISCRIMINATOR,
                 market_closed,
                 "MarketClosedEvent",
+            ),
+            (
+                MARKET_METADATA_INITIALIZED_DISCRIMINATOR,
+                market_metadata_initialized,
+                "MarketMetadataInitializedEvent",
+            ),
+            (
+                MARKET_METADATA_UPDATED_DISCRIMINATOR,
+                market_metadata_updated,
+                "MarketMetadataUpdatedEvent",
+            ),
+            (
+                MARKET_METADATA_CLOSED_DISCRIMINATOR,
+                market_metadata_closed,
+                "MarketMetadataClosedEvent",
             ),
             (ORDER_PLACED_DISCRIMINATOR, order_placed, "OrderPlacedEvent"),
             (

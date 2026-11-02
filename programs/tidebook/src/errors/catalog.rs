@@ -291,4 +291,16 @@ pub enum TidebookError {
 
     #[msg("The market test faucet must be closed before closing the market")]
     FaucetMustBeClosed = 93,
+
+    #[msg("Market symbols must be 1-16 ASCII letters, digits, '.', '-' or '_'")]
+    InvalidMarketSymbol = 94,
+
+    #[msg("Market display name must be 1-64 printable ASCII characters without outer whitespace")]
+    InvalidMarketDisplayName = 95,
+
+    #[msg("Prediction market metadata is unavailable until prediction settlement is implemented")]
+    PredictionMarketUnavailable = 96,
+
+    #[msg("Market metadata belongs to a different market")]
+    MarketMetadataMismatch = 97,
 }

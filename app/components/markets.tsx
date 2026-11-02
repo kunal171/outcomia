@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import {
   accountExplorerUrl,
+  decodeMarketKind,
   decodeMarketStatus,
   getTidebookAccounts,
   getTidebookReadProgram,
+  type MarketMetadataAccount,
   type MarketView,
 } from "../lib/tidebook";
 import { AppHeader } from "./app-header";
@@ -23,6 +25,9 @@ function getErrorMessage(cause: unknown) {
 export function Markets() {
   const { connection } = useConnection();
   const [markets, setMarkets] = useState<MarketView[]>([]);
+  const [metadataByMarket, setMetadataByMarket] = useState<
+    Map<string, MarketMetadataAccount>
+  >(() => new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +41,19 @@ export function Markets() {
     setError(null);
 
     try {
-      const records = await getTidebookAccounts(program).market.all();
+      const accounts = getTidebookAccounts(program);
+      const [records, metadataRecords] = await Promise.all([
+        accounts.market.all(),
+        accounts.marketMetadata.all(),
+      ]);
+      setMetadataByMarket(
+        new Map(
+          metadataRecords.map(({ account }) => [
+            account.market.toBase58(),
+            account,
+          ]),
+        ),
+      );
       setMarkets(
         records
           .map(({ publicKey, account }) => ({
@@ -116,13 +133,25 @@ export function Markets() {
         <section className="markets-grid" aria-live="polite">
           {markets.map((market) => {
             const status = decodeMarketStatus(market.status);
+            const metadata = metadataByMarket.get(market.address.toBase58());
+            const kind = metadata ? decodeMarketKind(metadata.kind) : null;
 
             return (
               <article className="market-card" key={market.address.toBase58()}>
                 <div className="market-card-heading">
                   <div>
-                    <span className="card-label">Market</span>
-                    <strong>{shortAddress(market.address.toBase58())}</strong>
+                    <span className="card-label">
+                      {kind ? `${kind} market` : "Unlabelled market"}
+                    </span>
+                    <strong>
+                      {metadata?.displayName ??
+                        shortAddress(market.address.toBase58())}
+                    </strong>
+                    {metadata && (
+                      <small className="market-address-caption">
+                        {shortAddress(market.address.toBase58())}
+                      </small>
+                    )}
                   </div>
                   <span className={`role-badge market-${status}`}>{status}</span>
                 </div>
@@ -130,12 +159,24 @@ export function Markets() {
                 <div className="market-pair">
                   <div>
                     <span>Base mint</span>
-                    <strong>{shortAddress(market.baseMint.toBase58())}</strong>
+                    <strong>
+                      {metadata?.baseSymbol ??
+                        shortAddress(market.baseMint.toBase58())}
+                    </strong>
+                    {metadata && (
+                      <small>{shortAddress(market.baseMint.toBase58())}</small>
+                    )}
                   </div>
                   <span aria-hidden="true">/</span>
                   <div>
                     <span>Quote mint</span>
-                    <strong>{shortAddress(market.quoteMint.toBase58())}</strong>
+                    <strong>
+                      {metadata?.quoteSymbol ??
+                        shortAddress(market.quoteMint.toBase58())}
+                    </strong>
+                    {metadata && (
+                      <small>{shortAddress(market.quoteMint.toBase58())}</small>
+                    )}
                   </div>
                 </div>
 
