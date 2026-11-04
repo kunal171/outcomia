@@ -1,4 +1,4 @@
-//! Collateral custody, ledger credit and rollback through the actual SPL CPI.
+//! Prediction cash custody and complete-set conservation through real instructions.
 #![allow(clippy::result_large_err)] // Keep LiteSVM's detailed failure metadata.
 
 use anchor_lang::{
@@ -66,6 +66,68 @@ struct Fixture {
 }
 
 impl Fixture {
+    fn withdrawal(&self, amount: u64) -> Instruction {
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::WithdrawPredictionCollateral { amount }.data(),
+            tidebook::accounts::WithdrawPredictionCollateral {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+                collateral_mint: self.mint,
+                destination: self.source,
+                vault_authority: self.vault_authority,
+                collateral_vault: self.vault,
+                token_program: anchor_spl::token::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    fn complete_set(&self, quantity: u64, split: bool) -> Instruction {
+        let data = if split {
+            tidebook::instruction::SplitPredictionCompleteSet { quantity }.data()
+        } else {
+            tidebook::instruction::MergePredictionCompleteSet { quantity }.data()
+        };
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &data,
+            tidebook::accounts::PredictionCompleteSet {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    fn fund_open(&mut self) {
+        let ix = self.instruction(20_000_000);
+        assert!(self.send(&[ix]).is_ok());
+        let mut market = self.market_state();
+        market.status = PredictionStatus::Open;
+        market.close_ts = i64::MAX;
+        store(&mut self.svm, self.market, &market);
+    }
+
+    fn assert_backed(&self) {
+        let p = self.ledger();
+        let m = self.market_state();
+        assert_eq!(
+            self.token(self.source).amount + self.token(self.vault).amount,
+            100_000_000
+        );
+        assert_eq!(
+            self.token(self.vault).amount,
+            p.collateral_free + p.collateral_locked + m.backing_reserve
+        );
+        assert_eq!(m.yes_supply, p.yes_free + p.yes_locked);
+        assert_eq!(m.no_supply, p.no_free + p.no_locked);
+        assert_eq!(m.yes_supply, m.no_supply);
+        assert_eq!(m.backing_reserve, m.yes_supply * m.payout_per_contract);
+    }
+
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(tidebook::ID, PROGRAM).unwrap();
@@ -516,4 +578,446 @@ fn multiple_wallet_claims_sum_to_the_vault_balance() {
     let ix = f.instruction(20_000_000);
     assert!(f.send(&[ix]).is_ok());
     assert_eq!(f.token(f.vault).amount, first + f.ledger().collateral_free);
+}
+
+#[test]
+fn deposit_split_partial_merge_and_withdraw_preserve_every_claim() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    f.assert_backed();
+    let vault_before = f.svm.get_account(&f.vault).unwrap().data;
+    let ix = f.complete_set(7, true);
+    assert!(f.send(&[ix]).is_ok());
+    assert_eq!(f.ledger().collateral_free, 13_000_000);
+    assert_eq!((f.ledger().yes_free, f.ledger().no_free), (7, 7));
+    assert_eq!(f.market_state().backing_reserve, 7_000_000);
+    assert_eq!(f.svm.get_account(&f.vault).unwrap().data, vault_before);
+    f.assert_backed();
+    let ix = f.complete_set(3, false);
+    assert!(f.send(&[ix]).is_ok());
+    assert_eq!((f.ledger().yes_free, f.ledger().no_free), (4, 4));
+    assert_eq!(f.ledger().collateral_free, 16_000_000);
+    assert_eq!(f.svm.get_account(&f.vault).unwrap().data, vault_before);
+    let ix = f.withdrawal(16_000_000);
+    assert!(f.send(&[ix]).is_ok());
+    assert_eq!(f.ledger().collateral_free, 0);
+    assert_eq!(f.token(f.vault).amount, 4_000_000);
+    f.assert_backed();
+    let before = f.snapshot();
+    let merge = f.complete_set(4, false);
+    let withdraw = f.withdrawal(4_000_000);
+    assert!(f.send(&[merge, withdraw]).is_ok());
+    assert_eq!(f.token(f.source).amount, 100_000_000);
+    assert_eq!(f.market_state().backing_reserve, 0);
+    assert_ne!(f.snapshot(), before);
+    f.assert_backed();
+}
+
+#[test]
+fn withdrawal_is_available_in_every_status_and_does_not_touch_market() {
+    for status in [
+        PredictionStatus::Draft,
+        PredictionStatus::Open,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut market = f.market_state();
+        market.status = status;
+        market.close_ts = -1;
+        store(&mut f.svm, f.market, &market);
+        let before = f.svm.get_account(&f.market).unwrap().data;
+        let ix = f.withdrawal(20_000_000);
+        assert!(f.send(&[ix]).is_ok());
+        assert_eq!(f.svm.get_account(&f.market).unwrap().data, before);
+        assert_eq!(f.ledger().collateral_free, 0);
+        f.assert_backed();
+    }
+}
+
+#[test]
+fn withdrawal_cannot_spend_zero_locked_cash_or_outcome_reserves() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    let ix = f.complete_set(7, true);
+    assert!(f.send(&[ix]).is_ok());
+    let mut p = f.ledger();
+    p.collateral_free -= 2_000_000;
+    p.collateral_locked = 2_000_000;
+    store(&mut f.svm, f.position, &p);
+    let ix = f.withdrawal(0);
+    f.reject_unchanged(ix, "InvalidWithdrawalAmount");
+    let ix = f.withdrawal(11_000_001);
+    f.reject_unchanged(ix, "InsufficientFreeBalance");
+    let ix = f.withdrawal(11_000_000);
+    assert!(f.send(&[ix]).is_ok());
+    assert_eq!(f.ledger().collateral_locked, 2_000_000);
+    assert_eq!(f.market_state().backing_reserve, 7_000_000);
+    f.assert_backed();
+}
+
+#[test]
+fn withdrawal_checks_destination_owner_mint_and_vault_relationships() {
+    for owner in [true, false] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut destination = f.token(f.source);
+        if owner {
+            destination.owner = Pubkey::new_unique();
+        } else {
+            destination.mint = Pubkey::new_unique();
+        }
+        store_spl(&mut f.svm, f.source, destination);
+        let ix = f.withdrawal(1);
+        f.reject_unchanged(
+            ix,
+            if owner {
+                "InvalidWithdrawalDestinationOwner"
+            } else {
+                "InvalidPredictionCollateralMint"
+            },
+        );
+    }
+    for index in [3, 5, 6] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut ix = f.withdrawal(1);
+        let replacement = Pubkey::new_unique();
+        if let Some(a) = f.svm.get_account(&ix.accounts[index].pubkey) {
+            f.svm.set_account(replacement, a).unwrap();
+        }
+        ix.accounts[index].pubkey = replacement;
+        f.reject_unchanged(
+            ix,
+            if index == 3 {
+                "InvalidPredictionCollateralMint"
+            } else {
+                "ConstraintSeeds"
+            },
+        );
+    }
+    let mut f = Fixture::new();
+    f.fund_open();
+    let mut market = f.market_state();
+    market.collateral_vault = Pubkey::new_unique();
+    store(&mut f.svm, f.market, &market);
+    let ix = f.withdrawal(1);
+    f.reject_unchanged(ix, "InvalidPredictionVault");
+}
+
+#[test]
+fn withdrawal_insufficient_vault_and_frozen_destination_leave_claims_intact() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    let mut vault = f.token(f.vault);
+    vault.amount = 0;
+    store_spl(&mut f.svm, f.vault, vault);
+    let ix = f.withdrawal(1);
+    f.reject_unchanged(ix, "InsufficientVaultFunds");
+    let mut f = Fixture::new();
+    f.fund_open();
+    let mut destination = f.token(f.source);
+    destination.state = AccountState::Frozen;
+    store_spl(&mut f.svm, f.source, destination);
+    let before = f.snapshot();
+    let ix = f.withdrawal(1);
+    assert!(f.send(&[ix]).is_err());
+    assert_eq!(f.snapshot(), before);
+}
+
+#[test]
+fn split_lifecycle_close_boundary_and_merge_lifecycle_are_enforced() {
+    for status in [
+        PredictionStatus::Draft,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut m = f.market_state();
+        m.status = status;
+        store(&mut f.svm, f.market, &m);
+        let ix = f.complete_set(1, true);
+        f.reject_unchanged(ix, "PredictionSplitUnavailable");
+    }
+    for close in [-1, 0] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut clock = f.svm.get_sysvar::<anchor_lang::prelude::Clock>();
+        clock.unix_timestamp = 0;
+        f.svm.set_sysvar(&clock);
+        let mut m = f.market_state();
+        m.close_ts = close;
+        store(&mut f.svm, f.market, &m);
+        let ix = f.complete_set(1, true);
+        f.reject_unchanged(ix, "PredictionSplitUnavailable");
+    }
+    for status in [
+        PredictionStatus::Draft,
+        PredictionStatus::Open,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let ix = f.complete_set(2, true);
+        assert!(f.send(&[ix]).is_ok());
+        let mut m = f.market_state();
+        m.status = status;
+        m.close_ts = -1;
+        store(&mut f.svm, f.market, &m);
+        let ix = f.complete_set(2, false);
+        if matches!(status, PredictionStatus::Draft | PredictionStatus::Resolved) {
+            f.reject_unchanged(ix, "PredictionMergeUnavailable");
+        } else {
+            assert!(f.send(&[ix]).is_ok());
+            f.assert_backed();
+        }
+    }
+}
+
+#[test]
+fn complete_set_zero_insufficient_cash_and_locked_outcomes_are_rejected() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    for split in [true, false] {
+        let ix = f.complete_set(0, split);
+        f.reject_unchanged(ix, "InvalidPredictionContractQuantity");
+    }
+    let ix = f.complete_set(21, true);
+    f.reject_unchanged(ix, "InsufficientFreeBalance");
+    let ix = f.complete_set(5, true);
+    assert!(f.send(&[ix]).is_ok());
+    for yes in [true, false] {
+        let mut p = f.ledger();
+        if yes {
+            p.yes_free = 4;
+            p.yes_locked = 1;
+        } else {
+            p.yes_free = 5;
+            p.yes_locked = 0;
+            p.no_free = 4;
+            p.no_locked = 1;
+        }
+        store(&mut f.svm, f.position, &p);
+        let ix = f.complete_set(5, false);
+        f.reject_unchanged(ix, "InsufficientPredictionPositions");
+    }
+    f.assert_backed();
+}
+
+#[test]
+fn complete_set_overflow_and_corrupt_backing_fail_atomically() {
+    // Each checked field is exercised independently; corrupt host fixtures
+    // model accounting damage and must never allow wraparound or partial writes.
+    for field in 0..6 {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let mut p = f.ledger();
+        let mut m = f.market_state();
+        match field {
+            0 => m.payout_per_contract = u64::MAX,
+            1 => p.yes_free = u64::MAX,
+            2 => p.no_free = u64::MAX,
+            3 => m.yes_supply = u64::MAX,
+            4 => m.no_supply = u64::MAX,
+            _ => m.backing_reserve = u64::MAX,
+        }
+        store(&mut f.svm, f.position, &p);
+        store(&mut f.svm, f.market, &m);
+        let ix = f.complete_set(2, true);
+        f.reject_unchanged(ix, "PredictionAccountingOverflow");
+    }
+    for field in 0..5 {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let ix = f.complete_set(2, true);
+        assert!(f.send(&[ix]).is_ok());
+        let mut p = f.ledger();
+        let mut m = f.market_state();
+        match field {
+            0 => p.collateral_free = u64::MAX,
+            1 => m.yes_supply = 0,
+            2 => m.no_supply = 0,
+            3 => m.backing_reserve = 0,
+            _ => m.payout_per_contract = u64::MAX,
+        }
+        store(&mut f.svm, f.position, &p);
+        store(&mut f.svm, f.market, &m);
+        let ix = f.complete_set(2, false);
+        f.reject_unchanged(
+            ix,
+            match field {
+                0 => "FreeBalanceOverflow",
+                4 => "PredictionAccountingOverflow",
+                _ => "PredictionBackingUnderflow",
+            },
+        );
+    }
+}
+
+#[test]
+fn withdrawal_and_complete_sets_require_signer_and_canonical_position() {
+    for operation in 0..3 {
+        for bad in 0..6 {
+            let mut f = Fixture::new();
+            f.fund_open();
+            let split = f.complete_set(2, true);
+            assert!(f.send(&[split]).is_ok());
+            let mut ix = match operation {
+                0 => f.withdrawal(1),
+                1 => f.complete_set(1, true),
+                _ => f.complete_set(1, false),
+            };
+            let code = match bad {
+                0 => {
+                    // A different payer cannot remove the owner's signer check.
+                    let victim = Pubkey::new_unique();
+                    f.svm.airdrop(&victim, 1_000_000).unwrap();
+                    ix.accounts[0].pubkey = victim;
+                    ix.accounts[0].is_signer = false;
+                    "AccountNotSigner"
+                }
+                1 | 2 => {
+                    let index = bad;
+                    let replacement = Pubkey::new_unique();
+                    f.svm
+                        .set_account(
+                            replacement,
+                            f.svm.get_account(&ix.accounts[index].pubkey).unwrap(),
+                        )
+                        .unwrap();
+                    ix.accounts[index].pubkey = replacement;
+                    "ConstraintSeeds"
+                }
+                3 => {
+                    let mut p = f.ledger();
+                    p.owner = Pubkey::new_unique();
+                    store(&mut f.svm, f.position, &p);
+                    "PredictionPositionOwnerMismatch"
+                }
+                4 => {
+                    let mut p = f.ledger();
+                    p.market = Pubkey::new_unique();
+                    store(&mut f.svm, f.position, &p);
+                    "PredictionPositionMarketMismatch"
+                }
+                _ => {
+                    ix.accounts[2].pubkey = Pubkey::new_unique();
+                    "AccountNotInitialized"
+                }
+            };
+            f.reject_unchanged(ix, code);
+        }
+    }
+}
+
+#[test]
+fn failed_batch_rolls_back_withdrawal_split_and_merge() {
+    for operation in 0..3 {
+        let mut f = Fixture::new();
+        f.fund_open();
+        let split = f.complete_set(5, true);
+        assert!(f.send(&[split]).is_ok());
+        let first = match operation {
+            0 => f.withdrawal(1),
+            1 => f.complete_set(1, true),
+            _ => f.complete_set(1, false),
+        };
+        let bad = f.complete_set(u64::MAX, true);
+        let before = f.snapshot();
+        assert!(f.send(&[first, bad]).is_err());
+        assert_eq!(f.snapshot(), before);
+    }
+}
+
+#[test]
+fn two_wallets_share_backing_without_spending_each_others_claims() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    let ix = f.complete_set(7, true);
+    assert!(f.send(&[ix]).is_ok());
+    let first_owner = std::mem::replace(&mut f.owner, Keypair::new());
+    let first_position = f.position;
+    let first_source = f.source;
+    f.svm.airdrop(&f.owner.pubkey(), 1_000_000_000).unwrap();
+    let (position, bump) =
+        tidebook::derive_prediction_position_pda(&tidebook::ID, &f.market, &f.owner.pubkey());
+    f.position = position;
+    store(
+        &mut f.svm,
+        position,
+        &PredictionPosition {
+            market: f.market,
+            owner: f.owner.pubkey(),
+            collateral_free: 0,
+            collateral_locked: 0,
+            yes_free: 0,
+            yes_locked: 0,
+            no_free: 0,
+            no_locked: 0,
+            bump,
+        },
+    );
+    // Redistribute existing fixture tokens, keeping the mint supply unchanged.
+    let mut first_tokens = f.token(first_source);
+    first_tokens.amount -= 20_000_000;
+    store_spl(&mut f.svm, first_source, first_tokens);
+    f.source = Pubkey::new_unique();
+    store_spl(
+        &mut f.svm,
+        f.source,
+        TokenAccount {
+            mint: f.mint,
+            owner: f.owner.pubkey(),
+            amount: 20_000_000,
+            state: AccountState::Initialized,
+            ..TokenAccount::default()
+        },
+    );
+    let second_source = f.source;
+    let deposit = f.instruction(20_000_000);
+    let split = f.complete_set(5, true);
+    assert!(f.send(&[deposit, split]).is_ok());
+    let mut wrong_position = f.complete_set(1, false);
+    wrong_position.accounts[2].pubkey = first_position;
+    f.reject_unchanged(wrong_position, "ConstraintSeeds");
+    let first_before = f.svm.get_account(&first_position).unwrap().data;
+    let merge = f.complete_set(2, false);
+    let withdraw = f.withdrawal(17_000_000);
+    assert!(f.send(&[merge, withdraw]).is_ok());
+    assert_eq!(
+        f.svm.get_account(&first_position).unwrap().data,
+        first_before
+    );
+    let second = f.ledger();
+    let second_before = f.svm.get_account(&f.position).unwrap().data;
+    let second_position = f.position;
+    f.owner = first_owner;
+    f.position = first_position;
+    f.source = first_source;
+    let merge = f.complete_set(7, false);
+    let withdraw = f.withdrawal(20_000_000);
+    assert!(f.send(&[merge, withdraw]).is_ok());
+    assert_eq!(
+        f.svm.get_account(&second_position).unwrap().data,
+        second_before
+    );
+    let first = f.ledger();
+    let m = f.market_state();
+    assert_eq!(m.yes_supply, first.yes_free + second.yes_free);
+    assert_eq!(m.no_supply, first.no_free + second.no_free);
+    assert_eq!(m.backing_reserve, 3_000_000);
+    assert_eq!(
+        f.token(f.vault).amount,
+        first.collateral_free + second.collateral_free + m.backing_reserve
+    );
+    assert_eq!(
+        f.token(first_source).amount + f.token(second_source).amount + f.token(f.vault).amount,
+        100_000_000
+    );
 }

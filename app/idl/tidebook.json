@@ -2799,6 +2799,115 @@
       ]
     },
     {
+      "name": "merge_prediction_complete_set",
+      "docs": [
+        "Burns free YES/NO pairs and releases their backing into free cash."
+      ],
+      "discriminator": [
+        223,
+        13,
+        3,
+        245,
+        142,
+        193,
+        249,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "pause_market",
       "docs": [
         "Stops new order placement while preserving cancellation access."
@@ -2968,6 +3077,115 @@
         {
           "name": "taker_fee_bps",
           "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "split_prediction_complete_set",
+      "docs": [
+        "Reserves one payout of cash per newly created YES/NO pair."
+      ],
+      "discriminator": [
+        170,
+        147,
+        167,
+        13,
+        176,
+        167,
+        139,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
         }
       ]
     },
@@ -3223,6 +3441,182 @@
               {
                 "kind": "account",
                 "path": "withdrawal_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_prediction_collateral",
+      "docs": [
+        "Withdraws only free collateral, including after trading or resolution."
+      ],
+      "discriminator": [
+        104,
+        247,
+        205,
+        160,
+        164,
+        229,
+        89,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
               }
             ]
           }
@@ -4415,6 +4809,36 @@
       "code": 6113,
       "name": "InvalidPredictionTokenOwner",
       "msg": "Prediction collateral source is not owned by the signing wallet"
+    },
+    {
+      "code": 6114,
+      "name": "InvalidPredictionContractQuantity",
+      "msg": "Contract quantity must be a positive whole number"
+    },
+    {
+      "code": 6115,
+      "name": "PredictionSplitUnavailable",
+      "msg": "Complete sets may only be split while the market is open and before close"
+    },
+    {
+      "code": 6116,
+      "name": "PredictionMergeUnavailable",
+      "msg": "Complete sets may only be merged in Open, Frozen or Proposed markets"
+    },
+    {
+      "code": 6117,
+      "name": "InsufficientPredictionPositions",
+      "msg": "Not enough free YES and NO positions to merge"
+    },
+    {
+      "code": 6118,
+      "name": "PredictionAccountingOverflow",
+      "msg": "Prediction quantity, payout or reserve exceeds u64"
+    },
+    {
+      "code": 6119,
+      "name": "PredictionBackingUnderflow",
+      "msg": "Prediction supply or backing reserve cannot cover the complete set"
     }
   ],
   "types": [

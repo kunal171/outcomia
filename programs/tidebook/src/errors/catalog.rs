@@ -351,4 +351,22 @@ pub enum TidebookError {
 
     #[msg("Prediction collateral source is not owned by the signing wallet")]
     InvalidPredictionTokenOwner = 113,
+
+    #[msg("Contract quantity must be a positive whole number")]
+    InvalidPredictionContractQuantity = 114,
+
+    #[msg("Complete sets may only be split while the market is open and before close")]
+    PredictionSplitUnavailable = 115,
+
+    #[msg("Complete sets may only be merged in Open, Frozen or Proposed markets")]
+    PredictionMergeUnavailable = 116,
+
+    #[msg("Not enough free YES and NO positions to merge")]
+    InsufficientPredictionPositions = 117,
+
+    #[msg("Prediction quantity, payout or reserve exceeds u64")]
+    PredictionAccountingOverflow = 118,
+
+    #[msg("Prediction supply or backing reserve cannot cover the complete set")]
+    PredictionBackingUnderflow = 119,
 }

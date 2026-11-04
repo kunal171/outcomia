@@ -1,8 +1,9 @@
 # Prediction Market Design
 
 Status: draft and wallet-position initialization, creation validation and
-collateral deposits are implemented locally. Opening, withdrawals, trading and
-resolution remain planned. This program version has not been deployed to devnet.
+collateral deposits/withdrawals and complete-set splitting/merging are implemented
+locally. Opening, trading and resolution remain planned. This program version
+has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
@@ -338,14 +339,16 @@ The position panel displays the aggregate collateral balance across wallet token
 accounts, accepts exact human-unit amounts, and selects a single owned token
 account with enough funds for the transfer. If funds are fragmented across
 accounts, selection reports an error; the client does not silently consolidate
-them. Wallet/position read failures disable funding. Confirmation reloads both
+them. Wallet read failures disable deposits; position read failures disable all
+position actions. Withdrawals do not depend on reading the wallet balance.
+Confirmation reloads both
 the wallet balance and ledger. Transactions still revalidate all accounts and
 amounts because browser balances can become stale.
 
 `NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED` defaults to false and requires the draft
 rollout flag as well. It may be enabled explicitly for local tests against the
-new binary. Keep public funding disabled and do not deploy deposit functionality
-for users until prediction withdrawals are implemented. This UI flag is not an
+new binary. Keep it false against older deployments; enable it only after
+deploying deposits, withdrawals and complete sets together. This UI flag is not an
 on-chain security boundary. Events/indexer integration remain a later milestone.
 
 LiteSVM tests cover successful credits, repeated and multi-wallet conservation,
@@ -353,6 +356,59 @@ non-resolved status funding, resolved rejection, signatures, source ownership,
 mint/vault/position binding, overflow, insufficient funds, SPL frozen-account
 failure and whole-transaction rollback. Client tests cover amount limits and
 IDL encoding of the exact atomic amount and account roles.
+
+### Free-collateral withdrawals (implemented locally)
+
+`withdraw_prediction_collateral(amount)` requires the wallet signature, its
+canonical position and the market's canonical mint, vault and authority. The
+destination must be a legacy SPL token account owned by that wallet and using
+the collateral mint. The browser creates the associated token account
+idempotently in the same transaction if needed; the wallet pays its SOL rent.
+The instruction itself also accepts other valid wallet-owned token accounts.
+
+Only positive amounts up to `collateral_free` can leave the vault. The vault
+authority signs `TransferChecked` with its canonical PDA seeds. The transfer
+and debit are atomic; locked collateral, outcome balances, reserve and fees
+remain unchanged. Withdrawals work in every lifecycle status, including after
+close and resolution. They do not redeem outcomes. Failed wallet-balance reads
+do not block withdrawing a known free balance, but position read errors do.
+
+### Complete sets (implemented locally)
+
+`split_prediction_complete_set(quantity)` takes a positive whole number of
+pairs. It requires Open status and `Clock.unix_timestamp < close_ts`. Each pair
+debits `payout_per_contract` atoms from free collateral, increases backing by
+the same amount, and adds one YES and one NO to both the wallet and market
+supplies. It creates internal positions, not SPL token mints.
+
+`merge_prediction_complete_set(quantity)` burns equal quantities of free YES
+and NO, decreases both supplies and reserve, and credits their full backing to
+free collateral. Open, Frozen and Proposed markets allow merging, including
+after close. Draft and Resolved markets reject it; resolved markets will use
+outcome redemption. Locked outcomes cannot be merged. A complete pair has a
+fixed payout regardless of the eventual result, so no oracle price is needed.
+
+Example with six-decimal collateral: deposit 10 tokens, split 3 pairs, then
+merge 1 pair. The wallet has 8 free collateral, 2 YES and 2 NO, and the market
+reserves 2 tokens. Withdrawing 8 leaves the 2-token backing in the vault.
+
+Splitting and merging do not transfer SPL tokens. Every multiplication, credit,
+debit, supply and reserve change uses checked arithmetic. The market is writable
+because it stores aggregate supply and backing: this serializes operations
+within a market, but makes exact reserve accounting simple. No protocol fee is
+charged for either conversion. Trading fees belong to matching, added later.
+
+The UI takes whole pairs separately from decimal cash amounts, shows the exact
+collateral reserved/released, and refreshes position and reserve after confirmation.
+It rejects fractional contracts and excludes locked balances when checking funds.
+Chain checks remain authoritative if prices, timestamps or balances change.
+There is not yet an opening instruction, so new drafts cannot split pairs;
+integration tests use an Open fixture until that lifecycle transition is added.
+
+Tests cover full and partial round trips, two-wallet conservation and isolation,
+all lifecycle gates, the exact close boundary, locked funds, zero amounts,
+overflow/underflow, unsigned or substituted accounts, SPL CPI failure and batch
+rollback. Typed events/indexer decoding remain a later milestone.
 
 ### Position creation
 
@@ -525,18 +581,19 @@ these equations with checked `u128` intermediate arithmetic.
 
 ## Implementation sequence
 
-1. Add prediction enums, accounts, sizes, and PDA tests.
-2. Initialize a market with one collateral vault and immutable rule hashes.
-3. Add position ledgers plus deposit and withdrawal.
-4. Add split and merge with conservation tests.
-5. Add YES/NO price levels, FIFO orders, and cancellation.
-6. Add bounded matching and fees.
-7. Add freeze, propose, finalize, invalid outcome, and redemption.
-8. Add typed events and indexer decoding.
-9. Add the market page, probability display, positions, and redemption UI.
-10. Run a complete devnet lifecycle before considering an oracle adapter.
-11. Add same-market atomic position switching, with execution limits, fee and
-    insufficient-liquidity rollback tests.
+The remaining implementation is grouped into four milestones. Each includes
+its tests, frontend and documentation; grouping does not remove the safety checks.
+
+1. **Collateral recovery — implemented locally.** Position ledgers, deposits and
+   withdrawals, with owner checks and atomic SPL custody.
+2. **Complete sets — implemented locally.** Split/merge with exact backing,
+   free/locked separation and conservation tests.
+3. **Trading.** Open markets, YES/NO price levels, FIFO orders, cancellation,
+   bounded matching, fees, trading UI, typed events and indexer decoding.
+4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
+   handling, redemption and its UI. Add atomic position switching with execution
+   limits and rollback tests, then run a full devnet lifecycle. Oracle adapters
+   remain outside the first version.
 
 ## Sources
 

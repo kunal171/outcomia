@@ -220,11 +220,30 @@ name without reallocating `Market`. The account stores the market address,
 base and quote symbols, a display name, an immutable `MarketKind`, and its bump.
 
 `Spot` is the normal base/quote model. `Other` is available for explicit
-experiments. `Prediction` is serialized but initialization rejects it until
-collateral, position, resolution, and payout rules exist on-chain. Active
+experiments. Spot metadata initialization rejects `Prediction`; the separate
+prediction draft initializer creates that kind atomically with its collateral
+vault and immutable rules. Active
 administrators may initialize metadata and update its three labels; no update
 instruction accepts `kind`. The market authority closes metadata before closing
 a paused market so the separate PDA does not retain orphaned rent.
+
+### Prediction collateral and complete sets
+
+Prediction markets use a separate `PredictionMarket` and per-wallet
+`PredictionPosition`, plus one collateral vault. Spot account layouts do not
+change. Deposits credit free collateral; withdrawals debit only that cash and
+remain available in every status. The vault-authority PDA signs outgoing SPL
+transfers, and account seeds bind each claim to its market and wallet.
+
+Splitting in an Open market before close moves one payout per whole contract
+from free cash to backing reserve and creates equal YES/NO claims. Merging in
+Open, Frozen or Proposed burns a free pair and releases its backing. Locked
+balances cannot be used. Neither conversion moves SPL tokens; checked ledger
+and aggregate updates preserve `vault = cash claims + backing + fees`.
+Writable aggregate totals serialize conversions in one market. Lifecycle
+opening, matching and resolution are still planned; these operations are tested
+locally and have not been deployed. See [prediction design](prediction-market-design.md)
+for lifecycle rules, accounting and the four-milestone implementation plan.
 
 ### Market vault topology
 

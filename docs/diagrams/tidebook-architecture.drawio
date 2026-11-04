@@ -100,16 +100,16 @@
         <mxCell id="eFees" value="configure / accrue / withdraw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#82b366" edge="1" parent="1" source="program" target="fees">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="predictionGroup" value="PLANNED PREDICTION MARKET MODULE — SAME TIDEBOOK PROGRAM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontStyle=1;verticalAlign=top;spacingTop=15" vertex="1" parent="1">
+        <mxCell id="predictionGroup" value="PREDICTION MARKETS — CASH + COMPLETE SETS IMPLEMENTED LOCALLY; TRADING + RESOLUTION PLANNED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontStyle=1;verticalAlign=top;spacingTop=15" vertex="1" parent="1">
           <mxGeometry x="40" y="820" width="1480" height="610" as="geometry"/>
         </mxCell>
-        <mxCell id="predictionMarket" value="PredictionMarket PDA&lt;br&gt;Immutable Prediction classification&lt;br&gt;Resolver keys + enforced time windows&lt;br&gt;Rule hashes + backing reserve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+        <mxCell id="predictionMarket" value="PredictionMarket PDA&lt;br&gt;Draft creation + validated terms&lt;br&gt;Rule hashes + immutable classification&lt;br&gt;Whole pairs + checked backing reserve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="40" y="70" width="370" height="100" as="geometry"/>
         </mxCell>
         <mxCell id="predictionVault" value="Single collateral mint + vault&lt;br&gt;One SPL asset per market&lt;br&gt;Trader collateral + backing reserve + fees" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="560" y="70" width="350" height="100" as="geometry"/>
         </mxCell>
-        <mxCell id="predictionPosition" value="PredictionPosition PDA per trader&lt;br&gt;Collateral free / locked&lt;br&gt;Internal YES and NO free / locked&lt;br&gt;Split / merge / redeem; no outcome SPL mints" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+        <mxCell id="predictionPosition" value="PredictionPosition PDA per trader&lt;br&gt;Deposit / withdraw free collateral&lt;br&gt;Split / merge free YES + NO pairs&lt;br&gt;No outcome SPL mints; redemption planned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="1060" y="70" width="370" height="100" as="geometry"/>
         </mxCell>
         <mxCell id="predictionRules" value="Arweave rules + proposal evidence&lt;br&gt;Question, YES/NO criteria, evidence sources&lt;br&gt;Fallback procedure + deadlines&lt;br&gt;Document URI + SHA-256 committed on-chain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
@@ -121,13 +121,13 @@
         <mxCell id="predictionBooks" value="YES and NO bid / ask books&lt;br&gt;Separate prediction orders + price levels&lt;br&gt;Reuse bounded FIFO design&lt;br&gt;Atomic fills + collateral fees&lt;br&gt;Later: atomic sell -&gt; buy opposite outcome" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="1060" y="270" width="370" height="110" as="geometry"/>
         </mxCell>
-        <mxCell id="predictionIntegration" value="Planned UI + indexer integration&lt;br&gt;Next.js: question, rules, probability, positions and redemption&lt;br&gt;Typed prediction events -&gt; existing Rust ingestion service -&gt; PostgreSQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+        <mxCell id="predictionIntegration" value="Local UI: drafts, rules, balances, deposit / withdraw, split / merge&lt;br&gt;Planned: trading, probability, redemption and typed prediction events&lt;br&gt;Future events -&gt; existing Rust ingestion service -&gt; PostgreSQL; not deployed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="350" y="460" width="780" height="75" as="geometry"/>
         </mxCell>
         <mxCell id="predictionDetails" value="Open detailed prediction architecture: accounts, resolution and atomic switching" link="prediction-market-architecture.drawio" style="text;html=1;align=center;fontColor=#0066cc;whiteSpace=wrap;" vertex="1" parent="predictionGroup">
           <mxGeometry x="250" y="560" width="980" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="ePredictionModule" value="planned instructions + account validation" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#666666;endArrow=block;exitX=0;exitY=0.8;entryX=0;entryY=0.5;" edge="1" parent="1" source="program" target="predictionMarket">
+        <mxCell id="ePredictionModule" value="draft / cash / complete-set instructions" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#666666;endArrow=block;exitX=0;exitY=0.8;entryX=0;entryY=0.5;" edge="1" parent="1" source="program" target="predictionMarket">
           <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="20" y="290"/><mxPoint x="20" y="940"/></Array></mxGeometry>
         </mxCell>
         <mxCell id="ePredictionVault" value="canonical collateral" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionMarket" target="predictionVault"><mxGeometry relative="1" as="geometry"/></mxCell>

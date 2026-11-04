@@ -37,6 +37,8 @@ const {
   derivePredictionMarketPda,
   derivePredictionPositionPda,
   validatePredictionDepositAmount,
+  validatePredictionWithdrawalAmount,
+  validatePredictionCompleteSet,
   PREDICTION_FUNDING_ENABLED,
 } = mod.exports;
 
@@ -234,6 +236,230 @@ test("deposit preflight rejects zero, unavailable balance, overspending and u64 
     maximum.toString(),
   );
   assert.equal(PREDICTION_FUNDING_ENABLED, false);
+});
+
+test("withdrawal preflight uses only free cash and rejects zero and oversized amounts", () => {
+  const { BN } = require("@anchor-lang/core");
+  const free = new BN("1000000");
+  assert.equal(
+    validatePredictionWithdrawalAmount(free, free).toString(),
+    "1000000",
+  );
+  for (const amount of [
+    new BN(0),
+    new BN(-1),
+    new BN("18446744073709551616"),
+  ]) {
+    assert.throws(
+      () => validatePredictionWithdrawalAmount(amount, free),
+      /positive u64/,
+    );
+  }
+  assert.throws(
+    () => validatePredictionWithdrawalAmount(new BN(1), new BN(0)),
+    /available collateral/,
+  );
+  assert.throws(
+    () => validatePredictionWithdrawalAmount(free.addn(1), free),
+    /available collateral/,
+  );
+});
+
+function completeSetFixture() {
+  const { BN } = require("@anchor-lang/core");
+  return {
+    position: {
+      collateralFree: new BN("10000000"),
+      yesFree: new BN(3),
+      noFree: new BN(3),
+      collateralLocked: new BN("5000000"),
+      yesLocked: new BN(10),
+      noLocked: new BN(10),
+    },
+    market: {
+      status: { open: {} },
+      closeTs: new BN(100),
+      payoutPerContract: new BN("1000000"),
+      yesSupply: new BN(13),
+      noSupply: new BN(13),
+      backingReserve: new BN("13000000"),
+    },
+  };
+}
+
+test("complete-set preflight enforces time, free pairs and exact collateral arithmetic", () => {
+  const { BN } = require("@anchor-lang/core");
+  const { position, market } = completeSetFixture();
+  const run = (quantity, action, now = 99) =>
+    validatePredictionCompleteSet(
+      new BN(quantity),
+      position,
+      market,
+      action,
+      new BN(now),
+    );
+  assert.equal(run(3, "split").toString(), "3000000");
+  assert.equal(run(3, "merge", 100).toString(), "3000000");
+  assert.throws(() => run(1, "split", 100), /before its close/);
+  assert.throws(() => run(11, "split"), /available collateral/);
+  assert.throws(() => run(4, "merge"), /available YES and NO/);
+  for (const action of ["split", "merge"]) {
+    for (const q of ["0", "-1", "18446744073709551616"])
+      assert.throws(() => run(q, action), /positive whole/);
+  }
+  for (const status of ["draft", "frozen", "proposed", "resolved"]) {
+    market.status = { [status]: {} };
+    assert.throws(() => run(1, "split"), /open market/);
+    if (["frozen", "proposed"].includes(status))
+      assert.equal(run(1, "merge").toString(), "1000000");
+    else assert.throws(() => run(1, "merge"), /Merging requires/);
+  }
+});
+
+test("complete-set preflight checks all supply and reserve overflow or underflow", () => {
+  const { BN } = require("@anchor-lang/core");
+  const maximum = new BN("18446744073709551615");
+  for (const field of [
+    "yesFree",
+    "noFree",
+    "yesSupply",
+    "noSupply",
+    "backingReserve",
+  ]) {
+    const { position, market } = completeSetFixture();
+    (field.endsWith("Free") ? position : market)[field] = maximum;
+    assert.throws(
+      () =>
+        validatePredictionCompleteSet(
+          new BN(1),
+          position,
+          market,
+          "split",
+          new BN(99),
+        ),
+      /limit/,
+    );
+  }
+  for (const field of ["yesSupply", "noSupply", "backingReserve"]) {
+    const { position, market } = completeSetFixture();
+    market[field] = new BN(0);
+    assert.throws(
+      () =>
+        validatePredictionCompleteSet(
+          new BN(1),
+          position,
+          market,
+          "merge",
+          new BN(99),
+        ),
+      /backing/,
+    );
+  }
+  for (const action of ["split", "merge"]) {
+    const { position, market } = completeSetFixture();
+    market.payoutPerContract = maximum;
+    assert.throws(
+      () =>
+        validatePredictionCompleteSet(
+          new BN(2),
+          position,
+          market,
+          action,
+          new BN(99),
+        ),
+      /exceeds u64/,
+    );
+  }
+  const { position, market } = completeSetFixture();
+  position.collateralFree = maximum;
+  assert.throws(
+    () =>
+      validatePredictionCompleteSet(
+        new BN(1),
+        position,
+        market,
+        "merge",
+        new BN(99),
+      ),
+    /collateral limit/,
+  );
+});
+
+test("withdrawal and complete-set IDL agree with wallet account roles and units", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, Keypair } = require("@solana/web3.js");
+  const {
+    getAssociatedTokenAddressSync,
+    createAssociatedTokenAccountIdempotentInstruction,
+  } = require("@solana/spl-token");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const owner = Keypair.generate().publicKey;
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const mint = new PublicKey(new Uint8Array(32).fill(5));
+  const derive = (seed, ...keys) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from(seed), ...keys],
+      program.programId,
+    )[0];
+  const position = derive(
+    "prediction_position",
+    market.toBuffer(),
+    owner.toBuffer(),
+  );
+  const destination = getAssociatedTokenAddressSync(mint, owner);
+  const ata = createAssociatedTokenAccountIdempotentInstruction(
+    owner,
+    destination,
+    owner,
+    mint,
+  );
+  assert.equal(ata.data[0], 1); // Safe if the ATA exists or is created concurrently.
+  assert.equal(ata.keys[1].pubkey.toBase58(), destination.toBase58());
+  const ix = await program.methods
+    .withdrawPredictionCollateral(new BN("10000000"))
+    .accountsStrict({
+      owner,
+      market,
+      position,
+      collateralMint: mint,
+      destination,
+      vaultAuthority: derive("vault-authority", market.toBuffer()),
+      collateralVault: derive("vault", market.toBuffer(), mint.toBuffer()),
+      tokenProgram: new PublicKey(
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      ),
+    })
+    .instruction();
+  assert.equal(
+    program.coder.instruction.decode(ix.data).data.amount.toString(),
+    "10000000",
+  );
+  assert.equal(ix.keys[0].isSigner, true);
+  assert.equal(ix.keys[1].isWritable, false);
+  assert.equal(ix.keys[2].isWritable, true);
+  assert.equal(ix.keys[4].pubkey.toBase58(), destination.toBase58());
+  assert.equal(ix.keys[4].isWritable, true);
+  assert.equal(ix.keys[6].isWritable, true);
+  for (const action of [
+    "splitPredictionCompleteSet",
+    "mergePredictionCompleteSet",
+  ]) {
+    const ix = await program.methods[action](new BN(3))
+      .accountsStrict({ owner, market, position })
+      .instruction();
+    assert.equal(ix.keys.length, 3); // Ledger conversion: no token CPI or mint.
+    assert.equal(ix.keys[0].isSigner, true);
+    assert.equal(ix.keys[1].isWritable, true);
+    assert.equal(ix.keys[2].isWritable, true);
+    const decoded = program.coder.instruction.decode(ix.data);
+    assert.equal(decoded.name, action);
+    assert.equal(decoded.data.quantity.toString(), "3");
+  }
 });
 
 test("deposit arguments encode exact collateral atoms and canonical account roles", async () => {

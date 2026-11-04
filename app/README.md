@@ -56,7 +56,7 @@ updated client against devnet.
   resolver keys, rules URI and content hashes; connected-wallet position
   initialization and display of all six free/locked balance fields.
   The position panel also displays wallet collateral and includes a separately
-  gated collateral-deposit form.
+  gated deposit/withdrawal form and whole YES/NO pair split/merge actions.
 
 Draft and position creation remain disabled by default. After deploying the
 matching program containing both initializers,
@@ -78,12 +78,12 @@ keys and timing come from the file. Hashing uses the original bytes; changing
 whitespace changes the rules hash. The form does not verify the remote copy.
 
 Contracts use whole quantities and pay one collateral token per winning
-contract. Prices use the mint's precision. Opening, withdrawals, trading, resolution
+contract. Prices use the mint's precision. Opening, trading, resolution
 and redemption are later milestones; a newly created account is always Draft.
 
-Prediction deposits are implemented locally. Keep
-`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` on public deployments until
-withdrawals are ready. For local tests, enable it alongside the draft flag and
+Prediction deposits, withdrawals and complete sets are implemented locally. Keep
+`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` against older deployments. After
+deploying all three operations, enable it alongside the draft flag and
 rebuild against the matching program. A deposit credits only free collateral;
 it creates no YES/NO positions. Resolved markets reject deposits.
 
@@ -93,6 +93,18 @@ The displayed wallet balance is aggregated: fragmented funds may require a
 smaller deposit. Failed balance reads disable submission. Confirmed deposits
 refresh wallet and position balances. The program enforces ownership, mint and
 vault checks independently of this UI.
+
+Withdrawals spend available collateral only and work after trading closes or
+resolution. The client creates a missing collateral ATA atomically; wallet SOL
+pays rent. Wallet-balance read errors block deposits but do not block recovering
+a known available position balance. Zero amounts and overspending disable submission.
+
+Splitting one whole pair reserves one collateral token and creates one YES
+plus one NO internal contract. Merging burns a free pair and returns that token
+to available collateral; it does not transfer tokens out of the vault. Locked
+outcomes cannot be merged. Splitting requires Open status before close; merging
+works in Open, Frozen and Proposed. Drafts cannot split until the opening
+instruction is implemented. Confirmation refreshes the position and backing reserve.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 

@@ -63,6 +63,32 @@ pub mod tidebook {
         )
     }
 
+    /// Withdraws only free collateral, including after trading or resolution.
+    pub fn withdraw_prediction_collateral(
+        ctx: Context<WithdrawPredictionCollateral>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::withdraw_prediction_collateral::handle_withdraw_prediction_collateral(
+            ctx, amount,
+        )
+    }
+
+    /// Reserves one payout of cash per newly created YES/NO pair.
+    pub fn split_prediction_complete_set(
+        ctx: Context<PredictionCompleteSet>,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::prediction_complete_set::handle_split_prediction_complete_set(ctx, quantity)
+    }
+
+    /// Burns free YES/NO pairs and releases their backing into free cash.
+    pub fn merge_prediction_complete_set(
+        ctx: Context<PredictionCompleteSet>,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::prediction_complete_set::handle_merge_prediction_complete_set(ctx, quantity)
+    }
+
     /// Creates a configured market and its canonical base/quote token vaults.
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,

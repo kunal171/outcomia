@@ -6,7 +6,7 @@ import { PROGRAM_ID } from "./solana";
 export const PREDICTION_DRAFTS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";
 
-// Local funding tests only until withdrawals are implemented and deployed.
+// Enable only against a deployment containing deposits, withdrawals and sets.
 export const PREDICTION_FUNDING_ENABLED =
   PREDICTION_DRAFTS_ENABLED &&
   process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true";
@@ -26,6 +26,64 @@ export function validatePredictionDepositAmount(
   if (collateralFree.add(amount).bitLength() > 64)
     throw new Error("Deposit would exceed the position balance limit");
   return amount;
+}
+
+/** Withdrawals spend cash only; wallet RPC errors must not block cash recovery. */
+export function validatePredictionWithdrawalAmount(
+  amount: BN,
+  collateralFree: BN,
+): BN {
+  if (amount.isNeg() || amount.isZero() || amount.bitLength() > 64)
+    throw new Error("Withdrawal must be a positive u64 amount");
+  if (amount.gt(collateralFree))
+    throw new Error("Withdrawal exceeds your available collateral");
+  return amount;
+}
+
+/** Whole pairs only. BN arithmetic preserves exact u64 collateral quantities. */
+export function validatePredictionCompleteSet(
+  quantity: BN,
+  position: PredictionPositionAccount,
+  market: PredictionMarketAccount,
+  action: "split" | "merge",
+  now: BN,
+): BN {
+  if (quantity.isNeg() || quantity.isZero() || quantity.bitLength() > 64)
+    throw new Error("Quantity must be a positive whole u64 contract count");
+  const status = predictionStatus(market);
+  if (action === "split" && (status !== "open" || now.gte(market.closeTs)))
+    throw new Error("Splitting requires an open market before its close time");
+  if (action === "merge" && !["open", "frozen", "proposed"].includes(status))
+    throw new Error("Merging requires an open, frozen or proposed market");
+  const collateral = quantity.mul(market.payoutPerContract);
+  if (collateral.bitLength() > 64)
+    throw new Error("Collateral amount exceeds u64");
+  if (action === "split") {
+    if (collateral.gt(position.collateralFree))
+      throw new Error("Not enough available collateral to split");
+    if (
+      [
+        position.yesFree.add(quantity),
+        position.noFree.add(quantity),
+        market.yesSupply.add(quantity),
+        market.noSupply.add(quantity),
+        market.backingReserve.add(collateral),
+      ].some((value) => value.bitLength() > 64)
+    )
+      throw new Error("Splitting would exceed a position or reserve limit");
+  } else {
+    if (quantity.gt(position.yesFree) || quantity.gt(position.noFree))
+      throw new Error("Not enough available YES and NO positions to merge");
+    if (
+      quantity.gt(market.yesSupply) ||
+      quantity.gt(market.noSupply) ||
+      collateral.gt(market.backingReserve)
+    )
+      throw new Error("Market backing cannot cover this merge");
+    if (position.collateralFree.add(collateral).bitLength() > 64)
+      throw new Error("Merge would exceed the available collateral limit");
+  }
+  return collateral;
 }
 
 /** Collateral fields use mint atoms; YES/NO fields count whole contracts. */

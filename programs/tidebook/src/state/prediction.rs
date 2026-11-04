@@ -1,13 +1,13 @@
 //! Binary prediction layouts, isolated from the existing spot ledger.
 //!
-//! These types define serialization and allocation only. Future instructions
-//! must enforce authority, timing and conservation. Enum and field order are
+//! These types define serialization and allocation only. Instructions enforce
+//! authority, timing and conservation. Enum and field order are
 //! persistent storage contracts; changing them later requires a migration.
 
 use anchor_lang::prelude::*;
 
 /// Maximum UTF-8 bytes reserved for each Arweave rules or evidence URI.
-/// `max_len` computes space; future handlers must reject oversized inputs.
+/// `max_len` computes space; writing handlers must reject oversized inputs.
 pub const PREDICTION_URI_MAX_LENGTH: usize = 200;
 
 /// Tradable positions. Invalid is a resolution result, never a third asset.
@@ -77,7 +77,7 @@ pub struct PredictionProposal {
 #[account]
 #[derive(InitSpace)]
 pub struct PredictionMarket {
-    /// Retained for future PDA constraints and signer seed reconstruction.
+    /// Used to verify the canonical market PDA in prediction instructions.
     pub market_id: [u8; 32],
     pub authority: Pubkey,
     pub resolver: Pubkey,
@@ -126,7 +126,7 @@ pub struct PredictionMarket {
 ///
 /// PDA: ["prediction_position", market, owner]. Collateral is measured in SPL
 /// mint atoms. YES/NO balances count whole contracts backed by the reserve;
-/// they are not token accounts. Splitting and merging will move value between
+/// they are not token accounts. Splitting and merging move value between
 /// free collateral and the market reserve without moving SPL tokens.
 #[account]
 #[derive(InitSpace)]
