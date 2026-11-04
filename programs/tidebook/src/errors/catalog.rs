@@ -303,4 +303,34 @@ pub enum TidebookError {
 
     #[msg("Market metadata belongs to a different market")]
     MarketMetadataMismatch = 97,
+
+    #[msg("Prediction trading close time must be in the future")]
+    InvalidPredictionCloseTime = 98,
+
+    #[msg("Prediction resolution cannot begin before trading closes")]
+    InvalidPredictionResolutionTime = 99,
+
+    #[msg("Prediction fallback activation and deadline must follow the resolution window")]
+    InvalidPredictionFallback = 100,
+
+    #[msg("Prediction resolver keys must be nonzero and primary and fallback must differ")]
+    InvalidPredictionResolver = 101,
+
+    #[msg("Prediction resolution delay must be positive and fit signed timestamp arithmetic")]
+    InvalidPredictionResolutionDelay = 102,
+
+    #[msg("Prediction payout must be positive and even for exact Invalid settlement")]
+    InvalidPredictionPayout = 103,
+
+    #[msg("Prediction price tick must be positive, below payout and divide it exactly")]
+    InvalidPredictionPriceTick = 104,
+
+    #[msg("Prediction rules URI must be bounded printable ASCII using ar:// or https://")]
+    InvalidPredictionRulesUri = 105,
+
+    #[msg("Prediction question and rules hashes must be nonzero")]
+    InvalidPredictionRulesHash = 106,
+
+    #[msg("Prediction timestamp plus resolution delay exceeds the timestamp range")]
+    PredictionTimestampOverflow = 107,
 }

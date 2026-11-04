@@ -12,6 +12,7 @@ pub mod market;
 pub mod matching;
 pub mod metadata;
 pub mod order;
+pub mod prediction;
 
 mod catalog;
 

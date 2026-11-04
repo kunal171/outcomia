@@ -1,7 +1,8 @@
 # Prediction Market Design
 
-Status: account-layout milestone implemented locally. Prediction instructions,
-trading and resolution remain planned; prediction markets cannot be created yet.
+Status: account layouts and pure creation-config validation are implemented.
+Prediction instructions, trading and resolution remain planned; prediction
+markets cannot be created yet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
@@ -13,6 +14,23 @@ discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
 113 payload bytes (121 including its discriminator). These are Borsh sizes,
 not Rust in-memory struct sizes. URI limits and state rules will be enforced by
 future instruction handlers; `InitSpace` only calculates allocation.
+
+`programs/tidebook/src/prediction_config.rs` validates proposed creation terms
+without account allocation or network access. It requires a future close time,
+ordered optional resolution windows, nonzero resolver keys, a distinct fallback
+resolver, positive representable delay, and timestamp arithmetic without overflow.
+Payout must be positive and even. Price tick must be positive, below payout,
+and divide payout exactly so complementary prices share the same grid. Rule
+references must fit the URI bound, use printable ASCII without whitespace and
+start with `ar://` or `https://` with a nonempty target. Both content commitments
+must be nonzero. This is not full URL validation or document verification.
+
+Tests cover valid optional configurations, boundary timestamps, delay overflow,
+payout/tick constraints, resolver keys, URI bounds and missing hashes. The future
+initializer must call this validator using Solana Clock and separately check the
+admin role, SPL mint, vault authority and canonical account addresses. Proposal
+instructions must repeat checked timestamp arithmetic at the actual proposal
+time, especially when a resolver window has no deadline.
 
 This design adds binary prediction markets to Tidebook without creating YES and
 NO SPL tokens. A market uses one collateral mint, such as test USDC. YES and NO

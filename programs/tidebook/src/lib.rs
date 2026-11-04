@@ -10,6 +10,7 @@ pub mod fees;
 pub mod instructions;
 pub mod matching;
 pub mod pda;
+pub mod prediction_config;
 pub mod state;
 
 use anchor_lang::prelude::*;
