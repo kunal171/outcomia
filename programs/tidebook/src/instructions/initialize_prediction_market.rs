@@ -3,7 +3,7 @@
 //! The active-admin constraint is authoritative; a UI badge grants no access.
 //! Anchor's init constraints run before the handler, so a validation failure
 //! rolls back every account creation and token CPI in the transaction.
-//! Opening, deposits and outcome positions remain separate milestones.
+//! Opening, deposits and outcome issuance remain separate milestones.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};

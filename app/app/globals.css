@@ -1004,6 +1004,10 @@ footer {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.prediction-position {
+  margin-top: 24px;
+}
+
 .prediction-terms {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }

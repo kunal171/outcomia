@@ -46,6 +46,13 @@ pub mod tidebook {
         )
     }
 
+    /// Creates the signing wallet's zeroed prediction-position ledger.
+    pub fn initialize_prediction_position(
+        ctx: Context<InitializePredictionPosition>,
+    ) -> Result<()> {
+        instructions::initialize_prediction_position::handle_initialize_prediction_position(ctx)
+    }
+
     /// Creates a configured market and its canonical base/quote token vaults.
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,

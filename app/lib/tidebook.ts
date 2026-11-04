@@ -12,7 +12,10 @@ import {
 } from "@solana/web3.js";
 import tidebookIdl from "../idl/tidebook.json";
 import { PROGRAM_ID } from "./solana";
-import type { PredictionMarketAccount } from "./prediction";
+import type {
+  PredictionMarketAccount,
+  PredictionPositionAccount,
+} from "./prediction";
 
 export const PROTOCOL_CONFIG_SEED = "protocol_config";
 export const ADMIN_SEED = "admin";
@@ -194,6 +197,7 @@ interface AccountClient<T> {
 
 interface TidebookAccounts {
   predictionMarket: AccountClient<PredictionMarketAccount>;
+  predictionPosition: AccountClient<PredictionPositionAccount>;
   protocolConfig: AccountClient<ProtocolConfigAccount>;
   adminRecord: AccountClient<AdminRecordAccount>;
   market: AccountClient<MarketAccount>;

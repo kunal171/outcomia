@@ -6,6 +6,19 @@ import { PROGRAM_ID } from "./solana";
 export const PREDICTION_DRAFTS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";
 
+/** Collateral fields use mint atoms; YES/NO fields count whole contracts. */
+export interface PredictionPositionAccount {
+  market: PublicKey;
+  owner: PublicKey;
+  collateralFree: BN;
+  collateralLocked: BN;
+  yesFree: BN;
+  yesLocked: BN;
+  noFree: BN;
+  noLocked: BN;
+  bump: number;
+}
+
 export interface PredictionMarketAccount {
   marketId: number[];
   authority: PublicKey;
@@ -53,6 +66,17 @@ export function derivePredictionMarketPda(marketId: Uint8Array) {
     throw new Error("Market ID must contain 32 bytes");
   return PublicKey.findProgramAddressSync(
     [Buffer.from("prediction_market"), Buffer.from(marketId)],
+    PROGRAM_ID,
+  )[0];
+}
+
+/** Must match Rust's [prediction_position, market, owner] seed order. */
+export function derivePredictionPositionPda(
+  market: PublicKey,
+  owner: PublicKey,
+) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_position"), market.toBuffer(), owner.toBuffer()],
     PROGRAM_ID,
   )[0];
 }

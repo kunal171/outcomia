@@ -1,7 +1,7 @@
 # Prediction Market Design
 
-Status: draft initialization, account layouts and creation-config validation
-are implemented locally. Opening, deposits, trading and resolution remain
+Status: draft and wallet-position initialization, account layouts and creation
+validation are implemented locally. Opening, deposits, trading and resolution remain
 planned. This program version has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -235,6 +235,22 @@ The collateral fields are claims against the single market vault. Outcome
 fields are program accounting units, not SPL balances. Ask orders move outcome
 units from free to locked. Bid orders move collateral from free to locked.
 
+`initialize_prediction_position` is implemented. The wallet signs and pays rent
+for its canonical `["prediction_position", market, owner]` account. The program
+validates the prediction-market discriminator and its market-ID seeds, then
+sets all six balances to zero. Existing ledgers are rejected rather than reset.
+No admin role, mint, token account or vault is required, and market data stays
+read-only. Ledger creation is allowed in every lifecycle status because it
+creates no claims; funding and trading must enforce their own status rules.
+
+The prediction detail page shows a connected wallet's six balances or an
+initialization button after a successful read confirms the account is absent.
+Read failures remain errors. Confirmation triggers an account reload. Wallet,
+market and RPC changes reset the panel's action state, and canceled reads cannot
+replace data in the new panel. The same rollout flag gates position creation;
+it must be enabled only after deploying a program containing both initializers.
+Deposits, withdrawals and outcome issuance are not implemented yet.
+
 ### `PredictionPriceLevel` and `PredictionOrder`
 
 The current spot accounts assume a base mint, quote mint, and `TraderBalance`.
@@ -291,10 +307,12 @@ precision and creates a draft. It does not upload to Arweave or establish that
 the URI serves those same bytes. The terms page displays hashes and on-chain
 configuration, without claiming the remote question has been verified.
 
-Creation is disabled unless `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true`. Enable
+Draft and position creation are disabled unless
+`NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true`. Enable
 that flag only after deployment of this program version, then rebuild Next.js.
 It is a rollout switch rather than an authorization mechanism; on-chain admin
-constraints always apply. Reads remain public and distinguish RPC errors from
+constraints always apply to draft creation, while position creation requires
+the owner's signature. Reads remain public and distinguish RPC errors from
 an empty result. UI trading and deposit actions are not exposed yet.
 
 ### Position creation

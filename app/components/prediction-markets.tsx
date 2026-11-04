@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AppHeader } from "./app-header";
+import { PredictionPositionPanel } from "./prediction-position";
 import { useProtocolRole } from "./protocol-role-provider";
 import {
   predictionStatus,
@@ -232,6 +233,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     View account ↗
                   </a>
                 </div>
+                {address && (
+                  <PredictionPositionPanel
+                    market={key}
+                    payoutPerContract={market.payoutPerContract}
+                    collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
+                  />
+                )}
               </article>
             );
           })}

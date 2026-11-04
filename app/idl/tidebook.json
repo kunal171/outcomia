@@ -1729,6 +1729,119 @@
       ]
     },
     {
+      "name": "initialize_prediction_position",
+      "docs": [
+        "Creates the signing wallet's zeroed prediction-position ledger."
+      ],
+      "discriminator": [
+        222,
+        225,
+        252,
+        214,
+        57,
+        67,
+        242,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "A wallet may initialize only its own position and pays the account rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Validate both account type and canonical address. A spot Market account",
+            "has a different discriminator and cannot be used as this ledger's market."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "docs": [
+            "`init` deliberately rejects existing ledgers. Reinitialization must",
+            "never zero out a trader's funded or locked balances."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_protocol",
       "docs": [
         "Creates singleton governance state and the deployer's admin record."
@@ -3206,6 +3319,19 @@
         58,
         51,
         58
+      ]
+    },
+    {
+      "name": "PredictionPosition",
+      "discriminator": [
+        42,
+        168,
+        32,
+        158,
+        13,
+        15,
+        100,
+        46
       ]
     },
     {
@@ -5325,6 +5451,67 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionPosition",
+      "docs": [
+        "One trader's collateral claims and internal YES/NO positions.",
+        "",
+        "PDA: [\"prediction_position\", market, owner]. Collateral is measured in SPL",
+        "mint atoms. YES/NO balances count whole contracts backed by the reserve;",
+        "they are not token accounts. Splitting and merging will move value between",
+        "free collateral and the market reserve without moving SPL tokens."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_free",
+            "docs": [
+              "Collateral available for withdrawal, bids or splitting."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "collateral_locked",
+            "docs": [
+              "Collateral reserved for open buy orders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_free",
+            "docs": [
+              "Free outcomes may be sold, merged as a pair or redeemed when resolved."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_locked",
+            "type": "u64"
+          },
+          {
+            "name": "no_free",
+            "type": "u64"
+          },
+          {
+            "name": "no_locked",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

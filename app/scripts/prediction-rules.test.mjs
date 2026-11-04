@@ -32,7 +32,11 @@ runInNewContext(code, {
   require: (name) =>
     name === "./solana" ? { PROGRAM_ID: PublicKey.default } : require(name),
 });
-const { parsePredictionRules, derivePredictionMarketPda } = mod.exports;
+const {
+  parsePredictionRules,
+  derivePredictionMarketPda,
+  derivePredictionPositionPda,
+} = mod.exports;
 
 function rules() {
   return {
@@ -158,6 +162,82 @@ test("PDA namespace matches Rust and requires a 32-byte market ID", () => {
     () => derivePredictionMarketPda(new Uint8Array(31)),
     /32 bytes/,
   );
+});
+
+test("position PDA scopes the ledger to both market and wallet", () => {
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const owner = new PublicKey(new Uint8Array(32).fill(4));
+  const other = new PublicKey(new Uint8Array(32).fill(5));
+  const expected = PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_position"), market.toBuffer(), owner.toBuffer()],
+    PublicKey.default,
+  )[0];
+  assert.equal(
+    derivePredictionPositionPda(market, owner).toBase58(),
+    expected.toBase58(),
+  );
+  assert.notEqual(
+    derivePredictionPositionPda(market, other).toBase58(),
+    expected.toBase58(),
+  );
+  assert.notEqual(
+    derivePredictionPositionPda(other, owner).toBase58(),
+    expected.toBase58(),
+  );
+});
+
+test("position instruction and all six balance buckets agree with the IDL", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, SystemProgram } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const owner = new PublicKey(new Uint8Array(32).fill(4));
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const position = PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_position"), market.toBuffer(), owner.toBuffer()],
+    program.programId,
+  )[0];
+  const ix = await program.methods
+    .initializePredictionPosition()
+    .accountsStrict({
+      owner,
+      market,
+      position,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+  assert.equal(
+    program.coder.instruction.decode(ix.data).name,
+    "initializePredictionPosition",
+  );
+  assert.equal(ix.keys[0].isSigner, true);
+  assert.equal(ix.keys[1].isWritable, false);
+  assert.equal(ix.keys[2].pubkey.toBase58(), position.toBase58());
+  const fields = [
+    "collateralFree",
+    "collateralLocked",
+    "yesFree",
+    "yesLocked",
+    "noFree",
+    "noLocked",
+  ];
+  const ledger = { market, owner, bump: 254 };
+  for (const [i, field] of fields.entries())
+    ledger[field] = new BN(String((i + 1) * 11));
+  const encoded = await program.coder.accounts.encode(
+    "predictionPosition",
+    ledger,
+  );
+  assert.equal(encoded.length, 121);
+  const decoded = program.coder.accounts.decode("predictionPosition", encoded);
+  assert.equal(decoded.market.toBase58(), market.toBase58());
+  assert.equal(decoded.owner.toBase58(), owner.toBase58());
+  for (const field of fields)
+    assert.equal(decoded[field].toString(), ledger[field].toString());
 });
 
 test("creation arguments encode against the checked-in IDL within transaction limits", async () => {

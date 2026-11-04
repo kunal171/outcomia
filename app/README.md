@@ -53,11 +53,21 @@ updated client against devnet.
 - `/predictions`: public draft discovery.
 - `/predictions/new`: active-admin form for atomic draft creation.
 - `/predictions/[address]`: public inspection of collateral, resolution windows,
-  resolver keys, rules URI and content hashes.
+  resolver keys, rules URI and content hashes; connected-wallet position
+  initialization and display of all six free/locked balance fields.
 
-Creation remains disabled by default. After deploying the matching program,
+Draft and position creation remain disabled by default. After deploying the
+matching program containing both initializers,
 set `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true` and rebuild. This switch only
-controls rollout; the program enforces the admin role independently.
+controls rollout; the program enforces the admin role for drafts and owner
+signatures for positions independently.
+
+Position creation is available to any signing wallet and only pays SOL rent.
+It creates no collateral or outcome claims, and duplicate initialization cannot
+reset existing balances. Confirmation reloads the account; RPC failures do not
+display fabricated zero balances or offer initialization based on a failed read.
+Wallet changes reset the position panel, and the first wallet render is delayed
+until hydration to match the server HTML.
 
 Upload the rules JSON to Arweave first, then select the exact same local file
 and enter its URI in the form. Use schema version 1 from
