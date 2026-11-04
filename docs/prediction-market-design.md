@@ -1,8 +1,8 @@
 # Prediction Market Design
 
-Status: draft and wallet-position initialization, account layouts and creation
-validation are implemented locally. Opening, deposits, trading and resolution remain
-planned. This program version has not been deployed to devnet.
+Status: draft and wallet-position initialization, creation validation and
+collateral deposits are implemented locally. Opening, withdrawals, trading and
+resolution remain planned. This program version has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
@@ -249,7 +249,8 @@ Read failures remain errors. Confirmation triggers an account reload. Wallet,
 market and RPC changes reset the panel's action state, and canceled reads cannot
 replace data in the new panel. The same rollout flag gates position creation;
 it must be enabled only after deploying a program containing both initializers.
-Deposits, withdrawals and outcome issuance are not implemented yet.
+Deposits are implemented with a separate funding rollout gate. Withdrawals and
+outcome issuance are not implemented yet.
 
 ### `PredictionPriceLevel` and `PredictionOrder`
 
@@ -313,7 +314,45 @@ that flag only after deployment of this program version, then rebuild Next.js.
 It is a rollout switch rather than an authorization mechanism; on-chain admin
 constraints always apply to draft creation, while position creation requires
 the owner's signature. Reads remain public and distinguish RPC errors from
-an empty result. UI trading and deposit actions are not exposed yet.
+an empty result. UI trading actions are not exposed yet.
+
+### Collateral deposits (implemented locally)
+
+`deposit_prediction_collateral(amount)` requires the position owner's signature,
+the canonical prediction-market PDA, the canonical market/wallet position with
+matching stored ownership fields, and a legacy SPL source owned by that wallet.
+The mint must equal `market.collateral_mint`. The destination must both match
+`market.collateral_vault` and derive from `["vault", market, collateral_mint]`,
+with the canonical vault-authority PDA as its SPL owner.
+
+Deposits accept Draft, Open, Frozen and Proposed markets. Resolved markets reject
+new deposits. The instruction checks positive amount, source funds and checked
+addition to `collateral_free`, then calls SPL `TransferChecked` using the mint's
+decimals. Only a successful transfer is credited. Other collateral buckets,
+outcome quantities, reserve, fees and market state remain unchanged. A failure
+rolls back the complete transaction, including preceding deposits in a batch.
+SPL token transfers use the wallet signature; the vault authority does not sign
+incoming deposits. No YES/NO positions are issued by depositing.
+
+The position panel displays the aggregate collateral balance across wallet token
+accounts, accepts exact human-unit amounts, and selects a single owned token
+account with enough funds for the transfer. If funds are fragmented across
+accounts, selection reports an error; the client does not silently consolidate
+them. Wallet/position read failures disable funding. Confirmation reloads both
+the wallet balance and ledger. Transactions still revalidate all accounts and
+amounts because browser balances can become stale.
+
+`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED` defaults to false and requires the draft
+rollout flag as well. It may be enabled explicitly for local tests against the
+new binary. Keep public funding disabled and do not deploy deposit functionality
+for users until prediction withdrawals are implemented. This UI flag is not an
+on-chain security boundary. Events/indexer integration remain a later milestone.
+
+LiteSVM tests cover successful credits, repeated and multi-wallet conservation,
+non-resolved status funding, resolved rejection, signatures, source ownership,
+mint/vault/position binding, overflow, insufficient funds, SPL frozen-account
+failure and whole-transaction rollback. Client tests cover amount limits and
+IDL encoding of the exact atomic amount and account roles.
 
 ### Position creation
 

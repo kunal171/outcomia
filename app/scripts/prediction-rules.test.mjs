@@ -36,6 +36,8 @@ const {
   parsePredictionRules,
   derivePredictionMarketPda,
   derivePredictionPositionPda,
+  validatePredictionDepositAmount,
+  PREDICTION_FUNDING_ENABLED,
 } = mod.exports;
 
 function rules() {
@@ -184,6 +186,104 @@ test("position PDA scopes the ledger to both market and wallet", () => {
     derivePredictionPositionPda(other, owner).toBase58(),
     expected.toBase58(),
   );
+});
+
+test("deposit preflight rejects zero, unavailable balance, overspending and u64 overflow", () => {
+  const { BN } = require("@anchor-lang/core");
+  const amount = new BN("10000000");
+  assert.equal(
+    validatePredictionDepositAmount(
+      amount,
+      new BN("20000000"),
+      new BN(0),
+    ).toString(),
+    "10000000",
+  );
+  assert.throws(
+    () => validatePredictionDepositAmount(new BN(0), amount, new BN(0)),
+    /positive u64/,
+  );
+  assert.throws(
+    () => validatePredictionDepositAmount(new BN(-1), amount, new BN(0)),
+    /positive u64/,
+  );
+  assert.throws(
+    () => validatePredictionDepositAmount(amount, null, new BN(0)),
+    /unavailable/,
+  );
+  assert.throws(
+    () => validatePredictionDepositAmount(amount, new BN(0), new BN(0)),
+    /wallet collateral balance/,
+  );
+  const maximum = new BN("18446744073709551615");
+  assert.throws(
+    () =>
+      validatePredictionDepositAmount(
+        maximum.addn(1),
+        maximum.addn(1),
+        new BN(0),
+      ),
+    /positive u64/,
+  );
+  assert.throws(
+    () => validatePredictionDepositAmount(new BN(1), new BN(1), maximum),
+    /position balance limit/,
+  );
+  assert.equal(
+    validatePredictionDepositAmount(maximum, maximum, new BN(0)).toString(),
+    maximum.toString(),
+  );
+  assert.equal(PREDICTION_FUNDING_ENABLED, false);
+});
+
+test("deposit arguments encode exact collateral atoms and canonical account roles", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const owner = new PublicKey(new Uint8Array(32).fill(4));
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const mint = new PublicKey(new Uint8Array(32).fill(5));
+  const source = new PublicKey(new Uint8Array(32).fill(6));
+  const derive = (seed, ...keys) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from(seed), ...keys],
+      program.programId,
+    )[0];
+  const vault = derive("vault", market.toBuffer(), mint.toBuffer());
+  const ix = await program.methods
+    .depositPredictionCollateral(new BN("10000000"))
+    .accountsStrict({
+      owner,
+      market,
+      position: derive(
+        "prediction_position",
+        market.toBuffer(),
+        owner.toBuffer(),
+      ),
+      collateralMint: mint,
+      source,
+      vaultAuthority: derive("vault-authority", market.toBuffer()),
+      collateralVault: vault,
+      tokenProgram: new PublicKey(
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      ),
+    })
+    .instruction();
+  const decoded = program.coder.instruction.decode(ix.data);
+  assert.equal(decoded.name, "depositPredictionCollateral");
+  assert.equal(decoded.data.amount.toString(), "10000000");
+  assert.equal(ix.keys[0].isSigner, true);
+  assert.equal(ix.keys[1].isWritable, false);
+  assert.equal(ix.keys[2].isWritable, true);
+  assert.equal(ix.keys[4].pubkey.toBase58(), source.toBase58());
+  assert.equal(ix.keys[4].isWritable, true);
+  assert.equal(ix.keys[6].pubkey.toBase58(), vault.toBase58());
+  assert.equal(ix.keys[6].isWritable, true);
 });
 
 test("position instruction and all six balance buckets agree with the IDL", async () => {

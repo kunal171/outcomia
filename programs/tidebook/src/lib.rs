@@ -53,6 +53,16 @@ pub mod tidebook {
         instructions::initialize_prediction_position::handle_initialize_prediction_position(ctx)
     }
 
+    /// Deposits collateral and atomically credits the owner's free balance.
+    pub fn deposit_prediction_collateral(
+        ctx: Context<DepositPredictionCollateral>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::deposit_prediction_collateral::handle_deposit_prediction_collateral(
+            ctx, amount,
+        )
+    }
+
     /// Creates a configured market and its canonical base/quote token vaults.
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,

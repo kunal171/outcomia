@@ -333,4 +333,22 @@ pub enum TidebookError {
 
     #[msg("Prediction timestamp plus resolution delay exceeds the timestamp range")]
     PredictionTimestampOverflow = 107,
+
+    #[msg("Prediction position belongs to a different market")]
+    PredictionPositionMarketMismatch = 108,
+
+    #[msg("Prediction position belongs to a different wallet")]
+    PredictionPositionOwnerMismatch = 109,
+
+    #[msg("Token mint does not match the prediction market collateral")]
+    InvalidPredictionCollateralMint = 110,
+
+    #[msg("Token vault does not match the prediction market custody account")]
+    InvalidPredictionVault = 111,
+
+    #[msg("A resolved prediction market cannot accept new collateral deposits")]
+    PredictionDepositAfterResolution = 112,
+
+    #[msg("Prediction collateral source is not owned by the signing wallet")]
+    InvalidPredictionTokenOwner = 113,
 }

@@ -7,6 +7,8 @@ import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import {
   derivePredictionPositionPda,
   PREDICTION_DRAFTS_ENABLED,
+  PREDICTION_FUNDING_ENABLED,
+  validatePredictionDepositAmount,
   type PredictionPositionAccount,
 } from "../lib/prediction";
 import {
@@ -14,11 +16,19 @@ import {
   formatAtomicAmount,
   getTidebookAccounts,
   getTidebookProgram,
+  getOwnedTokenBalance,
+  findOwnedTokenAccount,
+  deriveVaultAuthorityPda,
+  parseTokenAmount,
+  TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
 } from "../lib/tidebook";
 
 interface PositionProps {
   market: PublicKey;
+  collateralMint: PublicKey;
+  collateralVault: PublicKey;
+  status: string;
   payoutPerContract: BN;
   collateralSymbol: string;
 }
@@ -60,6 +70,9 @@ export function PredictionPositionPanel(props: PositionProps) {
 
 function ConnectedPosition({
   market,
+  collateralMint,
+  collateralVault,
+  status,
   payoutPerContract,
   collateralSymbol,
   wallet,
@@ -82,6 +95,14 @@ function ConnectedPosition({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [resultKind, setResultKind] = useState<"position" | "deposit">(
+    "position",
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<BN | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -120,6 +141,31 @@ function ConnectedPosition({
     };
   }, [program, positionAddress, market, wallet.publicKey, refresh]);
 
+  useEffect(() => {
+    let canceled = false;
+    setWalletLoading(true);
+    setWalletBalance(null);
+    setWalletError(null);
+    getOwnedTokenBalance(connection, wallet.publicKey, collateralMint)
+      .then((balance) => {
+        if (!canceled) setWalletBalance(balance);
+      })
+      .catch((cause) => {
+        if (!canceled)
+          setWalletError(
+            cause instanceof Error
+              ? cause.message
+              : "Unable to load wallet collateral",
+          );
+      })
+      .finally(() => {
+        if (!canceled) setWalletLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [connection, wallet.publicKey, collateralMint, refresh]);
+
   async function initialize() {
     if (
       !PREDICTION_DRAFTS_ENABLED ||
@@ -131,7 +177,7 @@ function ConnectedPosition({
     )
       return;
     setPending(true);
-    setError(null);
+    setActionError(null);
     try {
       const ix = await program.methods
         .initializePredictionPosition()
@@ -146,11 +192,12 @@ function ConnectedPosition({
         program.provider as AnchorProvider
       ).sendAndConfirm(new Transaction().add(ix));
       setSignature(confirmed);
+      setResultKind("position");
       // Read authoritative account data after confirmation rather than
       // inventing a client-side ledger with assumed balances.
       setRefresh((value) => value + 1);
     } catch (cause) {
-      setError(
+      setActionError(
         cause instanceof Error
           ? cause.message
           : "Position initialization failed",
@@ -163,6 +210,82 @@ function ConnectedPosition({
   // Initialization enforces payout_per_contract = 10^mint.decimals.
   // Derive precision from that scale without another mint RPC request.
   const decimals = payoutPerContract.toString().length - 1;
+  let depositAmount: BN | null = null;
+  let depositIssue: string | null = null;
+  if (
+    position &&
+    amount.trim() &&
+    !loading &&
+    !walletLoading &&
+    !error &&
+    !walletError
+  ) {
+    try {
+      depositAmount = validatePredictionDepositAmount(
+        parseTokenAmount(amount, decimals, "Deposit amount"),
+        walletBalance,
+        position.collateralFree,
+      );
+    } catch (cause) {
+      depositIssue =
+        cause instanceof Error ? cause.message : "Invalid deposit amount";
+    }
+  }
+  const acceptsDeposits = ["draft", "open", "frozen", "proposed"].includes(
+    status,
+  );
+  const canDeposit =
+    PREDICTION_FUNDING_ENABLED &&
+    acceptsDeposits &&
+    !!depositAmount &&
+    !loading &&
+    !walletLoading &&
+    !pending &&
+    !error &&
+    !walletError;
+
+  async function deposit() {
+    if (!canDeposit || !depositAmount || !position) return;
+    setPending(true);
+    setActionError(null);
+    setSignature(null);
+    try {
+      // Wallet balance is aggregated for display. Each transfer uses one
+      // owned source account; fragmentation is reported rather than guessed.
+      const source = await findOwnedTokenAccount(
+        connection,
+        wallet.publicKey,
+        collateralMint,
+        depositAmount,
+      );
+      const ix = await program.methods
+        .depositPredictionCollateral(depositAmount)
+        .accounts({
+          owner: wallet.publicKey,
+          market,
+          position: positionAddress,
+          collateralMint,
+          source,
+          vaultAuthority: deriveVaultAuthorityPda(market),
+          collateralVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .instruction();
+      const confirmed = await (
+        program.provider as AnchorProvider
+      ).sendAndConfirm(new Transaction().add(ix));
+      setSignature(confirmed);
+      setResultKind("deposit");
+      setAmount("");
+      setRefresh((value) => value + 1);
+    } catch (cause) {
+      setActionError(
+        cause instanceof Error ? cause.message : "Collateral deposit failed",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
   const balances = position
     ? [
         [
@@ -183,14 +306,14 @@ function ConnectedPosition({
   return (
     <section
       className="admin-card prediction-position"
-      aria-busy={loading || pending}
+      aria-busy={loading || walletLoading || pending}
     >
       <div className="market-list-heading">
         <h2>Your position</h2>
         <button
           className="text-button"
           type="button"
-          disabled={loading || pending}
+          disabled={loading || walletLoading || pending}
           onClick={() => setRefresh((value) => value + 1)}
         >
           Refresh position
@@ -200,6 +323,11 @@ function ConnectedPosition({
       {error && (
         <p className="access-denied" role="alert">
           {error}
+        </p>
+      )}
+      {actionError && (
+        <p className="access-denied" role="alert">
+          {actionError}
         </p>
       )}
       {!loading && !error && position && (
@@ -220,6 +348,55 @@ function ConnectedPosition({
           >
             View position account ↗
           </a>
+          <form
+            className="market-create-form prediction-deposit"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void deposit();
+            }}
+          >
+            <p>
+              {collateralSymbol} in wallet:{" "}
+              {walletLoading
+                ? "Loading…"
+                : walletBalance !== null
+                  ? formatAtomicAmount(walletBalance, decimals)
+                  : "Unavailable"}
+            </p>
+            {walletError && (
+              <p className="access-denied" role="alert">
+                {walletError}
+              </p>
+            )}
+            <label>
+              Deposit amount ({collateralSymbol})
+              <input
+                inputMode="decimal"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                disabled={pending}
+                placeholder="10"
+                aria-describedby="prediction-deposit-issue"
+              />
+            </label>
+            <small id="prediction-deposit-issue">
+              {depositIssue ??
+                "Depositing credits available collateral; it does not create YES/NO positions."}
+            </small>
+            {!PREDICTION_FUNDING_ENABLED && (
+              <p>Public funding is disabled until withdrawals are ready.</p>
+            )}
+            {!acceptsDeposits && (
+              <p>This market no longer accepts new collateral deposits.</p>
+            )}
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={!canDeposit}
+            >
+              {pending ? "Confirming…" : "Deposit collateral"}
+            </button>
+          </form>
         </>
       )}
       {!loading && !error && !position && (
@@ -250,7 +427,9 @@ function ConnectedPosition({
       )}
       {signature && (
         <p className="transaction-message transaction-success">
-          Position initialized.{" "}
+          {resultKind === "deposit"
+            ? "Collateral deposited."
+            : "Position initialized."}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"
@@ -260,10 +439,7 @@ function ConnectedPosition({
           </a>
         </p>
       )}
-      <p>
-        Deposits, withdrawals and outcome trading will be added in later
-        milestones.
-      </p>
+      <p>Withdrawals and outcome trading will be added in later milestones.</p>
     </section>
   );
 }

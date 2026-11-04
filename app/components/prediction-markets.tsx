@@ -236,6 +236,9 @@ export function PredictionMarkets({ address }: { address?: string }) {
                 {address && (
                   <PredictionPositionPanel
                     market={key}
+                    collateralMint={market.collateralMint}
+                    collateralVault={market.collateralVault}
+                    status={status}
                     payoutPerContract={market.payoutPerContract}
                     collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
                   />

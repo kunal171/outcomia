@@ -6,6 +6,28 @@ import { PROGRAM_ID } from "./solana";
 export const PREDICTION_DRAFTS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";
 
+// Local funding tests only until withdrawals are implemented and deployed.
+export const PREDICTION_FUNDING_ENABLED =
+  PREDICTION_DRAFTS_ENABLED &&
+  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true";
+
+/** Preflight bounds only; on-chain custody and ledger checks remain required. */
+export function validatePredictionDepositAmount(
+  amount: BN,
+  walletBalance: BN | null,
+  collateralFree: BN,
+): BN {
+  if (amount.isNeg() || amount.isZero() || amount.bitLength() > 64)
+    throw new Error("Deposit must be a positive u64 amount");
+  if (walletBalance === null)
+    throw new Error("Wallet collateral balance is unavailable");
+  if (amount.gt(walletBalance))
+    throw new Error("Deposit exceeds your wallet collateral balance");
+  if (collateralFree.add(amount).bitLength() > 64)
+    throw new Error("Deposit would exceed the position balance limit");
+  return amount;
+}
+
 /** Collateral fields use mint atoms; YES/NO fields count whole contracts. */
 export interface PredictionPositionAccount {
   market: PublicKey;

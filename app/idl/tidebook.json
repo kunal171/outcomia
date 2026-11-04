@@ -993,6 +993,189 @@
       ]
     },
     {
+      "name": "deposit_prediction_collateral",
+      "docs": [
+        "Deposits collateral and atomically credits the owner's free balance."
+      ],
+      "discriminator": [
+        235,
+        220,
+        147,
+        67,
+        109,
+        190,
+        30,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "source",
+          "docs": [
+            "Explicit wallet ownership excludes funding from another user's account",
+            "through a delegated transfer allowance; only the source owner signs."
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "docs": [
+            "It does not sign this CPI: the wallet owns and signs for the source."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "disable_admin",
       "docs": [
         "Suspends an administrator without deleting its provenance record."
@@ -4202,6 +4385,36 @@
       "code": 6107,
       "name": "PredictionTimestampOverflow",
       "msg": "Prediction timestamp plus resolution delay exceeds the timestamp range"
+    },
+    {
+      "code": 6108,
+      "name": "PredictionPositionMarketMismatch",
+      "msg": "Prediction position belongs to a different market"
+    },
+    {
+      "code": 6109,
+      "name": "PredictionPositionOwnerMismatch",
+      "msg": "Prediction position belongs to a different wallet"
+    },
+    {
+      "code": 6110,
+      "name": "InvalidPredictionCollateralMint",
+      "msg": "Token mint does not match the prediction market collateral"
+    },
+    {
+      "code": 6111,
+      "name": "InvalidPredictionVault",
+      "msg": "Token vault does not match the prediction market custody account"
+    },
+    {
+      "code": 6112,
+      "name": "PredictionDepositAfterResolution",
+      "msg": "A resolved prediction market cannot accept new collateral deposits"
+    },
+    {
+      "code": 6113,
+      "name": "InvalidPredictionTokenOwner",
+      "msg": "Prediction collateral source is not owned by the signing wallet"
     }
   ],
   "types": [

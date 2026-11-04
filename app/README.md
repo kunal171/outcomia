@@ -55,6 +55,8 @@ updated client against devnet.
 - `/predictions/[address]`: public inspection of collateral, resolution windows,
   resolver keys, rules URI and content hashes; connected-wallet position
   initialization and display of all six free/locked balance fields.
+  The position panel also displays wallet collateral and includes a separately
+  gated collateral-deposit form.
 
 Draft and position creation remain disabled by default. After deploying the
 matching program containing both initializers,
@@ -76,8 +78,21 @@ keys and timing come from the file. Hashing uses the original bytes; changing
 whitespace changes the rules hash. The form does not verify the remote copy.
 
 Contracts use whole quantities and pay one collateral token per winning
-contract. Prices use the mint's precision. Opening, funding, trading, resolution
+contract. Prices use the mint's precision. Opening, withdrawals, trading, resolution
 and redemption are later milestones; a newly created account is always Draft.
+
+Prediction deposits are implemented locally. Keep
+`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` on public deployments until
+withdrawals are ready. For local tests, enable it alongside the draft flag and
+rebuild against the matching program. A deposit credits only free collateral;
+it creates no YES/NO positions. Resolved markets reject deposits.
+
+The form converts human amounts to exact mint atoms, checks wallet balance and
+ledger overflow, then chooses one wallet token account able to fund the amount.
+The displayed wallet balance is aggregated: fragmented funds may require a
+smaller deposit. Failed balance reads disable submission. Confirmed deposits
+refresh wallet and position balances. The program enforces ownership, mint and
+vault checks independently of this UI.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 
