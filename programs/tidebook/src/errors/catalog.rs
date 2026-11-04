@@ -369,4 +369,16 @@ pub enum TidebookError {
 
     #[msg("Prediction supply or backing reserve cannot cover the complete set")]
     PredictionBackingUnderflow = 119,
+
+    #[msg("Only the prediction market authority may open this market")]
+    UnauthorizedPredictionAuthority = 120,
+
+    #[msg("Only a draft prediction market can be opened")]
+    PredictionNotDraft = 121,
+
+    #[msg("A prediction market cannot be opened at or after its close time")]
+    PredictionOpeningClosed = 122,
+
+    #[msg("The market creator must be its primary outcome resolver")]
+    PredictionCreatorMustResolve = 123,
 }

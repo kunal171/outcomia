@@ -2908,6 +2908,89 @@
       ]
     },
     {
+      "name": "open_prediction_market",
+      "docs": [
+        "Moves a draft to Open before close under its stored authority."
+      ],
+      "discriminator": [
+        150,
+        58,
+        235,
+        203,
+        39,
+        221,
+        19,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "market",
+            "admin_record"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "pause_market",
       "docs": [
         "Stops new order placement while preserving cancellation access."
@@ -4839,6 +4922,26 @@
       "code": 6119,
       "name": "PredictionBackingUnderflow",
       "msg": "Prediction supply or backing reserve cannot cover the complete set"
+    },
+    {
+      "code": 6120,
+      "name": "UnauthorizedPredictionAuthority",
+      "msg": "Only the prediction market authority may open this market"
+    },
+    {
+      "code": 6121,
+      "name": "PredictionNotDraft",
+      "msg": "Only a draft prediction market can be opened"
+    },
+    {
+      "code": 6122,
+      "name": "PredictionOpeningClosed",
+      "msg": "A prediction market cannot be opened at or after its close time"
+    },
+    {
+      "code": 6123,
+      "name": "PredictionCreatorMustResolve",
+      "msg": "The market creator must be its primary outcome resolver"
     }
   ],
   "types": [
@@ -5833,7 +5936,7 @@
           {
             "name": "market_id",
             "docs": [
-              "Retained for future PDA constraints and signer seed reconstruction."
+              "Used to verify the canonical market PDA in prediction instructions."
             ],
             "type": {
               "array": [
@@ -6099,7 +6202,7 @@
         "",
         "PDA: [\"prediction_position\", market, owner]. Collateral is measured in SPL",
         "mint atoms. YES/NO balances count whole contracts backed by the reserve;",
-        "they are not token accounts. Splitting and merging will move value between",
+        "they are not token accounts. Splitting and merging move value between",
         "free collateral and the market reserve without moving SPL tokens."
       ],
       "type": {

@@ -80,6 +80,7 @@ pub struct PredictionMarket {
     /// Used to verify the canonical market PDA in prediction instructions.
     pub market_id: [u8; 32],
     pub authority: Pubkey,
+    /// Primary outcome proposer; creation/opening bind this to the creator.
     pub resolver: Pubkey,
     /// None selects primary-only resolution; there is no fallback timeout.
     pub fallback: Option<PredictionFallback>,

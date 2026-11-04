@@ -12,6 +12,7 @@ import {
   derivePredictionMarketPda,
   parsePredictionRules,
   PREDICTION_DRAFTS_ENABLED,
+  validatePredictionCreatorResolver,
 } from "../lib/prediction";
 import {
   deriveAdminRecordPda,
@@ -81,6 +82,7 @@ export function CreatePredictionMarket() {
           "Enter an ar:// or HTTPS rules reference of at most 200 ASCII bytes",
         );
       const rules = await parsePredictionRules(await file.arrayBuffer());
+      validatePredictionCreatorResolver(rules.resolver, wallet.publicKey);
       if (rules.closeTs.lte(new BN(String(Math.floor(Date.now() / 1000)))))
         throw new Error("Trading close time must be in the future");
       const collateralMint = new PublicKey(mint.trim());
@@ -166,8 +168,9 @@ export function CreatePredictionMarket() {
           <div className="eyebrow">Prediction market setup</div>
           <h1>Create a draft</h1>
           <p>
-            One collateral token backs each YES/NO pair. This milestone creates
-            a draft; trading and deposits are not available yet.
+            One collateral token backs each YES/NO pair. Create a draft, then
+            open it as its active-admin creator. Outcome trading and payouts are
+            still being built.
           </p>
         </div>
         {!PREDICTION_DRAFTS_ENABLED && (
@@ -254,8 +257,10 @@ export function CreatePredictionMarket() {
             </label>
             <p>
               The file supplies the full question, resolver keys, closing time
-              and optional fallback. Its exact bytes are hashed locally. This
-              form does not upload the file or verify the remote copy.
+              and optional fallback. Its primaryResolver must be your connected
+              creator wallet, which will decide the outcome. Its exact bytes are
+              hashed locally. This form does not upload the file or verify the
+              remote copy.
             </p>
             <button
               className="primary-button"

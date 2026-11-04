@@ -106,9 +106,23 @@ impl Fixture {
         let ix = self.instruction(20_000_000);
         assert!(self.send(&[ix]).is_ok());
         let mut market = self.market_state();
-        market.status = PredictionStatus::Open;
         market.close_ts = i64::MAX;
         store(&mut self.svm, self.market, &market);
+        let opening = Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::OpenPredictionMarket {}.data(),
+            tidebook::accounts::OpenPredictionMarket {
+                authority: self.owner.pubkey(),
+                market: self.market,
+                admin_record: Pubkey::find_program_address(
+                    &[tidebook::ADMIN_SEED, self.owner.pubkey().as_ref()],
+                    &tidebook::ID,
+                )
+                .0,
+            }
+            .to_account_metas(None),
+        );
+        assert!(self.send(&[opening]).is_ok());
     }
 
     fn assert_backed(&self) {
@@ -133,6 +147,20 @@ impl Fixture {
         svm.add_program(tidebook::ID, PROGRAM).unwrap();
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 1_000_000_000).unwrap();
+        let (admin_key, admin_bump) = Pubkey::find_program_address(
+            &[tidebook::ADMIN_SEED, owner.pubkey().as_ref()],
+            &tidebook::ID,
+        );
+        store(
+            &mut svm,
+            admin_key,
+            &tidebook::state::AdminRecord {
+                authority: owner.pubkey(),
+                added_by: owner.pubkey(),
+                status: tidebook::state::AdminStatus::Active,
+                bump: admin_bump,
+            },
+        );
         let (market, bump) = tidebook::derive_prediction_market_pda(&tidebook::ID, &[7; 32]);
         let mint = Pubkey::new_unique();
         let vault_authority = Pubkey::find_program_address(
@@ -182,8 +210,8 @@ impl Fixture {
             market,
             &PredictionMarket {
                 market_id: [7; 32],
-                authority: Pubkey::new_unique(),
-                resolver: Pubkey::new_unique(),
+                authority: owner.pubkey(),
+                resolver: owner.pubkey(),
                 fallback: None,
                 collateral_mint: mint,
                 collateral_vault: vault,
@@ -1020,4 +1048,28 @@ fn two_wallets_share_backing_without_spending_each_others_claims() {
         f.token(first_source).amount + f.token(second_source).amount + f.token(f.vault).amount,
         100_000_000
     );
+}
+
+#[test]
+fn disabling_creator_admin_role_does_not_block_recovering_free_collateral() {
+    let mut f = Fixture::new();
+    f.fund_open();
+    let (key, bump) = Pubkey::find_program_address(
+        &[tidebook::ADMIN_SEED, f.owner.pubkey().as_ref()],
+        &tidebook::ID,
+    );
+    store(
+        &mut f.svm,
+        key,
+        &tidebook::state::AdminRecord {
+            authority: f.owner.pubkey(),
+            added_by: f.owner.pubkey(),
+            status: tidebook::state::AdminStatus::Disabled,
+            bump,
+        },
+    );
+    let ix = f.withdrawal(20_000_000);
+    assert!(f.send(&[ix]).is_ok());
+    f.assert_backed();
+    assert_eq!(f.ledger().collateral_free, 0);
 }

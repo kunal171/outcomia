@@ -1,8 +1,10 @@
 //! Pure validation of prediction-market creation terms.
 //!
 //! This module does not read accounts, fetch Arweave data or mutate state.
-//! The future initializer must pass Solana Clock time and separately validate
+//! The initializer passes Solana Clock time and separately validates
 //! administrator authority, mint ownership and canonical vault/metadata PDAs.
+//! It also binds the primary resolver to the creator; this pure helper has no
+//! signer argument and cannot enforce that account relationship by itself.
 
 use anchor_lang::prelude::*;
 

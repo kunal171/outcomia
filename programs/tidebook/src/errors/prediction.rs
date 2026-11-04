@@ -6,7 +6,8 @@ pub use super::TidebookError::{
     InvalidPredictionPriceTick, InvalidPredictionResolutionDelay, InvalidPredictionResolutionTime,
     InvalidPredictionResolver, InvalidPredictionRulesHash, InvalidPredictionRulesUri,
     InvalidPredictionTokenOwner, InvalidPredictionVault, PredictionAccountingOverflow,
-    PredictionBackingUnderflow, PredictionDepositAfterResolution, PredictionMergeUnavailable,
+    PredictionBackingUnderflow, PredictionCreatorMustResolve, PredictionDepositAfterResolution,
+    PredictionMergeUnavailable, PredictionNotDraft, PredictionOpeningClosed,
     PredictionPositionMarketMismatch, PredictionPositionOwnerMismatch, PredictionSplitUnavailable,
-    PredictionTimestampOverflow,
+    PredictionTimestampOverflow, UnauthorizedPredictionAuthority,
 };

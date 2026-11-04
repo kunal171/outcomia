@@ -1,4 +1,4 @@
-//! Draft creation, authorization, canonical custody and atomic rollback.
+//! Draft creation and opening: authority, timing, canonical custody and rollback.
 #![allow(clippy::result_large_err)] // LiteSVM transaction diagnostics are intentionally rich.
 
 use anchor_lang::{
@@ -27,6 +27,54 @@ struct Fixture {
 }
 
 impl Fixture {
+    fn opening(&self) -> Instruction {
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::OpenPredictionMarket {}.data(),
+            tidebook::accounts::OpenPredictionMarket {
+                authority: self.admin.pubkey(),
+                market: tidebook::derive_prediction_market_pda(&tidebook::ID, &[7; 32]).0,
+                admin_record: Pubkey::find_program_address(
+                    &[tidebook::ADMIN_SEED, self.admin.pubkey().as_ref()],
+                    &tidebook::ID,
+                )
+                .0,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    fn market(&self) -> PredictionMarket {
+        let key = self.opening().accounts[1].pubkey;
+        PredictionMarket::try_deserialize(&mut self.svm.get_account(&key).unwrap().data.as_slice())
+            .unwrap()
+    }
+
+    fn write_market(&mut self, market: &PredictionMarket) {
+        let key = self.opening().accounts[1].pubkey;
+        let mut account = self.svm.get_account(&key).unwrap();
+        let length = account.data.len();
+        account.data.clear();
+        market.try_serialize(&mut account.data).unwrap();
+        account.data.resize(length, 0);
+        self.svm.set_account(key, account).unwrap();
+    }
+
+    fn reject_open_unchanged(&mut self, ix: Instruction, code: &str) {
+        let key = self.opening().accounts[1].pubkey;
+        let before = self.svm.get_account(&key).unwrap();
+        let failure = self.send(ix).unwrap_err();
+        assert!(
+            failure
+                .meta
+                .logs
+                .iter()
+                .any(|line| line.contains(&format!("Error Code: {code}"))),
+            "{failure:?}"
+        );
+        assert_eq!(self.svm.get_account(&key).unwrap(), before);
+    }
+
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(tidebook::ID, PROGRAM).unwrap();
@@ -165,6 +213,213 @@ impl Fixture {
                 .is_none());
         }
     }
+}
+
+#[test]
+fn opening_an_initialized_draft_changes_only_its_status() {
+    let mut f = Fixture::new();
+    let mut config = f.config();
+    config.fallback = Some(PredictionFallback {
+        resolver: Pubkey::new_unique(),
+        available_ts: 300,
+        deadline_ts: Some(400),
+    });
+    let initialize = f.instruction(config);
+    assert!(f.send(initialize.clone()).is_ok());
+    let keys: Vec<_> = [5, 6, 7].map(|i| initialize.accounts[i].pubkey).into();
+    let side_accounts: Vec<_> = keys.iter().map(|k| f.svm.get_account(k).unwrap()).collect();
+    let mut expected = f.market();
+    expected.status = PredictionStatus::Open;
+    let ix = f.opening();
+    assert!(f.send(ix).is_ok());
+    let mut expected_bytes = Vec::new();
+    expected.try_serialize(&mut expected_bytes).unwrap();
+    let actual = f.svm.get_account(&f.opening().accounts[1].pubkey).unwrap();
+    expected_bytes.resize(actual.data.len(), 0);
+    assert_eq!(actual.data, expected_bytes);
+    for (key, before) in keys.iter().zip(side_accounts) {
+        assert_eq!(f.svm.get_account(key).unwrap(), before);
+    }
+    // Successful opening cannot be replayed or interpreted as a new transition.
+    let ix = f.opening();
+    f.reject_open_unchanged(ix, "PredictionNotDraft");
+}
+
+#[test]
+fn opening_checks_the_exact_close_boundary_using_chain_clock() {
+    for now in [199, 200, 201] {
+        let mut f = Fixture::new();
+        let initialize = f.instruction(f.config());
+        assert!(f.send(initialize).is_ok());
+        let mut clock = f.svm.get_sysvar::<Clock>();
+        clock.unix_timestamp = now;
+        f.svm.set_sysvar(&clock);
+        let ix = f.opening();
+        if now < 200 {
+            assert!(f.send(ix).is_ok());
+            assert_eq!(f.market().status, PredictionStatus::Open);
+        } else {
+            f.reject_open_unchanged(ix, "PredictionOpeningClosed");
+        }
+    }
+}
+
+#[test]
+fn other_lifecycle_statuses_cannot_be_reopened() {
+    for status in [
+        PredictionStatus::Open,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut f = Fixture::new();
+        let initialize = f.instruction(f.config());
+        assert!(f.send(initialize).is_ok());
+        let mut market = f.market();
+        market.status = status;
+        f.write_market(&market);
+        let ix = f.opening();
+        f.reject_open_unchanged(ix, "PredictionNotDraft");
+    }
+}
+
+#[test]
+fn opening_requires_creator_and_current_active_admin_membership() {
+    let mut f = Fixture::new();
+    let initialize = f.instruction(f.config());
+    assert!(f.send(initialize).is_ok());
+    let creator = std::mem::replace(&mut f.admin, Keypair::new());
+    f.svm.airdrop(&f.admin.pubkey(), 1_000_000_000).unwrap();
+    f.set_admin(AdminStatus::Active);
+    let mut market = f.market();
+    market.resolver = f.admin.pubkey();
+    f.write_market(&market);
+    let ix = f.opening();
+    f.reject_open_unchanged(ix, "UnauthorizedPredictionAuthority");
+    f.admin = creator;
+    let ix = f.opening();
+    f.reject_open_unchanged(ix, "PredictionCreatorMustResolve");
+    let mut market = f.market();
+    market.resolver = f.admin.pubkey();
+    f.write_market(&market);
+    f.set_admin(AdminStatus::Disabled);
+    let ix = f.opening();
+    f.reject_open_unchanged(ix, "AdminDisabled");
+    f.set_admin(AdminStatus::Active);
+    let ix = f.opening();
+    assert!(f.send(ix).is_ok());
+}
+
+#[test]
+fn missing_substituted_and_corrupt_admin_records_cannot_authorize_opening() {
+    for case in 0..3 {
+        let mut f = Fixture::new();
+        let initialize = f.instruction(f.config());
+        assert!(f.send(initialize).is_ok());
+        let mut ix = f.opening();
+        let original = ix.accounts[2].pubkey;
+        match case {
+            0 => {
+                // A deleted admin PDA has no account data, even if its address
+                // is the expected canonical PDA.
+                let mut record = f.svm.get_account(&original).unwrap();
+                record.owner = system_program::ID;
+                record.data.clear();
+                record.lamports = 0;
+                f.svm.set_account(original, record).unwrap();
+                f.reject_open_unchanged(ix, "AccountNotInitialized");
+            }
+            1 => {
+                let substitute = Pubkey::new_unique();
+                f.svm
+                    .set_account(substitute, f.svm.get_account(&original).unwrap())
+                    .unwrap();
+                ix.accounts[2].pubkey = substitute;
+                f.reject_open_unchanged(ix, "ConstraintSeeds");
+            }
+            _ => {
+                let mut record = f.svm.get_account(&original).unwrap();
+                let mut admin = AdminRecord::try_deserialize(&mut record.data.as_slice()).unwrap();
+                admin.authority = Pubkey::new_unique();
+                record.data.clear();
+                admin.try_serialize(&mut record.data).unwrap();
+                f.svm.set_account(original, record).unwrap();
+                f.reject_open_unchanged(ix, "UnauthorizedAdmin");
+            }
+        }
+    }
+}
+
+#[test]
+fn draft_creation_cannot_delegate_primary_resolution_away_from_creator() {
+    let mut f = Fixture::new();
+    let mut config = f.config();
+    config.resolver = Pubkey::new_unique();
+    let ix = f.instruction(config);
+    let failure = f.send(ix.clone()).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("PredictionCreatorMustResolve")),
+        "{failure:?}"
+    );
+    f.assert_no_created_accounts(&ix);
+}
+
+#[test]
+fn unsigned_owner_missing_market_and_noncanonical_market_cannot_open() {
+    let mut f = Fixture::new();
+    let initialize = f.instruction(f.config());
+    assert!(f.send(initialize.clone()).is_ok());
+    let mut ix = f.opening();
+    let unsigned = Pubkey::new_unique();
+    f.svm.airdrop(&unsigned, 1_000_000).unwrap();
+    ix.accounts[0].pubkey = unsigned;
+    ix.accounts[0].is_signer = false;
+    f.reject_open_unchanged(ix, "AccountNotSigner");
+    let mut ix = f.opening();
+    ix.accounts[1].pubkey = Pubkey::new_unique();
+    f.reject_open_unchanged(ix, "AccountNotInitialized");
+    let mut ix = f.opening();
+    let duplicate = Pubkey::new_unique();
+    f.svm
+        .set_account(
+            duplicate,
+            f.svm.get_account(&ix.accounts[1].pubkey).unwrap(),
+        )
+        .unwrap();
+    ix.accounts[1].pubkey = duplicate;
+    f.reject_open_unchanged(ix, "ConstraintSeeds");
+    let mut ix = f.opening();
+    ix.accounts[1].pubkey = initialize.accounts[6].pubkey;
+    f.reject_open_unchanged(ix, "AccountDiscriminatorMismatch");
+}
+
+#[test]
+fn a_later_failure_rolls_back_opening() {
+    let mut f = Fixture::new();
+    let initialize = f.instruction(f.config());
+    assert!(f.send(initialize).is_ok());
+    let ix = f.opening();
+    let before = f.svm.get_account(&ix.accounts[1].pubkey).unwrap();
+    let message = Message::new_with_blockhash(
+        &[ix.clone(), ix.clone()],
+        Some(&f.admin.pubkey()),
+        &f.svm.latest_blockhash(),
+    );
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(message), &[&f.admin]).unwrap();
+    let failure = f.svm.send_transaction(tx).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("PredictionNotDraft")),
+        "{failure:?}"
+    );
+    assert_eq!(f.svm.get_account(&ix.accounts[1].pubkey).unwrap(), before);
 }
 
 #[test]

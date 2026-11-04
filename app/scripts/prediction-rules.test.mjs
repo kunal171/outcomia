@@ -40,6 +40,9 @@ const {
   validatePredictionWithdrawalAmount,
   validatePredictionCompleteSet,
   PREDICTION_FUNDING_ENABLED,
+  PREDICTION_OPENING_ENABLED,
+  predictionOpeningIssue,
+  validatePredictionCreatorResolver,
 } = mod.exports;
 
 function rules() {
@@ -263,6 +266,110 @@ test("withdrawal preflight uses only free cash and rejects zero and oversized am
     () => validatePredictionWithdrawalAmount(free.addn(1), free),
     /available collateral/,
   );
+});
+
+test("opening preflight requires the active-admin creator, Draft status and exclusive close time", () => {
+  const { BN } = require("@anchor-lang/core");
+  const authority = new PublicKey(new Uint8Array(32).fill(3));
+  const stranger = new PublicKey(new Uint8Array(32).fill(4));
+  const market = {
+    authority,
+    resolver: authority,
+    status: { draft: {} },
+    closeTs: new BN(100),
+  };
+  assert.equal(
+    predictionOpeningIssue(market, authority, new BN(99), true),
+    null,
+  );
+  assert.match(
+    predictionOpeningIssue(market, authority, new BN(99), false),
+    /active administrator/,
+  );
+  market.resolver = stranger;
+  assert.match(
+    predictionOpeningIssue(market, authority, new BN(99), true),
+    /primary outcome resolver/,
+  );
+  market.resolver = authority;
+  for (const now of [100, 101]) {
+    assert.match(
+      predictionOpeningIssue(market, authority, new BN(now), true),
+      /close time/,
+    );
+  }
+  assert.match(
+    predictionOpeningIssue(market, stranger, new BN(99), true),
+    /authority/,
+  );
+  for (const status of ["open", "frozen", "proposed", "resolved"]) {
+    market.status = { [status]: {} };
+    assert.match(
+      predictionOpeningIssue(market, authority, new BN(99), true),
+      /draft/,
+    );
+  }
+  // Draft creation alone must not expose an unsupported opening instruction.
+  assert.equal(PREDICTION_OPENING_ENABLED, false);
+});
+
+test("rule files must appoint the creator as primary resolver", () => {
+  const creator = new PublicKey(new Uint8Array(32).fill(3));
+  const stranger = new PublicKey(new Uint8Array(32).fill(4));
+  assert.doesNotThrow(() =>
+    validatePredictionCreatorResolver(creator, creator),
+  );
+  assert.throws(
+    () => validatePredictionCreatorResolver(stranger, creator),
+    /primaryResolver.*creator/,
+  );
+});
+
+test("opening IDL requires the authority signature, writable market and canonical admin record", async () => {
+  const { Program } = require("@anchor-lang/core");
+  const { Connection } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const authority = new PublicKey(new Uint8Array(32).fill(3));
+  const market = PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_market"), Buffer.alloc(32, 7)],
+    program.programId,
+  )[0];
+  const ix = await program.methods
+    .openPredictionMarket()
+    .accountsStrict({
+      authority,
+      market,
+      adminRecord: PublicKey.findProgramAddressSync(
+        [Buffer.from("admin"), authority.toBuffer()],
+        program.programId,
+      )[0],
+    })
+    .instruction();
+  assert.equal(ix.data.length, 8); // No rule updates, amounts or new timestamps.
+  const decoded = program.coder.instruction.decode(ix.data);
+  assert.equal(decoded.name, "openPredictionMarket");
+  assert.deepEqual(decoded.data, {});
+  assert.equal(ix.keys.length, 3);
+  assert.equal(ix.keys[0].pubkey.toBase58(), authority.toBase58());
+  assert.equal(ix.keys[0].isSigner, true);
+  assert.equal(ix.keys[0].isWritable, false);
+  assert.equal(ix.keys[1].pubkey.toBase58(), market.toBase58());
+  assert.equal(ix.keys[1].isSigner, false);
+  assert.equal(ix.keys[1].isWritable, true);
+  assert.equal(
+    ix.keys[2].pubkey.toBase58(),
+    PublicKey.findProgramAddressSync(
+      [Buffer.from("admin"), authority.toBuffer()],
+      program.programId,
+    )[0].toBase58(),
+  );
+  assert.equal(ix.keys[2].isSigner, false);
+  assert.equal(ix.keys[2].isWritable, false);
 });
 
 function completeSetFixture() {

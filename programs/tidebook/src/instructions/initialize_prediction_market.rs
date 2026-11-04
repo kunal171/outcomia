@@ -3,7 +3,7 @@
 //! The active-admin constraint is authoritative; a UI badge grants no access.
 //! Anchor's init constraints run before the handler, so a validation failure
 //! rolls back every account creation and token CPI in the transaction.
-//! Opening, deposits and outcome issuance remain separate milestones.
+//! Opening, deposits and outcome issuance use separate instructions.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
@@ -66,6 +66,13 @@ pub fn handle_initialize_prediction_market(
     collateral_symbol: String,
 ) -> Result<()> {
     validate_prediction_market_config(&config, Clock::get()?.unix_timestamp)?;
+    // The first version trusts the creator to choose the outcome. A rules
+    // document cannot silently delegate primary resolution to another wallet.
+    require_keys_eq!(
+        config.resolver,
+        ctx.accounts.authority.key(),
+        prediction::PredictionCreatorMustResolve
+    );
     super::market_metadata::validate_labels("YES-NO", &collateral_symbol, &display_name)?;
     // A winning whole contract pays exactly one collateral token. Token
     // decimals cannot silently change that meaning; zero-decimal mints also

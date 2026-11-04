@@ -240,8 +240,13 @@ from free cash to backing reserve and creates equal YES/NO claims. Merging in
 Open, Frozen or Proposed burns a free pair and releases its backing. Locked
 balances cannot be used. Neither conversion moves SPL tokens; checked ledger
 and aggregate updates preserve `vault = cash claims + backing + fees`.
-Writable aggregate totals serialize conversions in one market. Lifecycle
-opening, matching and resolution are still planned; these operations are tested
+Writable aggregate totals serialize conversions in one market. The stored market
+authority must still be an active admin to open a canonical Draft strictly before
+close; only status changes. Creation and opening bind the primary resolver to
+that creator wallet. Administrative closure and outcome proposals will require
+the same creator-plus-active-admin rule. Trader payout claims will require the
+position owner instead. Matching and
+resolution are still planned; these operations are tested
 locally and have not been deployed. See [prediction design](prediction-market-design.md)
 for lifecycle rules, accounting and the four-milestone implementation plan.
 

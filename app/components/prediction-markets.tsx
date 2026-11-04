@@ -6,6 +6,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { AppHeader } from "./app-header";
 import { PredictionPositionPanel } from "./prediction-position";
+import { PredictionLifecycle } from "./prediction-lifecycle";
 import { useProtocolRole } from "./protocol-role-provider";
 import {
   predictionStatus,
@@ -105,12 +106,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
           <div className="eyebrow">Binary outcomes</div>
           <h1>{address ? "Prediction market" : "Prediction markets"}</h1>
           <p>
-            Inspect draft terms and collateral accounts. Opening, deposits,
-            outcome trading and resolution will be added in later milestones.
+            Inspect market terms, fund your position and create backed YES/NO
+            pairs in open markets. Outcome trading and resolution are being
+            built.
           </p>
         </div>
         <div className="market-list-heading">
-          <h2>{address ? "Market terms" : "On-chain drafts"}</h2>
+          <h2>{address ? "Market terms" : "On-chain markets"}</h2>
           <div className="admin-actions">
             {isAdmin && (
               <Link className="admin-action-button" href="/predictions/new">
@@ -137,7 +139,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
         )}
         {!loading && !error && records.length === 0 && (
           <div className="access-card">
-            No prediction drafts exist on this network yet.
+            No prediction markets exist on this network yet.
           </div>
         )}
         <section
@@ -221,7 +223,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                       className="market-open-link"
                       href={`/predictions/${key.toBase58()}`}
                     >
-                      Inspect draft →
+                      View market →
                     </Link>
                   )}
                   <a
@@ -233,6 +235,21 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     View account ↗
                   </a>
                 </div>
+                {address && (
+                  <PredictionLifecycle
+                    address={key}
+                    market={market}
+                    onOpened={(updated) => {
+                      setRecords((current) =>
+                        current.map((row) =>
+                          row.address.equals(key)
+                            ? { ...row, market: updated }
+                            : row,
+                        ),
+                      );
+                    }}
+                  />
+                )}
                 {address && (
                   <PredictionPositionPanel
                     market={key}

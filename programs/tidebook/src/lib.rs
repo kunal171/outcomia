@@ -63,6 +63,11 @@ pub mod tidebook {
         )
     }
 
+    /// Moves a draft to Open before close under its stored authority.
+    pub fn open_prediction_market(ctx: Context<OpenPredictionMarket>) -> Result<()> {
+        instructions::open_prediction_market::handle_open_prediction_market(ctx)
+    }
+
     /// Withdraws only free collateral, including after trading or resolution.
     pub fn withdraw_prediction_collateral(
         ctx: Context<WithdrawPredictionCollateral>,

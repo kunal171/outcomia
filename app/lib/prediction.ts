@@ -6,6 +6,43 @@ import { PROGRAM_ID } from "./solana";
 export const PREDICTION_DRAFTS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";
 
+// Separate rollout from draft creation so older deployments cannot expose an
+// opening button for an instruction their binary does not understand.
+export const PREDICTION_OPENING_ENABLED =
+  PREDICTION_DRAFTS_ENABLED &&
+  process.env.NEXT_PUBLIC_PREDICTION_OPENING_ENABLED === "true";
+
+/** Advisory preflight. Chain Clock and the stored signer binding are authoritative. */
+export function predictionOpeningIssue(
+  market: PredictionMarketAccount,
+  authority: PublicKey,
+  now: BN,
+  activeAdmin: boolean,
+): string | null {
+  if (!market.authority.equals(authority))
+    return "Only the market authority can open this draft";
+  if (!activeAdmin)
+    return "An active administrator role is required to open this draft";
+  if (!market.resolver.equals(authority))
+    return "The market creator must be its primary outcome resolver";
+  if (predictionStatus(market) !== "draft")
+    return "Only a draft market can be opened";
+  if (now.gte(market.closeTs))
+    return "The market close time has already been reached";
+  return null;
+}
+
+/** Bind the uploaded primary resolver to the creator without rewriting rule bytes. */
+export function validatePredictionCreatorResolver(
+  resolver: PublicKey,
+  creator: PublicKey,
+): void {
+  if (!resolver.equals(creator))
+    throw new Error(
+      "Rules primaryResolver must match the market creator wallet",
+    );
+}
+
 // Enable only against a deployment containing deposits, withdrawals and sets.
 export const PREDICTION_FUNDING_ENABLED =
   PREDICTION_DRAFTS_ENABLED &&

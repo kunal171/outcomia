@@ -169,7 +169,7 @@ function ConnectedPosition({
     return () => {
       canceled = true;
     };
-  }, [program, positionAddress, market, wallet.publicKey, refresh]);
+  }, [program, positionAddress, market, wallet.publicKey, status, refresh]);
 
   useEffect(() => {
     let canceled = false;
@@ -659,8 +659,8 @@ function ConnectedPosition({
         </p>
       )}
       <p>
-        Market opening, outcome trading and redemption will be added in later
-        milestones. Draft markets cannot create pairs.
+        Outcome trading and redemption will be added in later milestones. The
+        market authority must open a draft before pairs can be created.
       </p>
     </section>
   );

@@ -50,7 +50,7 @@ updated client against devnet.
 
 ## Prediction draft foundation
 
-- `/predictions`: public draft discovery.
+- `/predictions`: public prediction-market discovery, including open markets.
 - `/predictions/new`: active-admin form for atomic draft creation.
 - `/predictions/[address]`: public inspection of collateral, resolution windows,
   resolver keys, rules URI and content hashes; connected-wallet position
@@ -78,7 +78,7 @@ keys and timing come from the file. Hashing uses the original bytes; changing
 whitespace changes the rules hash. The form does not verify the remote copy.
 
 Contracts use whole quantities and pay one collateral token per winning
-contract. Prices use the mint's precision. Opening, trading, resolution
+contract. Prices use the mint's precision. Trading, resolution
 and redemption are later milestones; a newly created account is always Draft.
 
 Prediction deposits, withdrawals and complete sets are implemented locally. Keep
@@ -103,8 +103,20 @@ Splitting one whole pair reserves one collateral token and creates one YES
 plus one NO internal contract. Merging burns a free pair and returns that token
 to available collateral; it does not transfer tokens out of the vault. Locked
 outcomes cannot be merged. Splitting requires Open status before close; merging
-works in Open, Frozen and Proposed. Drafts cannot split until the opening
-instruction is implemented. Confirmation refreshes the position and backing reserve.
+works in Open, Frozen and Proposed. Drafts must be opened first. Confirmation
+refreshes the position and backing reserve.
+
+The market detail page shows an **Open market** control only to the stored
+market authority. It requires Draft status, a time before close and the creator's
+current active admin record. Disabled or removed admins cannot open markets;
+another active admin cannot open someone else's market.
+Opening preserves all committed terms and balances. After deploying the opening
+instruction, set `NEXT_PUBLIC_PREDICTION_OPENING_ENABLED=true` alongside the draft
+flag and rebuild; this new flag defaults false against older binaries. The
+client reloads the market after confirmation and enables position splitting.
+Opening does not yet enable order placement or settlement. The rules file's
+`primaryResolver` must match the creator wallet. The creator will propose the
+outcome once settlement is implemented; traders will claim payouts themselves.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 

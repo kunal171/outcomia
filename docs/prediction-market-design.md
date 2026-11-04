@@ -2,7 +2,8 @@
 
 Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
-locally. Opening, trading and resolution remain planned. This program version
+locally, along with active-admin creator-controlled market opening. Trading and resolution
+remain planned. This program version
 has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -88,7 +89,7 @@ FIFO matching.
 | Order book | One bid/ask book for YES and one bid/ask book for NO |
 | Matching | Best-price FIFO, validated and settled on-chain |
 | Price | Collateral atoms paid for one winning-payout contract |
-| Resolution | Trusted resolver for the research version; oracle adapter later |
+| Resolution | Creator is the trusted primary resolver; predeclared optional fallback; oracle adapter later |
 | Long rules | Immutable URI plus content hashes stored on-chain |
 
 ## User-facing meaning
@@ -205,7 +206,9 @@ without an end time uses `proposalDeadlineTimestamp: null` and
 fixed before opening and must be shown in the UI. Optional configuration cannot
 be filled in later merely because an administrator wants to change the rules.
 
-The creation client checks that the document's timestamps and resolver keys
+The rules document's `primaryResolver` must equal the creator wallet. Both the
+client and draft initializer enforce this; the uploaded bytes are never rewritten
+to make a mismatched document appear valid. The creation client checks that the document's timestamps and resolver keys
 match the submitted on-chain configuration. Program code cannot fetch or
 evaluate an Arweave document: clients validate the document, while the program
 enforces its stored keys, timestamps and transitions. These economic terms and document references
@@ -279,6 +282,7 @@ working.
 2. `initialize_prediction_position`
 3. `deposit_prediction_collateral`
 4. `withdraw_prediction_collateral`
+5. `open_prediction_market`
 
 Initialization creates the market, collateral vault, metadata, and fee account
 in one transaction. `MarketKind::Prediction` becomes available only through
@@ -299,8 +303,8 @@ the internal base label and immutable `Prediction` classification. The fee
 record reuses `MarketFees`, with collateral in its `quote_mint` field. Existing
 spot deposit, matching, metadata-update and fee-withdrawal instructions require
 the spot `Market` discriminator and cannot operate on prediction accounts.
-Prediction opening, update, close and funding instructions will be separate
-milestones. Creation events and indexer event decoding are also deferred.
+Opening and funding use separate instructions. Term updates and account closure
+are not implemented. Creation events and indexer event decoding are deferred.
 
 The frontend foundation includes `/predictions`, `/predictions/new`, and
 `/predictions/[address]`. The create form reads the original uploaded Arweave
@@ -316,6 +320,43 @@ It is a rollout switch rather than an authorization mechanism; on-chain admin
 constraints always apply to draft creation, while position creation requires
 the owner's signature. Reads remain public and distinguish RPC errors from
 an empty result. UI trading actions are not exposed yet.
+
+### Opening (implemented locally)
+
+`open_prediction_market()` takes the stored authority's signature, the canonical
+prediction-market PDA and the authority's canonical active `AdminRecord`. It
+also requires the stored primary resolver to equal that creator. It accepts only Draft status and a chain Clock
+strictly before `close_ts`. At the exact closing second, opening fails.
+Success changes only status to Open: rule hashes, resolver windows, vault
+identity, balances and aggregate backing do not change. No deposit or complete
+set is required first. Repeated calls and attempts to reopen Frozen, Proposed
+or Resolved markets fail.
+
+Opening requires both the creator authority and current active admin membership.
+Another admin or super-admin has no override merely because of that role.
+Disabling or removing the creator's admin record blocks opening. Re-enabling
+the same creator permits opening again if the market is still Draft and before
+close. This does not disable that wallet's trader withdrawals. An older draft
+with a different primary resolver cannot open under this version; recreate it
+with matching rules rather than rewriting its committed terms.
+
+The detail page shows lifecycle controls only to the connected market authority,
+and disables opening if its admin role is inactive, missing, loading or unreadable.
+`NEXT_PUBLIC_PREDICTION_OPENING_ENABLED` defaults false and also requires the
+draft rollout flag. Enable it only after deploying the opening instruction.
+The client checks the displayed close time and reads fresh terms and the canonical
+admin record before signing;
+on-chain checks remain authoritative. Confirmation reloads the market and its
+position controls. If that read fails, the receipt remains visible and asks for
+a refresh instead of inventing a status or reporting the confirmed opening as
+failed. Opening currently enables splitting; order placement and settlement
+remain unimplemented and the UI says so.
+
+Tests use actual initialized drafts, check unchanged vault/metadata/fee data,
+status-only mutation, disabled/removed/substituted/corrupt admin records,
+creator versus admin/resolver roles, unsigned accounts,
+canonical addresses, account type, close boundaries and whole-transaction
+rollback. Collateral round-trip tests now open through this instruction.
 
 ### Collateral deposits (implemented locally)
 
@@ -402,23 +443,13 @@ The UI takes whole pairs separately from decimal cash amounts, shows the exact
 collateral reserved/released, and refreshes position and reserve after confirmation.
 It rejects fractional contracts and excludes locked balances when checking funds.
 Chain checks remain authoritative if prices, timestamps or balances change.
-There is not yet an opening instruction, so new drafts cannot split pairs;
-integration tests use an Open fixture until that lifecycle transition is added.
+The authority can open a new draft through `open_prediction_market`; integration
+tests use that transition before splitting rather than directly setting Open.
 
 Tests cover full and partial round trips, two-wallet conservation and isolation,
 all lifecycle gates, the exact close boundary, locked funds, zero amounts,
 overflow/underflow, unsigned or substituted accounts, SPL CPI failure and batch
 rollback. Typed events/indexer decoding remain a later milestone.
-
-### Position creation
-
-`split_collateral(contracts)` moves
-`contracts * payout_per_contract` from the trader's free collateral into the
-market's backing reserve, then credits the same number of YES and NO positions.
-
-`merge_complete_set(contracts)` burns equal free YES and NO positions and
-returns the corresponding reserve to free collateral. Locked positions cannot
-be merged.
 
 ### Trading
 
@@ -441,29 +472,57 @@ requires positions to be free, so users cancel resting orders before redeeming.
 
 ### Resolution and redemption
 
-The research version uses a stored resolver key and makes that trust explicit:
+The creator is the trusted primary outcome decision-maker. The initializer
+already binds `resolver == authority`; proposal, finalization and redemption
+instructions are still planned. The permissions for those instructions are:
+
+| Action | Required permission |
+| --- | --- |
+| Create draft | Active admin |
+| Open | Stored creator and active admin; enforced now |
+| Administrative trading closure | Stored creator and active admin; planned |
+| Primary outcome proposal/correction | Stored creator and active admin; planned |
+| Fallback proposal/correction | Predeclared fallback resolver and active admin; planned |
+| Finalize after review delay | Anyone may execute the fixed result; cannot choose or replace it; planned |
+| Claim payout | Owner of the winning positions; no admin role; planned |
+| Withdraw free collateral | Position owner; no admin role; enforced now |
+
+Administrative trading closure stops new orders; it does not destroy collateral
+or pay out claims. The fixed close timestamp must also stop placement and
+matching automatically, without waiting for an admin transaction. A later
+account-deletion instruction must require the creator and active admin status
+and reject outstanding orders, cash claims, outcome claims, reserves or fees.
+Neither trading closure nor admin revocation may block trader cancellation,
+withdrawal or redemption. These prediction-closure instructions are not yet
+implemented; the spot `close_market` instruction cannot close a prediction account.
+
+The planned settlement flow is:
 
 1. All placement and matching instructions reject `now >= close_ts`, even if
    nobody has called the permissionless freeze instruction yet.
-2. At `earliest_resolution_ts` (or `close_ts` when absent), the primary resolver
-   may propose `Yes | No | Invalid`, with an evidence URI and hash. If configured,
+2. At `earliest_resolution_ts` (or `close_ts` when absent), the creator, while
+   still an active admin, may propose `Yes | No | Invalid`, with an evidence URI and hash. If configured,
    its proposal window ends at `fallback.available_ts`; otherwise it has no end.
 3. When fallback is configured and no primary proposal exists at its activation
    time, anyone may activate it. The primary window stays closed even if
-   activation is delayed. Only the fixed fallback resolver may then propose,
+   activation is delayed. Only the fixed fallback resolver, while an active admin, may then propose,
    before `fallback.deadline_ts` when that deadline exists.
 4. Every proposal waits `resolution_delay_seconds`. Only the resolver for the
-   active phase may correct it during that delay; each correction records new
+   active phase, still an active admin, may correct it during that delay; each correction records new
    evidence and restarts the full delay. Corrections must also occur before
    that resolver's proposal deadline when configured. Super-admin has no separate outcome
    override.
-5. Anyone may finalize after the delay. A timely proposal may finalize after
+5. Anyone may finalize after the delay, including a winning trader. This only
+   accepts the already proposed outcome; the caller cannot choose YES or NO.
+   Admin revocation after a valid proposal must not block finalization or claims.
+   A timely proposal may finalize after
    its proposal deadline. If a primary proposal exists, fallback does not
    replace it; this first version handles resolver silence, not disputes.
 6. If a fallback deadline exists and neither resolver proposed by it, anyone may finalize
    the precommitted `Invalid` outcome. Timeout settlement must reject an
    existing proposal, and timeout evidence is the on-chain absence of one.
 7. Traders redeem free outcome positions into free collateral, then withdraw.
+   They do not need an admin transaction or admin role to claim their winnings.
 
 Initialization uses `effective_earliest = earliest_resolution_ts.unwrap_or(close_ts)`
 and requires `close_ts <= effective_earliest`. If fallback exists, it also requires
@@ -588,7 +647,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    withdrawals, with owner checks and atomic SPL custody.
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
-3. **Trading.** Open markets, YES/NO price levels, FIFO orders, cancellation,
+3. **Trading — started locally.** Market opening is implemented. Next: YES/NO
+   price levels, FIFO orders, cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution
