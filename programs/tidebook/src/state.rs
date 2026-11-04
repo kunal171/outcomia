@@ -5,6 +5,9 @@
 
 use anchor_lang::prelude::*;
 
+pub mod prediction;
+pub use prediction::*;
+
 /// Configuration and lifecycle state for one ordered base/quote market.
 #[account]
 #[derive(InitSpace)]

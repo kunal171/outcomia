@@ -3,7 +3,10 @@
 use anchor_lang::prelude::Pubkey;
 
 use crate::{
-    constants::{MARKET_FEES_SEED, MARKET_METADATA_SEED, PRICE_LEVEL_SEED, TRADER_BALANCE_SEED},
+    constants::{
+        MARKET_FEES_SEED, MARKET_METADATA_SEED, PREDICTION_MARKET_SEED, PREDICTION_POSITION_SEED,
+        PRICE_LEVEL_SEED, TRADER_BALANCE_SEED,
+    },
     state::OrderSide,
 };
 
@@ -61,9 +64,75 @@ pub fn derive_market_metadata_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubk
     Pubkey::find_program_address(&[MARKET_METADATA_SEED, market.as_ref()], program_id)
 }
 
+/// Derives a prediction market from its program-wide, creator-supplied ID.
+pub fn derive_prediction_market_pda(program_id: &Pubkey, market_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[PREDICTION_MARKET_SEED, market_id], program_id)
+}
+
+/// Derives the prediction-only ledger for one market and wallet.
+pub fn derive_prediction_position_pda(
+    program_id: &Pubkey,
+    market: &Pubkey,
+    owner: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[PREDICTION_POSITION_SEED, market.as_ref(), owner.as_ref()],
+        program_id,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prediction_market_identity_and_signer_seeds_are_stable() {
+        let (market, bump) = derive_prediction_market_pda(&crate::ID, &[7; 32]);
+        assert_eq!(
+            (market, bump),
+            derive_prediction_market_pda(&crate::ID, &[7; 32])
+        );
+        // Literal namespace pins the address contract separately from constants.
+        let recreated =
+            Pubkey::create_program_address(&[b"prediction_market", &[7; 32], &[bump]], &crate::ID)
+                .unwrap();
+        assert_eq!(market, recreated);
+        assert_ne!(market, derive_prediction_market_pda(&crate::ID, &[8; 32]).0);
+        assert_ne!(
+            market,
+            derive_prediction_market_pda(&Pubkey::new_unique(), &[7; 32]).0
+        );
+    }
+
+    #[test]
+    fn prediction_positions_are_scoped_and_separate_from_spot_balances() {
+        let market = derive_prediction_market_pda(&crate::ID, &[7; 32]).0;
+        let owner = Pubkey::new_unique();
+        let (position, bump) = derive_prediction_position_pda(&crate::ID, &market, &owner);
+        let recreated = Pubkey::create_program_address(
+            &[
+                b"prediction_position",
+                market.as_ref(),
+                owner.as_ref(),
+                &[bump],
+            ],
+            &crate::ID,
+        )
+        .unwrap();
+        assert_eq!(position, recreated);
+        assert_ne!(
+            position,
+            derive_prediction_position_pda(&crate::ID, &market, &Pubkey::new_unique()).0
+        );
+        assert_ne!(
+            position,
+            derive_prediction_position_pda(&crate::ID, &Pubkey::new_unique(), &owner).0
+        );
+        assert_ne!(
+            position,
+            derive_trader_balance_pda(&crate::ID, &market, &owner).0
+        );
+    }
 
     #[test]
     fn identical_inputs_produce_identical_addresses() {

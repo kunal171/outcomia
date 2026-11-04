@@ -6,6 +6,14 @@ use anchor_lang::prelude::*;
 #[constant]
 pub const MARKET_SEED: &[u8] = b"market";
 
+/// Prediction market keyed by a program-wide 32-byte identifier.
+#[constant]
+pub const PREDICTION_MARKET_SEED: &[u8] = b"prediction_market";
+
+/// Internal prediction ledger: [namespace, prediction market, owner].
+#[constant]
+pub const PREDICTION_POSITION_SEED: &[u8] = b"prediction_position";
+
 /// Namespace for the human-readable metadata attached to one market.
 ///
 /// PDA: ["market_metadata", market]

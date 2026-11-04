@@ -115,7 +115,7 @@
         <mxCell id="predictionRules" value="Arweave rules + proposal evidence&lt;br&gt;Question, YES/NO criteria, evidence sources&lt;br&gt;Fallback procedure + deadlines&lt;br&gt;Document URI + SHA-256 committed on-chain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="40" y="270" width="370" height="110" as="geometry"/>
         </mxCell>
-        <mxCell id="predictionResolution" value="Resolution lifecycle&lt;br&gt;Close trading -&gt; primary / fallback proposal&lt;br&gt;Evidence + delay -&gt; final payout&lt;br&gt;No proposal by deadline -&gt; Invalid&lt;br&gt;Cancel, redeem, withdraw after resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+        <mxCell id="predictionResolution" value="Resolution lifecycle&lt;br&gt;Close -&gt; primary / optional fallback proposal&lt;br&gt;Evidence + delay -&gt; final payout&lt;br&gt;Invalid timeout requires a configured deadline&lt;br&gt;Cancel, redeem, withdraw after resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
           <mxGeometry x="560" y="270" width="350" height="110" as="geometry"/>
         </mxCell>
         <mxCell id="predictionBooks" value="YES and NO bid / ask books&lt;br&gt;Separate prediction orders + price levels&lt;br&gt;Reuse bounded FIFO design&lt;br&gt;Atomic fills + collateral fees&lt;br&gt;Later: atomic sell -&gt; buy opposite outcome" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">

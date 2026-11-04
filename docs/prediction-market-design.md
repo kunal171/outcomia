@@ -1,7 +1,18 @@
 # Prediction Market Design
 
-Status: design only. None of the accounts or instructions in this document are
-implemented yet.
+Status: account-layout milestone implemented locally. Prediction instructions,
+trading and resolution remain planned; prediction markets cannot be created yet.
+
+The first implementation is in `programs/tidebook/src/state/prediction.rs`:
+outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
+and `PredictionPosition`. PDA helpers live in `src/pda.rs`. Existing spot
+account layouts are unchanged.
+
+`PredictionMarket` reserves 834 payload bytes (842 including its Anchor
+discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
+113 payload bytes (121 including its discriminator). These are Borsh sizes,
+not Rust in-memory struct sizes. URI limits and state rules will be enforced by
+future instruction handlers; `InitSpace` only calculates allocation.
 
 This design adds binary prediction markets to Tidebook without creating YES and
 NO SPL tokens. A market uses one collateral mint, such as test USDC. YES and NO
@@ -86,9 +97,10 @@ fixed-point scale and more rounding paths, so they can be added later.
 ```text
 seeds = ["prediction_market", market_id]
 
+market_id
 authority
 resolver
-fallback_resolver
+fallback: Option<PredictionFallback { resolver, available_ts, deadline_ts: Option<i64> }>
 collateral_mint
 collateral_vault
 metadata
@@ -96,17 +108,12 @@ question_hash
 rules_hash
 rules_uri
 close_ts
-earliest_resolution_ts
-fallback_available_ts
-fallback_deadline_ts
+earliest_resolution_ts: Option<i64>
 resolution_delay_seconds
 resolution_phase
-evidence_uri
-evidence_hash
 status
-proposed_outcome
-proposal_ts
-final_outcome
+proposal: Option<PredictionProposal { outcome, proposed_at, evidence_uri, evidence_hash }>
+final_outcome: Option<PredictionResolution>
 payout_per_contract
 price_tick
 yes_supply
@@ -116,8 +123,25 @@ open_order_count
 bump
 ```
 
-`market_id` should be a creator-supplied 32-byte identifier or a monotonically
-allocated ID. The title remains in `MarketMetadata`. The full question and
+Absent values have explicit meanings:
+
+- `earliest_resolution_ts: None`: proposals can begin at `close_ts`.
+- `fallback: None`: only the primary resolver can propose, with no proposal
+  deadline and no automatic timeout payout.
+- `fallback.deadline_ts: None`: the fallback exists, but its proposal window has
+  no end and there is no automatic timeout payout.
+- `proposal: None`: no outcome, timestamp or evidence has been submitted.
+- `final_outcome: None`: payouts are not finalized.
+
+Grouping fallback configuration and proposal data prevents partially populated
+records. Resolver keys, collateral identity, rule references, close time, payout
+size and price tick remain mandatory. Zero balances and zero supply are valid
+numeric values, so those fields do not need `Option`. Allocations reserve the
+maximum size even when optional fields are absent.
+
+`market_id` is a creator-supplied 32-byte identifier unique within this program,
+stored in the account to reconstruct its PDA seeds. The title remains in
+`MarketMetadata`. The full question and
 rules can be much longer, so they belong in an Arweave JSON document at
 `rules_uri`. `rules_hash` is SHA-256 of the exact uploaded document bytes;
 `question_hash` hashes the UTF-8 question string without normalization. The UI
@@ -154,10 +178,17 @@ The JSON should contain at least:
 }
 ```
 
-The initializer checks that the structured timestamps and resolver keys match
-the on-chain configuration. Program code cannot fetch or evaluate an Arweave
-document: clients validate the document, while the program enforces its stored
-keys, timestamps and transitions. These economic terms and document references
+For markets without an extra wait after close, `earliestResolutionTimestamp`
+is `null`. For primary-only markets, `fallback` is `null`. A configured fallback
+without an end time uses `proposalDeadlineTimestamp: null` and
+`noProposalOutcome: "No automatic timeout; await resolver"`. These choices are
+fixed before opening and must be shown in the UI. Optional configuration cannot
+be filled in later merely because an administrator wants to change the rules.
+
+The creation client checks that the document's timestamps and resolver keys
+match the submitted on-chain configuration. Program code cannot fetch or
+evaluate an Arweave document: clients validate the document, while the program
+enforces its stored keys, timestamps and transitions. These economic terms and document references
 are fixed before opening. A new Arweave upload cannot replace existing terms.
 
 An evidence URI and content hash accompany each proposal and correction.
@@ -251,35 +282,42 @@ The research version uses a stored resolver key and makes that trust explicit:
 
 1. All placement and matching instructions reject `now >= close_ts`, even if
    nobody has called the permissionless freeze instruction yet.
-2. At `earliest_resolution_ts`, the primary resolver may propose
-   `Yes | No | Invalid`, with an evidence URI and hash. Its proposal window ends
-   at `fallback_available_ts`.
-3. If no primary proposal exists at `fallback_available_ts`, anyone may activate
-   fallback. The primary window stays closed even if activation is delayed.
-   Only the fixed fallback resolver may then propose, before
-   `fallback_deadline_ts`.
+2. At `earliest_resolution_ts` (or `close_ts` when absent), the primary resolver
+   may propose `Yes | No | Invalid`, with an evidence URI and hash. If configured,
+   its proposal window ends at `fallback.available_ts`; otherwise it has no end.
+3. When fallback is configured and no primary proposal exists at its activation
+   time, anyone may activate it. The primary window stays closed even if
+   activation is delayed. Only the fixed fallback resolver may then propose,
+   before `fallback.deadline_ts` when that deadline exists.
 4. Every proposal waits `resolution_delay_seconds`. Only the resolver for the
    active phase may correct it during that delay; each correction records new
    evidence and restarts the full delay. Corrections must also occur before
-   that resolver's proposal deadline. Super-admin has no separate outcome
+   that resolver's proposal deadline when configured. Super-admin has no separate outcome
    override.
 5. Anyone may finalize after the delay. A timely proposal may finalize after
    its proposal deadline. If a primary proposal exists, fallback does not
    replace it; this first version handles resolver silence, not disputes.
-6. If neither resolver proposed by the fallback deadline, anyone may finalize
+6. If a fallback deadline exists and neither resolver proposed by it, anyone may finalize
    the precommitted `Invalid` outcome. Timeout settlement must reject an
    existing proposal, and timeout evidence is the on-chain absence of one.
 7. Traders redeem free outcome positions into free collateral, then withdraw.
 
-Initialization requires
-`close_ts <= earliest_resolution_ts < fallback_available_ts < fallback_deadline_ts`
-and a positive resolution delay. Resolver windows use inclusive starts and
+Initialization uses `effective_earliest = earliest_resolution_ts.unwrap_or(close_ts)`
+and requires `close_ts <= effective_earliest`. If fallback exists, it also requires
+`effective_earliest < fallback.available_ts`. If its deadline exists,
+`fallback.available_ts < fallback.deadline_ts` is required. The resolution delay
+must be positive. Resolver windows use inclusive starts and
 exclusive ends. Proposal, correction, activation and finalization transitions
 are atomic, with events that include the phase, timestamps and evidence hashes.
 
 The timeout policy is a deliberate research compromise. A resolver capable of
 withholding evidence could benefit from a 50/50 payout. Public deployment needs
 a stronger dispute process; the UI must disclose the committed timeout policy.
+Without fallback or without its deadline, resolver silence can leave unpaired
+outcome positions unresolved indefinitely. Users can still cancel orders,
+withdraw free collateral and merge free complete sets before resolution, but
+cannot redeem unpaired outcomes. No administrator may invent a timeout refund
+after opening.
 
 `Invalid` pays half to YES and half to NO. The initializer must therefore
 require an even `payout_per_contract`. Later, the trusted resolver can be
@@ -308,7 +346,8 @@ earlier state.
 The timestamp gate also closes trading while the stored status is still `Open`.
 Fallback is a resolution phase within `Frozen`/`Proposed`, rather than reopening
 trading. A missing proposal can move `Frozen` directly to `Resolved(Invalid)`
-after the fallback deadline.
+after a configured fallback deadline. With no deadline there is no timeout
+transition.
 
 ## Later feature: atomic position switching
 
