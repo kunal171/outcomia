@@ -15,7 +15,7 @@ use crate::{
 ///
 /// Absence is deliberate: no earliest time uses close time; no fallback has
 /// no resolver timeout; a fallback without a deadline has an open-ended window.
-#[derive(Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct PredictionMarketConfig {
     pub resolver: Pubkey,
     pub fallback: Option<PredictionFallback>,

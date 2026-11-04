@@ -58,6 +58,7 @@ export function AppHeader() {
 
       <nav className="topbar-nav" aria-label="Primary navigation">
         <Link href="/markets">Markets</Link>
+        <Link href="/predictions">Predictions</Link>
         {canViewOrders && <Link href="/orders">Orders</Link>}
         {isSuperAdmin && <Link href="/admin">Manage admins</Link>}
         {canCreateMarket && <Link href="/markets/new">Create market</Link>}

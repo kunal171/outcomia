@@ -48,6 +48,33 @@ The checked-in client IDL mirrors the generated Anchor IDL. After any account
 layout or instruction change, rebuild and redeploy the program before using the
 updated client against devnet.
 
+## Prediction draft foundation
+
+- `/predictions`: public draft discovery.
+- `/predictions/new`: active-admin form for atomic draft creation.
+- `/predictions/[address]`: public inspection of collateral, resolution windows,
+  resolver keys, rules URI and content hashes.
+
+Creation remains disabled by default. After deploying the matching program,
+set `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true` and rebuild. This switch only
+controls rollout; the program enforces the admin role independently.
+
+Upload the rules JSON to Arweave first, then select the exact same local file
+and enter its URI in the form. Use schema version 1 from
+[`prediction-market-design.md`](../docs/prediction-market-design.md). Resolver
+keys and timing come from the file. Hashing uses the original bytes; changing
+whitespace changes the rules hash. The form does not verify the remote copy.
+
+Contracts use whole quantities and pay one collateral token per winning
+contract. Prices use the mint's precision. Opening, funding, trading, resolution
+and redemption are later milestones; a newly created account is always Draft.
+
+Verify the JSON parser, exact-byte hashing and PDA derivation with:
+
+```bash
+npm run test:prediction
+```
+
 Configure the public program identity and optionally override the default
 devnet RPC endpoint:
 

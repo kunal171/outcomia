@@ -1,8 +1,8 @@
 # Prediction Market Design
 
-Status: account layouts and pure creation-config validation are implemented.
-Prediction instructions, trading and resolution remain planned; prediction
-markets cannot be created yet.
+Status: draft initialization, account layouts and creation-config validation
+are implemented locally. Opening, deposits, trading and resolution remain
+planned. This program version has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
@@ -12,8 +12,9 @@ account layouts are unchanged.
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
 113 payload bytes (121 including its discriminator). These are Borsh sizes,
-not Rust in-memory struct sizes. URI limits and state rules will be enforced by
-future instruction handlers; `InitSpace` only calculates allocation.
+not Rust in-memory struct sizes. Creation enforces URI bounds and configuration
+rules; future handlers will enforce lifecycle transitions. `InitSpace` only
+calculates allocation.
 
 `programs/tidebook/src/prediction_config.rs` validates proposed creation terms
 without account allocation or network access. It requires a future close time,
@@ -26,8 +27,8 @@ start with `ar://` or `https://` with a nonempty target. Both content commitment
 must be nonzero. This is not full URL validation or document verification.
 
 Tests cover valid optional configurations, boundary timestamps, delay overflow,
-payout/tick constraints, resolver keys, URI bounds and missing hashes. The future
-initializer must call this validator using Solana Clock and separately check the
+payout/tick constraints, resolver keys, URI bounds and missing hashes. The draft
+initializer calls the validator using Solana Clock and separately checks the
 admin role, SPL mint, vault authority and canonical account addresses. Proposal
 instructions must repeat checked timestamp arithmetic at the actual proposal
 time, especially when a resolver window has no deadline.
@@ -264,6 +265,37 @@ working.
 Initialization creates the market, collateral vault, metadata, and fee account
 in one transaction. `MarketKind::Prediction` becomes available only through
 this instruction; the existing spot initializer must continue rejecting it.
+
+`initialize_prediction_market` is implemented for the draft milestone. It checks
+the caller's active `AdminRecord`, validates configuration with Solana Clock,
+and creates all four accounts atomically. Any validation failure rolls back
+account creation and token CPIs. The vault uses the existing canonical
+`["vault-authority", market]` signer and `["vault", market, collateral_mint]`
+address. The admin pays rent but does not control the vault's token authority.
+Mint decimals must make `payout_per_contract` exactly one collateral token;
+zero-decimal mints cannot satisfy the exact Invalid half-payout rule.
+
+The result is `Draft`, with zero supplies, reserve, fees and orders, primary
+resolution phase, and no proposal or final outcome. Metadata uses `YES-NO` as
+the internal base label and immutable `Prediction` classification. The fee
+record reuses `MarketFees`, with collateral in its `quote_mint` field. Existing
+spot deposit, matching, metadata-update and fee-withdrawal instructions require
+the spot `Market` discriminator and cannot operate on prediction accounts.
+Prediction opening, update, close and funding instructions will be separate
+milestones. Creation events and indexer event decoding are also deferred.
+
+The frontend foundation includes `/predictions`, `/predictions/new`, and
+`/predictions/[address]`. The create form reads the original uploaded Arweave
+JSON file, validates its structured rules, computes both hashes, derives mint
+precision and creates a draft. It does not upload to Arweave or establish that
+the URI serves those same bytes. The terms page displays hashes and on-chain
+configuration, without claiming the remote question has been verified.
+
+Creation is disabled unless `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true`. Enable
+that flag only after deployment of this program version, then rebuild Next.js.
+It is a rollout switch rather than an authorization mechanism; on-chain admin
+constraints always apply. Reads remain public and distinguish RPC errors from
+an empty result. UI trading and deposit actions are not exposed yet.
 
 ### Position creation
 

@@ -161,7 +161,11 @@ pub fn handle_close_market_metadata(ctx: Context<CloseMarketMetadata>) -> Result
 
 /// Restrict labels to a predictable ASCII subset so byte limits and rendered
 /// lengths agree across Rust, TypeScript, wallets, and indexers.
-fn validate_labels(base_symbol: &str, quote_symbol: &str, display_name: &str) -> Result<()> {
+pub(crate) fn validate_labels(
+    base_symbol: &str,
+    quote_symbol: &str,
+    display_name: &str,
+) -> Result<()> {
     require!(valid_symbol(base_symbol), metadata::InvalidMarketSymbol);
     require!(valid_symbol(quote_symbol), metadata::InvalidMarketSymbol);
     require!(

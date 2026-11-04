@@ -994,6 +994,20 @@ footer {
   margin-top: 4px;
 }
 
+.prediction-terms dd,
+.prediction-detail-grid .market-address-caption {
+  overflow-wrap: anywhere;
+}
+
+.prediction-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.prediction-terms {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
 .transaction-message {
   margin-top: 20px;
   overflow-wrap: anywhere;

@@ -1485,6 +1485,250 @@
       ]
     },
     {
+      "name": "initialize_prediction_market",
+      "docs": [
+        "Creates a draft prediction market, metadata, fees and collateral vault."
+      ],
+      "discriminator": [
+        248,
+        70,
+        198,
+        224,
+        224,
+        105,
+        125,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "market_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint",
+          "docs": [
+            "Account<Mint> validates legacy SPL ownership and initialized mint data."
+          ]
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_fees",
+          "docs": [
+            "Reuse the fee record's layout: quote_mint denotes collateral here.",
+            "Existing spot fee-withdrawal instructions require Account<Market> and",
+            "cannot operate on PredictionMarket. Prediction fee operations come later."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  102,
+                  101,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "PredictionMarketConfig"
+            }
+          }
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        },
+        {
+          "name": "collateral_symbol",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "initialize_protocol",
       "docs": [
         "Creates singleton governance state and the deployer's admin record."
@@ -2952,6 +3196,19 @@
       ]
     },
     {
+      "name": "PredictionMarket",
+      "discriminator": [
+        117,
+        150,
+        97,
+        152,
+        119,
+        58,
+        51,
+        58
+      ]
+    },
+    {
       "name": "PriceLevel",
       "discriminator": [
         236,
@@ -3769,6 +4026,56 @@
       "code": 6097,
       "name": "MarketMetadataMismatch",
       "msg": "Market metadata belongs to a different market"
+    },
+    {
+      "code": 6098,
+      "name": "InvalidPredictionCloseTime",
+      "msg": "Prediction trading close time must be in the future"
+    },
+    {
+      "code": 6099,
+      "name": "InvalidPredictionResolutionTime",
+      "msg": "Prediction resolution cannot begin before trading closes"
+    },
+    {
+      "code": 6100,
+      "name": "InvalidPredictionFallback",
+      "msg": "Prediction fallback activation and deadline must follow the resolution window"
+    },
+    {
+      "code": 6101,
+      "name": "InvalidPredictionResolver",
+      "msg": "Prediction resolver keys must be nonzero and primary and fallback must differ"
+    },
+    {
+      "code": 6102,
+      "name": "InvalidPredictionResolutionDelay",
+      "msg": "Prediction resolution delay must be positive and fit signed timestamp arithmetic"
+    },
+    {
+      "code": 6103,
+      "name": "InvalidPredictionPayout",
+      "msg": "Prediction payout must be positive and even for exact Invalid settlement"
+    },
+    {
+      "code": 6104,
+      "name": "InvalidPredictionPriceTick",
+      "msg": "Prediction price tick must be positive, below payout and divide it exactly"
+    },
+    {
+      "code": 6105,
+      "name": "InvalidPredictionRulesUri",
+      "msg": "Prediction rules URI must be bounded printable ASCII using ar:// or https://"
+    },
+    {
+      "code": 6106,
+      "name": "InvalidPredictionRulesHash",
+      "msg": "Prediction question and rules hashes must be nonzero"
+    },
+    {
+      "code": 6107,
+      "name": "PredictionTimestampOverflow",
+      "msg": "Prediction timestamp plus resolution delay exceeds the timestamp range"
     }
   ],
   "types": [
@@ -4715,6 +5022,417 @@
       }
     },
     {
+      "name": "PredictionFallback",
+      "docs": [
+        "Optional fallback policy, fixed with the market's original rules.",
+        "",
+        "Keeping the key and activation time together prevents partial configuration",
+        "such as a fallback deadline without a resolver. No deadline means the",
+        "fallback may propose indefinitely; no automatic timeout payout is possible."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "available_ts",
+            "docs": [
+              "Unix seconds when primary proposals stop and fallback becomes eligible."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "deadline_ts",
+            "docs": [
+              "Exclusive proposal/correction deadline, if a timeout was agreed upon."
+            ],
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionMarket",
+      "docs": [
+        "Terms and aggregate liabilities for a single-collateral binary market.",
+        "",
+        "PDA: [\"prediction_market\", market_id]. The creator supplies a 32-byte ID,",
+        "unique within this program. A separate account leaves spot layouts intact."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "docs": [
+              "Retained for future PDA constraints and signer seed reconstruction."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback",
+            "docs": [
+              "None selects primary-only resolution; there is no fallback timeout."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionFallback"
+                }
+              }
+            }
+          },
+          {
+            "name": "collateral_mint",
+            "docs": [
+              "Only SPL asset deposited into and withdrawn from this market."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata",
+            "docs": [
+              "Short labels, separate from immutable economic terms."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "question_hash",
+            "docs": [
+              "SHA-256 of the question's UTF-8 bytes, without normalization."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_hash",
+            "docs": [
+              "SHA-256 of the exact uploaded Arweave rules document bytes."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_uri",
+            "type": "string"
+          },
+          {
+            "name": "close_ts",
+            "docs": [
+              "Unix seconds. Placement and matching must reject now >= close_ts."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "earliest_resolution_ts",
+            "docs": [
+              "None uses close_ts as the earliest proposal time. It never permits",
+              "resolution while trading is still open."
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution_delay_seconds",
+            "docs": [
+              "The full delay restarts after every permitted correction."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "resolution_phase",
+            "type": {
+              "defined": {
+                "name": "PredictionResolutionPhase"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PredictionStatus"
+              }
+            }
+          },
+          {
+            "name": "proposal",
+            "docs": [
+              "Outcome, timestamp and evidence are either all present or all absent."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionProposal"
+                }
+              }
+            }
+          },
+          {
+            "name": "final_outcome",
+            "docs": [
+              "Set only at finalization, including the precommitted timeout path."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionResolution"
+                }
+              }
+            }
+          },
+          {
+            "name": "payout_per_contract",
+            "docs": [
+              "Raw collateral atoms per winning whole contract. Initialization must",
+              "require an even value so Invalid pays an exact half to each outcome."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_tick",
+            "docs": [
+              "Raw collateral-price increment per whole contract."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_supply",
+            "docs": [
+              "Outstanding whole contracts, including those locked in ask orders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "no_supply",
+            "type": "u64"
+          },
+          {
+            "name": "backing_reserve",
+            "docs": [
+              "Collateral reserved for payouts, excluding trader cash and fees.",
+              "Redemption reduces both outcome supply and this reserve."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "open_order_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionMarketConfig",
+      "docs": [
+        "Creation terms that can be checked before allocating any market accounts.",
+        "",
+        "Absence is deliberate: no earliest time uses close time; no fallback has",
+        "no resolver timeout; a fallback without a deadline has an open-ended window."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionFallback"
+                }
+              }
+            }
+          },
+          {
+            "name": "close_ts",
+            "type": "i64"
+          },
+          {
+            "name": "earliest_resolution_ts",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution_delay_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "payout_per_contract",
+            "type": "u64"
+          },
+          {
+            "name": "price_tick",
+            "type": "u64"
+          },
+          {
+            "name": "rules_uri",
+            "type": "string"
+          },
+          {
+            "name": "question_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionProposal",
+      "docs": [
+        "Evidence and timing attached to an actual proposed outcome.",
+        "",
+        "The market stores `None` before proposal instead of relying on zero hashes,",
+        "an empty URI or a sentinel timestamp. Future handlers must validate evidence",
+        "and replace the entire proposal when a correction restarts the delay."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionResolution"
+              }
+            }
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "evidence_uri",
+            "type": "string"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionResolution",
+      "docs": [
+        "Payout schedule: YES wins, NO wins, or both receive half the payout."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionResolutionPhase",
+      "docs": [
+        "Selects the resolver authorized within its fixed proposal window."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Primary"
+          },
+          {
+            "name": "Fallback"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionStatus",
+      "docs": [
+        "Stored lifecycle; trade handlers must also enforce the closing timestamp."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Draft"
+          },
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Frozen"
+          },
+          {
+            "name": "Proposed"
+          },
+          {
+            "name": "Resolved"
+          }
+        ]
+      }
+    },
+    {
       "name": "PriceLevel",
       "docs": [
         "One active price in a market-side order-book index."
@@ -5283,6 +6001,22 @@
       ],
       "type": "bytes",
       "value": "[111, 114, 100, 101, 114]"
+    },
+    {
+      "name": "PREDICTION_MARKET_SEED",
+      "docs": [
+        "Prediction market keyed by a program-wide 32-byte identifier."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 109, 97, 114, 107, 101, 116]"
+    },
+    {
+      "name": "PREDICTION_POSITION_SEED",
+      "docs": [
+        "Internal prediction ledger: [namespace, prediction market, owner]."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 112, 111, 115, 105, 116, 105, 111, 110]"
     },
     {
       "name": "PRICE_LEVEL_SEED",
