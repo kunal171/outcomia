@@ -1,4 +1,9 @@
 //! Deterministic decoding of Anchor event payloads emitted by Tidebook.
+//!
+//! This catalog supports the event definitions listed below, not every program
+//! account or instruction type. Prediction instructions currently emit no
+//! prediction-specific events. Adding such events requires matching this
+//! catalog and its Borsh mirrors before ingestion can checkpoint past them.
 
 mod types;
 
@@ -166,11 +171,24 @@ pub enum EventDecodeError {
 /// Decodes Base64 and separates the discriminator without interpreting the
 /// event body. Exactly eight decoded bytes is valid and represents an empty
 /// body; the typed decoder decides whether that body is valid for its event.
+///
+/// # Inputs
+/// RawEventLog with original log index and Base64 bytes selected by invocation-stack extraction.
+///
+/// # Errors
+/// Invalid Base64 or fewer than eight decoded bytes; unknown type/body validation belongs to the
+/// next stage.
+///
+/// # Returns
+/// An envelope preserving source index/Base64, the 8-byte discriminator and remaining body bytes.
 pub fn decode_envelope(raw_event: &RawEventLog) -> Result<DecodedEventEnvelope, EventDecodeError> {
     let decoded = STANDARD
         .decode(&raw_event.payload_base64)
         .map_err(|error| EventDecodeError::InvalidBase64(error.to_string()))?;
 
+    // Base64 transports bytes; it carries no Rust type information. The first
+    // 8 decoded bytes select the schema, and only the remaining bytes enter
+    // Borsh. An 8-byte payload has an empty body, which a typed schema may reject.
     let (discriminator_bytes, body) = decoded.split_at_checked(EVENT_DISCRIMINATOR_BYTES).ok_or(
         EventDecodeError::MissingDiscriminator {
             decoded_len: decoded.len(),
@@ -194,6 +212,16 @@ pub fn decode_envelope(raw_event: &RawEventLog) -> Result<DecodedEventEnvelope, 
 /// `borsh::from_slice` requires the entire slice to be consumed. This rejects
 /// both truncated payloads and payloads with trailing fields from a schema the
 /// current indexer does not yet understand.
+///
+/// # Inputs
+/// Borrowed body bytes and the event's stable name for diagnostics; `T` defines its schema.
+///
+/// # Errors
+/// `InvalidEventBody` on truncated, malformed or trailing bytes; partial successful decoding is
+/// rejected.
+///
+/// # Returns
+/// The typed event value with the entire input slice consumed.
 fn decode_body<T: BorshDeserialize>(
     body: &[u8],
     event_name: &'static str,
@@ -207,6 +235,16 @@ fn decode_body<T: BorshDeserialize>(
 /// Routes one extracted program-data log to its exact Tidebook event type.
 /// Unknown discriminators are errors so a future checkpoint cannot advance
 /// past an event that was never represented in the indexed state.
+///
+/// # Inputs
+/// A RawEventLog emitted while Tidebook is the active invocation.
+///
+/// # Errors
+/// Envelope failures, unknown discriminator or invalid known body; callers must not checkpoint past
+/// the failure.
+///
+/// # Returns
+/// A typed event with original source index/Base64 retained for persistence and replay.
 pub fn decode_event(raw_event: &RawEventLog) -> Result<DecodedEventLog, EventDecodeError> {
     let envelope = decode_envelope(raw_event)?;
 
@@ -330,6 +368,16 @@ impl TidebookEvent {
     ///
     /// This explicit mapping avoids using Debug output or Serde's JSON shape as
     /// a database identifier, either of which could change during refactoring.
+    ///
+    /// # Inputs
+    /// Borrowed TidebookEvent, including its domain-specific variant.
+    ///
+    /// # Errors
+    /// None; the exhaustive match has no fallback string.
+    ///
+    /// # Returns
+    /// A static on-chain event name; neither Debug formatting nor JSON enum shape defines storage
+    /// identity.
     pub fn event_type(&self) -> &'static str {
         match self {
             Self::Governance(event) => match event {

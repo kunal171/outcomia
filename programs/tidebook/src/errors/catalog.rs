@@ -303,4 +303,119 @@ pub enum TidebookError {
 
     #[msg("Market metadata belongs to a different market")]
     MarketMetadataMismatch = 97,
+
+    #[msg("Prediction trading close time must be in the future")]
+    InvalidPredictionCloseTime = 98,
+
+    #[msg("Prediction resolution cannot begin before trading closes")]
+    InvalidPredictionResolutionTime = 99,
+
+    #[msg("Prediction fallback activation and deadline must follow the resolution window")]
+    InvalidPredictionFallback = 100,
+
+    #[msg("Prediction resolver keys must be nonzero and primary and fallback must differ")]
+    InvalidPredictionResolver = 101,
+
+    #[msg("Prediction resolution delay must be positive and fit signed timestamp arithmetic")]
+    InvalidPredictionResolutionDelay = 102,
+
+    #[msg("Prediction payout must be positive and even for exact Invalid settlement")]
+    InvalidPredictionPayout = 103,
+
+    #[msg("Prediction price tick must be positive, below payout and divide it exactly")]
+    InvalidPredictionPriceTick = 104,
+
+    #[msg("Prediction rules URI must be bounded printable ASCII using ar:// or https://")]
+    InvalidPredictionRulesUri = 105,
+
+    #[msg("Prediction question and rules hashes must be nonzero")]
+    InvalidPredictionRulesHash = 106,
+
+    #[msg("Prediction timestamp plus resolution delay exceeds the timestamp range")]
+    PredictionTimestampOverflow = 107,
+
+    #[msg("Prediction position belongs to a different market")]
+    PredictionPositionMarketMismatch = 108,
+
+    #[msg("Prediction position belongs to a different wallet")]
+    PredictionPositionOwnerMismatch = 109,
+
+    #[msg("Token mint does not match the prediction market collateral")]
+    InvalidPredictionCollateralMint = 110,
+
+    #[msg("Token vault does not match the prediction market custody account")]
+    InvalidPredictionVault = 111,
+
+    #[msg("A resolved prediction market cannot accept new collateral deposits")]
+    PredictionDepositAfterResolution = 112,
+
+    #[msg("Prediction collateral source is not owned by the signing wallet")]
+    InvalidPredictionTokenOwner = 113,
+
+    #[msg("Contract quantity must be a positive whole number")]
+    InvalidPredictionContractQuantity = 114,
+
+    #[msg("Complete sets may only be split while the market is open and before close")]
+    PredictionSplitUnavailable = 115,
+
+    #[msg("Complete sets may only be merged in Open, Frozen or Proposed markets")]
+    PredictionMergeUnavailable = 116,
+
+    #[msg("Not enough free YES and NO positions to merge")]
+    InsufficientPredictionPositions = 117,
+
+    #[msg("Prediction quantity, payout or reserve exceeds u64")]
+    PredictionAccountingOverflow = 118,
+
+    #[msg("Prediction supply or backing reserve cannot cover the complete set")]
+    PredictionBackingUnderflow = 119,
+
+    #[msg("Only the prediction market authority may open this market")]
+    UnauthorizedPredictionAuthority = 120,
+
+    #[msg("Only a draft prediction market can be opened")]
+    PredictionNotDraft = 121,
+
+    #[msg("A prediction market cannot be opened at or after its close time")]
+    PredictionOpeningClosed = 122,
+
+    #[msg("The market creator must be its primary outcome resolver")]
+    PredictionCreatorMustResolve = 123,
+
+    #[msg("Prediction book belongs to a different market")]
+    PredictionBookMarketMismatch = 124,
+    #[msg("Prediction orders require an open market before its close time")]
+    PredictionOrderUnavailable = 125,
+    #[msg("This placement path requires an empty outcome/side price list")]
+    PredictionSideNotEmpty = 126,
+    #[msg("Prediction price must be positive, below payout and tick-aligned")]
+    InvalidPredictionOrderPrice = 127,
+    #[msg("A crossing prediction order must use the matching path")]
+    PredictionOrderWouldCross = 128,
+    #[msg("Prediction order ID must match the book's next positive ID")]
+    InvalidPredictionOrderId = 129,
+    #[msg("Prediction level identity or book linkage is invalid")]
+    InvalidPredictionPriceLevel = 130,
+    #[msg("Prediction queue tail identity, status or links are invalid")]
+    InvalidPredictionTail = 131,
+    #[msg("Prediction order must be open")]
+    PredictionOrderNotOpen = 132,
+    #[msg("Only the prediction order owner may cancel it")]
+    UnauthorizedPredictionOrderOwner = 133,
+    #[msg("Prediction FIFO neighbors are missing, stale or invalid")]
+    InvalidPredictionOrderNeighbor = 134,
+    #[msg("Empty prediction level rent must return to its original payer")]
+    InvalidPredictionRentRecipient = 135,
+    #[msg("Prediction order backing or book counters are inconsistent")]
+    PredictionOrderAccountingMismatch = 136,
+    #[msg("Prediction maker and taker must be on opposite sides")]
+    PredictionMatchingSameSide = 137,
+    #[msg("Prediction limit price does not cross the resting maker")]
+    PredictionOrdersDoNotCross = 138,
+    #[msg("Prediction traders cannot match their own resting orders")]
+    PredictionSelfTrade = 139,
+    #[msg("Prediction matching must use the best opposing price")]
+    PredictionMakerNotBest = 140,
+    #[msg("Prediction matching must use the oldest open order at that price")]
+    PredictionMakerNotHead = 141,
 }

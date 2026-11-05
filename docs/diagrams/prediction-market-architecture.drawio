@@ -1,0 +1,146 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="prediction-market" name="Prediction market architecture">
+    <mxGraphModel dx="1434" dy="827" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="Tidebook: backed YES/NO trading local; resolution planned" style="text;html=1;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="650" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="One SPL collateral mint; YES and NO remain internal program positions" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#666666;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="58" width="650" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="trader" value="Trader wallet&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;deposit / split / merge&lt;br&gt;place / match / cancel / redeem&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="170" width="190" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="admin" value="Active-admin creator&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;create / open market&lt;br&gt;planned: close / propose outcome&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="190" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="rules" value="Arweave rules JSON&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;YES / NO criteria + evidence&lt;br&gt;resolution times + fallback&lt;br&gt;immutable URI + SHA-256&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="190" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="program" value="Tidebook program&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;validates every transition&lt;br&gt;bounded on-chain FIFO matching&lt;br&gt;checked conservation math&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="310" y="280" width="230" height="125" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="market" value="PredictionMarket PDA&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;rule hashes + collateral reserve&lt;br&gt;resolver keys + enforced times&lt;br&gt;proposal evidence + final outcome&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="100" width="220" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="metadata" value="MarketMetadata PDA&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;short display name&lt;br&gt;kind = Prediction&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="100" width="200" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="position" value="PredictionPosition PDA&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;collateral free / locked&lt;br&gt;YES free / locked&lt;br&gt;NO free / locked&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="275" width="220" height="115" as="geometry"/>
+        </mxCell>
+        <mxCell id="vault" value="Collateral vault&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;single SPL token account&lt;br&gt;free + locked + reserve + fees&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="275" width="200" height="95" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="bookRoot" value="PredictionOrderBook root (initialized with draft)&lt;br&gt;Next ID = 1; four empty heads; 77-byte payload + 8-byte discriminator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="650" y="405" width="480" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="rootYes" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="bookRoot" target="yesBook"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="rootNo" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="bookRoot" target="noBook"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="yesBook" value="YES bid / ask queues&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;empty placement + same-price FIFO append&lt;br&gt;sorted new-price insertion&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="475" width="220" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="noBook" value="NO bid / ask queues&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;empty placement + same-price FIFO append&lt;br&gt;sorted new-price insertion&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="475" width="200" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="resolution" value="Resolution state (detail on page 2)&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Close -&gt; primary or optional fallback proposal -&gt; delay -&gt; finalize&lt;br&gt;Invalid timeout only with a configured fallback deadline&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="650" y="650" width="480" height="95" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="indexer" value="Events -&gt; Rust indexer -&gt; PostgreSQL&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;market, position, order, fill, resolution, redemption&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="270" width="280" height="95" as="geometry"/>
+        </mxCell>
+        <mxCell id="ui" value="Next.js UI&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;rules + YES/NO depth&lt;br&gt;Buy/Sell + safe remainder&lt;br&gt;balances; redemption planned&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="465" width="280" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="eTraderProgram" value="signed instructions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="trader" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eAdminProgram" value="governance + resolution" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="admin" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eRulesMarket" value="URI + SHA-256 hashes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="rules" target="market">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eProgramMarket" value="lifecycle" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="program" target="market">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eMarketMetadata" value="display metadata" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="market" target="metadata">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eProgramPosition" value="split / merge / trade / redeem" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="program" target="position">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ePositionVault" value="internal claims" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;startArrow=block;startFill=1;endArrow=block;endFill=1;" edge="1" parent="1" source="position" target="vault">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eProgramYes" value="match + FIFO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="program" target="yesBook">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eProgramNo" value="match + FIFO" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="program" target="noBook">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eMarketResolution" value="immutable outcome" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="market" target="resolution">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eResolutionPosition" value="payout schedule" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="resolution" target="position">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eProgramIndexer" value="typed events" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;" edge="1" parent="1" source="program" target="indexer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eIndexerUi" value="read models" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="indexer" target="ui">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eUiTrader" value="wallet actions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=1;" edge="1" parent="1" source="ui" target="trader">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend" value="Local: funding, orders, cancellation, 3-maker atomic matching with taker fees, safe limit remainders and public depth. Resolution planned. Deployment flags disabled." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;dashed=1;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1090" height="45" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="resolution-and-switching" name="Rules, resolution and switching">
+    <mxGraphModel grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1400" pageHeight="1100">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="detail-title" value="Prediction rules and execution (all planned)" style="text;html=1;fontSize=24;fontStyle=1;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="20" width="1000" height="45" as="geometry"/></mxCell>
+        <mxCell id="arweave" value="Arweave rules document&lt;br&gt;Question, criteria, source priority, evidence requirements&lt;br&gt;Resolver keys, time windows, timeout policy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="1"><mxGeometry x="40" y="100" width="360" height="100" as="geometry"/></mxCell>
+        <mxCell id="verify-client" value="Client verifies document hash&lt;br&gt;and compares structured terms&lt;br&gt;with market account" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="1"><mxGeometry x="490" y="100" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="chain-terms" value="Program enforces stored terms&lt;br&gt;Resolver keys + timestamps + transitions&lt;br&gt;Rules fixed before opening; evidence hash per proposal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;dashed=1;" vertex="1" parent="1"><mxGeometry x="880" y="100" width="360" height="100" as="geometry"/></mxCell>
+        <mxCell id="rules-client" value="fetch + hash exact bytes" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="arweave" target="verify-client"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="client-chain" value="verify matching configuration" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="verify-client" target="chain-terms"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="close" value="now &gt;= close_ts&lt;br&gt;Placement and matching reject&lt;br&gt;Cancellation remains available" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1"><mxGeometry x="40" y="290" width="260" height="90" as="geometry"/></mxCell>
+        <mxCell id="primary" value="Creator + active admin proposes outcome&lt;br&gt;Earliest = optional time or close_ts&lt;br&gt;Ends at fallback activation time if configured" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="1"><mxGeometry x="390" y="290" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="fallback" value="Predeclared fallback + active admin&lt;br&gt;Activate only if no primary proposal&lt;br&gt;available_ts &lt;= now; deadline optional" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="1"><mxGeometry x="390" y="460" width="300" height="90" as="geometry"/></mxCell>
+        <mxCell id="proposal" value="Proposal + evidence URI/hash&lt;br&gt;Wait full resolution delay&lt;br&gt;Correction restarts delay within resolver window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1"><mxGeometry x="800" y="290" width="340" height="90" as="geometry"/></mxCell>
+        <mxCell id="final" value="Permissionless finalization&lt;br&gt;YES / NO / Invalid&lt;br&gt;Immutable payout; redeem then withdraw" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="1"><mxGeometry x="800" y="460" width="340" height="90" as="geometry"/></mxCell>
+        <mxCell id="c-p" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="close" target="primary"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-proposal" value="propose in window" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="primary" target="proposal"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="p-fallback" value="no proposal at fallback time" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="primary" target="fallback"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="f-proposal" value="respect deadline if configured" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="fallback" target="proposal"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="proposal-final" value="delay elapsed" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="proposal" target="final"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="fallback-invalid" value="only if deadline exists and no proposal: Invalid" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="fallback" target="final"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="optional-policy-note" value="No fallback or no fallback deadline: no automatic timeout payout. Resolver silence may leave unpaired positions unresolved. These choices are fixed before opening." style="text;html=1;whiteSpace=wrap;align=left;fontColor=#666666;" vertex="1" parent="1"><mxGeometry x="40" y="570" width="1100" height="45" as="geometry"/></mxCell>
+        <mxCell id="switch-title" value="Later: atomic position switching within one market" style="text;html=1;fontSize=20;fontStyle=1;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="640" width="1000" height="40" as="geometry"/></mxCell>
+        <mxCell id="sell" value="Sell free YES (or NO)&lt;br&gt;Bounded FIFO fills&lt;br&gt;Minimum quantity and net proceeds" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="1"><mxGeometry x="40" y="720" width="280" height="100" as="geometry"/></mxCell>
+        <mxCell id="buy" value="Buy opposite outcome&lt;br&gt;Use net sale proceeds&lt;br&gt;Additional free collateral only if authorized" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="1"><mxGeometry x="440" y="720" width="300" height="100" as="geometry"/></mxCell>
+        <mxCell id="guard" value="Final transaction guard&lt;br&gt;Minimum bought + maximum extra spend&lt;br&gt;Any failure rolls back both legs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="1"><mxGeometry x="860" y="720" width="320" height="100" as="geometry"/></mxCell>
+        <mxCell id="sell-buy" value="credit collateral after fees" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="sell" target="buy"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="buy-guard" value="validate signed limits" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="buy" target="guard"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="switch-note" value="Both legs require now &lt; close_ts and counterparties. No resting remainder. Loss is reflected in sale price, not a separate charge. Network fees may apply on failure." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;dashed=1;" vertex="1" parent="1"><mxGeometry x="40" y="870" width="1140" height="60" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -88,6 +88,19 @@ pub struct AppendLimitOrder<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Appends a funded spot order behind the current FIFO tail.
+///
+/// # Inputs
+/// `ctx`: trader, Active market/ledger, canonical level/tail and new order; side, raw price and
+/// quantity.
+///
+/// # Errors
+/// Invalid grid/notional, stale tail, misbound accounts, insufficient free funds, overflow or
+/// initialization failure.
+///
+/// # Returns
+/// `Ok(())` after locking the trader's funds and extending the queue; earlier owners' claims and
+/// price links are unchanged.
 pub fn handle_append_limit_order(
     ctx: Context<AppendLimitOrder>,
     side: OrderSide,

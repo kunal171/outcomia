@@ -256,6 +256,298 @@
       ]
     },
     {
+      "name": "append_prediction_order",
+      "docs": [
+        "Appends a funded order after the verified tail at an existing price."
+      ],
+      "discriminator": [
+        187,
+        22,
+        84,
+        98,
+        132,
+        215,
+        219,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book",
+            "price_level"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tail_order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "tail_order.order_id",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "cancel_limit_order",
       "docs": [
         "Lets an order owner cancel an open order, including while paused."
@@ -423,6 +715,264 @@
               }
             ]
           }
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "cancel_prediction_order",
+      "docs": [
+        "Releases only the signing owner's unfilled claims, even after trading closes."
+      ],
+      "discriminator": [
+        87,
+        122,
+        0,
+        2,
+        168,
+        154,
+        140,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "order"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book",
+            "order",
+            "price_level"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "order.outcome",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "order.side",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "order.price",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "previous_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "docs": [
+            "Only supplied when the final order removes its price level."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
         }
       ],
       "args": [
@@ -993,6 +1543,189 @@
       ]
     },
     {
+      "name": "deposit_prediction_collateral",
+      "docs": [
+        "Deposits collateral and atomically credits the owner's free balance."
+      ],
+      "discriminator": [
+        235,
+        220,
+        147,
+        67,
+        109,
+        190,
+        30,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "source",
+          "docs": [
+            "Explicit wallet ownership excludes funding from another user's account",
+            "through a delegated transfer allowance; only the source owner signs."
+          ],
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "docs": [
+            "It does not sign this CPI: the wallet owns and signs for the source."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "disable_admin",
       "docs": [
         "Suspends an administrator without deleting its provenance record."
@@ -1485,6 +2218,400 @@
       ]
     },
     {
+      "name": "initialize_prediction_market",
+      "docs": [
+        "Creates a draft prediction market, book, metadata, fees and collateral vault."
+      ],
+      "discriminator": [
+        248,
+        70,
+        198,
+        224,
+        224,
+        105,
+        125,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "market_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint",
+          "docs": [
+            "Account<Mint> validates legacy SPL ownership and initialized mint data."
+          ]
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_fees",
+          "docs": [
+            "Reuse the fee record's layout: quote_mint denotes collateral here.",
+            "Existing spot fee-withdrawal instructions require Account<Market> and",
+            "cannot operate on PredictionMarket. Prediction fee operations come later."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  102,
+                  101,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "docs": [
+            "Created with the draft, so a successfully initialized market always has",
+            "its canonical index. Plain `init` deliberately rejects an existing root:",
+            "resetting a counter could reuse IDs or detach live price queues."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "PredictionMarketConfig"
+            }
+          }
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        },
+        {
+          "name": "collateral_symbol",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize_prediction_position",
+      "docs": [
+        "Creates the signing wallet's zeroed prediction-position ledger."
+      ],
+      "discriminator": [
+        222,
+        225,
+        252,
+        214,
+        57,
+        67,
+        242,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "A wallet may initialize only its own position and pays the account rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "Validate both account type and canonical address. A spot Market account",
+            "has a different discriminator and cannot be used as this ledger's market."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "docs": [
+            "`init` deliberately rejects existing ledgers. Reinitialization must",
+            "never zero out a trader's funded or locked balances."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_protocol",
       "docs": [
         "Creates singleton governance state and the deployer's admin record."
@@ -1964,6 +3091,275 @@
       ]
     },
     {
+      "name": "insert_prediction_order",
+      "docs": [
+        "Inserts a funded order between verified adjacent prices on an occupied side."
+      ],
+      "discriminator": [
+        59,
+        178,
+        203,
+        99,
+        235,
+        136,
+        1,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "better_level",
+          "docs": [
+            "Higher-priority adjacent price, absent only when inserting a new best."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "docs": [
+            "Lower-priority adjacent price, absent only when inserting a new worst."
+          ],
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "match_limit_order",
       "docs": [
         "Settles against one best FIFO maker and removes it when fully filled."
@@ -2259,6 +3655,563 @@
       ]
     },
     {
+      "name": "match_prediction_order",
+      "docs": [
+        "Settles up to one best FIFO maker; excess taker quantity is not posted."
+      ],
+      "discriminator": [
+        222,
+        232,
+        31,
+        94,
+        38,
+        142,
+        142,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "order_book",
+            "market_fees",
+            "maker_order",
+            "price_level",
+            "maker_position",
+            "taker_position"
+          ]
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_fees",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  102,
+                  101,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.order_id",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.side",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.price",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.owner",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "next_order",
+          "docs": [
+            "Only supplied when a full fill promotes the next FIFO order."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "docs": [
+            "Only supplied when a full fill empties the current best price level."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "merge_prediction_complete_set",
+      "docs": [
+        "Burns free YES/NO pairs and releases their backing into free cash."
+      ],
+      "discriminator": [
+        223,
+        13,
+        3,
+        245,
+        142,
+        193,
+        249,
+        118
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "open_prediction_market",
+      "docs": [
+        "Moves a draft to Open before close under its stored authority."
+      ],
+      "discriminator": [
+        150,
+        58,
+        235,
+        203,
+        39,
+        221,
+        19,
+        89
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "market",
+            "admin_record"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "pause_market",
       "docs": [
         "Stops new order placement while preserving cancellation access."
@@ -2287,6 +4240,259 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "place_prediction_order",
+      "docs": [
+        "Locks trader claims and seeds the first resting order on an empty side."
+      ],
+      "discriminator": [
+        119,
+        1,
+        59,
+        229,
+        186,
+        159,
+        116,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "remove_admin",
@@ -2428,6 +4634,115 @@
         {
           "name": "taker_fee_bps",
           "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "split_prediction_complete_set",
+      "docs": [
+        "Reserves one payout of cash per newly created YES/NO pair."
+      ],
+      "discriminator": [
+        170,
+        147,
+        167,
+        13,
+        176,
+        167,
+        139,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
         }
       ]
     },
@@ -2700,6 +5015,182 @@
       ]
     },
     {
+      "name": "withdraw_prediction_collateral",
+      "docs": [
+        "Withdraws only free collateral, including after trading or resolution."
+      ],
+      "discriminator": [
+        104,
+        247,
+        205,
+        160,
+        164,
+        229,
+        89,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "withdraw_protocol_fees",
       "docs": [
         "Transfers accrued quote-denominated protocol revenue to a treasury."
@@ -2949,6 +5440,71 @@
         86,
         28,
         51
+      ]
+    },
+    {
+      "name": "PredictionMarket",
+      "discriminator": [
+        117,
+        150,
+        97,
+        152,
+        119,
+        58,
+        51,
+        58
+      ]
+    },
+    {
+      "name": "PredictionOrder",
+      "discriminator": [
+        143,
+        114,
+        109,
+        86,
+        201,
+        242,
+        189,
+        215
+      ]
+    },
+    {
+      "name": "PredictionOrderBook",
+      "discriminator": [
+        5,
+        212,
+        167,
+        105,
+        82,
+        133,
+        138,
+        132
+      ]
+    },
+    {
+      "name": "PredictionPosition",
+      "discriminator": [
+        42,
+        168,
+        32,
+        158,
+        13,
+        15,
+        100,
+        46
+      ]
+    },
+    {
+      "name": "PredictionPriceLevel",
+      "discriminator": [
+        163,
+        54,
+        5,
+        27,
+        245,
+        40,
+        206,
+        235
       ]
     },
     {
@@ -3769,6 +6325,226 @@
       "code": 6097,
       "name": "MarketMetadataMismatch",
       "msg": "Market metadata belongs to a different market"
+    },
+    {
+      "code": 6098,
+      "name": "InvalidPredictionCloseTime",
+      "msg": "Prediction trading close time must be in the future"
+    },
+    {
+      "code": 6099,
+      "name": "InvalidPredictionResolutionTime",
+      "msg": "Prediction resolution cannot begin before trading closes"
+    },
+    {
+      "code": 6100,
+      "name": "InvalidPredictionFallback",
+      "msg": "Prediction fallback activation and deadline must follow the resolution window"
+    },
+    {
+      "code": 6101,
+      "name": "InvalidPredictionResolver",
+      "msg": "Prediction resolver keys must be nonzero and primary and fallback must differ"
+    },
+    {
+      "code": 6102,
+      "name": "InvalidPredictionResolutionDelay",
+      "msg": "Prediction resolution delay must be positive and fit signed timestamp arithmetic"
+    },
+    {
+      "code": 6103,
+      "name": "InvalidPredictionPayout",
+      "msg": "Prediction payout must be positive and even for exact Invalid settlement"
+    },
+    {
+      "code": 6104,
+      "name": "InvalidPredictionPriceTick",
+      "msg": "Prediction price tick must be positive, below payout and divide it exactly"
+    },
+    {
+      "code": 6105,
+      "name": "InvalidPredictionRulesUri",
+      "msg": "Prediction rules URI must be bounded printable ASCII using ar:// or https://"
+    },
+    {
+      "code": 6106,
+      "name": "InvalidPredictionRulesHash",
+      "msg": "Prediction question and rules hashes must be nonzero"
+    },
+    {
+      "code": 6107,
+      "name": "PredictionTimestampOverflow",
+      "msg": "Prediction timestamp plus resolution delay exceeds the timestamp range"
+    },
+    {
+      "code": 6108,
+      "name": "PredictionPositionMarketMismatch",
+      "msg": "Prediction position belongs to a different market"
+    },
+    {
+      "code": 6109,
+      "name": "PredictionPositionOwnerMismatch",
+      "msg": "Prediction position belongs to a different wallet"
+    },
+    {
+      "code": 6110,
+      "name": "InvalidPredictionCollateralMint",
+      "msg": "Token mint does not match the prediction market collateral"
+    },
+    {
+      "code": 6111,
+      "name": "InvalidPredictionVault",
+      "msg": "Token vault does not match the prediction market custody account"
+    },
+    {
+      "code": 6112,
+      "name": "PredictionDepositAfterResolution",
+      "msg": "A resolved prediction market cannot accept new collateral deposits"
+    },
+    {
+      "code": 6113,
+      "name": "InvalidPredictionTokenOwner",
+      "msg": "Prediction collateral source is not owned by the signing wallet"
+    },
+    {
+      "code": 6114,
+      "name": "InvalidPredictionContractQuantity",
+      "msg": "Contract quantity must be a positive whole number"
+    },
+    {
+      "code": 6115,
+      "name": "PredictionSplitUnavailable",
+      "msg": "Complete sets may only be split while the market is open and before close"
+    },
+    {
+      "code": 6116,
+      "name": "PredictionMergeUnavailable",
+      "msg": "Complete sets may only be merged in Open, Frozen or Proposed markets"
+    },
+    {
+      "code": 6117,
+      "name": "InsufficientPredictionPositions",
+      "msg": "Not enough free YES and NO positions to merge"
+    },
+    {
+      "code": 6118,
+      "name": "PredictionAccountingOverflow",
+      "msg": "Prediction quantity, payout or reserve exceeds u64"
+    },
+    {
+      "code": 6119,
+      "name": "PredictionBackingUnderflow",
+      "msg": "Prediction supply or backing reserve cannot cover the complete set"
+    },
+    {
+      "code": 6120,
+      "name": "UnauthorizedPredictionAuthority",
+      "msg": "Only the prediction market authority may open this market"
+    },
+    {
+      "code": 6121,
+      "name": "PredictionNotDraft",
+      "msg": "Only a draft prediction market can be opened"
+    },
+    {
+      "code": 6122,
+      "name": "PredictionOpeningClosed",
+      "msg": "A prediction market cannot be opened at or after its close time"
+    },
+    {
+      "code": 6123,
+      "name": "PredictionCreatorMustResolve",
+      "msg": "The market creator must be its primary outcome resolver"
+    },
+    {
+      "code": 6124,
+      "name": "PredictionBookMarketMismatch",
+      "msg": "Prediction book belongs to a different market"
+    },
+    {
+      "code": 6125,
+      "name": "PredictionOrderUnavailable",
+      "msg": "Prediction orders require an open market before its close time"
+    },
+    {
+      "code": 6126,
+      "name": "PredictionSideNotEmpty",
+      "msg": "This placement path requires an empty outcome/side price list"
+    },
+    {
+      "code": 6127,
+      "name": "InvalidPredictionOrderPrice",
+      "msg": "Prediction price must be positive, below payout and tick-aligned"
+    },
+    {
+      "code": 6128,
+      "name": "PredictionOrderWouldCross",
+      "msg": "A crossing prediction order must use the matching path"
+    },
+    {
+      "code": 6129,
+      "name": "InvalidPredictionOrderId",
+      "msg": "Prediction order ID must match the book's next positive ID"
+    },
+    {
+      "code": 6130,
+      "name": "InvalidPredictionPriceLevel",
+      "msg": "Prediction level identity or book linkage is invalid"
+    },
+    {
+      "code": 6131,
+      "name": "InvalidPredictionTail",
+      "msg": "Prediction queue tail identity, status or links are invalid"
+    },
+    {
+      "code": 6132,
+      "name": "PredictionOrderNotOpen",
+      "msg": "Prediction order must be open"
+    },
+    {
+      "code": 6133,
+      "name": "UnauthorizedPredictionOrderOwner",
+      "msg": "Only the prediction order owner may cancel it"
+    },
+    {
+      "code": 6134,
+      "name": "InvalidPredictionOrderNeighbor",
+      "msg": "Prediction FIFO neighbors are missing, stale or invalid"
+    },
+    {
+      "code": 6135,
+      "name": "InvalidPredictionRentRecipient",
+      "msg": "Empty prediction level rent must return to its original payer"
+    },
+    {
+      "code": 6136,
+      "name": "PredictionOrderAccountingMismatch",
+      "msg": "Prediction order backing or book counters are inconsistent"
+    },
+    {
+      "code": 6137,
+      "name": "PredictionMatchingSameSide",
+      "msg": "Prediction maker and taker must be on opposite sides"
+    },
+    {
+      "code": 6138,
+      "name": "PredictionOrdersDoNotCross",
+      "msg": "Prediction limit price does not cross the resting maker"
+    },
+    {
+      "code": 6139,
+      "name": "PredictionSelfTrade",
+      "msg": "Prediction traders cannot match their own resting orders"
+    },
+    {
+      "code": 6140,
+      "name": "PredictionMakerNotBest",
+      "msg": "Prediction matching must use the best opposing price"
+    },
+    {
+      "code": 6141,
+      "name": "PredictionMakerNotHead",
+      "msg": "Prediction matching must use the oldest open order at that price"
     }
   ],
   "types": [
@@ -4715,6 +7491,753 @@
       }
     },
     {
+      "name": "PredictionFallback",
+      "docs": [
+        "Optional fallback policy, fixed with the market's original rules.",
+        "",
+        "Keeping the key and activation time together prevents partial configuration",
+        "such as a fallback deadline without a resolver. No deadline means the",
+        "fallback may propose indefinitely; no automatic timeout payout is possible."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "available_ts",
+            "docs": [
+              "Unix seconds when primary proposals stop and fallback becomes eligible."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "deadline_ts",
+            "docs": [
+              "Exclusive proposal/correction deadline, if a timeout was agreed upon."
+            ],
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionMarket",
+      "docs": [
+        "Terms and aggregate liabilities for a single-collateral binary market.",
+        "",
+        "PDA: [\"prediction_market\", market_id]. The creator supplies a 32-byte ID,",
+        "unique within this program. A separate account leaves spot layouts intact."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "docs": [
+              "Used to verify the canonical market PDA in prediction instructions."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "docs": [
+              "Primary outcome proposer; creation/opening bind this to the creator."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback",
+            "docs": [
+              "None selects primary-only resolution; there is no fallback timeout."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionFallback"
+                }
+              }
+            }
+          },
+          {
+            "name": "collateral_mint",
+            "docs": [
+              "Only SPL asset deposited into and withdrawn from this market."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata",
+            "docs": [
+              "Short labels, separate from immutable economic terms."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "question_hash",
+            "docs": [
+              "SHA-256 of the question's UTF-8 bytes, without normalization."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_hash",
+            "docs": [
+              "SHA-256 of the exact uploaded Arweave rules document bytes."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_uri",
+            "type": "string"
+          },
+          {
+            "name": "close_ts",
+            "docs": [
+              "Unix seconds. Placement and matching must reject now >= close_ts."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "earliest_resolution_ts",
+            "docs": [
+              "None uses close_ts as the earliest proposal time. It never permits",
+              "resolution while trading is still open."
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution_delay_seconds",
+            "docs": [
+              "The full delay restarts after every permitted correction."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "resolution_phase",
+            "type": {
+              "defined": {
+                "name": "PredictionResolutionPhase"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PredictionStatus"
+              }
+            }
+          },
+          {
+            "name": "proposal",
+            "docs": [
+              "Outcome, timestamp and evidence are either all present or all absent."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionProposal"
+                }
+              }
+            }
+          },
+          {
+            "name": "final_outcome",
+            "docs": [
+              "Set only at finalization, including the precommitted timeout path."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionResolution"
+                }
+              }
+            }
+          },
+          {
+            "name": "payout_per_contract",
+            "docs": [
+              "Raw collateral atoms per winning whole contract. Initialization must",
+              "require an even value so Invalid pays an exact half to each outcome."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_tick",
+            "docs": [
+              "Raw collateral-price increment per whole contract."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_supply",
+            "docs": [
+              "Outstanding whole contracts, including those locked in ask orders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "no_supply",
+            "type": "u64"
+          },
+          {
+            "name": "backing_reserve",
+            "docs": [
+              "Collateral reserved for payouts, excluding trader cash and fees.",
+              "Redemption reduces both outcome supply and this reserve."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "open_order_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionMarketConfig",
+      "docs": [
+        "Creation terms that can be checked before allocating any market accounts.",
+        "",
+        "Absence is deliberate: no earliest time uses close time; no fallback has",
+        "no resolver timeout; a fallback without a deadline has an open-ended window."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionFallback"
+                }
+              }
+            }
+          },
+          {
+            "name": "close_ts",
+            "type": "i64"
+          },
+          {
+            "name": "earliest_resolution_ts",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution_delay_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "payout_per_contract",
+            "type": "u64"
+          },
+          {
+            "name": "price_tick",
+            "type": "u64"
+          },
+          {
+            "name": "rules_uri",
+            "type": "string"
+          },
+          {
+            "name": "question_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionOrder",
+      "docs": [
+        "One order submission: [\"prediction_order\", market, order_id_le].",
+        "",
+        "IDs are unique across both outcomes and both sides. Outcome is nevertheless",
+        "stored and must match the supplied level and position bucket on every action."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "price_level",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_order",
+            "docs": [
+              "Older/newer open orders at exactly the same outcome, side and price."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "next_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "quantity",
+            "docs": [
+              "Whole contracts, never mint atoms or fractional positions."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "remaining_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "docs": [
+              "Bid: collateral atoms reserved for the order, including any reserved",
+              "fee budget. Ask: whole YES or NO contracts selected by `outcome`.",
+              "Cancellation/fills must release the recorded amount, not guess units."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionOrderBook",
+      "docs": [
+        "One index root per prediction market: [\"prediction_book\", market].",
+        "",
+        "Keeping all four heads together costs one small account and simplifies",
+        "market-wide ID allocation. It also makes placements share a writable root;",
+        "this is a deliberate simplicity/parallelism tradeoff for the research book."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "next_order_id",
+            "docs": [
+              "First submission will use 1. Advance with checked arithmetic; never",
+              "reset this counter or recycle IDs while this market exists."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_best_bid",
+            "docs": [
+              "Highest live YES bid; None means that price list is empty."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "yes_best_ask",
+            "docs": [
+              "Lowest live YES ask."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "no_best_bid",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "no_best_ask",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Canonical root bump. The market retains the sole open-order counter."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionOutcome",
+      "docs": [
+        "Tradable positions. Invalid is a resolution result, never a third asset."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionPosition",
+      "docs": [
+        "One trader's collateral claims and internal YES/NO positions.",
+        "",
+        "PDA: [\"prediction_position\", market, owner]. Collateral is measured in SPL",
+        "mint atoms. YES/NO balances count whole contracts backed by the reserve;",
+        "they are not token accounts. Splitting and merging move value between",
+        "free collateral and the market reserve without moving SPL tokens."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_free",
+            "docs": [
+              "Collateral available for withdrawal, bids or splitting."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "collateral_locked",
+            "docs": [
+              "Collateral reserved for open buy orders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_free",
+            "docs": [
+              "Free outcomes may be sold, merged as a pair or redeemed when resolved."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_locked",
+            "type": "u64"
+          },
+          {
+            "name": "no_free",
+            "type": "u64"
+          },
+          {
+            "name": "no_locked",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionPriceLevel",
+      "docs": [
+        "One FIFO queue: [\"prediction_level\", market, outcome, side, price_le]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "docs": [
+              "Collateral atoms per whole contract; tick/range checks belong to placement."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "better_price",
+            "docs": [
+              "Higher matching priority within this outcome and side only:",
+              "higher prices for bids, lower prices for asks."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "worse_price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "first_order",
+            "docs": [
+              "Oldest open order, consumed first at this price."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "last_order",
+            "docs": [
+              "Newest open order; subsequent submissions append here."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "total_remaining_quantity",
+            "docs": [
+              "Whole outcome contracts, including partially filled order remainders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "order_count",
+            "type": "u64"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Receives rent when this empty level is eventually closed."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionProposal",
+      "docs": [
+        "Evidence and timing attached to an actual proposed outcome.",
+        "",
+        "The market stores `None` before proposal instead of relying on zero hashes,",
+        "an empty URI or a sentinel timestamp. Future handlers must validate evidence",
+        "and replace the entire proposal when a correction restarts the delay."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionResolution"
+              }
+            }
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "evidence_uri",
+            "type": "string"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionResolution",
+      "docs": [
+        "Payout schedule: YES wins, NO wins, or both receive half the payout."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionResolutionPhase",
+      "docs": [
+        "Selects the resolver authorized within its fixed proposal window."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Primary"
+          },
+          {
+            "name": "Fallback"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionStatus",
+      "docs": [
+        "Stored lifecycle; trade handlers must also enforce the closing timestamp."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Draft"
+          },
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Frozen"
+          },
+          {
+            "name": "Proposed"
+          },
+          {
+            "name": "Resolved"
+          }
+        ]
+      }
+    },
+    {
       "name": "PriceLevel",
       "docs": [
         "One active price in a market-side order-book index."
@@ -5283,6 +8806,46 @@
       ],
       "type": "bytes",
       "value": "[111, 114, 100, 101, 114]"
+    },
+    {
+      "name": "PREDICTION_BOOK_SEED",
+      "docs": [
+        "Index root: [namespace, prediction market]."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 98, 111, 111, 107]"
+    },
+    {
+      "name": "PREDICTION_MARKET_SEED",
+      "docs": [
+        "Prediction market keyed by a program-wide 32-byte identifier."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 109, 97, 114, 107, 101, 116]"
+    },
+    {
+      "name": "PREDICTION_ORDER_SEED",
+      "docs": [
+        "Market-wide submission identity: [namespace, market, order_id_le]."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 111, 114, 100, 101, 114]"
+    },
+    {
+      "name": "PREDICTION_POSITION_SEED",
+      "docs": [
+        "Internal prediction ledger: [namespace, prediction market, owner]."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 112, 111, 115, 105, 116, 105, 111, 110]"
+    },
+    {
+      "name": "PREDICTION_PRICE_LEVEL_SEED",
+      "docs": [
+        "FIFO price level: [namespace, market, outcome, side, price_le]."
+      ],
+      "type": "bytes",
+      "value": "[112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 108, 101, 118, 101, 108]"
     },
     {
       "name": "PRICE_LEVEL_SEED",

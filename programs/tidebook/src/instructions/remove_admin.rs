@@ -37,6 +37,20 @@ pub struct RemoveAdmin<'info> {
     pub admin_record: Account<'info, AdminRecord>,
 }
 
+/// Removes a disabled role under super-admin authority and returns its rent.
+///
+/// The target argument is consumed by account constraints, hence its underscore
+/// here. Anchor runs `close = super_admin` only after success; an error preserves
+/// the role account. The protected super-admin cannot be removed through this path.
+///
+/// # Inputs
+/// `ctx`: super-admin/config and role; `_target_admin`: wallet key bound by PDA constraints.
+///
+/// # Errors
+/// Active role, protected super-admin, unauthorized governance or incorrect account binding.
+///
+/// # Returns
+/// `Ok(())` and a removal event; Anchor then returns role rent to the super-admin.
 pub fn handle_remove_admin(ctx: Context<RemoveAdmin>, _target_admin: Pubkey) -> Result<()> {
     require!(
         ctx.accounts.admin_record.status == AdminStatus::Disabled,

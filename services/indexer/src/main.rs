@@ -52,6 +52,15 @@ const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 
 /// Recovers one complete finalized interval and reports why it was requested.
+///
+/// # Inputs
+/// RPC client, pool, target program, bounded config and human-readable reason.
+///
+/// # Errors
+/// Underlying recovery errors or a page-cap outcome converted into an operational error.
+///
+/// # Returns
+/// `Ok(())` only after the complete bounded interval has caught up; console output is diagnostic.
 async fn recover_and_report(
     client: &RpcClient,
     pool: &PgPool,
@@ -72,6 +81,19 @@ async fn recover_and_report(
 }
 
 #[tokio::main]
+/// Coordinates startup, historical bootstrap, subscription recovery and shutdown.
+///
+/// # Inputs
+/// Process environment supplies config; the runtime creates RPC clients, pool, health listener and
+/// reconnect state.
+///
+/// # Errors
+/// Configuration, startup, backfill or shutdown errors propagate. Subscription failures instead
+/// enter bounded-delay retries.
+///
+/// # Returns
+/// Normal completion on shutdown or a bounded historical run that needs another launch; healthy
+/// live mode keeps running.
 async fn main() -> Result<(), BoxError> {
     let config = Config::from_env()?;
     let program_id = Pubkey::from_str(&config.program_id)?;

@@ -95,6 +95,19 @@ pub struct InsertLimitOrder<'info> {
     pub worse_level: Option<Account<'info, PriceLevel>>,
 }
 
+/// Creates a funded spot price level in sorted priority.
+///
+/// # Inputs
+/// `ctx`: trader, Active market/ledger, new order/level and adjacent hints; side, raw price and
+/// quantity.
+///
+/// # Errors
+/// Invalid grid/notional/ordering, stale neighbors, insufficient funds, overflow or account
+/// creation failure.
+///
+/// # Returns
+/// `Ok(())` after an atomic level/order splice and counter advance; only new-best insertion changes
+/// the head.
 pub fn handle_insert_limit_order(
     ctx: Context<InsertLimitOrder>,
     side: OrderSide,
@@ -359,6 +372,15 @@ pub fn handle_insert_limit_order(
 /// Account ownership and deserialization prove only that this is a Tidebook
 /// `PriceLevel`. The stored market/side fields and the re-derived PDA establish
 /// that it is the unique canonical level eligible for this particular list.
+///
+/// # Inputs
+/// Program-owned PriceLevel, expected spot market key and side.
+///
+/// # Errors
+/// Wrong market/side or noncanonical level address.
+///
+/// # Returns
+/// `Ok(())` when identity matches; the insertion handler separately proves ordering and adjacency.
 fn validate_level(level: &Account<PriceLevel>, market: Pubkey, side: OrderSide) -> Result<()> {
     require!(level.market == market, order::PriceLevelMarketMismatch);
 

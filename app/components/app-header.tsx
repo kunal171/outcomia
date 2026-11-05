@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { NETWORK } from "../lib/solana";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -39,10 +40,12 @@ function HydrationSafeWalletButton() {
 }
 
 export function AppHeader() {
+  const pathname = usePathname();
   const { role, loading } = useProtocolRole();
   const roleLabel = loading ? "Checking role" : roleLabels[role];
   const isSuperAdmin = !loading && role === "super-admin";
-  const canCreateMarket = !loading && (role === "super-admin" || role === "admin");
+  const canCreateMarket =
+    !loading && (role === "super-admin" || role === "admin");
   const canViewOrders = !loading && role !== "disconnected";
 
   return (
@@ -57,14 +60,55 @@ export function AppHeader() {
       </Link>
 
       <nav className="topbar-nav" aria-label="Primary navigation">
-        <Link href="/markets">Markets</Link>
-        {canViewOrders && <Link href="/orders">Orders</Link>}
-        {isSuperAdmin && <Link href="/admin">Manage admins</Link>}
-        {canCreateMarket && <Link href="/markets/new">Create market</Link>}
+        <Link
+          href="/markets"
+          aria-current={
+            pathname === "/markets" ||
+            (pathname.startsWith("/markets/") && pathname !== "/markets/new")
+              ? "page"
+              : undefined
+          }
+        >
+          Markets
+        </Link>
+        <Link
+          href="/predictions"
+          aria-current={
+            pathname.startsWith("/predictions") ? "page" : undefined
+          }
+        >
+          Predictions
+        </Link>
+        {canViewOrders && (
+          <Link
+            href="/orders"
+            aria-current={pathname === "/orders" ? "page" : undefined}
+          >
+            Orders
+          </Link>
+        )}
+        {isSuperAdmin && (
+          <Link
+            href="/admin"
+            aria-current={pathname === "/admin" ? "page" : undefined}
+          >
+            Manage admins
+          </Link>
+        )}
+        {canCreateMarket && (
+          <Link
+            href="/markets/new"
+            aria-current={pathname === "/markets/new" ? "page" : undefined}
+          >
+            Create market
+          </Link>
+        )}
       </nav>
 
       <div className="topbar-actions">
-        {roleLabel && <span className={`role-badge role-${role}`}>{roleLabel}</span>}
+        {roleLabel && (
+          <span className={`role-badge role-${role}`}>{roleLabel}</span>
+        )}
         <span className="network-pill">
           <span className="network-dot" />
           {NETWORK}

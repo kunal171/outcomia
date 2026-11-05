@@ -14,6 +14,9 @@ remaining research milestones that are still planned.
 - [Crankless matching and settlement](crankless-settlement-design.md): Phoenix
   and OpenBook comparison, Tidebook's bounded PDA-based settlement model,
   trader balances, matching account contract, and implementation sequence.
+- [Prediction market design](prediction-market-design.md): binary outcome
+  positions, single-collateral accounting, resolution, redemption, tradeoffs,
+  and implementation order.
 - [Future enhancements](future-enhancements.md): staged oracle, reference
   market-maker, monitoring, standalone AMM, hybrid routing, and benchmarking
   roadmap with safety gates and effort estimates.
@@ -25,6 +28,9 @@ remaining research milestones that are still planned.
   nested-CPI event ownership, local operation, and deferred milestones.
 - [Draw.io architecture diagram](diagrams/tidebook-architecture.drawio):
   editable source for the current and planned architecture.
+- [Prediction market diagram](diagrams/prediction-market-architecture.drawio):
+  editable account, trading, resolution, and indexing flow for the planned
+  binary-market feature.
 
 Open the `.drawio` file with [draw.io](https://app.diagrams.net/) or a compatible
 editor. Blue and green elements are implemented. Gray dashed elements are

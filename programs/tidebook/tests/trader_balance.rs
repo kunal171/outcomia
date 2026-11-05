@@ -370,8 +370,18 @@ fn load_token_amount(svm: &LiteSVM, address: Pubkey) -> u64 {
 
 /// Proves that both canonical vaults exactly back every supplied trader claim.
 ///
-/// Fee accounting is not implemented yet, so there is deliberately no
-/// protocol-fee term in this equation.
+/// These deposit/withdrawal fixtures execute no fills and accrue no fees, so
+/// this local equation has no fee term. Trading conservation tests separately
+/// include the protocol-fee accumulator in quote-vault backing.
+///
+/// # Inputs
+/// VM, fixture vault addresses and a unique list of all funded trader-ledger addresses.
+///
+/// # Errors
+/// Panics on duplicate/missing ledgers, accumulator overflow or unequal custody.
+///
+/// # Returns
+/// Unit after both vaults equal their corresponding free+locked trader claims.
 fn assert_market_asset_conservation(
     svm: &LiteSVM,
     fixture: &DepositFixture,

@@ -64,6 +64,22 @@ pub struct InitializeTestFaucet<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Transfers both zero-supply test-mint authorities to the canonical faucet PDA.
+///
+/// Only the super-admin can opt in, and must currently own both mint authorities.
+/// Claim amounts are raw mint atoms. The two authority CPIs and config creation
+/// succeed or roll back together. There is no chain-ID check or on-chain claim
+/// cooldown: this permissionless faucet is only for valueless test assets.
+///
+/// # Inputs
+/// `ctx`: super-admin, market, zero-supply mints and new faucet; claim amounts in raw mint atoms.
+///
+/// # Errors
+/// Zero amounts, existing supply, wrong mint/governance authority, account creation or either
+/// authority-transfer failure.
+///
+/// # Returns
+/// `Ok(())` with both authorities transferred and the claim configuration stored atomically.
 pub fn handle_initialize_test_faucet(
     ctx: Context<InitializeTestFaucet>,
     base_claim_amount: u64,
@@ -152,6 +168,16 @@ pub struct CloseTestFaucet<'info> {
 /// The stateless authority PDA cannot sign outside Tidebook, and every claim
 /// requires the configuration account. Closing the config therefore freezes
 /// both test-mint supplies without needing to transfer authority elsewhere.
+///
+/// # Inputs
+/// `ctx`: stored spot authority and canonical faucet configuration.
+///
+/// # Errors
+/// Wrong authority or incorrect faucet/market/mint binding.
+///
+/// # Returns
+/// `Ok(())` and a closure event; config rent is returned without handing mint authority to a
+/// wallet.
 pub fn handle_close_test_faucet(ctx: Context<CloseTestFaucet>) -> Result<()> {
     emit!(crate::events::TestFaucetClosedEvent {
         market: ctx.accounts.market.key(),
@@ -219,6 +245,21 @@ pub struct ClaimTestTokens<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Mints both configured test amounts into accounts owned by the signing claimant.
+///
+/// The canonical authority PDA signs both mint CPIs. Either both grants succeed
+/// or neither does. No per-wallet rate limit is enforced here; an off-chain
+/// faucet's limits must not be mistaken for restrictions on this instruction.
+///
+/// # Inputs
+/// `ctx`: claimant, live faucet config, signing PDA, mints and claimant-owned destinations.
+///
+/// # Errors
+/// Missing/misbound config, wrong mint/destination owner or either mint CPI failure; no cooldown is
+/// checked.
+///
+/// # Returns
+/// `Ok(())` after both raw amounts are minted and an event is emitted.
 pub fn handle_claim_test_tokens(ctx: Context<ClaimTestTokens>) -> Result<()> {
     let faucet_key = ctx.accounts.test_faucet.key();
     let authority_bump = [ctx.accounts.test_faucet.authority_bump];

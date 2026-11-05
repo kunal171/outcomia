@@ -220,11 +220,95 @@ name without reallocating `Market`. The account stores the market address,
 base and quote symbols, a display name, an immutable `MarketKind`, and its bump.
 
 `Spot` is the normal base/quote model. `Other` is available for explicit
-experiments. `Prediction` is serialized but initialization rejects it until
-collateral, position, resolution, and payout rules exist on-chain. Active
+experiments. Spot metadata initialization rejects `Prediction`; the separate
+prediction draft initializer creates that kind atomically with its collateral
+vault and immutable rules. Active
 administrators may initialize metadata and update its three labels; no update
 instruction accepts `kind`. The market authority closes metadata before closing
 a paused market so the separate PDA does not retain orphaned rent.
+
+### Prediction collateral and complete sets
+
+Prediction markets use a separate `PredictionMarket` and per-wallet
+`PredictionPosition`, plus one collateral vault. Spot account layouts do not
+change. Deposits credit free collateral; withdrawals debit only that cash and
+remain available in every status. The vault-authority PDA signs outgoing SPL
+transfers, and account seeds bind each claim to its market and wallet.
+
+Splitting in an Open market before close moves one payout per whole contract
+from free cash to backing reserve and creates equal YES/NO claims. Merging in
+Open, Frozen or Proposed burns a free pair and releases its backing. Locked
+balances cannot be used. Neither conversion moves SPL tokens; checked ledger
+and aggregate updates preserve `vault = cash claims + backing + fees`.
+Writable aggregate totals serialize conversions in one market. The stored market
+authority must still be an active admin to open a canonical Draft strictly before
+close; only status changes. Creation and opening bind the primary resolver to
+that creator wallet. Administrative closure and outcome proposals will require
+the same creator-plus-active-admin rule. Trader payout claims will require the
+position owner instead. Matching and
+resolution are still planned; these operations are tested
+locally and have not been deployed. See [prediction design](prediction-market-design.md)
+for lifecycle rules, accounting and the four-milestone implementation plan.
+
+Prediction order layouts are now defined separately in
+`state/prediction_book.rs`. A `PredictionOrderBook` root holds the four YES/NO
+bid/ask heads and one monotonic order-ID counter. `PredictionPriceLevel` holds
+sorted price links and FIFO head/tail pointers; `PredictionOrder` holds one
+submission and its collateral claim. Their payload sizes are 77, 175 and 206
+bytes. The root adds rent and a shared write lock but preserves existing market
+layouts. Rust and browser helpers use identical textual outcome/side seeds and
+eight-byte little-endian numeric seeds. Draft creation initializes the book root
+atomically, with next ID 1 and four absent best-price heads. Its Anchor `init`
+constraint prevents counter resets, and any failure rolls back all five created
+accounts. The generated IDL and frontend reader expose the root; older drafts
+without one are identified explicitly. `place_prediction_order` creates the first
+resting order on an empty outcome/side, rejects crossing prices and locks only
+the signing trader's free collateral or outcome contracts. It atomically updates
+the canonical order, level, head, next ID and market count. No vault transfer,
+reserve change or fee accrual occurs. `append_prediction_order` adds at an existing
+price's verified FIFO tail, preserving its first order, neighbors and rent payer.
+The old tail may belong to another trader and needs no signature; only its next
+link changes. `insert_prediction_order` splices a new price between canonical,
+reciprocal adjacent levels, or at the best/worst edge. Funding, level/order
+creation and neighbor rewiring are atomic; only a new best changes the head.
+Common validation/funding helpers keep all three paths consistent.
+The client selects a path from actual account reads and revalidates before
+signing. Insertion discovers neighbors by following at most 128 levels; errors
+or stale links stop submission. On-chain insertion touches at most two neighbors
+without traversal. `cancel_prediction_order` requires the order owner's signature
+and Open status, with no market-status or close-time gate. It repairs canonical
+reciprocal FIFO links, refunds only the recorded remaining lock and decreases
+counts atomically. Final-order removal also unlinks the level and returns its
+rent to the original payer. Canceled order accounts remain as history; empty
+levels close, allowing price reuse with a new ID. Cancellation moves no vault
+tokens, reserves or fees. The wallet-scoped order list refreshes after confirmation.
+Its deployment flag is independent of new-order entry.
+`match_prediction_order` settles one best opposing FIFO maker at its resting
+price, using only existing claims in the same collateral vault. It rejects
+self-trades, non-crossing limits and trading at/after close. The global taker fee
+is credited to this market's collateral-denominated accumulator: buys pay
+notional plus fee, sells receive notional minus fee. Supply and payout reserve
+stay unchanged. Partial makers retain priority; full fills promote their FIFO
+successor or remove the empty best level and return rent to its original payer.
+The primitive creates no taker order. The Buy/Sell form uses
+`prediction-matching-plan.ts` to compose up to three
+existing matching instructions atomically. A read-only overlay simulates FIFO
+and price promotion, cumulative trader claims and per-fill rounded fees without
+changing caller snapshots. The plan distinguishes filled, exhausted,
+non-crossing and match-cap outcomes. In limit mode, positive exhausted or
+non-crossing remainders use the final simulated market/book/position to select
+and validate place/append/insert. The placement runs after all fills in the same
+transaction. Cap-blocked remainders stay unposted. Immediate-only mode never
+posts. Post-fill fees reduce the funds available to back a resting buy. The builder
+sets a 600,000-CU ceiling and checks the complete legacy packet before signing.
+Third-step failure rolls back earlier fills, fees and rent refunds. The UI
+refreshes the whole plan before signing and balances/book after confirmation.
+Public depth follows canonical price links and shows up to 20 aggregated levels
+per side, best first. It validates identity and reciprocal ordering; missing or
+changed accounts produce a refresh error, not an empty book. YES and NO books
+are separate. Depth is an account snapshot, not a last-trade price.
+Deployment flags default false. Prediction fee withdrawal, events/indexer
+support and resolution remain planned.
 
 ### Market vault topology
 

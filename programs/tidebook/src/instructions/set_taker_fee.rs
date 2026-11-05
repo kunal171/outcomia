@@ -28,6 +28,20 @@ pub struct SetTakerFee<'info> {
     pub protocol_config: Account<'info, ProtocolConfig>,
 }
 
+/// Sets the rate read by subsequent fills, without repricing resting orders.
+///
+/// Basis points have denominator 10,000: 25 bps means 0.25%, while zero disables
+/// fees. The shared cap is 1,000 bps. Accrued fees are not recalculated, and only
+/// the super-admin stored in the canonical config may authorize this change.
+///
+/// # Inputs
+/// `ctx`: super-admin and canonical config; `taker_fee_bps`: unsigned basis points.
+///
+/// # Errors
+/// `FeeRateTooHigh` above 1,000 bps; unauthorized or incorrectly bound config.
+///
+/// # Returns
+/// `Ok(())` after storing the rate and emitting old/new values; accrued fees are unchanged.
 pub fn handle_set_taker_fee(ctx: Context<SetTakerFee>, taker_fee_bps: u16) -> Result<()> {
     require!(taker_fee_bps <= MAX_TAKER_FEE_BPS, fee::FeeRateTooHigh);
 

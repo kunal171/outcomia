@@ -38,6 +38,20 @@ pub struct InitializeTraderBalance<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates one zeroed spot ledger for the signing wallet in this market.
+///
+/// The owner pays account rent but deposits no tokens. `init` prevents resetting
+/// an existing ledger, and the `(market, owner)` seeds keep the same wallet's
+/// claims in different markets separate. Funding is a later deposit operation.
+///
+/// # Inputs
+/// `ctx`: owner signer/payer, existing spot market and new `(market, owner)` ledger PDA.
+///
+/// # Errors
+/// Duplicate ledger, incorrect PDA, insufficient rent or allocation failure.
+///
+/// # Returns
+/// `Ok(())` with four zero free/locked buckets and an event; no tokens are deposited.
 pub fn handle_initialize_trader_balance(ctx: Context<InitializeTraderBalance>) -> Result<()> {
     let trader_balance = &mut ctx.accounts.trader_balance;
 

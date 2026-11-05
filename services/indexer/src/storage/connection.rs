@@ -8,6 +8,15 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 ///
 /// Migrations complete before Solana ingestion begins, preventing the indexer
 /// from processing transactions without a compatible storage schema.
+///
+/// # Inputs
+/// PostgreSQL URL supplied by configuration; not logged by this helper.
+///
+/// # Errors
+/// Connection/pool timeout, authentication, migration or schema errors stop startup.
+///
+/// # Returns
+/// A shared pool with at most five connections, ready for source/checkpoint operations.
 pub async fn connect(database_url: &str) -> Result<PgPool, Box<dyn Error + Send + Sync>> {
     // One indexer process performs sequential source writes, so a small pool is
     // enough for ingestion plus health/inspection queries without opening an

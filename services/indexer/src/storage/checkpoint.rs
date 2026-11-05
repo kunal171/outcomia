@@ -35,6 +35,15 @@ struct CheckpointRow {
 ///
 /// A missing row is not an error: it means the first request must begin at the
 /// newest finalized signature with no `before` cursor.
+///
+/// # Inputs
+/// Pool and target program key used to select its checkpoint row.
+///
+/// # Errors
+/// Database errors or an invalid stored Base58 signature.
+///
+/// # Returns
+/// Stored progress, or a fresh incomplete checkpoint with no cursor when no row exists.
 pub async fn load_backfill_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,
@@ -74,6 +83,16 @@ pub async fn load_backfill_checkpoint(
 /// skipping source history. The caller therefore invokes it only after the
 /// complete page succeeds. Exact page replay overwrites the same cursor and is
 /// intentionally harmless.
+///
+/// # Inputs
+/// Pool, program key, optional raw-page cursor and completed flag.
+///
+/// # Errors
+/// Database/write failure; callers must invoke this only after every page transaction persisted.
+///
+/// # Returns
+/// `Ok(())` after upsert. Exact page replay is harmless; this function does not process source
+/// records.
 pub async fn save_backfill_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,

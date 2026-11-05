@@ -52,6 +52,21 @@ pub struct InitializeProtocol<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates governance and the deployer's active role with an initial zero fee.
+///
+/// The loader's current upgrade authority must sign; the program address alone
+/// grants no authority. Both singleton/role accounts use `init`, making a second
+/// bootstrap fail rather than resetting governance. Deployment does not call
+/// this automatically: the client must submit this instruction explicitly.
+///
+/// # Inputs
+/// `ctx`: upgrade-authority signer, program/loader data and new config/deployer-role accounts.
+///
+/// # Errors
+/// Wrong upgrade authority, duplicate initialization, invalid PDAs, allocation or rent failure.
+///
+/// # Returns
+/// `Ok(())` with singleton governance, an Active deployer and zero taker fees.
 pub fn handle_initialize_protocol(ctx: Context<InitializeProtocol>) -> Result<()> {
     let deployer = ctx.accounts.deployer.key();
 

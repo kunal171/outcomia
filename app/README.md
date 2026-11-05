@@ -48,6 +48,138 @@ The checked-in client IDL mirrors the generated Anchor IDL. After any account
 layout or instruction change, rebuild and redeploy the program before using the
 updated client against devnet.
 
+## Prediction draft foundation
+
+- `/predictions`: public prediction-market discovery, including open markets.
+- `/predictions/new`: active-admin form creating the draft, vault, metadata,
+  fees and empty book root in one instruction.
+- `/predictions/[address]`: public inspection of collateral, resolution windows,
+  resolver keys, rules URI and content hashes; connected-wallet position
+  initialization and display of all six free/locked balance fields.
+  The position panel also displays wallet collateral and includes a separately
+  gated deposit/withdrawal form and whole YES/NO pair split/merge actions.
+
+Draft and position creation remain disabled by default. After deploying the
+matching program containing both initializers,
+set `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true` and rebuild. This switch only
+controls rollout; the program enforces the admin role for drafts and owner
+signatures for positions independently.
+
+Position creation is available to any signing wallet and only pays SOL rent.
+It creates no collateral or outcome claims, and duplicate initialization cannot
+reset existing balances. Confirmation reloads the account; RPC failures do not
+display fabricated zero balances or offer initialization based on a failed read.
+Wallet changes reset the position panel, and the first wallet render is delayed
+until hydration to match the server HTML.
+
+Upload the rules JSON to Arweave first, then select the exact same local file
+and enter its URI in the form. Use schema version 1 from
+[`prediction-market-design.md`](../docs/prediction-market-design.md). Resolver
+keys and timing come from the file. Hashing uses the original bytes; changing
+whitespace changes the rules hash. The form does not verify the remote copy.
+
+Contracts use whole quantities and pay one collateral token per winning
+contract. Prices use the mint's precision. Trading, resolution
+and redemption are later milestones; a newly created account is always Draft.
+
+Prediction deposits, withdrawals and complete sets are implemented locally. Keep
+`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` against older deployments. After
+deploying all three operations, enable it alongside the draft flag and
+rebuild against the matching program. A deposit credits only free collateral;
+it creates no YES/NO positions. Resolved markets reject deposits.
+
+The form converts human amounts to exact mint atoms, checks wallet balance and
+ledger overflow, then chooses one wallet token account able to fund the amount.
+The displayed wallet balance is aggregated: fragmented funds may require a
+smaller deposit. Failed balance reads disable submission. Confirmed deposits
+refresh wallet and position balances. The program enforces ownership, mint and
+vault checks independently of this UI.
+
+Withdrawals spend available collateral only and work after trading closes or
+resolution. The client creates a missing collateral ATA atomically; wallet SOL
+pays rent. Wallet-balance read errors block deposits but do not block recovering
+a known available position balance. Zero amounts and overspending disable submission.
+
+Splitting one whole pair reserves one collateral token and creates one YES
+plus one NO internal contract. Merging burns a free pair and returns that token
+to available collateral; it does not transfer tokens out of the vault. Locked
+outcomes cannot be merged. Splitting requires Open status before close; merging
+works in Open, Frozen and Proposed. Drafts must be opened first. Confirmation
+refreshes the position and backing reserve.
+
+The market detail page shows an **Open market** control only to the stored
+market authority. It requires Draft status, a time before close and the creator's
+current active admin record. Disabled or removed admins cannot open markets;
+another active admin cannot open someone else's market.
+Opening preserves all committed terms and balances. After deploying the opening
+instruction, set `NEXT_PUBLIC_PREDICTION_OPENING_ENABLED=true` alongside the draft
+flag and rebuild; this new flag defaults false against older binaries. The
+client reloads the market after confirmation and enables position splitting.
+Opening does not yet enable order placement or settlement. The rules file's
+`primaryResolver` must match the creator wallet. The creator will propose the
+outcome once settlement is implemented; traders will claim payouts themselves.
+
+`lib/prediction.ts` also defines the upcoming book, price-level and order account
+interfaces and their PDA helpers. Outcome and side use textual seeds; prices
+and IDs use exact eight-byte little-endian BN encoding. Shared Rust/browser
+test vectors protect that contract. The IDL-backed reader now exposes the root,
+which is initialized with the draft at next ID 1 and four absent best-price heads.
+The detail page shows these fields and its Explorer link. Older drafts missing
+the root are identified explicitly; create a fresh draft for the new order flow.
+The reader also exposes prediction levels and orders. The position panel has one
+Buy/Sell form for any connected trader: YES/NO, human-unit price and whole
+quantity. Its limit mode selects empty-side placement, same-price FIFO append or
+sorted new-price insertion from actual accounts. New-price discovery follows
+at most 128 linked levels and validates ordering and reciprocal links. The
+program rechecks adjacent hints and rejects stale ones atomically.
+RPC errors never trigger a fallback path. Resting placement rejects crossing
+prices and checks post-fill free funds and exact integer bounds. Buys lock collateral;
+sells lock outcome contracts. Confirmations refresh the ledger and public book.
+Appending preserves older orders' priority; the prior tail's owner does not sign
+and its balances do not change. Queue/totals, ownership and packet-size checks
+are covered in Rust/client tests. The wallet's order list shows price, quantity,
+remaining quantity and status. Only Open orders show Cancel; cancellation also
+works after trading closes. The program refunds the remaining lock, repairs the
+queue and closes an empty price level, returning its rent to the original payer.
+Confirmation refreshes the position, order list and public book.
+
+The form first trades with up to three best opposing FIFO
+orders in one atomic transaction. Each fill uses its resting price. The planner
+in `lib/prediction-matching-plan.ts` simulates promoted heads and cumulative
+balances without changing fetched accounts. The preview sums separately rounded
+fees and shows unposted quantity plus its stop reason. Buys pay notional plus
+fees; sells receive notional minus fees. A cap-blocked remainder stays free for
+retry. In limit mode, exhausted/non-crossing remainders rest at the requested
+price using the simulated final balance. Immediate-only mode never posts.
+The builder sets a 600,000-CU ceiling and checks the 1,232-byte legacy packet
+before wallet signing, including any placement instruction. If placement fails,
+the preceding fills also roll back. Oversized transactions require a smaller
+request or immediate-only mode; the client never drops instructions silently.
+Confirmations refresh positions, orders and public heads; previews are not
+claimed as confirmed fills.
+
+Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until this program
+version is deployed. Explicit local tests may enable it alongside the
+draft/funding/cancellation flags after deploying this version.
+`NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED` defaults false until deployment;
+it requires the draft flag but does not depend on new-order or funding flags.
+Disabling new orders therefore leaves cancellation available. No admin role is required for
+trading. Rebuild/redeploy the program before using the updated client on devnet.
+`NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` separately controls immediate trades
+and requires draft, funding and cancellation flags. It defaults false until
+`match_prediction_order` is deployed. Limit posting also requires the new-order
+flag. Public depth needs no wallet: it shows up to 20 canonical price levels per
+side, aggregated contract quantities and order counts, with YES/NO switching and
+explicit refresh/error states. Trading refreshes depth and wallet orders after
+confirmation. Resolution, reward claims and prediction fee withdrawal remain
+unimplemented; the UI says so explicitly.
+
+Verify the JSON parser, exact-byte hashing and PDA derivation with:
+
+```bash
+npm run test:prediction
+```
+
 Configure the public program identity and optionally override the default
 devnet RPC endpoint:
 

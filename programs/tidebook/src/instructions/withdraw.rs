@@ -73,6 +73,23 @@ pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Returns only the owner's free base/quote claim as tokens, including while paused.
+///
+/// Vault cash is pooled across traders; its total is not this wallet's spending
+/// limit. For example, free=3 and locked=7 permits withdrawing at most 3, even if
+/// the vault holds 100. Canonical PDA seeds let the program sign for custody;
+/// the owner signature authorizes debiting this particular ledger.
+///
+/// # Inputs
+/// `ctx`: owner/ledger, market mint, owner destination and vault; `amount`: positive mint atoms.
+///
+/// # Errors
+/// Wrong mint/destination, zero amount, insufficient free balance/vault funds or failed SPL
+/// transfer.
+///
+/// # Returns
+/// `Ok(())` after both custody and the free claim decrease by `amount`; locked funds cannot be
+/// withdrawn.
 pub fn handle_withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
     require!(amount > 0, balance::InvalidWithdrawalAmount);
 

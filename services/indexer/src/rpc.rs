@@ -1,4 +1,10 @@
 //! Historical Solana RPC access for the Tidebook indexer.
+//!
+//! These calls use the synchronous RpcClient, even when an async controller
+//! calls them. They block that Tokio worker during network IO. Sequential
+//! ingestion keeps ordering simple; a future concurrency change should use
+//! the nonblocking client or isolate blocking work without moving checkpoints
+//! ahead of completed source writes.
 
 use std::error::Error;
 
@@ -74,6 +80,16 @@ pub struct SignaturePage {
 /// records only within this page. Successive `before` pages still move toward
 /// older history, so global chronological projection replay is a later,
 /// explicit source-storage operation.
+///
+/// # Inputs
+/// Blocking RPC client, target program, optional exclusive `before` cursor and requested limit.
+///
+/// # Errors
+/// RPC/transport failure or invalid returned cursor signature.
+///
+/// # Returns
+/// Successful records reversed within the page, plus its raw oldest-entry cursor; not global
+/// chronological order across pages.
 pub fn fetch_signature_page(
     client: &RpcClient,
     program_id: &Pubkey,
@@ -88,6 +104,15 @@ pub fn fetch_signature_page(
 /// `before` continues a gap that spans multiple RPC pages. Callers must gather
 /// every page before processing them in reverse page order because pagination
 /// discovers the newest chunk first.
+///
+/// # Inputs
+/// RPC client, program, optional `before`, exclusive `until` signature and page limit.
+///
+/// # Errors
+/// RPC/transport failure or invalid returned cursor signature.
+///
+/// # Returns
+/// A normalized signature page; callers gather the entire gap before reversing page order.
 pub fn fetch_live_signature_page(
     client: &RpcClient,
     program_id: &Pubkey,
@@ -103,6 +128,15 @@ pub fn fetch_live_signature_page(
 /// Historical ingestion supplies only `before` and walks toward genesis. Live
 /// recovery additionally supplies `until`, preventing the RPC node from
 /// returning transactions already covered by the durable high-water mark.
+///
+/// # Inputs
+/// RPC client, target key, optional exclusive before/until cursors and limit forwarded to Solana.
+///
+/// # Errors
+/// RPC/transport or signature-normalization errors; the server validates its own limit rules.
+///
+/// # Returns
+/// One normalized page, with failed executions filtered from work but retained in cursor selection.
 fn fetch_signature_page_with_bounds(
     client: &RpcClient,
     program_id: &Pubkey,
@@ -127,11 +161,24 @@ fn fetch_signature_page_with_bounds(
 ///
 /// Keeping this transformation independent from network access makes the
 /// boundary-cursor rules directly testable without a live Solana endpoint.
+///
+/// # Inputs
+/// Signature-status entries including successful and failed executions.
+///
+/// # Errors
+/// An invalid last raw signature cannot become a pagination cursor.
+///
+/// # Returns
+/// A page of successful entries reversed oldest-first, with a cursor from the raw last entry even
+/// when every transaction failed.
 fn build_signature_page(
     entries: Vec<RpcConfirmedTransactionStatusWithSignature>,
 ) -> Result<SignaturePage, Box<dyn Error + Send + Sync>> {
     // Derive this before filtering failed transactions. The cursor describes
     // the RPC page boundary, not merely the successful subset.
+    // Example: raw newest-first [C(success), B(failed), A(failed)] yields work
+    // [C] but cursor A. Using C as the cursor would revisit B/A unnecessarily;
+    // treating an all-failed page as terminal could skip older successful work.
     let next_before = entries
         .last()
         .map(|entry| entry.signature.parse::<Signature>())
@@ -164,6 +211,17 @@ fn build_signature_page(
 /// record because metadata is absent or reports a failed execution. Transport,
 /// parsing, and RPC failures remain errors so callers can retry rather than
 /// silently advancing their durable checkpoint.
+///
+/// # Inputs
+/// RPC client and a discovered SignatureRecord whose signature parses.
+///
+/// # Errors
+/// Signature/RPC/transport errors propagate. Missing metadata or failed execution returns
+/// `Ok(None)` instead.
+///
+/// # Returns
+/// An optional transaction retaining full raw logs and RPC slot/time; signature-list transaction
+/// index is carried through.
 pub fn fetch_transaction(
     client: &RpcClient,
     signature_record: &SignatureRecord,
@@ -207,6 +265,16 @@ pub fn fetch_transaction(
 /// A failed execution cannot become an indexed source record because Solana
 /// rolled back its state changes. Missing log fields are valid for a successful
 /// transaction and normalize to an empty collection.
+///
+/// # Inputs
+/// Execution-failed flag and Solana's Some/None/Skip log representation.
+///
+/// # Errors
+/// None; unusable failed executions are represented by `None`.
+///
+/// # Returns
+/// Some logs for success (possibly empty), or None for failed execution so reverted events are not
+/// indexed.
 fn normalize_logs(
     execution_failed: bool,
     log_messages: OptionSerializer<Vec<String>>,

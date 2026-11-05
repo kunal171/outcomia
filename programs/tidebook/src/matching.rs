@@ -42,6 +42,15 @@ pub struct SettlementPlan {
 ///
 /// Bids cross asks priced at or below their limit.
 /// Asks cross bids priced at or above their limit.
+///
+/// # Inputs
+/// Taker side, raw taker limit and raw maker price in the same quote-price units.
+///
+/// # Errors
+/// None; no validation or account access occurs.
+///
+/// # Returns
+/// `true` for buy limit >= sell price, or sell limit <= buy price; otherwise `false`.
 pub fn prices_cross(taker_side: OrderSide, taker_limit_price: u64, maker_price: u64) -> bool {
     match taker_side {
         OrderSide::Bid => taker_limit_price >= maker_price,
@@ -53,6 +62,26 @@ pub fn prices_cross(taker_side: OrderSide, taker_limit_price: u64, maker_price: 
 ///
 /// Execution always occurs at the maker's price. The smaller remaining
 /// quantity determines whether the maker or taker is completely filled.
+///
+/// # Calculation
+/// `base_fill = min(taker_remaining, maker_remaining)` and
+/// `quote_fill = floor(maker_price * base_fill / 10^base_decimals)`.
+/// With six base decimals, price 25,000,000 and fill 2,000,000 base atoms
+/// give 50,000,000 quote atoms. If quote also has six decimals, that is
+/// 2 base tokens for 50 quote tokens. Quote decimals are already represented
+/// in the price; multiplying by their scale again would overcharge the fill.
+///
+/// # Inputs
+/// Maker price in quote atoms per whole base token; taker/maker remaining base atoms; base-mint
+/// decimals.
+///
+/// # Errors
+/// Zero fill quantity, quote notional rounded to zero, decimal-scale overflow or a result exceeding
+/// u64.
+///
+/// # Returns
+/// `Ok(FillCalculation)` with minimum remaining base quantity and floor-divided quote quantity;
+/// fees are calculated separately.
 pub fn calculate_fill(
     maker_price: u64,
     taker_remaining: u64,
@@ -86,6 +115,24 @@ pub fn calculate_fill(
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Plans one maker-price settlement, including final bid rounding dust.
+///
+/// Example: at base scale 10, price 15 and total quantity 2 lock 3 quote atoms.
+/// Two separate one-unit fills each cost floor(15 / 10) = 1 atom. After the
+/// first fill, 2 remain locked; the last fill pays 1 and refunds the final 1
+/// to the maker. Refunding only on completion keeps partial orders funded.
+///
+/// # Inputs
+/// Taker side/limit/remaining, maker side/price/remaining/recorded lock and base decimals.
+/// Quantities are base atoms.
+///
+/// # Errors
+/// Same-side or noncrossing orders, invalid fill math, mismatched ask backing or insufficient bid
+/// backing.
+///
+/// # Returns
+/// `Ok(SettlementPlan)` with executed amounts, completion flags, maker locked debit and any final
+/// bid rounding refund.
 pub fn calculate_settlement(
     taker_side: OrderSide,
     taker_limit_price: u64,

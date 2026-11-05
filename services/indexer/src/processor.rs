@@ -20,6 +20,17 @@ use crate::{
 /// unavailable transaction, malformed event, or rejected database write.
 /// Persistence precedes reporting: console output is observational, whereas
 /// PostgreSQL is the durable source used for replay and later projections.
+///
+/// # Inputs
+/// RPC client, pool, target program and discovered SignatureRecord.
+///
+/// # Errors
+/// Unusable transaction metadata, RPC, event-decoding or storage errors; the page controller must
+/// retain its previous checkpoint.
+///
+/// # Returns
+/// `Ok(())` after transaction/events persist and diagnostics print; it does not advance a page/live
+/// checkpoint itself.
 pub async fn process_signature(
     client: &RpcClient,
     pool: &PgPool,
