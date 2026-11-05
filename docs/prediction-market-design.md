@@ -4,7 +4,8 @@ Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
 locally, along with active-admin creator-controlled market opening and first
 resting orders on empty sides, same-price FIFO append, sorted new-price insertion
-and owner-only cancellation. Matching and resolution remain planned. This program version
+and owner-only cancellation. One-maker matching with taker fees is implemented
+locally; multi-maker planning and resolution remain planned. This program version
 has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -16,7 +17,7 @@ Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
 atomically. Empty-side placement, same-price FIFO append and new-price insertion
-and cancellation are implemented locally; matching remains unavailable.
+and cancellation are implemented locally, along with one-maker matching.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -335,7 +336,7 @@ order flow. Existing market/position layouts and funds are unchanged.
 
 `PredictionPriceLevel` and `PredictionOrder` are exposed through the placement
 instruction and registered in the frontend reader. Order submission is a separate
-rollout gate; public order submission stays disabled while matching is unfinished.
+rollout gate; public order submission stays disabled until this version is deployed.
 
 The new tests cover maximum/optional serialization, outcome/side isolation,
 spot discriminator rejection, integer boundaries, namespace separation and
@@ -538,7 +539,7 @@ positive whole u64. Price is positive, below payout and divisible by the tick.
 This first path accepts only an empty selected outcome/side list. A buy at or
 above that outcome's best ask, or a sell at or below its best bid, is rejected.
 There is no cross-outcome matching. Same-price append uses its own instruction;
-new-price insertion uses a separate instruction, and crossing orders still need matching. The program does not silently create a crossed
+new-price insertion uses a separate instruction, and crossing orders use the matching path. The program does not silently create a crossed
 book or skip existing priority.
 
 A buy locks exactly `price * quantity` collateral atoms. A sell locks exactly
@@ -563,8 +564,8 @@ refresh/retry. The receipt is held outside the loading form so refreshing cannot
 erase a confirmed transaction.
 
 `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED` defaults false and requires the draft,
-funding and cancellation flags. It is for explicit local resting-order tests until
-matching is implemented and deployed. Open orders can now be canceled to release
+funding and cancellation flags. It stays off publicly until this version is deployed.
+Open orders can be canceled to release
 their remaining locks. This flag is rollout, not on-chain
 authorization. Do not enable public order entry with this incomplete lifecycle.
 
@@ -619,7 +620,7 @@ falls back to another path. Before signing, the client reads fresh market,
 position, book, level and tail data; another transaction can still invalidate
 that snapshot, in which case the chain rejects it atomically and the user retries.
 
-The order rollout flag remains false publicly while matching is unfinished.
+The order rollout flag remains false publicly until this version is deployed.
 Tests verify three-order FIFO queues for both outcomes and sides,
 different traders, unchanged maker balances, reserve conservation, substituted
 and stale tails, corrupt endpoints/identity, timing/funding/counter failures,
@@ -720,14 +721,88 @@ expired/closed market states and whole-transaction rollback. A synthetic partial
 snapshot verifies remainder-only refunds; it does not execute matching. Client tests
 cover neighbor selection, failure handling, rollout flags and IDL packet size.
 
+### One-maker matching (implemented locally)
+
+`match_prediction_order(outcome, taker_side, limit_price, quantity)` fills at most
+one resting order. Any connected trader with an initialized position can call
+it. Trading requires Open status and `now < close_ts`; cancellation keeps its
+independent exit path after close.
+
+The maker must be the oldest Open order at the best opposing price for the
+selected outcome. Canonical seeds bind the book, level, order and both positions.
+The program rejects same-side orders, non-crossing limits and self-trades. Anchor
+can reject a self-trade earlier because the maker/taker ledgers alias the same
+mutable account. A client must not skip its own order to reach later liquidity.
+
+The fill is `min(requested_quantity, maker.remaining_quantity)` whole contracts.
+Execution uses the maker's price, not the taker's limit. For example, a buy limited
+to 0.70 fills a resting sell at 0.60 for 0.60 per contract. The buyer only spends
+the executed notional plus its fee. Excess requested quantity stays unposted and
+unreserved; this instruction neither creates an order nor advances the next ID.
+
+The seller transfers an internal YES or NO claim to the buyer; collateral claims
+move the other way. A resting seller uses locked contracts and receives free
+collateral. A resting buyer spends locked collateral and receives free contracts.
+The arriving trader uses its free balances. The other outcome is unchanged.
+No SPL transfer, supply change or payout-reserve change occurs.
+
+Fees use the canonical global `ProtocolConfig` and the market's existing
+`MarketFees`, whose mint is this prediction market's collateral mint. The fee is
+`ceil(executed_notional * taker_fee_bps / 10_000)`, with the existing 1,000-bps
+rate cap. A buying taker pays notional plus fee; a selling taker receives notional
+minus fee. Makers pay no fee. Resting backing therefore remains exact notional
+for buys and remaining contracts for sells; cancellation's backing rule is unchanged.
+Rounding can consume a one-atom seller's entire proceeds. This is the same
+anti-fragmentation rule used by spot fees, and the UI shows the net amount.
+
+Each settlement preserves:
+
+`collateral vault = all free/locked trader cash + backing reserve + accrued fees`
+
+For each outcome, all traders' free/locked contracts still sum to its supply.
+Every addition, debit and fee accrual is checked; a failure rolls back both
+ledgers, fees, book changes and any level-rent refund together.
+
+A partial maker stays Open at the FIFO head; only its remaining quantity/backing
+and the level quantity change. A full maker becomes Filled with zero backing,
+zero remaining quantity and no links. Its account remains as history. When
+another order exists at that price, the client supplies the exact canonical
+successor with a reciprocal previous link. It becomes the head. When the level
+empties, the exact worse neighbor is promoted and its better link is cleared;
+the level closes and rent returns to its original payer. Partial fills reject
+all removal accounts; full fills reject missing, stale or unnecessary hints.
+
+This instruction touches one maker, two positions and at most one FIFO successor
+or worse price. The bounded account set keeps compute predictable. Its tradeoff
+is that an oversized request needs another transaction to continue. Multi-maker
+planning and atomic remainder posting will be separate steps.
+
+The position panel now has a separate Buy or sell now form with a maximum buy
+price or minimum sell price. Its preview shows the fill, fee, net collateral and
+unposted quantity. It refreshes the maker, positions and fee rate before signing.
+The local clock disables trading at close without polling RPC every second.
+Previews are advisory: concurrent fills can change execution, and the fee rate
+at execution comes from the global config. Confirmation refreshes balances,
+orders and the public book; it does not report a stale preview as an actual fill.
+
+`NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` defaults false until deployment and
+requires draft, funding and cancellation rollout flags. It is independent of
+resting-order entry, so disabling new resting orders does not disable matching
+existing orders. Cancellation does not depend on either trading flag.
+
+Tests cover both outcomes/directions, maker-price improvement, partial/full fills,
+FIFO and price promotion, exact fee rounding, zero/max rates, self-trade and
+priority rejection, lifecycle boundaries, account substitutions, malformed hints,
+funding/overflow failures, real partial-fill cancellation and transaction rollback.
+Conservation tests sum both actual traders, reserve and fees against the vault.
+
 ### Trading still to implement
 
-The resting paths above are implemented without taker fees. Future crossing
-orders need bounded matching, fee checks and a safe resting-remainder path.
-
-Matching will transfer an internal outcome position from seller to buyer and move
-the maker-price collateral from buyer to seller. It does not transfer SPL
-tokens because both traders already hold claims against the same vault.
+Multi-maker transaction planning, automatic safe remainder posting, an aggregated
+prediction order book and typed prediction events/indexer decoding remain.
+Fee accrual is implemented, but the existing spot fee-withdrawal instruction
+accepts spot market accounts only; prediction fee withdrawal needs a separate
+collateral-vault adapter. Prediction fills do not emit events yet.
 
 Cancellation remains available after the market freezes or resolves and releases
 only the unfilled collateral or positions. Planned redemption initially
@@ -912,7 +987,9 @@ its tests, frontend and documentation; grouping does not remove the safety check
    free/locked separation and conservation tests.
 3. **Trading — started locally.** Opening, atomic book initialization, empty-side
    placement, same-price FIFO append, new-price insertion and cancellation are implemented.
-   Next: bounded matching, fees, trading UI, typed events and indexer decoding.
+   One-maker matching, taker fees and an immediate-trade UI are also implemented.
+   Next: multi-maker planning, remainder posting, book display, prediction fee
+   withdrawal, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution
    limits and rollback tests, then run a full devnet lifecycle. Oracle adapters

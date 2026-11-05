@@ -49,6 +49,9 @@ const {
   validatePredictionRestingOrder,
   readPredictionPlacementTarget,
   readPredictionCancellationAccounts,
+  readPredictionMatchTarget,
+  validatePredictionMatch,
+  PREDICTION_MATCHING_ENABLED,
   PREDICTION_CANCELLATION_ENABLED,
   PREDICTION_ORDERS_ENABLED,
 } = mod.exports;
@@ -1018,6 +1021,371 @@ test("insertion IDL encodes optional neighbors and stays within packet limits", 
   }
 });
 
+test("one-maker matching previews maker-price execution, fees and unposted quantity on both outcomes", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const outcome of ["yes", "no"])
+    for (const makerSide of ["bid", "ask"]) {
+      const x = cancellationFixture(outcome, makerSide);
+      x.book.nextOrderId = new BN(2);
+      const side = makerSide === "bid" ? "ask" : "bid";
+      const taker = new PublicKey(new Uint8Array(32).fill(9));
+      x.position.owner = taker;
+      for (const quantity of [1, 2, 10]) {
+        const target = await readPredictionMatchTarget(
+          x.reader,
+          x.book.market,
+          x.book,
+          outcome,
+          side,
+          new BN(quantity),
+        );
+        const limit = new BN(side === "bid" ? 800000 : 400000);
+        const plan = validatePredictionMatch(
+          x.market,
+          x.book,
+          x.position,
+          target,
+          outcome,
+          side,
+          limit,
+          new BN(quantity),
+          100,
+          taker,
+          new BN(99),
+        );
+        const fill = Math.min(quantity, 2);
+        assert.equal(plan.fill.toNumber(), fill);
+        assert.equal(plan.notional.toNumber(), 600000 * fill);
+        assert.equal(plan.fee.toNumber(), 6000 * fill);
+        assert.equal(
+          plan.cash.toNumber(),
+          (side === "bid" ? 606000 : 594000) * fill,
+        );
+        assert.equal(plan.unfilled.toNumber(), quantity - fill);
+        assert.equal(target.nextOrder, null);
+        assert.equal(
+          target.rentRecipient?.toBase58() ?? null,
+          quantity >= 2 ? x.owner.toBase58() : null,
+        );
+      }
+    }
+  assert.equal(PREDICTION_MATCHING_ENABLED, false);
+});
+
+test("matching discovers only full-fill FIFO or empty-level removal accounts", async () => {
+  const { BN } = require("@anchor-lang/core");
+  const x = cancellationFixture("yes", "ask", 3);
+  x.book.nextOrderId = new BN(4);
+  const partial = await readPredictionMatchTarget(
+    x.reader,
+    x.book.market,
+    x.book,
+    "yes",
+    "bid",
+    new BN(1),
+  );
+  assert.equal(partial.nextOrder, null);
+  const full = await readPredictionMatchTarget(
+    x.reader,
+    x.book.market,
+    x.book,
+    "yes",
+    "bid",
+    new BN(2),
+  );
+  assert.equal(full.nextOrder.toBase58(), x.address(2).toBase58());
+  assert.equal(full.rentRecipient, null);
+  assert.equal(full.worseLevel, null);
+  x.orders.get(x.address(2).toBase58()).previousOrder = null;
+  await assert.rejects(
+    () =>
+      readPredictionMatchTarget(
+        x.reader,
+        x.book.market,
+        x.book,
+        "yes",
+        "bid",
+        new BN(2),
+      ),
+    /successor/,
+  );
+  const y = cancellationFixture("no", "bid");
+  y.book.nextOrderId = new BN(2);
+  y.level.worsePrice = new BN(500000);
+  const worse = derivePredictionPriceLevelPda(
+    y.book.market,
+    "no",
+    "bid",
+    new BN(500000),
+  );
+  y.levels.set(worse.toBase58(), {
+    ...y.level,
+    price: new BN(500000),
+    betterPrice: new BN(600000),
+    worsePrice: null,
+  });
+  const target = await readPredictionMatchTarget(
+    y.reader,
+    y.book.market,
+    y.book,
+    "no",
+    "ask",
+    new BN(2),
+  );
+  assert.equal(target.worseLevel.toBase58(), worse.toBase58());
+  y.levels.get(worse.toBase58()).betterPrice = null;
+  await assert.rejects(
+    () =>
+      readPredictionMatchTarget(
+        y.reader,
+        y.book.market,
+        y.book,
+        "no",
+        "ask",
+        new BN(2),
+      ),
+    /Next price level/,
+  );
+});
+
+test("matching fails closed on missing books, bad heads, invalid amounts or RPC errors", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const mutate of [
+    (x) => {
+      x.book.yesBestAsk = null;
+    },
+    (x) => {
+      x.level.betterPrice = new BN(500000);
+    },
+    (x) => {
+      x.level.firstOrder = null;
+    },
+    (x) => {
+      x.level.totalRemainingQuantity = new BN(3);
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).previousOrder = x.address(2);
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).status = { filled: {} };
+    },
+    (x) => {
+      x.orders.clear();
+    },
+    (x) => {
+      x.levels.clear();
+    },
+  ]) {
+    const x = cancellationFixture("yes", "ask");
+    x.book.nextOrderId = new BN(2);
+    mutate(x);
+    await assert.rejects(
+      () =>
+        readPredictionMatchTarget(
+          x.reader,
+          x.book.market,
+          x.book,
+          "yes",
+          "bid",
+          new BN(1),
+        ),
+      /No sell|invalid|changed/i,
+    );
+  }
+  const x = cancellationFixture("yes", "ask");
+  x.book.nextOrderId = new BN(2);
+  await assert.rejects(
+    () =>
+      readPredictionMatchTarget(
+        x.reader,
+        x.book.market,
+        x.book,
+        "yes",
+        "bid",
+        new BN(0),
+      ),
+    /positive/,
+  );
+  x.reader.predictionPriceLevel.fetchNullable = async () => {
+    throw new Error("RPC failed");
+  };
+  await assert.rejects(
+    () =>
+      readPredictionMatchTarget(
+        x.reader,
+        x.book.market,
+        x.book,
+        "yes",
+        "bid",
+        new BN(1),
+      ),
+    /RPC failed/,
+  );
+});
+
+test("matching preflight rejects self trades, closed time, noncrossing prices, funds and arithmetic limits", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const mutation of [
+    "self",
+    "time",
+    "limit",
+    "funds",
+    "overflow",
+    "fee",
+    "backing",
+    "identity",
+  ]) {
+    const x = cancellationFixture("yes", "ask");
+    x.book.nextOrderId = new BN(2);
+    const taker = new PublicKey(new Uint8Array(32).fill(9));
+    x.position.owner = taker;
+    const target = await readPredictionMatchTarget(
+      x.reader,
+      x.book.market,
+      x.book,
+      "yes",
+      "bid",
+      new BN(1),
+    );
+    let limit = new BN(700000),
+      now = new BN(99),
+      fee = 100;
+    if (mutation === "self") target.maker.owner = taker;
+    if (mutation === "time") now = new BN(100);
+    if (mutation === "limit") limit = new BN(500000);
+    if (mutation === "funds") x.position.collateralFree = new BN(600000);
+    if (mutation === "overflow")
+      x.position.yesFree = new BN("18446744073709551615");
+    if (mutation === "fee") fee = 1001;
+    if (mutation === "backing") target.maker.lockedCollateral = new BN(99);
+    if (mutation === "identity") target.makerAddress = PublicKey.default;
+    assert.throws(() =>
+      validatePredictionMatch(
+        x.market,
+        x.book,
+        x.position,
+        target,
+        "yes",
+        "bid",
+        limit,
+        new BN(1),
+        fee,
+        taker,
+        now,
+      ),
+    );
+  }
+});
+
+test("matching fee previews round upward even when a tiny seller receives zero net collateral", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const makerSide of ["bid", "ask"]) {
+    const x = cancellationFixture("yes", makerSide);
+    x.book.nextOrderId = new BN(2);
+    const old = x.append.levelAddress.toBase58();
+    x.levels.delete(old);
+    const levelAddress = derivePredictionPriceLevelPda(
+      x.book.market,
+      "yes",
+      makerSide,
+      new BN(1),
+    );
+    x.level.price = new BN(1);
+    x.levels.set(levelAddress.toBase58(), x.level);
+    x.book[makerSide === "bid" ? "yesBestBid" : "yesBestAsk"] = new BN(1);
+    const maker = x.orders.get(x.address(1).toBase58());
+    maker.price = new BN(1);
+    maker.priceLevel = levelAddress;
+    maker.lockedCollateral = new BN(2);
+    x.market.priceTick = new BN(1);
+    const taker = new PublicKey(new Uint8Array(32).fill(9));
+    x.position.owner = taker;
+    const side = makerSide === "bid" ? "ask" : "bid";
+    const target = await readPredictionMatchTarget(
+      x.reader,
+      x.book.market,
+      x.book,
+      "yes",
+      side,
+      new BN(1),
+    );
+    const plan = validatePredictionMatch(
+      x.market,
+      x.book,
+      x.position,
+      target,
+      "yes",
+      side,
+      new BN(1),
+      new BN(1),
+      1,
+      taker,
+      new BN(99),
+    );
+    assert.equal(plan.fee.toNumber(), 1);
+    assert.equal(plan.cash.toNumber(), side === "bid" ? 2 : 0);
+  }
+});
+
+test("matching IDL encodes one taker signature, optional removal accounts and a bounded packet", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, Transaction } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const names = [
+    "taker",
+    "market",
+    "orderBook",
+    "protocolConfig",
+    "marketFees",
+    "makerOrder",
+    "priceLevel",
+    "makerPosition",
+    "takerPosition",
+    "nextOrder",
+    "worseLevel",
+    "levelRentRecipient",
+  ];
+  for (const optional of [false, true]) {
+    const accounts = Object.fromEntries(
+      names.map((name, i) => [
+        name,
+        i >= 9 && !optional
+          ? program.programId
+          : new PublicKey(new Uint8Array(32).fill(i + 1)),
+      ]),
+    );
+    const ix = await program.methods
+      .matchPredictionOrder(
+        { no: {} },
+        { bid: {} },
+        new BN(600000),
+        new BN("9007199254740993"),
+      )
+      .accountsStrict(accounts)
+      .instruction();
+    const decoded = program.coder.instruction.decode(ix.data);
+    assert.equal(decoded.name, "matchPredictionOrder");
+    assert.equal(decoded.data.quantity.toString(), "9007199254740993");
+    assert.equal(ix.keys.filter((k) => k.isSigner).length, 1);
+    assert.equal(ix.keys[3].isWritable, false);
+    assert.equal(ix.keys[4].isWritable, true);
+    for (let i = 9; i < 12; i++) assert.equal(ix.keys[i].isWritable, optional);
+    const tx = new Transaction({
+      feePayer: accounts.taker,
+      recentBlockhash: PublicKey.default.toBase58(),
+    }).add(ix);
+    assert.ok(
+      tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+        .length <= 1232,
+    );
+  }
+});
+
 function cancellationFixture(outcome = "yes", side = "bid", size = 1) {
   const { BN } = require("@anchor-lang/core");
   const x = appendFixture(outcome, side);
@@ -1113,15 +1481,22 @@ test("turning off order entry or funding never turns off deployed cancellation",
   const exitsOnly = flags(draft);
   assert.equal(exitsOnly.PREDICTION_CANCELLATION_ENABLED, true);
   assert.equal(exitsOnly.PREDICTION_ORDERS_ENABLED, false);
+  assert.equal(exitsOnly.PREDICTION_MATCHING_ENABLED, false);
   const localTrading = {
     ...draft,
     NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED: "true",
     NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED: "true",
   };
   assert.equal(flags(localTrading).PREDICTION_ORDERS_ENABLED, true);
+  localTrading.NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED = "true";
+  localTrading.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED = "false";
+  assert.equal(flags(localTrading).PREDICTION_MATCHING_ENABLED, true);
+  assert.equal(flags(localTrading).PREDICTION_ORDERS_ENABLED, false);
+  localTrading.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED = "true";
   localTrading.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED = "false";
   assert.equal(flags(localTrading).PREDICTION_ORDERS_ENABLED, false);
   assert.equal(flags(localTrading).PREDICTION_CANCELLATION_ENABLED, false);
+  assert.equal(flags(localTrading).PREDICTION_MATCHING_ENABLED, false);
 });
 
 test("final-order cancellation discovers reciprocal price neighbors and preserves the rent payer", async () => {

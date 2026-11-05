@@ -282,8 +282,18 @@ counts atomically. Final-order removal also unlinks the level and returns its
 rent to the original payer. Canceled order accounts remain as history; empty
 levels close, allowing price reuse with a new ID. Cancellation moves no vault
 tokens, reserves or fees. The wallet-scoped order list refreshes after confirmation.
-Its deployment flag is independent of new-order entry. Prediction matching is
-not implemented yet; public order entry defaults disabled.
+Its deployment flag is independent of new-order entry.
+`match_prediction_order` settles one best opposing FIFO maker at its resting
+price, using only existing claims in the same collateral vault. It rejects
+self-trades, non-crossing limits and trading at/after close. The global taker fee
+is credited to this market's collateral-denominated accumulator: buys pay
+notional plus fee, sells receive notional minus fee. Supply and payout reserve
+stay unchanged. Partial makers retain priority; full fills promote their FIFO
+successor or remove the empty best level and return rent to its original payer.
+No taker order is created and excess requested quantity stays unposted. The
+immediate-trade form previews fees and refreshes after confirmation. Deployment
+flags default false. Multi-maker planning, remainder posting, prediction fee
+withdrawal, events/indexer support and resolution remain planned.
 
 ### Market vault topology
 

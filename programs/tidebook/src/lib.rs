@@ -30,6 +30,23 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
+    /// Settles up to one best FIFO maker; excess taker quantity is not posted.
+    pub fn match_prediction_order(
+        ctx: Context<MatchPredictionOrder>,
+        outcome: PredictionOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::match_prediction_order::handle_match_prediction_order(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
     /// Releases only the signing owner's unfilled claims, even after trading closes.
     pub fn cancel_prediction_order(
         ctx: Context<CancelPredictionOrder>,

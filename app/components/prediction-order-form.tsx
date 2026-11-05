@@ -319,8 +319,8 @@ export function PredictionOrderForm({
       <h3>Place a limit order</h3>
       <p>
         Resting-order testing supports new prices and FIFO queues at existing
-        prices. Matching is not available yet. Cancel open orders below to
-        release their unfilled funds.
+        prices. For an immediate trade, use Buy or sell now below. Cancel open
+        orders to release their unfilled funds.
       </p>
       {!PREDICTION_ORDERS_ENABLED && (
         <p>Public order submission is disabled for this deployment.</p>

@@ -69,6 +69,127 @@ struct Fixture {
     fees: Pubkey,
 }
 impl Fixture {
+    fn set_fee_rate(&mut self, rate: u16) {
+        let (key, bump) =
+            Pubkey::find_program_address(&[tidebook::PROTOCOL_CONFIG_SEED], &tidebook::ID);
+        let mut data = Vec::new();
+        ProtocolConfig {
+            super_admin: self.owner.pubkey(),
+            taker_fee_bps: rate,
+            bump,
+        }
+        .try_serialize(&mut data)
+        .unwrap();
+        account(&mut self.svm, key, data, tidebook::ID);
+    }
+
+    fn match_ix(
+        &self,
+        id: u64,
+        outcome: PredictionOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Instruction {
+        let maker: PredictionOrder = read(&self.svm, self.order_key(id));
+        let level: PredictionPriceLevel = read(&self.svm, maker.price_level);
+        let full = quantity >= maker.remaining_quantity;
+        let closes = full && level.order_count == 1;
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::MatchPredictionOrder {
+                outcome,
+                taker_side,
+                limit_price,
+                quantity,
+            }
+            .data(),
+            tidebook::accounts::MatchPredictionOrder {
+                taker: self.owner.pubkey(),
+                market: self.market,
+                order_book: self.book,
+                protocol_config: Pubkey::find_program_address(
+                    &[tidebook::PROTOCOL_CONFIG_SEED],
+                    &tidebook::ID,
+                )
+                .0,
+                market_fees: self.fees,
+                maker_order: self.order_key(id),
+                price_level: maker.price_level,
+                maker_position: tidebook::derive_prediction_position_pda(
+                    &tidebook::ID,
+                    &self.market,
+                    &maker.owner,
+                )
+                .0,
+                taker_position: self.position,
+                next_order: if full && !closes {
+                    maker.next_order
+                } else {
+                    None
+                },
+                worse_level: if closes {
+                    level
+                        .worse_price
+                        .map(|p| self.level(outcome, maker.side, p))
+                } else {
+                    None
+                },
+                level_rent_recipient: closes.then_some(level.rent_payer),
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    fn reject_match(&mut self, ix: Instruction, code: &str) {
+        let before = self.snapshot();
+        let keys: Vec<_> = ix
+            .accounts
+            .iter()
+            .map(|a| a.pubkey)
+            .filter(|k| *k != self.owner.pubkey())
+            .collect();
+        let stored: Vec<_> = keys.iter().map(|key| self.svm.get_account(key)).collect();
+        let failure = send(&mut self.svm, &self.owner, &[ix]).unwrap_err();
+        assert!(
+            failure
+                .meta
+                .logs
+                .iter()
+                .any(|s| s.contains(&format!("Error Code: {code}"))),
+            "{failure:?}"
+        );
+        assert_eq!(self.snapshot(), before);
+        for (key, old) in keys.iter().zip(stored) {
+            assert_eq!(self.svm.get_account(key), old);
+        }
+    }
+
+    /// Sum both traders' cash/outcome claims plus reserve/fees against custody.
+    fn assert_trade_conservation(&self, maker_position: Pubkey) {
+        let maker: PredictionPosition = read(&self.svm, maker_position);
+        let taker: PredictionPosition = read(&self.svm, self.position);
+        let market: PredictionMarket = read(&self.svm, self.market);
+        let fees: MarketFees = read(&self.svm, self.fees);
+        let vault = TokenAccount::unpack(&self.svm.get_account(&self.vault).unwrap().data).unwrap();
+        assert_eq!(
+            vault.amount,
+            maker.collateral_free
+                + maker.collateral_locked
+                + taker.collateral_free
+                + taker.collateral_locked
+                + market.backing_reserve
+                + fees.accrued_quote_fees
+        );
+        assert_eq!(
+            market.yes_supply,
+            maker.yes_free + maker.yes_locked + taker.yes_free + taker.yes_locked
+        );
+        assert_eq!(
+            market.no_supply,
+            maker.no_free + maker.no_locked + taker.no_free + taker.no_locked
+        );
+    }
     fn order_key(&self, id: u64) -> Pubkey {
         tidebook::derive_prediction_order_pda(&tidebook::ID, &self.market, id).0
     }
@@ -575,6 +696,543 @@ impl Fixture {
             assert!(self.svm.get_account(&ix.accounts[index].pubkey).is_none());
         }
     }
+}
+
+#[test]
+fn prediction_partial_and_full_fills_settle_both_outcomes_at_maker_price_with_fees() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for maker_side in [OrderSide::Bid, OrderSide::Ask] {
+            let taker_side = if maker_side == OrderSide::Bid {
+                OrderSide::Ask
+            } else {
+                OrderSide::Bid
+            };
+            let mut f = Fixture::new();
+            f.set_fee_rate(100);
+            f.seed_queue(outcome, maker_side, 1);
+            let maker_position = f.position;
+            let rent_payer = f.owner.pubkey();
+            let maker_start: PredictionPosition = read(&f.svm, maker_position);
+            f.switch_to_funded_trader();
+            let taker_start: PredictionPosition = read(&f.svm, f.position);
+            let vault = f.svm.get_account(&f.vault);
+            let market_before: PredictionMarket = read(&f.svm, f.market);
+            let level_key = f.level(outcome, maker_side, 600000);
+            let level_before: PredictionPriceLevel = read(&f.svm, level_key);
+            let limit = if taker_side == OrderSide::Bid {
+                800000
+            } else {
+                400000
+            };
+            let ix = f.match_ix(1, outcome, taker_side, limit, 1);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let order: PredictionOrder = read(&f.svm, f.order_key(1));
+            assert_eq!(
+                (order.remaining_quantity, order.status),
+                (1, OrderStatus::Open)
+            );
+            assert_eq!(
+                order.locked_collateral,
+                if maker_side == OrderSide::Bid {
+                    600000
+                } else {
+                    1
+                }
+            );
+            let level: PredictionPriceLevel = read(&f.svm, level_key);
+            assert_eq!((level.order_count, level.total_remaining_quantity), (1, 1));
+            assert_eq!(
+                (
+                    level.first_order,
+                    level.last_order,
+                    level.better_price,
+                    level.worse_price
+                ),
+                (
+                    level_before.first_order,
+                    level_before.last_order,
+                    level_before.better_price,
+                    level_before.worse_price
+                )
+            );
+            let maker: PredictionPosition = read(&f.svm, maker_position);
+            let taker: PredictionPosition = read(&f.svm, f.position);
+            if taker_side == OrderSide::Bid {
+                assert_eq!(maker.collateral_free - maker_start.collateral_free, 600000);
+                assert_eq!(taker_start.collateral_free - taker.collateral_free, 606000);
+            } else {
+                assert_eq!(
+                    maker_start.collateral_locked - maker.collateral_locked,
+                    600000
+                );
+                assert_eq!(taker.collateral_free - taker_start.collateral_free, 594000);
+            }
+            f.assert_trade_conservation(maker_position);
+            assert_eq!(f.svm.get_account(&f.vault), vault);
+            let rent_before = f.svm.get_account(&rent_payer).unwrap().lamports;
+            let rent = f.svm.get_account(&level_key).unwrap().lamports;
+            // Request more than remains: execute only one contract, never post 99.
+            let ix = f.match_ix(1, outcome, taker_side, limit, 100);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let order: PredictionOrder = read(&f.svm, f.order_key(1));
+            assert_eq!(
+                (
+                    order.status,
+                    order.remaining_quantity,
+                    order.locked_collateral,
+                    order.previous_order,
+                    order.next_order
+                ),
+                (OrderStatus::Filled, 0, 0, None, None)
+            );
+            assert_eq!(order.quantity, 2);
+            assert!(f.svm.get_account(&level_key).is_none());
+            assert!(f.svm.get_account(&f.order_key(2)).is_none());
+            assert_eq!(
+                f.svm.get_account(&rent_payer).unwrap().lamports,
+                rent_before + rent
+            );
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            assert_eq!(book.best_price(outcome, maker_side), None);
+            assert_eq!(book.next_order_id, 2);
+            let market: PredictionMarket = read(&f.svm, f.market);
+            assert_eq!(market.open_order_count, 0);
+            assert_eq!(
+                (market.backing_reserve, market.yes_supply, market.no_supply),
+                (
+                    market_before.backing_reserve,
+                    market_before.yes_supply,
+                    market_before.no_supply
+                )
+            );
+            let fees: MarketFees = read(&f.svm, f.fees);
+            assert_eq!(fees.accrued_quote_fees, 12000);
+            f.assert_trade_conservation(maker_position);
+        }
+    }
+}
+
+#[test]
+fn full_fills_promote_fifo_then_worse_price_without_creating_taker_orders() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for maker_side in [OrderSide::Bid, OrderSide::Ask] {
+            let mut f = Fixture::new();
+            f.set_fee_rate(0);
+            f.seed_queue(outcome, maker_side, 2);
+            let worse = if maker_side == OrderSide::Bid {
+                500000
+            } else {
+                700000
+            };
+            let ix = f.insert(outcome, maker_side, worse, 1, (Some(600000), None));
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let maker_position = f.position;
+            f.switch_to_funded_trader();
+            let taker_side = if maker_side == OrderSide::Bid {
+                OrderSide::Ask
+            } else {
+                OrderSide::Bid
+            };
+            let limit = if taker_side == OrderSide::Bid {
+                800000
+            } else {
+                400000
+            };
+            let ix = f.match_ix(1, outcome, taker_side, limit, 2);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let next: PredictionOrder = read(&f.svm, f.order_key(2));
+            assert_eq!(next.previous_order, None);
+            let level: PredictionPriceLevel = read(&f.svm, f.level(outcome, maker_side, 600000));
+            assert_eq!(
+                (
+                    level.first_order,
+                    level.last_order,
+                    level.order_count,
+                    level.total_remaining_quantity
+                ),
+                (Some(f.order_key(2)), Some(f.order_key(2)), 1, 2)
+            );
+            let ix = f.match_ix(2, outcome, taker_side, limit, 2);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            assert!(f
+                .svm
+                .get_account(&f.level(outcome, maker_side, 600000))
+                .is_none());
+            let level: PredictionPriceLevel = read(&f.svm, f.level(outcome, maker_side, worse));
+            assert_eq!(level.better_price, None);
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            assert_eq!(book.best_price(outcome, maker_side), Some(worse));
+            assert_eq!(book.next_order_id, 4);
+            let ix = f.match_ix(3, outcome, taker_side, limit, 1);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            f.assert_trade_conservation(maker_position);
+        }
+    }
+}
+
+#[test]
+fn matching_rejects_self_trade_same_side_non_crossing_and_skipped_priority() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(0);
+    f.seed_queue(PredictionOutcome::Yes, OrderSide::Ask, 2);
+    let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 700000, 1);
+    // Anchor rejects aliasing maker/taker ledgers before handler constraints.
+    f.reject_match(ix, "ConstraintDuplicateMutableAccount");
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Ask,
+        700000,
+        1,
+        (Some(600000), None),
+    );
+    send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    f.switch_to_funded_trader();
+    for (id, side, price, qty, code) in [
+        (1, OrderSide::Ask, 600000, 1, "PredictionMatchingSameSide"),
+        (1, OrderSide::Bid, 500000, 1, "PredictionOrdersDoNotCross"),
+        (1, OrderSide::Bid, 600001, 1, "InvalidPredictionOrderPrice"),
+        (1, OrderSide::Bid, 0, 1, "InvalidPredictionOrderPrice"),
+        (1, OrderSide::Bid, 1000000, 1, "InvalidPredictionOrderPrice"),
+        (
+            1,
+            OrderSide::Bid,
+            700000,
+            0,
+            "InvalidPredictionContractQuantity",
+        ),
+        (2, OrderSide::Bid, 700000, 1, "PredictionMakerNotHead"),
+        (3, OrderSide::Bid, 700000, 1, "PredictionMakerNotBest"),
+    ] {
+        let ix = f.match_ix(id, PredictionOutcome::Yes, side, price, qty);
+        f.reject_match(ix, code);
+    }
+}
+
+#[test]
+fn matching_rejects_closed_markets_and_stops_at_exact_close_time() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(0);
+    f.seed_queue(PredictionOutcome::No, OrderSide::Bid, 1);
+    f.switch_to_funded_trader();
+    let original = f.svm.get_account(&f.market).unwrap();
+    for status in [
+        PredictionStatus::Draft,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut m: PredictionMarket = read(&f.svm, f.market);
+        m.status = status;
+        write(&mut f.svm, f.market, &m);
+        let ix = f.match_ix(1, PredictionOutcome::No, OrderSide::Ask, 600000, 1);
+        f.reject_match(ix, "PredictionOrderUnavailable");
+    }
+    f.svm.set_account(f.market, original).unwrap();
+    let m: PredictionMarket = read(&f.svm, f.market);
+    let mut clock = f.svm.get_sysvar::<Clock>();
+    clock.unix_timestamp = m.close_ts;
+    f.svm.set_sysvar(&clock);
+    let ix = f.match_ix(1, PredictionOutcome::No, OrderSide::Ask, 600000, 1);
+    f.reject_match(ix, "PredictionOrderUnavailable");
+}
+
+#[test]
+fn matching_checks_free_funds_fee_bounds_and_checked_receiving_balances() {
+    for maker_side in [OrderSide::Ask, OrderSide::Bid] {
+        let mut f = Fixture::new();
+        f.set_fee_rate(100);
+        f.seed_queue(PredictionOutcome::Yes, maker_side, 1);
+        let maker_position = f.position;
+        f.switch_to_funded_trader();
+        let side = if maker_side == OrderSide::Ask {
+            OrderSide::Bid
+        } else {
+            OrderSide::Ask
+        };
+        let original = f.svm.get_account(&f.position).unwrap();
+        let mut p: PredictionPosition = read(&f.svm, f.position);
+        if side == OrderSide::Bid {
+            p.collateral_free = 600000;
+        } else {
+            p.yes_free = 0;
+        }
+        write(&mut f.svm, f.position, &p);
+        let ix = f.match_ix(1, PredictionOutcome::Yes, side, 600000, 1);
+        f.reject_match(
+            ix,
+            if side == OrderSide::Bid {
+                "InsufficientFreeBalance"
+            } else {
+                "InsufficientPredictionPositions"
+            },
+        );
+        f.svm.set_account(f.position, original).unwrap();
+        let maker_original = f.svm.get_account(&maker_position).unwrap();
+        let mut p: PredictionPosition = read(&f.svm, maker_position);
+        if side == OrderSide::Bid {
+            p.collateral_free = u64::MAX;
+        } else {
+            p.yes_free = u64::MAX;
+        }
+        write(&mut f.svm, maker_position, &p);
+        let ix = f.match_ix(1, PredictionOutcome::Yes, side, 600000, 1);
+        f.reject_match(
+            ix,
+            if side == OrderSide::Bid {
+                "FreeBalanceOverflow"
+            } else {
+                "PredictionAccountingOverflow"
+            },
+        );
+        f.svm.set_account(maker_position, maker_original).unwrap();
+        let taker_original = f.svm.get_account(&f.position).unwrap();
+        let mut p: PredictionPosition = read(&f.svm, f.position);
+        if side == OrderSide::Bid {
+            p.yes_free = u64::MAX;
+        } else {
+            p.collateral_free = u64::MAX;
+        }
+        write(&mut f.svm, f.position, &p);
+        let ix = f.match_ix(1, PredictionOutcome::Yes, side, 600000, 1);
+        f.reject_match(
+            ix,
+            if side == OrderSide::Bid {
+                "PredictionAccountingOverflow"
+            } else {
+                "FreeBalanceOverflow"
+            },
+        );
+        f.svm.set_account(f.position, taker_original).unwrap();
+        let mut fees: MarketFees = read(&f.svm, f.fees);
+        fees.accrued_quote_fees = u64::MAX;
+        write(&mut f.svm, f.fees, &fees);
+        let ix = f.match_ix(1, PredictionOutcome::Yes, side, 600000, 1);
+        f.reject_match(ix, "FeeAccrualOverflow");
+        fees.accrued_quote_fees = 0;
+        write(&mut f.svm, f.fees, &fees);
+        f.set_fee_rate(1001);
+        let ix = f.match_ix(1, PredictionOutcome::Yes, side, 600000, 1);
+        f.reject_match(ix, "FeeRateTooHigh");
+    }
+}
+
+#[test]
+fn matching_requires_exact_removal_hints_and_rejects_stale_or_corrupt_neighbors() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(0);
+    f.seed_queue(PredictionOutcome::Yes, OrderSide::Ask, 2);
+    let maker_owner = f.owner.insecure_clone();
+    let maker_position = f.position;
+    f.switch_to_funded_trader();
+    let mut ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+    ix.accounts[9].pubkey = f.order_key(2);
+    ix.accounts[9].is_writable = true;
+    f.reject_match(ix, "InvalidPredictionOrderNeighbor");
+    let mut ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 2);
+    ix.accounts[9].pubkey = tidebook::ID;
+    f.reject_match(ix, "InvalidPredictionOrderNeighbor");
+    let key = f.order_key(2);
+    let stored = f.svm.get_account(&key).unwrap();
+    let mut successor: PredictionOrder = read(&f.svm, key);
+    successor.previous_order = None;
+    write(&mut f.svm, key, &successor);
+    let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 2);
+    f.reject_match(ix, "InvalidPredictionOrderNeighbor");
+    f.svm.set_account(key, stored).unwrap();
+    let stale = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+    let taker = std::mem::replace(&mut f.owner, maker_owner);
+    let taker_position = std::mem::replace(&mut f.position, maker_position);
+    let ix = f.cancel(1);
+    send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    f.owner = taker;
+    f.position = taker_position;
+    f.reject_match(stale, "PredictionOrderNotOpen");
+    let mut ix = f.match_ix(2, PredictionOutcome::Yes, OrderSide::Bid, 600000, 2);
+    ix.accounts[11].pubkey = f.owner.pubkey();
+    f.reject_match(ix, "InvalidPredictionRentRecipient");
+}
+
+#[test]
+fn matching_rejects_wrong_namespaces_fee_bindings_signatures_and_maker_backing() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(0);
+    f.seed_queue(PredictionOutcome::Yes, OrderSide::Ask, 1);
+    f.switch_to_funded_trader();
+    for index in [1, 2, 3, 4, 5, 6, 7, 8] {
+        let mut ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+        let fake = Pubkey::new_unique();
+        f.svm
+            .set_account(fake, f.svm.get_account(&ix.accounts[index].pubkey).unwrap())
+            .unwrap();
+        ix.accounts[index].pubkey = fake;
+        f.reject_match(ix, "ConstraintSeeds");
+    }
+    let ix = f.match_ix(1, PredictionOutcome::No, OrderSide::Bid, 600000, 1);
+    f.reject_match(ix, "InvalidPredictionPriceLevel");
+    let payer = Keypair::new();
+    f.svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
+    let mut ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+    ix.accounts[0].is_signer = false;
+    let before = f.snapshot();
+    let result = send(&mut f.svm, &payer, &[ix]).unwrap_err();
+    assert!(
+        result
+            .meta
+            .logs
+            .iter()
+            .any(|s| s.contains("AccountNotSigner")),
+        "{result:?}"
+    );
+    assert_eq!(f.snapshot(), before);
+    let stored = f.svm.get_account(&f.fees).unwrap();
+    let mut fees: MarketFees = read(&f.svm, f.fees);
+    fees.quote_mint = Pubkey::new_unique();
+    write(&mut f.svm, f.fees, &fees);
+    let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+    f.reject_match(ix, "MarketFeesQuoteMintMismatch");
+    f.svm.set_account(f.fees, stored).unwrap();
+    let key = f.order_key(1);
+    let mut order: PredictionOrder = read(&f.svm, key);
+    order.locked_collateral += 1;
+    write(&mut f.svm, key, &order);
+    let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1);
+    f.reject_match(ix, "PredictionOrderAccountingMismatch");
+}
+
+#[test]
+fn matching_can_be_followed_by_real_owner_cancellation_of_only_the_remainder() {
+    for maker_side in [OrderSide::Ask, OrderSide::Bid] {
+        let mut f = Fixture::new();
+        f.set_fee_rate(100);
+        f.seed_queue(PredictionOutcome::No, maker_side, 1);
+        let maker_owner = f.owner.insecure_clone();
+        let maker_position = f.position;
+        f.switch_to_funded_trader();
+        let taker_position = f.position;
+        let side = if maker_side == OrderSide::Ask {
+            OrderSide::Bid
+        } else {
+            OrderSide::Ask
+        };
+        let ix = f.match_ix(1, PredictionOutcome::No, side, 600000, 1);
+        send(&mut f.svm, &f.owner, &[ix]).unwrap();
+        f.assert_trade_conservation(maker_position);
+        let before: PredictionPosition = read(&f.svm, maker_position);
+        f.owner = maker_owner;
+        f.position = maker_position;
+        let ix = f.cancel(1);
+        send(&mut f.svm, &f.owner, &[ix]).unwrap();
+        let after: PredictionPosition = read(&f.svm, maker_position);
+        if maker_side == OrderSide::Bid {
+            assert_eq!(
+                (
+                    after.collateral_locked,
+                    after.collateral_free - before.collateral_free
+                ),
+                (0, 600000)
+            );
+        } else {
+            assert_eq!((after.no_locked, after.no_free - before.no_free), (0, 1));
+        }
+        f.position = taker_position;
+        f.assert_trade_conservation(maker_position);
+    }
+}
+
+#[test]
+fn matching_fee_rounding_and_zero_or_max_rates_preserve_custody_at_tiny_notionals() {
+    for rate in [0, 1, 1000] {
+        for maker_side in [OrderSide::Ask, OrderSide::Bid] {
+            let mut f = Fixture::new();
+            f.set_fee_rate(rate);
+            let mut market: PredictionMarket = read(&f.svm, f.market);
+            market.price_tick = 1;
+            write(&mut f.svm, f.market, &market);
+            let ix = f.ix(PredictionOutcome::Yes, maker_side, 1, 2, 1);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let maker_position = f.position;
+            f.switch_to_funded_trader();
+            let side = if maker_side == OrderSide::Ask {
+                OrderSide::Bid
+            } else {
+                OrderSide::Ask
+            };
+            let before: PredictionPosition = read(&f.svm, f.position);
+            let ix = f.match_ix(1, PredictionOutcome::Yes, side, 1, 1);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let after: PredictionPosition = read(&f.svm, f.position);
+            let fees: MarketFees = read(&f.svm, f.fees);
+            let fee = u64::from(rate != 0);
+            assert_eq!(fees.accrued_quote_fees, fee);
+            if side == OrderSide::Bid {
+                assert_eq!(before.collateral_free - after.collateral_free, 1 + fee);
+            } else {
+                assert_eq!(after.collateral_free - before.collateral_free, 1 - fee);
+            }
+            f.assert_trade_conservation(maker_position);
+        }
+    }
+}
+
+#[test]
+fn matching_batch_failure_rolls_back_both_ledgers_fees_book_and_level_rent() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(100);
+    f.seed_queue(PredictionOutcome::Yes, OrderSide::Ask, 1);
+    let maker_position = f.position;
+    let maker_owner = f.owner.pubkey();
+    f.switch_to_funded_trader();
+    for quantity in [1, 2] {
+        let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 700000, quantity);
+        let keys = [
+            maker_position,
+            f.order_key(1),
+            f.level(PredictionOutcome::Yes, OrderSide::Ask, 600000),
+            maker_owner,
+        ];
+        let accounts: Vec<_> = keys.iter().map(|key| f.svm.get_account(key)).collect();
+        let before = f.snapshot();
+        // Partial then full without removal hints, or full then already-closed
+        // level: in both cases the second instruction aborts the first fill too.
+        assert!(send(&mut f.svm, &f.owner, &[ix.clone(), ix]).is_err());
+        assert_eq!(f.snapshot(), before);
+        for (key, account) in keys.iter().zip(accounts) {
+            assert_eq!(f.svm.get_account(key), account);
+        }
+        f.assert_trade_conservation(maker_position);
+    }
+}
+
+#[test]
+fn matching_level_removal_rejects_missing_cross_outcome_and_nonreciprocal_worse_levels() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(100);
+    f.seed_queue(PredictionOutcome::Yes, OrderSide::Ask, 1);
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Ask,
+        700000,
+        1,
+        (Some(600000), None),
+    );
+    send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    let ix = f.ix(PredictionOutcome::No, OrderSide::Ask, 700000, 1, 3);
+    send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    f.switch_to_funded_trader();
+    for replacement in [
+        tidebook::ID,
+        f.level(PredictionOutcome::No, OrderSide::Ask, 700000),
+    ] {
+        let mut ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 2);
+        ix.accounts[10].pubkey = replacement;
+        f.reject_match(ix, "InvalidPredictionPriceLevel");
+    }
+    let key = f.level(PredictionOutcome::Yes, OrderSide::Ask, 700000);
+    let mut level: PredictionPriceLevel = read(&f.svm, key);
+    level.better_price = None;
+    write(&mut f.svm, key, &level);
+    let ix = f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 600000, 2);
+    f.reject_match(ix, "InvalidPredictionPriceLevel");
 }
 
 #[test]

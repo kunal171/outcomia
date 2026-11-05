@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PredictionOrderForm } from "./prediction-order-form";
 import { PredictionOrders } from "./prediction-orders";
+import { PredictionMatchForm } from "./prediction-match-form";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -109,7 +110,14 @@ function ConnectedPosition({
   const [signature, setSignature] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<PublicKey | null>(null);
   const [resultKind, setResultKind] = useState<
-    "position" | "deposit" | "withdraw" | "split" | "merge" | "order" | "cancel"
+    | "position"
+    | "deposit"
+    | "withdraw"
+    | "split"
+    | "merge"
+    | "order"
+    | "cancel"
+    | "match"
   >("position");
   const [actionError, setActionError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<BN | null>(null);
@@ -496,6 +504,22 @@ function ConnectedPosition({
               }}
             />
           )}
+          <PredictionMatchForm
+            program={program}
+            owner={wallet.publicKey}
+            market={market}
+            decimals={decimals}
+            symbol={collateralSymbol}
+            pending={pending}
+            setPending={setPending}
+            onMatched={(confirmed) => {
+              setSignature(confirmed);
+              setLastOrder(null);
+              setResultKind("match");
+              setRefresh((value) => value + 1);
+              onOrderPlaced();
+            }}
+          />
           <PredictionOrders
             program={program}
             owner={wallet.publicKey}
@@ -695,7 +719,9 @@ function ConnectedPosition({
                     ? "Prediction order placed."
                     : resultKind === "cancel"
                       ? "Prediction order canceled; unfilled funds released."
-                      : "Position initialized."}{" "}
+                      : resultKind === "match"
+                        ? "Trade confirmed. See updated balances and orders below."
+                        : "Position initialized."}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"

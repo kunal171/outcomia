@@ -3655,6 +3655,371 @@
       ]
     },
     {
+      "name": "match_prediction_order",
+      "docs": [
+        "Settles up to one best FIFO maker; excess taker quantity is not posted."
+      ],
+      "discriminator": [
+        222,
+        232,
+        31,
+        94,
+        38,
+        142,
+        142,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "order_book",
+            "market_fees",
+            "maker_order",
+            "price_level",
+            "maker_position",
+            "taker_position"
+          ]
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_fees",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  102,
+                  101,
+                  101,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.order_id",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.side",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.price",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.owner",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "next_order",
+          "docs": [
+            "Only supplied when a full fill promotes the next FIFO order."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "docs": [
+            "Only supplied when a full fill empties the current best price level."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "merge_prediction_complete_set",
       "docs": [
         "Burns free YES/NO pairs and releases their backing into free cash."
@@ -6134,7 +6499,7 @@
     {
       "code": 6132,
       "name": "PredictionOrderNotOpen",
-      "msg": "Only an open prediction order can be canceled"
+      "msg": "Prediction order must be open"
     },
     {
       "code": 6133,
@@ -6155,6 +6520,31 @@
       "code": 6136,
       "name": "PredictionOrderAccountingMismatch",
       "msg": "Prediction order backing or book counters are inconsistent"
+    },
+    {
+      "code": 6137,
+      "name": "PredictionMatchingSameSide",
+      "msg": "Prediction maker and taker must be on opposite sides"
+    },
+    {
+      "code": 6138,
+      "name": "PredictionOrdersDoNotCross",
+      "msg": "Prediction limit price does not cross the resting maker"
+    },
+    {
+      "code": 6139,
+      "name": "PredictionSelfTrade",
+      "msg": "Prediction traders cannot match their own resting orders"
+    },
+    {
+      "code": 6140,
+      "name": "PredictionMakerNotBest",
+      "msg": "Prediction matching must use the best opposing price"
+    },
+    {
+      "code": 6141,
+      "name": "PredictionMakerNotHead",
+      "msg": "Prediction matching must use the oldest open order at that price"
     }
   ],
   "types": [

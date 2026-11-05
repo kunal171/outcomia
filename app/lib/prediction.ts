@@ -18,6 +18,252 @@ export const PREDICTION_CANCELLATION_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
   process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED === "true";
 
+// Keep deployment of matching separate from research-only resting order entry.
+export const PREDICTION_MATCHING_ENABLED =
+  PREDICTION_CANCELLATION_ENABLED &&
+  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true" &&
+  process.env.NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED === "true";
+
+export interface PredictionMatchTarget {
+  makerAddress: PublicKey;
+  levelAddress: PublicKey;
+  maker: PredictionOrderAccount;
+  level: PredictionPriceLevelAccount;
+  nextOrder: PublicKey | null;
+  worseLevel: PublicKey | null;
+  rentRecipient: PublicKey | null;
+}
+
+/** Select one current best FIFO maker and only the removal accounts it needs.
+ * RPC failures stay errors. No skipping self-owned liquidity or a stale head. */
+export async function readPredictionMatchTarget(
+  accounts: PredictionPlacementReader,
+  market: PublicKey,
+  book: PredictionOrderBookAccount,
+  outcome: PredictionOutcome,
+  takerSide: OrderSide,
+  quantity: BN,
+): Promise<PredictionMatchTarget> {
+  if (!book.market.equals(market)) throw new Error("Book market mismatch");
+  if (quantity.lten(0) || quantity.bitLength() > 64)
+    throw new Error("Enter a positive whole u64 quantity");
+  const makerSide = takerSide === "bid" ? "ask" : "bid";
+  const best = predictionBestPrice(book, outcome, makerSide);
+  if (!best)
+    throw new Error(
+      `No ${makerSide === "ask" ? "sell" : "buy"} orders for ${outcome.toUpperCase()}`,
+    );
+  const levelAddress = derivePredictionPriceLevelPda(
+    market,
+    outcome,
+    makerSide,
+    best,
+  );
+  const level = await accounts.predictionPriceLevel.fetchNullable(levelAddress);
+  const validLevel = (value: PredictionPriceLevelAccount | null, price: BN) =>
+    value &&
+    value.market.equals(market) &&
+    outcome in value.outcome &&
+    makerSide in value.side &&
+    value.price.eq(price) &&
+    value.orderCount.gtn(0) &&
+    value.totalRemainingQuantity.gtn(0) &&
+    value.firstOrder &&
+    value.lastOrder;
+  if (
+    !validLevel(level, best) ||
+    !level ||
+    !level.firstOrder ||
+    !level.lastOrder ||
+    level.betterPrice !== null
+  )
+    throw new Error("Best price level changed or is invalid; refresh");
+  const makerAddress = level.firstOrder;
+  const lastOrder = level.lastOrder;
+  const maker = await accounts.predictionOrder.fetchNullable(makerAddress);
+  const validOrder = (
+    value: PredictionOrderAccount | null,
+    address: PublicKey,
+  ) =>
+    value &&
+    address.equals(derivePredictionOrderPda(market, value.orderId)) &&
+    value.market.equals(market) &&
+    value.priceLevel.equals(levelAddress) &&
+    outcome in value.outcome &&
+    makerSide in value.side &&
+    value.price.eq(best) &&
+    "open" in value.status &&
+    value.remainingQuantity.gtn(0) &&
+    value.remainingQuantity.lte(value.quantity) &&
+    value.orderId.gtn(0) &&
+    value.orderId.lt(book.nextOrderId);
+  if (
+    !validOrder(maker, makerAddress) ||
+    !maker ||
+    maker.previousOrder !== null
+  )
+    throw new Error("Best FIFO order changed or is invalid; refresh");
+  if (
+    level.orderCount.eqn(1)
+      ? !lastOrder.equals(makerAddress) ||
+        maker.nextOrder !== null ||
+        !level.totalRemainingQuantity.eq(maker.remainingQuantity)
+      : lastOrder.equals(makerAddress) ||
+        !maker.nextOrder ||
+        maker.nextOrder.equals(makerAddress) ||
+        level.totalRemainingQuantity.lte(maker.remainingQuantity)
+  )
+    throw new Error("Best FIFO endpoints or totals are invalid; refresh");
+  let nextOrder: PublicKey | null = null,
+    worseLevel: PublicKey | null = null,
+    rentRecipient: PublicKey | null = null;
+  if (quantity.gte(maker.remainingQuantity)) {
+    if (level.orderCount.gtn(1)) {
+      const address = maker.nextOrder;
+      if (!address) throw new Error("FIFO successor is missing; refresh");
+      const next = await accounts.predictionOrder.fetchNullable(address);
+      if (
+        !validOrder(next, address) ||
+        !next ||
+        !next.previousOrder?.equals(makerAddress) ||
+        next.orderId.lte(maker.orderId)
+      )
+        throw new Error("FIFO successor changed or is invalid; refresh");
+      nextOrder = address;
+    } else {
+      rentRecipient = level.rentPayer;
+      if (level.worsePrice) {
+        const price = level.worsePrice;
+        const address = derivePredictionPriceLevelPda(
+          market,
+          outcome,
+          makerSide,
+          price,
+        );
+        const worse =
+          await accounts.predictionPriceLevel.fetchNullable(address);
+        if (
+          !validLevel(worse, price) ||
+          !worse ||
+          !worse.betterPrice?.eq(best) ||
+          (makerSide === "bid" ? price.gte(best) : price.lte(best))
+        )
+          throw new Error("Next price level changed or is invalid; refresh");
+        worseLevel = address;
+      }
+    }
+  }
+  return {
+    makerAddress,
+    levelAddress,
+    maker,
+    level,
+    nextOrder,
+    worseLevel,
+    rentRecipient,
+  };
+}
+
+/** Exact one-maker preview, including ceiling-rounded collateral taker fees.
+ * The chain also validates the maker ledger and rechecks every routing hint. */
+export function validatePredictionMatch(
+  market: PredictionMarketAccount,
+  book: PredictionOrderBookAccount,
+  position: PredictionPositionAccount,
+  target: PredictionMatchTarget,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+  limit: BN,
+  quantity: BN,
+  feeBps: number,
+  owner: PublicKey,
+  now: BN,
+) {
+  if (!["yes", "no"].includes(outcome) || !["bid", "ask"].includes(side))
+    throw new Error("Invalid outcome or side");
+  if (predictionStatus(market) !== "open" || now.gte(market.closeTs))
+    throw new Error("Trading requires an open market before close");
+  if (quantity.lten(0) || quantity.bitLength() > 64)
+    throw new Error("Enter a positive whole u64 quantity");
+  if (
+    limit.lten(0) ||
+    limit.gte(market.payoutPerContract) ||
+    limit.bitLength() > 64 ||
+    market.priceTick.lten(0) ||
+    !limit.mod(market.priceTick).isZero()
+  )
+    throw new Error("Limit price must be positive, below 1 and tick-aligned");
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000)
+    throw new Error("Invalid taker fee rate");
+  if (!position.owner.equals(owner) || !position.market.equals(book.market))
+    throw new Error("Position ownership mismatch");
+  const { maker, level } = target;
+  const makerSide = side === "bid" ? "ask" : "bid";
+  if (maker.owner.equals(owner))
+    throw new Error("You cannot trade against your own order; cancel it first");
+  if (
+    !(outcome in maker.outcome) ||
+    !(makerSide in maker.side) ||
+    !maker.market.equals(book.market) ||
+    !level.market.equals(book.market) ||
+    !(outcome in level.outcome) ||
+    !(makerSide in level.side) ||
+    !level.price.eq(maker.price) ||
+    level.betterPrice !== null ||
+    level.orderCount.lten(0) ||
+    level.totalRemainingQuantity.lt(maker.remainingQuantity) ||
+    maker.price.lten(0) ||
+    maker.price.gte(market.payoutPerContract) ||
+    !maker.price.mod(market.priceTick).isZero() ||
+    !target.makerAddress.equals(
+      derivePredictionOrderPda(book.market, maker.orderId),
+    ) ||
+    !target.levelAddress.equals(
+      derivePredictionPriceLevelPda(
+        book.market,
+        outcome,
+        makerSide,
+        maker.price,
+      ),
+    ) ||
+    !maker.priceLevel.equals(target.levelAddress) ||
+    !level.firstOrder?.equals(target.makerAddress) ||
+    !predictionBestPrice(book, outcome, makerSide)?.eq(maker.price) ||
+    !("open" in maker.status) ||
+    maker.previousOrder !== null ||
+    maker.orderId.lten(0) ||
+    maker.orderId.gte(book.nextOrderId) ||
+    maker.remainingQuantity.lten(0) ||
+    maker.remainingQuantity.gt(maker.quantity)
+  )
+    throw new Error("Maker is not the current best FIFO order; refresh");
+  if (side === "bid" ? limit.lt(maker.price) : limit.gt(maker.price))
+    throw new Error("Limit price does not cross the best order");
+  const backing =
+    makerSide === "bid"
+      ? maker.price.mul(maker.remainingQuantity)
+      : maker.remainingQuantity;
+  if (!maker.lockedCollateral.eq(backing) || backing.bitLength() > 64)
+    throw new Error("Maker backing is invalid");
+  const fill = BN.min(quantity, maker.remainingQuantity);
+  const notional = maker.price.mul(fill);
+  const fee = notional.muln(feeBps).addn(9999).divn(10000);
+  const cash = side === "bid" ? notional.add(fee) : notional.sub(fee);
+  const contracts = outcome === "yes" ? position.yesFree : position.noFree;
+  if (notional.bitLength() > 64 || cash.isNeg() || cash.bitLength() > 64)
+    throw new Error("Trade exceeds u64 collateral bounds");
+  if (side === "bid" ? cash.gt(position.collateralFree) : fill.gt(contracts))
+    throw new Error("Not enough free funds for this fill");
+  if (
+    (side === "bid"
+      ? contracts.add(fill)
+      : position.collateralFree.add(cash)
+    ).bitLength() > 64
+  )
+    throw new Error("Receiving balance exceeds u64");
+  return { fill, notional, fee, cash, unfilled: quantity.sub(fill) };
+}
+
 /** Read current neighbors just before signing; RPC/decode failures propagate.
  * These are routing hints, not authorization. The program rechecks all of them
  * atomically because another order can change the links after these RPC reads. */
@@ -438,7 +684,7 @@ export function validatePredictionRestingOrder(
   );
   if (opposing && (side === "bid" ? price.gte(opposing) : price.lte(opposing)))
     throw new Error(
-      "This order would cross; prediction matching is not available yet",
+      "This order would cross; use the Buy or sell now form for matching",
     );
   if (
     book.nextOrderId.lte(new BN(0)) ||

@@ -398,7 +398,7 @@ pub enum TidebookError {
     InvalidPredictionPriceLevel = 130,
     #[msg("Prediction queue tail identity, status or links are invalid")]
     InvalidPredictionTail = 131,
-    #[msg("Only an open prediction order can be canceled")]
+    #[msg("Prediction order must be open")]
     PredictionOrderNotOpen = 132,
     #[msg("Only the prediction order owner may cancel it")]
     UnauthorizedPredictionOrderOwner = 133,
@@ -408,4 +408,14 @@ pub enum TidebookError {
     InvalidPredictionRentRecipient = 135,
     #[msg("Prediction order backing or book counters are inconsistent")]
     PredictionOrderAccountingMismatch = 136,
+    #[msg("Prediction maker and taker must be on opposite sides")]
+    PredictionMatchingSameSide = 137,
+    #[msg("Prediction limit price does not cross the resting maker")]
+    PredictionOrdersDoNotCross = 138,
+    #[msg("Prediction traders cannot match their own resting orders")]
+    PredictionSelfTrade = 139,
+    #[msg("Prediction matching must use the best opposing price")]
+    PredictionMakerNotBest = 140,
+    #[msg("Prediction matching must use the oldest open order at that price")]
+    PredictionMakerNotHead = 141,
 }

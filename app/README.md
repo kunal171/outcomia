@@ -143,13 +143,24 @@ works after trading closes. The program refunds the remaining lock, repairs the
 queue and closes an empty price level, returning its rent to the original payer.
 Confirmation refreshes the position, order list and public book.
 
-Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until matching is
-implemented and deployed. Explicit local tests may enable it alongside the
+The separate Buy or sell now form trades with one best opposing FIFO order at
+its resting price. It previews executed contracts, collateral, global taker fee
+and unposted quantity. Buys pay notional plus fee; sells receive notional minus
+fee. A partial maker stays at the head; a full maker promotes the next order or
+price. No taker order or automatic remainder is created. Confirmations refresh
+positions, orders and public heads; previews are not claimed as confirmed fills.
+
+Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until this program
+version is deployed. Explicit local tests may enable it alongside the
 draft/funding/cancellation flags after deploying this version.
 `NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED` defaults false until deployment;
 it requires the draft flag but does not depend on new-order or funding flags.
 Disabling new orders therefore leaves cancellation available. No admin role is required for
 trading. Rebuild/redeploy the program before using the updated client on devnet.
+`NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` separately controls immediate trades
+and requires draft, funding and cancellation flags. It defaults false until
+`match_prediction_order` is deployed. Multi-maker planning, automatic remainder
+posting and prediction fee withdrawal are not included in this milestone.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 
