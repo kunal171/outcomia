@@ -2,12 +2,14 @@
 
 pub use super::TidebookError::{
     InsufficientPredictionPositions, InvalidPredictionCloseTime, InvalidPredictionCollateralMint,
-    InvalidPredictionContractQuantity, InvalidPredictionFallback, InvalidPredictionPayout,
-    InvalidPredictionPriceTick, InvalidPredictionResolutionDelay, InvalidPredictionResolutionTime,
-    InvalidPredictionResolver, InvalidPredictionRulesHash, InvalidPredictionRulesUri,
-    InvalidPredictionTokenOwner, InvalidPredictionVault, PredictionAccountingOverflow,
-    PredictionBackingUnderflow, PredictionCreatorMustResolve, PredictionDepositAfterResolution,
+    InvalidPredictionContractQuantity, InvalidPredictionFallback, InvalidPredictionOrderId,
+    InvalidPredictionOrderPrice, InvalidPredictionPayout, InvalidPredictionPriceTick,
+    InvalidPredictionResolutionDelay, InvalidPredictionResolutionTime, InvalidPredictionResolver,
+    InvalidPredictionRulesHash, InvalidPredictionRulesUri, InvalidPredictionTokenOwner,
+    InvalidPredictionVault, PredictionAccountingOverflow, PredictionBackingUnderflow,
+    PredictionBookMarketMismatch, PredictionCreatorMustResolve, PredictionDepositAfterResolution,
     PredictionMergeUnavailable, PredictionNotDraft, PredictionOpeningClosed,
-    PredictionPositionMarketMismatch, PredictionPositionOwnerMismatch, PredictionSplitUnavailable,
+    PredictionOrderUnavailable, PredictionOrderWouldCross, PredictionPositionMarketMismatch,
+    PredictionPositionOwnerMismatch, PredictionSideNotEmpty, PredictionSplitUnavailable,
     PredictionTimestampOverflow, UnauthorizedPredictionAuthority,
 };

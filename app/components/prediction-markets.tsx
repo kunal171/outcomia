@@ -252,7 +252,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     {book ? (
                       <>
                         <p>
-                          Book initialized. Order placement will be added next.
+                          Book initialized. First orders on empty sides are
+                          available for local testing.
                         </p>
                         <dl className="market-metadata">
                           <div>
@@ -320,6 +321,39 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     status={status}
                     payoutPerContract={market.payoutPerContract}
                     collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
+                    onOrderPlaced={() => {
+                      const accounts = getTidebookAccounts(program);
+                      void Promise.all([
+                        accounts.predictionMarket.fetchNullable(key),
+                        accounts.predictionOrderBook.fetchNullable(
+                          derivePredictionBookPda(key),
+                        ),
+                      ])
+                        .then(([updatedMarket, updatedBook]) => {
+                          if (
+                            !updatedMarket ||
+                            !updatedBook ||
+                            !updatedBook.market.equals(key)
+                          )
+                            throw new Error("Updated market/book unavailable");
+                          setRecords((current) =>
+                            current.map((row) =>
+                              row.address.equals(key)
+                                ? {
+                                    ...row,
+                                    market: updatedMarket,
+                                    book: updatedBook,
+                                  }
+                                : row,
+                            ),
+                          );
+                        })
+                        .catch(() =>
+                          setError(
+                            "Order confirmed; refresh to load the updated book.",
+                          ),
+                        );
+                    }}
                   />
                 )}
               </article>

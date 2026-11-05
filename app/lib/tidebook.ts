@@ -16,6 +16,8 @@ import type {
   PredictionMarketAccount,
   PredictionPositionAccount,
   PredictionOrderBookAccount,
+  PredictionOrderAccount,
+  PredictionPriceLevelAccount,
 } from "./prediction";
 
 export const PROTOCOL_CONFIG_SEED = "protocol_config";
@@ -200,6 +202,8 @@ interface TidebookAccounts {
   predictionMarket: AccountClient<PredictionMarketAccount>;
   predictionPosition: AccountClient<PredictionPositionAccount>;
   predictionOrderBook: AccountClient<PredictionOrderBookAccount>;
+  predictionOrder: AccountClient<PredictionOrderAccount>;
+  predictionPriceLevel: AccountClient<PredictionPriceLevelAccount>;
   protocolConfig: AccountClient<ProtocolConfigAccount>;
   adminRecord: AccountClient<AdminRecordAccount>;
   market: AccountClient<MarketAccount>;

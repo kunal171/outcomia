@@ -3058,6 +3058,259 @@
       "args": []
     },
     {
+      "name": "place_prediction_order",
+      "docs": [
+        "Locks trader claims and seeds the first resting order on an empty side."
+      ],
+      "discriminator": [
+        119,
+        1,
+        59,
+        229,
+        186,
+        159,
+        116,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        },
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "remove_admin",
       "docs": [
         "Closes a disabled administrator record and returns its rent."
@@ -4019,6 +4272,19 @@
       ]
     },
     {
+      "name": "PredictionOrder",
+      "discriminator": [
+        143,
+        114,
+        109,
+        86,
+        201,
+        242,
+        189,
+        215
+      ]
+    },
+    {
       "name": "PredictionOrderBook",
       "discriminator": [
         5,
@@ -4042,6 +4308,19 @@
         15,
         100,
         46
+      ]
+    },
+    {
+      "name": "PredictionPriceLevel",
+      "discriminator": [
+        163,
+        54,
+        5,
+        27,
+        245,
+        40,
+        206,
+        235
       ]
     },
     {
@@ -4992,6 +5271,36 @@
       "code": 6123,
       "name": "PredictionCreatorMustResolve",
       "msg": "The market creator must be its primary outcome resolver"
+    },
+    {
+      "code": 6124,
+      "name": "PredictionBookMarketMismatch",
+      "msg": "Prediction book belongs to a different market"
+    },
+    {
+      "code": 6125,
+      "name": "PredictionOrderUnavailable",
+      "msg": "Prediction orders require an open market before its close time"
+    },
+    {
+      "code": 6126,
+      "name": "PredictionSideNotEmpty",
+      "msg": "This placement path requires an empty outcome/side price list"
+    },
+    {
+      "code": 6127,
+      "name": "InvalidPredictionOrderPrice",
+      "msg": "Prediction price must be positive, below payout and tick-aligned"
+    },
+    {
+      "code": 6128,
+      "name": "PredictionOrderWouldCross",
+      "msg": "A crossing prediction order must use the matching path"
+    },
+    {
+      "code": 6129,
+      "name": "InvalidPredictionOrderId",
+      "msg": "Prediction order ID must match the book's next positive ID"
     }
   ],
   "types": [
@@ -6249,6 +6558,103 @@
       }
     },
     {
+      "name": "PredictionOrder",
+      "docs": [
+        "One order submission: [\"prediction_order\", market, order_id_le].",
+        "",
+        "IDs are unique across both outcomes and both sides. Outcome is nevertheless",
+        "stored and must match the supplied level and position bucket on every action."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "price_level",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_order",
+            "docs": [
+              "Older/newer open orders at exactly the same outcome, side and price."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "next_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "quantity",
+            "docs": [
+              "Whole contracts, never mint atoms or fractional positions."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "remaining_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "docs": [
+              "Bid: collateral atoms reserved for the order, including any reserved",
+              "fee budget. Ask: whole YES or NO contracts selected by `outcome`.",
+              "Cancellation/fills must release the recorded amount, not guess units."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "PredictionOrderBook",
       "docs": [
         "One index root per prediction market: [\"prediction_book\", market].",
@@ -6313,6 +6719,23 @@
       }
     },
     {
+      "name": "PredictionOutcome",
+      "docs": [
+        "Tradable positions. Invalid is a resolution result, never a third asset."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          }
+        ]
+      }
+    },
+    {
       "name": "PredictionPosition",
       "docs": [
         "One trader's collateral claims and internal YES/NO positions.",
@@ -6365,6 +6788,100 @@
           {
             "name": "no_locked",
             "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionPriceLevel",
+      "docs": [
+        "One FIFO queue: [\"prediction_level\", market, outcome, side, price_le]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "PredictionOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "docs": [
+              "Collateral atoms per whole contract; tick/range checks belong to placement."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "better_price",
+            "docs": [
+              "Higher matching priority within this outcome and side only:",
+              "higher prices for bids, lower prices for asks."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "worse_price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "first_order",
+            "docs": [
+              "Oldest open order, consumed first at this price."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "last_order",
+            "docs": [
+              "Newest open order; subsequent submissions append here."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "total_remaining_quantity",
+            "docs": [
+              "Whole outcome contracts, including partially filled order remainders."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "order_count",
+            "type": "u64"
+          },
+          {
+            "name": "rent_payer",
+            "docs": [
+              "Receives rent when this empty level is eventually closed."
+            ],
+            "type": "pubkey"
           },
           {
             "name": "bump",

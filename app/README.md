@@ -126,9 +126,17 @@ test vectors protect that contract. The IDL-backed reader now exposes the root,
 which is initialized with the draft at next ID 1 and four absent best-price heads.
 The detail page shows these fields and its Explorer link. Older drafts missing
 the root are identified explicitly; create a fresh draft for the new order flow.
-Order/level creation and placement are pending, so those accounts are not yet
-registered and no prediction order form is exposed. Rebuild/redeploy the program
-before using this changed creation transaction against devnet.
+The reader also exposes prediction levels and orders. The position panel has a
+first-order form for any connected trader: YES/NO, buy/sell, human-unit price
+and whole quantity. It supports an empty outcome/side only, rejects crossing
+prices, and checks free funds and exact integer bounds. Buys lock collateral;
+sells lock outcome contracts. Confirmations refresh the ledger and public book.
+
+Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until cancellation
+and matching are implemented. Explicit local tests may enable it alongside the
+draft/funding flags after deploying this version. The form states that placed
+orders cannot yet be canceled and remain locked. No admin role is required for
+trading. Rebuild/redeploy the program before using the updated client on devnet.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 

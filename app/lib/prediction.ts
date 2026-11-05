@@ -1,4 +1,4 @@
-/** Prediction accounts, exact address derivation and rule validation. Placement is pending. */
+/** Prediction accounts, exact addresses, rule validation and resting-order preflight. */
 import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
@@ -6,7 +6,96 @@ import type { OrderSide } from "./tidebook";
 
 export type PredictionOutcome = "yes" | "no";
 
-/** Created atomically with new drafts; placement remains a later step. */
+export const PREDICTION_ORDERS_ENABLED =
+  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
+  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true" &&
+  process.env.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED === "true";
+
+export function predictionBestPrice(
+  book: PredictionOrderBookAccount,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+): BN | null {
+  return outcome === "yes"
+    ? side === "bid"
+      ? book.yesBestBid
+      : book.yesBestAsk
+    : side === "bid"
+      ? book.noBestBid
+      : book.noBestAsk;
+}
+
+/** Advisory empty-side placement checks; all arithmetic stays exact in BN. */
+export function validatePredictionRestingOrder(
+  market: PredictionMarketAccount,
+  book: PredictionOrderBookAccount,
+  position: PredictionPositionAccount,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+  price: BN,
+  quantity: BN,
+  now: BN,
+): BN {
+  if (!["yes", "no"].includes(outcome) || !["bid", "ask"].includes(side))
+    throw new Error("Select a valid outcome and side");
+  if (!book.market.equals(position.market))
+    throw new Error("Book and position belong to different markets");
+  if (predictionStatus(market) !== "open" || now.gte(market.closeTs))
+    throw new Error("Orders require an open market before close");
+  if (quantity.isNeg() || quantity.isZero() || quantity.bitLength() > 64)
+    throw new Error("Quantity must be a positive whole u64 contract count");
+  if (
+    price.isNeg() ||
+    price.isZero() ||
+    price.bitLength() > 64 ||
+    price.gte(market.payoutPerContract) ||
+    market.priceTick.isZero() ||
+    !price.mod(market.priceTick).isZero()
+  )
+    throw new Error("Price must be positive, below 1 and tick-aligned");
+  if (predictionBestPrice(book, outcome, side) !== null)
+    throw new Error("This step supports only the first order on an empty side");
+  const opposing = predictionBestPrice(
+    book,
+    outcome,
+    side === "bid" ? "ask" : "bid",
+  );
+  if (opposing && (side === "bid" ? price.gte(opposing) : price.lte(opposing)))
+    throw new Error(
+      "This order would cross; prediction matching is not available yet",
+    );
+  if (
+    book.nextOrderId.lte(new BN(0)) ||
+    book.nextOrderId.addn(1).bitLength() > 64 ||
+    market.openOrderCount.addn(1).bitLength() > 64
+  )
+    throw new Error("Order counter limit reached");
+  const amount = side === "bid" ? price.mul(quantity) : quantity;
+  if (amount.bitLength() > 64) throw new Error("Order collateral exceeds u64");
+  const free =
+    side === "bid"
+      ? position.collateralFree
+      : outcome === "yes"
+        ? position.yesFree
+        : position.noFree;
+  const locked =
+    side === "bid"
+      ? position.collateralLocked
+      : outcome === "yes"
+        ? position.yesLocked
+        : position.noLocked;
+  if (amount.gt(free))
+    throw new Error(
+      side === "bid"
+        ? "Not enough available collateral"
+        : `Not enough available ${outcome.toUpperCase()} contracts`,
+    );
+  if (locked.add(amount).bitLength() > 64)
+    throw new Error("Locked balance limit reached");
+  return amount;
+}
+
+/** Created atomically with new drafts; each head selects one outcome/side list. */
 export interface PredictionOrderBookAccount {
   market: PublicKey;
   nextOrderId: BN;

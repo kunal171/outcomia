@@ -46,6 +46,8 @@ const {
   PREDICTION_OPENING_ENABLED,
   predictionOpeningIssue,
   validatePredictionCreatorResolver,
+  validatePredictionRestingOrder,
+  PREDICTION_ORDERS_ENABLED,
 } = mod.exports;
 
 function rules() {
@@ -290,6 +292,220 @@ test("prediction seeds preserve full u64 values and reject overflow and unknown 
     () => derivePredictionPriceLevelPda(market, "yes", "buy", new BN(1)),
     /Side/,
   );
+});
+
+function restingFixture() {
+  const { BN } = require("@anchor-lang/core");
+  const { market, position } = completeSetFixture();
+  position.market = new PublicKey(new Uint8Array(32).fill(3));
+  market.priceTick = new BN(10000);
+  market.openOrderCount = new BN(0);
+  const book = {
+    market: position.market,
+    nextOrderId: new BN(1),
+    yesBestBid: null,
+    yesBestAsk: null,
+    noBestBid: null,
+    noBestAsk: null,
+  };
+  return { market, position, book };
+}
+
+test("resting preflight uses cash for buys and only the selected free outcome for sells", () => {
+  const { BN } = require("@anchor-lang/core");
+  const { market, position, book } = restingFixture();
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      assert.equal(
+        validatePredictionRestingOrder(
+          market,
+          book,
+          position,
+          outcome,
+          side,
+          new BN(600000),
+          new BN(3),
+          new BN(99),
+        ).toString(),
+        side === "bid" ? "1800000" : "3",
+      );
+    }
+  assert.equal(PREDICTION_ORDERS_ENABLED, false);
+  assert.throws(
+    () =>
+      validatePredictionRestingOrder(
+        market,
+        book,
+        position,
+        "yes",
+        "bid",
+        new BN(600000),
+        new BN(17),
+        new BN(99),
+      ),
+    /available collateral/,
+  );
+  for (const outcome of ["yes", "no"])
+    assert.throws(
+      () =>
+        validatePredictionRestingOrder(
+          market,
+          book,
+          position,
+          outcome,
+          "ask",
+          new BN(600000),
+          new BN(4),
+          new BN(99),
+        ),
+      /available.*contracts/,
+    );
+});
+
+test("resting preflight rejects invalid grid, timing, counters, selectors and crossed or occupied sides", () => {
+  const { BN } = require("@anchor-lang/core");
+  const { market, position, book } = restingFixture();
+  const run = (
+    price = 600000,
+    quantity = 1,
+    side = "bid",
+    outcome = "yes",
+    now = 99,
+  ) =>
+    validatePredictionRestingOrder(
+      market,
+      book,
+      position,
+      outcome,
+      side,
+      new BN(price),
+      new BN(quantity),
+      new BN(now),
+    );
+  for (const price of [0, -1, 600001, 1000000, 1100000])
+    assert.throws(() => run(price), /Price/);
+  for (const quantity of [0, -1, "18446744073709551616"])
+    assert.throws(() => run(600000, quantity), /positive whole/);
+  assert.throws(
+    () => run(600000, "18446744073709551615"),
+    /collateral exceeds/,
+  );
+  assert.throws(() => run(600000, 1, "bid", "yes", 100), /before close/);
+  for (const status of ["draft", "frozen", "proposed", "resolved"]) {
+    market.status = { [status]: {} };
+    assert.throws(() => run(), /open market/);
+  }
+  market.status = { open: {} };
+  book.yesBestBid = new BN(500000);
+  assert.throws(() => run(), /empty side/);
+  book.yesBestBid = null;
+  book.yesBestAsk = new BN(600000);
+  assert.throws(() => run(), /would cross/);
+  book.yesBestAsk = null;
+  book.yesBestBid = new BN(600000);
+  assert.throws(() => run(600000, 1, "ask"), /would cross/);
+  book.yesBestBid = null;
+  assert.throws(() => run(600000, 1, "buy"), /valid outcome and side/);
+  assert.throws(
+    () => run(600000, 1, "bid", "invalid"),
+    /valid outcome and side/,
+  );
+  book.nextOrderId = new BN(0);
+  assert.throws(() => run(), /counter/);
+  book.nextOrderId = new BN("18446744073709551615");
+  assert.throws(() => run(), /counter/);
+  book.nextOrderId = new BN(1);
+  market.openOrderCount = new BN("18446744073709551615");
+  assert.throws(() => run(), /counter/);
+  market.openOrderCount = new BN(0);
+  for (const [side, outcome, field] of [
+    ["bid", "yes", "collateralLocked"],
+    ["ask", "yes", "yesLocked"],
+    ["ask", "no", "noLocked"],
+  ]) {
+    const before = position[field];
+    position[field] = new BN("18446744073709551615");
+    assert.throws(() => run(600000, 1, side, outcome), /Locked balance/);
+    position[field] = before;
+  }
+  market.priceTick = new BN(0);
+  assert.throws(() => run(), /Price/);
+  market.priceTick = new BN(10000);
+  book.market = PublicKey.default;
+  assert.throws(() => run(), /different markets/);
+});
+
+test("placement IDL binds a signed trader to exact units and canonical order/level accounts", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const owner = new PublicKey(new Uint8Array(32).fill(4)),
+    market = new PublicKey(new Uint8Array(32).fill(3));
+  const derive = (seed, ...keys) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from(seed), ...keys],
+      program.programId,
+    )[0];
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const id = new BN(1),
+        price = new BN(600000),
+        quantity = new BN(10);
+      const ix = await program.methods
+        .placePredictionOrder(
+          id,
+          { [outcome]: {} },
+          { [side]: {} },
+          price,
+          quantity,
+        )
+        .accountsStrict({
+          owner,
+          market,
+          position: derive(
+            "prediction_position",
+            market.toBuffer(),
+            owner.toBuffer(),
+          ),
+          orderBook: derive("prediction_book", market.toBuffer()),
+          priceLevel: derive(
+            "prediction_level",
+            market.toBuffer(),
+            Buffer.from(outcome),
+            Buffer.from(side),
+            price.toArrayLike(Buffer, "le", 8),
+          ),
+          order: derive(
+            "prediction_order",
+            market.toBuffer(),
+            id.toArrayLike(Buffer, "le", 8),
+          ),
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      const decoded = program.coder.instruction.decode(ix.data);
+      assert.equal(decoded.name, "placePredictionOrder");
+      assert.equal(decoded.data.price.toString(), "600000");
+      assert.equal(decoded.data.quantity.toString(), "10");
+      assert.ok(outcome in decoded.data.outcome);
+      assert.ok(side in decoded.data.side);
+      assert.equal(ix.keys.length, 7);
+      assert.equal(ix.keys[0].isSigner, true);
+      for (let i = 0; i < 6; i++) assert.equal(ix.keys[i].isWritable, true);
+      const tx = new Transaction({
+        feePayer: owner,
+        recentBlockhash: PublicKey.default.toBase58(),
+      }).add(ix);
+      assert.ok(
+        tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+          .length <= 1232,
+      );
+    }
 });
 
 test("deposit preflight rejects zero, unavailable balance, overspending and u64 overflow", () => {

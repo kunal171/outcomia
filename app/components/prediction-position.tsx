@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PredictionOrderForm } from "./prediction-order-form";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -39,6 +40,7 @@ interface PositionProps {
   status: string;
   payoutPerContract: BN;
   collateralSymbol: string;
+  onOrderPlaced: () => void;
 }
 
 /** Public market terms stay visible; the wallet's private action state resets
@@ -83,6 +85,7 @@ function ConnectedPosition({
   status,
   payoutPerContract,
   collateralSymbol,
+  onOrderPlaced,
   wallet,
 }: PositionProps & {
   wallet: NonNullable<ReturnType<typeof useAnchorWallet>>;
@@ -103,8 +106,9 @@ function ConnectedPosition({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [lastOrder, setLastOrder] = useState<PublicKey | null>(null);
   const [resultKind, setResultKind] = useState<
-    "position" | "deposit" | "withdraw" | "split" | "merge"
+    "position" | "deposit" | "withdraw" | "split" | "merge" | "order"
   >("position");
   const [actionError, setActionError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<BN | null>(null);
@@ -469,6 +473,28 @@ function ConnectedPosition({
               </div>
             ))}
           </dl>
+          {marketState && (
+            <PredictionOrderForm
+              program={program}
+              owner={wallet.publicKey}
+              marketAddress={market}
+              market={marketState}
+              positionAddress={positionAddress}
+              position={position}
+              symbol={collateralSymbol}
+              pending={pending}
+              setPending={setPending}
+              onPlaced={(confirmed, order) => {
+                // Keep the receipt outside the loading section: a ledger refresh
+                // unmounts the form, but must not lose a confirmed transaction.
+                setSignature(confirmed);
+                setLastOrder(order);
+                setResultKind("order");
+                setRefresh((value) => value + 1);
+                onOrderPlaced();
+              }}
+            />
+          )}
           <a
             className="market-explorer-link"
             href={accountExplorerUrl(positionAddress)}
@@ -648,7 +674,9 @@ function ConnectedPosition({
                 ? "YES + NO pairs created."
                 : resultKind === "merge"
                   ? "Pairs merged into available collateral."
-                  : "Position initialized."}{" "}
+                  : resultKind === "order"
+                    ? "Prediction order placed."
+                    : "Position initialized."}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"
@@ -656,11 +684,24 @@ function ConnectedPosition({
           >
             View transaction ↗
           </a>
+          {resultKind === "order" && lastOrder && (
+            <>
+              {" "}
+              ·{" "}
+              <a
+                href={accountExplorerUrl(lastOrder)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View order ↗
+              </a>
+            </>
+          )}
         </p>
       )}
       <p>
-        Outcome trading and redemption will be added in later milestones. The
-        market authority must open a draft before pairs can be created.
+        Matching, cancellation and redemption will be added in later milestones.
+        The market authority must open a draft before pairs can be created.
       </p>
     </section>
   );

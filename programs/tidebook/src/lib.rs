@@ -29,6 +29,20 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
+    /// Locks trader claims and seeds the first resting order on an empty side.
+    pub fn place_prediction_order(
+        ctx: Context<PlacePredictionOrder>,
+        order_id: u64,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::place_prediction_order::handle_place_prediction_order(
+            ctx, order_id, outcome, side, price, quantity,
+        )
+    }
+
     /// Creates a draft prediction market, book, metadata, fees and collateral vault.
     pub fn initialize_prediction_market(
         ctx: Context<InitializePredictionMarket>,

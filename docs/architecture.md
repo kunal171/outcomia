@@ -261,8 +261,12 @@ eight-byte little-endian numeric seeds. Draft creation initializes the book root
 atomically, with next ID 1 and four absent best-price heads. Its Anchor `init`
 constraint prevents counter resets, and any failure rolls back all five created
 accounts. The generated IDL and frontend reader expose the root; older drafts
-without one are identified explicitly. Price-level/order creation, placement and
-matching are not implemented yet.
+without one are identified explicitly. `place_prediction_order` creates the first
+resting order on an empty outcome/side, rejects crossing prices and locks only
+the signing trader's free collateral or outcome contracts. It atomically updates
+the canonical order, level, head, next ID and market count. No vault transfer,
+reserve change or fee accrual occurs. Existing-side insertion, cancellation and
+matching are not implemented yet; public order entry defaults disabled.
 
 ### Market vault topology
 

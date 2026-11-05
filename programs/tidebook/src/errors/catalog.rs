@@ -381,4 +381,17 @@ pub enum TidebookError {
 
     #[msg("The market creator must be its primary outcome resolver")]
     PredictionCreatorMustResolve = 123,
+
+    #[msg("Prediction book belongs to a different market")]
+    PredictionBookMarketMismatch = 124,
+    #[msg("Prediction orders require an open market before its close time")]
+    PredictionOrderUnavailable = 125,
+    #[msg("This placement path requires an empty outcome/side price list")]
+    PredictionSideNotEmpty = 126,
+    #[msg("Prediction price must be positive, below payout and tick-aligned")]
+    InvalidPredictionOrderPrice = 127,
+    #[msg("A crossing prediction order must use the matching path")]
+    PredictionOrderWouldCross = 128,
+    #[msg("Prediction order ID must match the book's next positive ID")]
+    InvalidPredictionOrderId = 129,
 }

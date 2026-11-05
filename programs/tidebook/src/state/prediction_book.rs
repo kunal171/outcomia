@@ -1,9 +1,10 @@
-//! Prediction order-book layouts; this step defines storage, not placement.
+//! Prediction order-book layouts shared by initialization and placement.
 //!
 //! A separate root keeps index pointers out of already-created market accounts.
 //! Each outcome has independent bid/ask price lists, while one root allocates
-//! market-wide order IDs. Instructions must later validate reciprocal links,
-//! FIFO priority, funding and lifecycle gates before changing these accounts.
+//! market-wide order IDs. The empty-side placement instruction checks funding
+//! and lifecycle gates. Future insertion, cancellation and matching must also
+//! validate reciprocal links and FIFO priority before changing existing queues.
 
 use super::{OrderSide, OrderStatus, PredictionOutcome};
 use anchor_lang::prelude::*;
@@ -28,6 +29,32 @@ pub struct PredictionOrderBook {
     pub no_best_ask: Option<u64>,
     /// Canonical root bump. The market retains the sole open-order counter.
     pub bump: u8,
+}
+
+impl PredictionOrderBook {
+    /// Select exactly one outcome/side list; complementary outcomes stay separate.
+    pub fn best_price(&self, outcome: PredictionOutcome, side: OrderSide) -> Option<u64> {
+        match (outcome, side) {
+            (PredictionOutcome::Yes, OrderSide::Bid) => self.yes_best_bid,
+            (PredictionOutcome::Yes, OrderSide::Ask) => self.yes_best_ask,
+            (PredictionOutcome::No, OrderSide::Bid) => self.no_best_bid,
+            (PredictionOutcome::No, OrderSide::Ask) => self.no_best_ask,
+        }
+    }
+
+    pub fn set_best_price(
+        &mut self,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: Option<u64>,
+    ) {
+        match (outcome, side) {
+            (PredictionOutcome::Yes, OrderSide::Bid) => self.yes_best_bid = price,
+            (PredictionOutcome::Yes, OrderSide::Ask) => self.yes_best_ask = price,
+            (PredictionOutcome::No, OrderSide::Bid) => self.no_best_bid = price,
+            (PredictionOutcome::No, OrderSide::Ask) => self.no_best_ask = price,
+        }
+    }
 }
 
 /// One FIFO queue: ["prediction_level", market, outcome, side, price_le].

@@ -2,8 +2,9 @@
 
 Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
-locally, along with active-admin creator-controlled market opening. Trading and resolution
-remain planned. This program version
+locally, along with active-admin creator-controlled market opening and first
+resting orders on empty sides. Existing-side insertion, cancellation, matching
+and resolution remain planned. This program version
 has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -14,7 +15,8 @@ account layouts are unchanged.
 Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook`,
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
-atomically. Order/level layouts exist, but placement/matching remain unavailable.
+atomically. First resting orders on empty sides are implemented locally;
+insertion into existing queues, cancellation and matching remain unavailable.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -331,8 +333,9 @@ an initialized empty book; RPC failures remain errors. This version provides no
 backfill/reset instruction for older drafts. Create a fresh draft for the new
 order flow. Existing market/position layouts and funds are unchanged.
 
-`PredictionPriceLevel` and `PredictionOrder` will enter the IDL when placement
-uses them. No order submission or matching UI is exposed yet.
+`PredictionPriceLevel` and `PredictionOrder` are exposed through the placement
+instruction and registered in the frontend reader. Order submission is a separate
+rollout gate; it remains disabled on public deployments while cancellation is missing.
 
 The new tests cover maximum/optional serialization, outcome/side isolation,
 spot discriminator rejection, integer boundaries, namespace separation and
@@ -524,7 +527,59 @@ all lifecycle gates, the exact close boundary, locked funds, zero amounts,
 overflow/underflow, unsigned or substituted accounts, SPL CPI failure and batch
 rollback. Typed events/indexer decoding remain a later milestone.
 
-### Trading
+### First resting order (implemented locally)
+
+`place_prediction_order(order_id, outcome, side, price, quantity)` is callable
+by any signing trader with an initialized position. No admin record is needed.
+It requires canonical market, position and book accounts with matching stored
+ownership, Open status and a chain Clock strictly before close. Quantity is a
+positive whole u64. Price is positive, below payout and divisible by the tick.
+
+This first path accepts only an empty selected outcome/side list. A buy at or
+above that outcome's best ask, or a sell at or below its best bid, is rejected.
+There is no cross-outcome matching. Occupied-side insertion and crossing orders
+must wait for later instructions; the program does not silently create a crossed
+book or skip existing priority.
+
+A buy locks exactly `price * quantity` collateral atoms. A sell locks exactly
+`quantity` free YES or NO contracts. Already locked assets are unavailable for
+new orders. Free-to-locked movement preserves the trader's total claim; vault
+tokens, payout reserve, outcome supply and accrued fees are unchanged. Resting
+placement charges no taker fee and reserves no extra fee budget in this step.
+
+The instruction creates a canonical level and order using plain Anchor `init`.
+The level has one order, no price neighbors, and the same first/last order key.
+The order has Open status, its full submitted quantity remaining and no FIFO
+neighbors. The selected book head becomes its price, the global next ID advances,
+and the market open-order count increases. All arithmetic is checked and all
+mutations/account allocations roll back together on failure. An ID must match
+the book's next positive ID; stale, reused or overflowing IDs cannot reset state.
+
+The position panel exposes a buy/sell form with a YES/NO selector, decimal price
+and whole contracts. It displays the exact amount to lock, re-reads market/book/
+position before signing, and refreshes public heads and wallet position balances
+after confirmation. A stale concurrent submission still fails on chain and must
+refresh/retry. The receipt is held outside the loading form so refreshing cannot
+erase a confirmed transaction.
+
+`NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED` defaults false and requires the draft and
+funding flags. It is for explicit local first-order tests only until cancellation
+and matching are implemented/deployed. Orders already placed cannot be canceled
+in this version, so their claims stay locked. This flag is rollout, not on-chain
+authorization. Do not enable public order entry with this incomplete lifecycle.
+
+Example: buying 10 YES at 0.60 locks 6 collateral tokens. Selling 10 YES locks
+10 existing YES contracts, not 6 collateral tokens. Splitting may create those
+YES contracts first; an uncovered sell is rejected.
+
+Tests use a non-admin trader with real initialization/opening, deposit and split
+instructions. They cover all four heads, linked-account contents, unchanged
+custody/backing/fees, role independence, invalid timing/grid/quantity, funding
+shortfalls, occupied/crossing rejection, checked arithmetic, account binding,
+ID reuse and full rollback of multi-instruction placements. Client tests check
+preflight bounds, exact units, account metadata, enum encoding and packet size.
+
+### Trading still to implement
 
 `place_prediction_order(outcome, side, price, quantity)` checks:
 
@@ -720,8 +775,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    withdrawals, with owner checks and atomic SPL custody.
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
-3. **Trading — started locally.** Opening, atomic book initialization and
-   book/order/level layouts are implemented. Next: YES/NO queue insertion, cancellation,
+3. **Trading — started locally.** Opening, atomic book initialization and first
+   resting orders on empty sides are implemented. Next: existing-side queue insertion, cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution
