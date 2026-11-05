@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PROGRAM_EXPLORER_URL, PROGRAM_ID } from "../lib/solana";
 import { AppHeader } from "./app-header";
@@ -14,7 +14,7 @@ function OrderFlow() {
     <div
       className="landing-flow"
       role="img"
-      aria-label="Illustration of buy and sell orders meeting"
+      aria-label="Illustration of buy and sell orders for a YES contract meeting"
     >
       <div className="flow-orbit flow-orbit-outer" aria-hidden="true" />
       <div className="flow-orbit flow-orbit-inner" aria-hidden="true" />
@@ -71,7 +71,7 @@ function OrderFlow() {
       </svg>
       <div className="flow-order flow-order-sell" aria-hidden="true">
         <span>
-          Sell orders <i>↘</i>
+          Sell YES <i>↘</i>
         </span>
         <div>
           <b />
@@ -84,7 +84,7 @@ function OrderFlow() {
       </div>
       <div className="flow-order flow-order-buy" aria-hidden="true">
         <span>
-          Buy orders <i>↗</i>
+          Buy YES <i>↗</i>
         </span>
         <div>
           <b />
@@ -93,9 +93,165 @@ function OrderFlow() {
         </div>
       </div>
       <span className="flow-caption" aria-hidden="true">
-        Different sides. One atomic trade.
+        One outcome. Two sides of the book.
       </span>
     </div>
+  );
+}
+
+/** Scroll changes only this illustration. Prices are examples, never fetched quotes. */
+function PredictionJourney() {
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = section.current;
+    if (!node) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    function update() {
+      frame = 0;
+      if (!node) return;
+      const bounds = node.getBoundingClientRect();
+      const progress = Math.min(
+        1,
+        Math.max(
+          0,
+          (innerHeight * 0.6 - bounds.top) /
+            Math.max(1, bounds.height - innerHeight * 0.4),
+        ),
+      );
+      node.style.setProperty(
+        "--journey-progress",
+        String(motion.matches ? 1 : progress),
+      );
+      node.dataset.step = motion.matches
+        ? "2"
+        : String(Math.min(2, Math.floor(progress * 3)));
+    }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    motion.addEventListener("change", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      motion.removeEventListener("change", schedule);
+    };
+  }, []);
+  return (
+    <section
+      className="prediction-journey"
+      id="how-predictions-work"
+      ref={section}
+      aria-labelledby="journey-title"
+    >
+      <div className="journey-intro">
+        <span className="eyebrow">A question. An order book. Your call.</span>
+        <h2 id="journey-title">
+          From “what if”
+          <br />
+          to your next move.
+        </h2>
+        <p>Scroll through a prediction.</p>
+      </div>
+      <div className="journey-layout">
+        <div className="journey-steps">
+          <article className="journey-step">
+            <span>01 / Choose</span>
+            <h3>
+              Have a view?
+              <br />
+              Take a side.
+            </h3>
+            <p>Find a question. Read its rules. Choose YES or NO.</p>
+          </article>
+          <article className="journey-step">
+            <span>02 / Trade</span>
+            <h3>
+              Your conviction.
+              <br />
+              Your limit price.
+            </h3>
+            <p>
+              Buy or sell outcome contracts with other traders. Your limit sets
+              the price you’ll accept.
+            </p>
+          </article>
+          <article className="journey-step">
+            <span>03 / Understand</span>
+            <h3>
+              Clear rules.
+              <br />
+              Before your trade.
+            </h3>
+            <p>
+              Check the evidence, resolver and cutoff. A winning contract is
+              designed to pay 1 collateral token after final resolution.
+            </p>
+            <small>
+              Resolution and reward claims are still in development.
+            </small>
+          </article>
+        </div>
+        <div className="journey-sticky">
+          <div
+            className="journey-market"
+            aria-label="Illustrative prediction market"
+          >
+            <div className="journey-market-top">
+              <span>EXAMPLE MARKET</span>
+              <span className="journey-demo">Illustration only</span>
+            </div>
+            <div className="journey-question-icon" aria-hidden="true">
+              ↗
+            </div>
+            <h3>
+              Will Solana hit
+              <br />
+              its next milestone?
+            </h3>
+            <p className="journey-question-note">
+              One question. Two possible outcomes.
+            </p>
+            <div className="journey-outcomes">
+              <div>
+                <span>YES</span>
+                <strong>
+                  0.60 <small>tUSDC</small>
+                </strong>
+              </div>
+              <div>
+                <span>NO</span>
+                <strong>
+                  0.40 <small>tUSDC</small>
+                </strong>
+              </div>
+            </div>
+            <div className="journey-order">
+              <span>Example limit buy</span>
+              <strong>10 YES × 0.60 = 6 tUSDC</strong>
+              <small>Before fees · only if the order fills</small>
+            </div>
+            <div className="journey-terms">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Know what decides the outcome</strong>
+                <small>Evidence · resolver · closing time</small>
+              </div>
+            </div>
+            <div className="journey-progress" aria-hidden="true">
+              <span />
+            </div>
+            <p className="journey-card-caption">
+              Example prices, not live quotes or guaranteed probabilities.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -129,79 +285,87 @@ export function Dashboard() {
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-copy">
             <span className="landing-kicker">
-              <i aria-hidden="true" /> Made for the order book.
+              <i aria-hidden="true" /> Prediction markets on Solana.
             </span>
             <h1 id="landing-title">
-              Your price.
+              Predict what
               <br />
-              <span>Your move.</span>
+              <span>comes next.</span>
             </h1>
-            <p>Trade on Solana. Set your limit. Keep control.</p>
+            <p>
+              Trade your view on what comes next. YES or NO. Your price, your
+              call.
+            </p>
             <div className="landing-actions">
-              <Link className="landing-action-primary" href="/markets">
-                Explore markets <span aria-hidden="true">↗</span>
+              <Link className="landing-action-primary" href="/predictions">
+                Explore predictions <span aria-hidden="true">↗</span>
               </Link>
-              <Link className="landing-action-secondary" href="/orders">
-                Your orders <span aria-hidden="true">→</span>
+              <Link
+                className="landing-action-secondary"
+                href="#how-predictions-work"
+              >
+                How it works <span aria-hidden="true">→</span>
               </Link>
             </div>
             <div className="landing-tags">
-              <span>Price-time priority</span>
+              <span>YES / NO order books</span>
               <i aria-hidden="true" />
-              <span>Atomic settlement</span>
+              <span>One collateral asset</span>
             </div>
           </div>
-          <OrderFlow />
+          <div className="prediction-hero-art">
+            <span className="hero-art-label">
+              A market for every point of view.
+            </span>
+            <OrderFlow />
+          </div>
         </section>
-        <nav className="landing-destinations" aria-label="Explore Tidebook">
-          <Link
-            className="landing-destination destination-spot"
-            href="/markets"
-          >
-            <span className="destination-icon" aria-hidden="true">
-              ↗
-            </span>
-            <div>
-              <h2>Spot markets</h2>
-              <p>Find your next trade.</p>
-            </div>
-            <span className="destination-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </Link>
-          <Link
-            className="landing-destination destination-orders"
-            href="/orders"
-          >
-            <span className="destination-icon" aria-hidden="true">
-              ≋
-            </span>
-            <div>
-              <h2>Your orders</h2>
-              <p>Track fills. Cancel open orders.</p>
-            </div>
-            <span className="destination-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </Link>
-          <Link
-            className="landing-destination destination-prediction"
-            href="/predictions"
-          >
-            <span className="destination-icon" aria-hidden="true">
-              ◈
-            </span>
-            <div>
-              <h2>
-                Predictions <small>In development</small>
-              </h2>
-              <p>Explore the YES / NO books.</p>
-            </div>
-            <span className="destination-arrow" aria-hidden="true">
-              ↗
-            </span>
-          </Link>
-        </nav>
+        <p className="landing-rollout-note">
+          Devnet preview · Prediction trading is in development. Resolution and
+          reward claims are not available yet.
+        </p>
+        <PredictionJourney />
+        <section
+          className="landing-secondary"
+          aria-labelledby="secondary-title"
+        >
+          <div className="secondary-heading">
+            <span className="eyebrow">More on Tidebook</span>
+            <h2 id="secondary-title">Beyond predictions.</h2>
+          </div>
+          <nav className="landing-destinations" aria-label="More on Tidebook">
+            <Link
+              className="landing-destination destination-spot"
+              href="/markets"
+            >
+              <span className="destination-icon" aria-hidden="true">
+                ↗
+              </span>
+              <div>
+                <h2>Spot markets</h2>
+                <p>Find your next trade.</p>
+              </div>
+              <span className="destination-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </Link>
+            <Link
+              className="landing-destination destination-orders"
+              href="/orders"
+            >
+              <span className="destination-icon" aria-hidden="true">
+                ≋
+              </span>
+              <div>
+                <h2>Your orders</h2>
+                <p>Track fills. Cancel open orders.</p>
+              </div>
+              <span className="destination-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </Link>
+          </nav>
+        </section>
         <div className="landing-status">
           <div role="status">
             <span

@@ -481,3 +481,304 @@
     transition: none !important;
   }
 }
+
+/* Prediction-first landing. Scroll progress belongs to this decorative demo only. */
+.landing-copy h1 {
+  font-size: clamp(58px, 6.6vw, 92px);
+  letter-spacing: -0.06em;
+}
+.landing-copy > p {
+  max-width: 370px;
+}
+.prediction-hero-art {
+  min-width: 0;
+  position: relative;
+}
+.hero-art-label {
+  display: block;
+  text-align: center;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.landing-rollout-note {
+  margin: 16px 0 0;
+  padding: 14px 18px;
+  border-left: 2px solid var(--accent);
+  background: rgb(var(--accent-rgb) / 0.04);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.prediction-journey {
+  --journey-progress: 0;
+  padding: 100px 0 50px;
+  scroll-margin-top: 30px;
+}
+.journey-intro h2 {
+  margin: 18px 0;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+}
+.journey-intro > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.journey-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: start;
+  margin-top: 40px;
+}
+.journey-step {
+  min-height: 58vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 50px 0;
+  opacity: 0.65;
+  transition: opacity 350ms ease;
+}
+.journey-step > span {
+  color: var(--accent);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+.journey-step h3 {
+  font-size: clamp(28px, 3.6vw, 44px);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  margin: 20px 0 16px;
+}
+.journey-step p {
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+  margin: 0;
+}
+.journey-step > small {
+  color: var(--amber);
+  line-height: 1.6;
+  font-size: 12px;
+  max-width: 320px;
+  margin-top: 16px;
+}
+.prediction-journey[data-step="0"] .journey-step:nth-child(1),
+.prediction-journey[data-step="1"] .journey-step:nth-child(2),
+.prediction-journey[data-step="2"] .journey-step:nth-child(3) {
+  opacity: 1;
+}
+.journey-sticky {
+  position: sticky;
+  top: max(36px, calc((100dvh - 560px) / 2));
+  padding: 25px 0;
+}
+.journey-market {
+  padding: 28px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.28);
+  border-radius: 24px;
+  background:
+    radial-gradient(ellipse at top right, #49336c50, transparent 60%), #1b1927;
+  box-shadow: 0 24px 90px #0003;
+  transform: translateY(calc((1 - var(--journey-progress)) * 18px));
+}
+.journey-market-top {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+}
+.journey-demo {
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.journey-question-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 28px 0 18px;
+  color: var(--coral);
+  border-radius: 14px;
+  background: #ffb19c14;
+  font-size: 26px;
+}
+.journey-market h3 {
+  font-size: clamp(24px, 2.7vw, 34px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+.journey-question-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px 0 24px;
+}
+.journey-outcomes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.journey-outcomes > div {
+  padding: 17px;
+  border-radius: 12px;
+  background: #79e8d40a;
+  border: 1px solid #79e8d433;
+  color: var(--buy);
+}
+.journey-outcomes > div:last-child {
+  color: var(--sell);
+  background: #ffb19c0a;
+  border-color: #ffb19c33;
+}
+.journey-outcomes span {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+}
+.journey-outcomes strong {
+  display: block;
+  font-size: 26px;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.journey-outcomes small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.journey-order {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 18px;
+  background: #10101960;
+  border-radius: 12px;
+  opacity: calc(0.7 + var(--journey-progress) * 0.3);
+  transform: translateX(calc((1 - var(--journey-progress)) * 12px));
+}
+.journey-order > span,
+.journey-order > small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.journey-order strong {
+  font-size: 16px;
+  color: var(--ink);
+}
+.journey-terms {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  align-items: center;
+}
+.journey-terms > span {
+  color: var(--buy);
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: #79e8d412;
+  border-radius: 50%;
+}
+.journey-terms strong {
+  display: block;
+  font-size: 12px;
+}
+.journey-terms small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.journey-progress {
+  height: 3px;
+  background: #ffffff0a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 26px;
+}
+.journey-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--buy));
+  transform: scaleX(var(--journey-progress));
+  transform-origin: left;
+}
+.journey-card-caption {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 12px 0 0;
+}
+.landing-secondary {
+  padding: 36px 0 20px;
+  border-top: 1px solid var(--line);
+}
+.secondary-heading h2 {
+  font-size: 30px;
+  letter-spacing: -0.035em;
+  margin: 12px 0 22px;
+}
+.landing-secondary .landing-destinations {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+  animation: none;
+}
+@media (max-width: 760px) {
+  .landing-copy h1 {
+    font-size: clamp(55px, 12vw, 86px);
+  }
+  .prediction-hero-art {
+    margin-top: 36px;
+  }
+  .prediction-journey {
+    padding-top: 70px;
+  }
+  .journey-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .journey-sticky {
+    grid-row: 1;
+    position: relative;
+    top: auto;
+  }
+  .journey-steps {
+    display: grid;
+    gap: 28px;
+    padding-top: 16px;
+  }
+  .journey-step {
+    min-height: auto;
+    padding: 24px 0;
+    opacity: 1;
+    border-top: 1px solid var(--line);
+  }
+  .journey-step h3 {
+    font-size: 30px;
+  }
+  .journey-market {
+    padding: 22px;
+  }
+  .landing-secondary .landing-destinations {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .journey-market,
+  .journey-order {
+    transform: none;
+  }
+  .journey-order,
+  .journey-step {
+    opacity: 1;
+  }
+}
