@@ -36,6 +36,9 @@ const {
   parsePredictionRules,
   derivePredictionMarketPda,
   derivePredictionPositionPda,
+  derivePredictionBookPda,
+  derivePredictionOrderPda,
+  derivePredictionPriceLevelPda,
   validatePredictionDepositAmount,
   validatePredictionWithdrawalAmount,
   validatePredictionCompleteSet,
@@ -190,6 +193,102 @@ test("position PDA scopes the ledger to both market and wallet", () => {
   assert.notEqual(
     derivePredictionPositionPda(other, owner).toBase58(),
     expected.toBase58(),
+  );
+});
+
+test("prediction book, order and level addresses match Rust golden vectors", () => {
+  const { BN } = require("@anchor-lang/core");
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const value = new BN("0102030405060708", 16);
+  assert.equal(
+    derivePredictionBookPda(market).toBase58(),
+    "2o2oe3DTgaHc2MzTxkecU3x23sE4MeNPsTSMC9JAzdY5",
+  );
+  assert.equal(
+    derivePredictionOrderPda(market, value).toBase58(),
+    "7aYy4r8ww7hs5bsT52www1gBYaZuVK58rBcJv2k2HoYz",
+  );
+  assert.equal(
+    derivePredictionPriceLevelPda(market, "yes", "bid", value).toBase58(),
+    "7vmpMMVMsgbR3oTLvCSAfftj8PAvHkpDYbujS3u61UkP",
+  );
+});
+
+test("prediction queue namespaces isolate outcomes, sides, markets and prices", () => {
+  const { BN } = require("@anchor-lang/core");
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const other = new PublicKey(new Uint8Array(32).fill(4));
+  const price = new BN(650000);
+  const levels = ["yes", "no"].flatMap((outcome) =>
+    ["bid", "ask"].map((side) =>
+      derivePredictionPriceLevelPda(market, outcome, side, price).toBase58(),
+    ),
+  );
+  assert.equal(new Set(levels).size, 4);
+  assert.notEqual(
+    levels[0],
+    derivePredictionPriceLevelPda(other, "yes", "bid", price).toBase58(),
+  );
+  assert.notEqual(
+    levels[0],
+    derivePredictionPriceLevelPda(
+      market,
+      "yes",
+      "bid",
+      price.addn(1),
+    ).toBase58(),
+  );
+  const spot = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("price_level"),
+      market.toBuffer(),
+      Buffer.from("bid"),
+      price.toArrayLike(Buffer, "le", 8),
+    ],
+    PublicKey.default,
+  )[0];
+  assert.notEqual(levels[0], spot.toBase58());
+  assert.notEqual(
+    derivePredictionBookPda(market).toBase58(),
+    derivePredictionBookPda(other).toBase58(),
+  );
+  assert.notEqual(
+    derivePredictionOrderPda(market, new BN(1)).toBase58(),
+    derivePredictionOrderPda(other, new BN(1)).toBase58(),
+  );
+});
+
+test("prediction seeds preserve full u64 values and reject overflow and unknown selectors", () => {
+  const { BN } = require("@anchor-lang/core");
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const maximum = new BN("18446744073709551615");
+  const first = derivePredictionOrderPda(market, maximum);
+  assert.notEqual(
+    first.toBase58(),
+    derivePredictionOrderPda(market, maximum.subn(1)).toBase58(),
+  );
+  const expected = PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_order"), market.toBuffer(), Buffer.alloc(8, 255)],
+    PublicKey.default,
+  )[0];
+  assert.equal(first.toBase58(), expected.toBase58());
+  for (const value of [new BN(-1), maximum.addn(1)]) {
+    assert.throws(
+      () => derivePredictionOrderPda(market, value),
+      /unsigned u64/,
+    );
+    assert.throws(
+      () => derivePredictionPriceLevelPda(market, "yes", "bid", value),
+      /unsigned u64/,
+    );
+  }
+  assert.throws(
+    () => derivePredictionPriceLevelPda(market, "invalid", "bid", new BN(1)),
+    /Outcome/,
+  );
+  assert.throws(
+    () => derivePredictionPriceLevelPda(market, "yes", "buy", new BN(1)),
+    /Side/,
   );
 });
 

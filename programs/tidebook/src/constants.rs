@@ -14,6 +14,18 @@ pub const PREDICTION_MARKET_SEED: &[u8] = b"prediction_market";
 #[constant]
 pub const PREDICTION_POSITION_SEED: &[u8] = b"prediction_position";
 
+/// Index root: [namespace, prediction market].
+#[constant]
+pub const PREDICTION_BOOK_SEED: &[u8] = b"prediction_book";
+
+/// FIFO price level: [namespace, market, outcome, side, price_le].
+#[constant]
+pub const PREDICTION_PRICE_LEVEL_SEED: &[u8] = b"prediction_level";
+
+/// Market-wide submission identity: [namespace, market, order_id_le].
+#[constant]
+pub const PREDICTION_ORDER_SEED: &[u8] = b"prediction_order";
+
 /// Namespace for the human-readable metadata attached to one market.
 ///
 /// PDA: ["market_metadata", market]

@@ -17,6 +17,16 @@ pub enum PredictionOutcome {
     No,
 }
 
+impl PredictionOutcome {
+    /// Stable textual PDA seed; independent of Borsh enum discriminant bytes.
+    pub const fn seed(self) -> &'static [u8] {
+        match self {
+            Self::Yes => b"yes",
+            Self::No => b"no",
+        }
+    }
+}
+
 /// Payout schedule: YES wins, NO wins, or both receive half the payout.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub enum PredictionResolution {

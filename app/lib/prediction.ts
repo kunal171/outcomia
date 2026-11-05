@@ -1,7 +1,102 @@
-/** Prediction draft types and rule-file validation. No trading routes yet. */
+/** Prediction accounts, exact address derivation and rule validation. Placement is pending. */
 import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
+import type { OrderSide } from "./tidebook";
+
+export type PredictionOutcome = "yes" | "no";
+
+/** Storage foundation only: initialization/placement instructions come next. */
+export interface PredictionOrderBookAccount {
+  market: PublicKey;
+  nextOrderId: BN;
+  yesBestBid: BN | null;
+  yesBestAsk: BN | null;
+  noBestBid: BN | null;
+  noBestAsk: BN | null;
+  bump: number;
+}
+
+export interface PredictionPriceLevelAccount {
+  market: PublicKey;
+  outcome: { yes?: object; no?: object };
+  side: { bid?: object; ask?: object };
+  price: BN;
+  betterPrice: BN | null;
+  worsePrice: BN | null;
+  firstOrder: PublicKey | null;
+  lastOrder: PublicKey | null;
+  totalRemainingQuantity: BN;
+  orderCount: BN;
+  rentPayer: PublicKey;
+  bump: number;
+}
+
+export interface PredictionOrderAccount {
+  owner: PublicKey;
+  market: PublicKey;
+  orderId: BN;
+  outcome: { yes?: object; no?: object };
+  side: { bid?: object; ask?: object };
+  price: BN;
+  priceLevel: PublicKey;
+  previousOrder: PublicKey | null;
+  nextOrder: PublicKey | null;
+  quantity: BN;
+  remainingQuantity: BN;
+  /** Bid collateral atoms (including any fee budget), or ask outcome contracts. */
+  lockedCollateral: BN;
+  status: { open?: object; filled?: object; canceled?: object };
+  bump: number;
+}
+
+/** Encode full-width unsigned seeds without converting through JS Number. */
+function predictionU64Seed(value: BN, label: string): Buffer {
+  if (value.isNeg() || value.bitLength() > 64)
+    throw new Error(`${label} must fit unsigned u64`);
+  return value.toArrayLike(Buffer, "le", 8);
+}
+
+export function derivePredictionBookPda(market: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("prediction_book"), market.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function derivePredictionOrderPda(market: PublicKey, orderId: BN) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("prediction_order"),
+      market.toBuffer(),
+      predictionU64Seed(orderId, "Order ID"),
+    ],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function derivePredictionPriceLevelPda(
+  market: PublicKey,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+  price: BN,
+) {
+  // TypeScript types are erased; reject unknown namespaces from JS callers too.
+  if (outcome !== "yes" && outcome !== "no")
+    throw new Error("Outcome must be yes or no");
+  if (side !== "bid" && side !== "ask")
+    throw new Error("Side must be bid or ask");
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("prediction_level"),
+      market.toBuffer(),
+      Buffer.from(outcome),
+      Buffer.from(side),
+      predictionU64Seed(price, "Price"),
+    ],
+    PROGRAM_ID,
+  )[0];
+}
 
 export const PREDICTION_DRAFTS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";

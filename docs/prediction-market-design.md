@@ -11,6 +11,11 @@ outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
 and `PredictionPosition`. PDA helpers live in `src/pda.rs`. Existing spot
 account layouts are unchanged.
 
+Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook`,
+`PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
+on fixed test vectors. This is a layout-only step: these accounts are not yet
+created by an instruction, and order placement/matching remain unavailable.
+
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
 113 payload bytes (121 including its discriminator). These are Borsh sizes,
@@ -253,24 +258,76 @@ Read failures remain errors. Confirmation triggers an account reload. Wallet,
 market and RPC changes reset the panel's action state, and canceled reads cannot
 replace data in the new panel. The same rollout flag gates position creation;
 it must be enabled only after deploying a program containing both initializers.
-Deposits are implemented with a separate funding rollout gate. Withdrawals and
-outcome issuance are not implemented yet.
+Deposits, withdrawals and split/merge use the separate funding rollout gate.
 
-### `PredictionPriceLevel` and `PredictionOrder`
+### Prediction order-book accounts (layouts implemented locally)
 
 The current spot accounts assume a base mint, quote mint, and `TraderBalance`.
 Reusing them directly would require a fake base mint and still would not model
-both outcomes. Prediction markets therefore need separate accounts at first:
+both outcomes. Prediction markets use separate order-book layouts:
 
 ```text
+PredictionOrderBook seeds =
+  ["prediction_book", market]
+
 PredictionPriceLevel seeds =
-  ["prediction_level", market, outcome, side, price]
+  ["prediction_level", market, outcome, side, price_le]
 
 PredictionOrder seeds =
-  ["prediction_order", market, order_id]
+  ["prediction_order", market, order_id_le]
 ```
 
-Both accounts keep the same sorted-level and FIFO-link rules as the spot book.
+The outcome seed is ASCII `yes` or `no`; the side is `bid` or `ask`. Price and
+order ID are exactly eight little-endian bytes. They never pass through a
+JavaScript Number, which cannot represent every u64. These address helpers do
+not validate market ticks or trading rules; placement must do that separately.
+
+The root stores its market, one shared `next_order_id`, four optional best-price
+heads and a bump. The four heads are YES bid, YES ask, NO bid and NO ask. A new
+root will start at ID 1. IDs must never reset or wrap while the market exists.
+`PredictionMarket.open_order_count` remains the sole market-wide order count.
+
+A level stores market/outcome/side/price, better/worse prices, first/last order,
+remaining quantity, order count, rent payer and bump. Better means a higher bid
+or lower ask. Orders at one price form a doubly linked FIFO queue: new orders
+append at the tail and matching starts at the head. Neighbor links must never
+cross an outcome, side or price boundary.
+
+An order stores its owner, market, ID, outcome, side, raw price, level address,
+previous/next order, submitted/remaining quantities, locked collateral, status
+and bump. Quantities are whole contracts. For bids, locked collateral uses mint
+atoms and includes any reserved fee budget. For asks, it counts the chosen
+outcome's whole contracts. Future fills/cancellation must use those exact units.
+
+| Account | Payload | With Anchor discriminator |
+| --- | ---: | ---: |
+| `PredictionOrderBook` | 77 bytes | 85 bytes |
+| `PredictionPriceLevel` | 175 bytes | 183 bytes |
+| `PredictionOrder` | 206 bytes | 214 bytes |
+
+These are maximum Borsh lengths, including Option tags and payloads. An absent
+link is `None`, not a zero-key sentinel. Account discriminators separate the
+prediction layouts from similar-looking spot accounts.
+
+Tradeoffs: the root adds one account and its rent, but avoids changing existing
+market layouts. One shared counter gives market-wide order identity and a
+simple index; placements will contend on the writable root. Per-order and
+per-level accounts keep edits bounded but cost rent and require clients to
+supply validated neighbors. All four queues remain independent: complementary
+YES/NO prices do not automatically match against each other in this version.
+
+Initialization is next. It must create the root atomically with new drafts and
+must not allow an existing root to be reset. Client interfaces and PDA helpers
+exist now, but account readers will be registered only when real instruction
+contexts expose these account types in the generated IDL. No fake order-book
+UI or unsupported transaction instruction is added in this step.
+
+The new tests cover maximum/optional serialization, outcome/side isolation,
+spot discriminator rejection, integer boundaries, namespace separation and
+shared Rust/TypeScript PDA vectors. They do not prove queue mutation or matching
+correctness; those require the placement and matching instructions.
+
+These accounts follow the spot book's sorted-level and FIFO-link design.
 Pure linked-list validation helpers can be shared later, after both versions are
 working.
 
@@ -647,8 +704,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    withdrawals, with owner checks and atomic SPL custody.
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
-3. **Trading — started locally.** Market opening is implemented. Next: YES/NO
-   price levels, FIFO orders, cancellation,
+3. **Trading — started locally.** Opening and book/order/level layouts are
+   implemented. Next: atomic book initialization, YES/NO queue insertion, cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution

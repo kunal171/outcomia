@@ -250,6 +250,16 @@ resolution are still planned; these operations are tested
 locally and have not been deployed. See [prediction design](prediction-market-design.md)
 for lifecycle rules, accounting and the four-milestone implementation plan.
 
+Prediction order layouts are now defined separately in
+`state/prediction_book.rs`. A `PredictionOrderBook` root holds the four YES/NO
+bid/ask heads and one monotonic order-ID counter. `PredictionPriceLevel` holds
+sorted price links and FIFO head/tail pointers; `PredictionOrder` holds one
+submission and its collateral claim. Their payload sizes are 77, 175 and 206
+bytes. The root adds rent and a shared write lock but preserves existing market
+layouts. Rust and browser helpers use identical textual outcome/side seeds and
+eight-byte little-endian numeric seeds. These are storage definitions only;
+root initialization, placement and matching are not implemented yet.
+
 ### Market vault topology
 
 Each market is created with one PDA authority and two canonical SPL Token

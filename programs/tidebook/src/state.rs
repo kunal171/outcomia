@@ -7,6 +7,8 @@ use anchor_lang::prelude::*;
 
 pub mod prediction;
 pub use prediction::*;
+pub mod prediction_book;
+pub use prediction_book::*;
 
 /// Configuration and lifecycle state for one ordered base/quote market.
 #[account]

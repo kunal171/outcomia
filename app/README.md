@@ -118,6 +118,13 @@ Opening does not yet enable order placement or settlement. The rules file's
 `primaryResolver` must match the creator wallet. The creator will propose the
 outcome once settlement is implemented; traders will claim payouts themselves.
 
+`lib/prediction.ts` also defines the upcoming book, price-level and order account
+interfaces and their PDA helpers. Outcome and side use textual seeds; prices
+and IDs use exact eight-byte little-endian BN encoding. Shared Rust/browser
+test vectors protect that contract. Book initialization and order placement are
+still pending, so these types are not yet registered in the IDL-backed account
+reader and no prediction order form is exposed.
+
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 
 ```bash
