@@ -1058,6 +1058,268 @@ fn prediction_partial_and_full_fills_settle_both_outcomes_at_maker_price_with_fe
     }
 }
 
+/// Execute promoted heads within one transaction, not a sequence of committed fills.
+///
+/// # Inputs
+/// No external arguments; fresh fixtures cover both outcomes/sides and requests of 5 or 6 contracts.
+///
+/// # Errors
+/// Panics on fixture failure, rejected valid batch, wrong funding/counts/rent or broken conservation.
+///
+/// # Returns
+/// Unit after proving full-prefix fills and a partial/full final maker commit atomically.
+#[test]
+fn prediction_three_maker_fifo_batches_settle_atomically_with_partial_or_full_last_fill() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for maker_side in [OrderSide::Bid, OrderSide::Ask] {
+            for requested in [5, 6] {
+                let mut f = Fixture::new();
+                f.set_fee_rate(25);
+                f.seed_queue(outcome, maker_side, 3);
+                let maker_position = f.position;
+                let rent_payer = f.owner.pubkey();
+                let level_key = f.level(outcome, maker_side, 600000);
+                let rent = f.svm.get_account(&level_key).unwrap().lamports;
+                f.switch_to_funded_trader();
+                // Selling six contracts needs one more free pair than this
+                // trader's default five. Use a real split before matching.
+                if requested == 6 && maker_side == OrderSide::Bid {
+                    let split = Instruction::new_with_bytes(
+                        tidebook::ID,
+                        &tidebook::instruction::SplitPredictionCompleteSet { quantity: 1 }.data(),
+                        tidebook::accounts::PredictionCompleteSet {
+                            owner: f.owner.pubkey(),
+                            market: f.market,
+                            position: f.position,
+                        }
+                        .to_account_metas(None),
+                    );
+                    send(&mut f.svm, &f.owner, &[split]).unwrap();
+                }
+                let taker_side = if maker_side == OrderSide::Ask {
+                    OrderSide::Bid
+                } else {
+                    OrderSide::Ask
+                };
+                let first = f.match_ix(1, outcome, taker_side, 600000, requested);
+                let second = f.match_ix(2, outcome, taker_side, 600000, requested - 2);
+                let mut third = f.match_ix(3, outcome, taker_side, 600000, requested - 4);
+                // All three instructions are built from the same RPC-era state.
+                // Earlier fills leave the third as a singleton, although the
+                // stored level currently says three orders. Supply its rent
+                // hint only when this last fill will close the simulated level.
+                if requested == 6 {
+                    third.accounts[11].pubkey = rent_payer;
+                    third.accounts[11].is_writable = true;
+                }
+                let custody = f.svm.get_account(&f.vault);
+                let reserve: PredictionMarket = read(&f.svm, f.market);
+                let rent_before = f.svm.get_account(&rent_payer).unwrap().lamports;
+                let result = send(&mut f.svm, &f.owner, &[first, second, third]).unwrap();
+                assert!(result.compute_units_consumed <= 600_000, "{result:?}");
+                for id in [1, 2] {
+                    let order: PredictionOrder = read(&f.svm, f.order_key(id));
+                    assert_eq!(
+                        (
+                            order.status,
+                            order.remaining_quantity,
+                            order.locked_collateral
+                        ),
+                        (OrderStatus::Filled, 0, 0)
+                    );
+                }
+                let last: PredictionOrder = read(&f.svm, f.order_key(3));
+                assert_eq!(last.remaining_quantity, 6 - requested);
+                assert_eq!(last.previous_order, None);
+                let market: PredictionMarket = read(&f.svm, f.market);
+                assert_eq!(market.open_order_count, u64::from(requested != 6));
+                assert_eq!(
+                    (market.yes_supply, market.no_supply, market.backing_reserve),
+                    (
+                        reserve.yes_supply,
+                        reserve.no_supply,
+                        reserve.backing_reserve
+                    )
+                );
+                let book: PredictionOrderBook = read(&f.svm, f.book);
+                assert_eq!(book.next_order_id, 4);
+                let fees: MarketFees = read(&f.svm, f.fees);
+                assert_eq!(fees.accrued_quote_fees, 1500 * requested);
+                assert_eq!(f.svm.get_account(&f.vault), custody);
+                if requested == 6 {
+                    assert!(f.svm.get_account(&level_key).is_none());
+                    assert_eq!(book.best_price(outcome, maker_side), None);
+                    assert_eq!(
+                        f.svm.get_account(&rent_payer).unwrap().lamports,
+                        rent_before + rent
+                    );
+                } else {
+                    let level: PredictionPriceLevel = read(&f.svm, level_key);
+                    assert_eq!(
+                        (
+                            level.first_order,
+                            level.last_order,
+                            level.order_count,
+                            level.total_remaining_quantity
+                        ),
+                        (Some(f.order_key(3)), Some(f.order_key(3)), 1, 1)
+                    );
+                }
+                f.assert_trade_conservation(maker_position);
+            }
+        }
+    }
+}
+
+/// Each later instruction observes the preceding instruction's repaired best pointer.
+///
+/// # Inputs
+/// No external arguments; three-price fixtures for both outcomes and sides use real resting orders.
+///
+/// # Errors
+/// Panics if execution rejects valid promotions, custody changes or rent/fee/account totals disagree.
+///
+/// # Returns
+/// Unit after all three levels close under one transaction and all claims remain backed.
+#[test]
+fn prediction_three_price_batches_promote_levels_and_return_each_original_payers_rent() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for maker_side in [OrderSide::Bid, OrderSide::Ask] {
+            let mut f = Fixture::new();
+            f.set_fee_rate(100);
+            let prices = if maker_side == OrderSide::Ask {
+                [600000, 610000, 620000]
+            } else {
+                [600000, 590000, 580000]
+            };
+            let first = f.ix(outcome, maker_side, prices[0], 1, 1);
+            send(&mut f.svm, &f.owner, &[first]).unwrap();
+            for i in 1..3 {
+                let ix = f.insert(
+                    outcome,
+                    maker_side,
+                    prices[i],
+                    1,
+                    (Some(prices[i - 1]), None),
+                );
+                send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            }
+            let maker_position = f.position;
+            let rent_payer = f.owner.pubkey();
+            let rent: u64 = prices
+                .iter()
+                .map(|p| {
+                    f.svm
+                        .get_account(&f.level(outcome, maker_side, *p))
+                        .unwrap()
+                        .lamports
+                })
+                .sum();
+            f.switch_to_funded_trader();
+            let side = if maker_side == OrderSide::Ask {
+                OrderSide::Bid
+            } else {
+                OrderSide::Ask
+            };
+            let limit = if side == OrderSide::Bid {
+                700000
+            } else {
+                500000
+            };
+            let instructions: Vec<_> = (1..=3)
+                .map(|id| f.match_ix(id, outcome, side, limit, 4 - id))
+                .collect();
+            let owner_before = f.svm.get_account(&rent_payer).unwrap().lamports;
+            let result = send(&mut f.svm, &f.owner, &instructions).unwrap();
+            assert!(result.compute_units_consumed <= 600_000, "{result:?}");
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            assert_eq!(book.best_price(outcome, maker_side), None);
+            assert_eq!(book.next_order_id, 4);
+            for price in prices {
+                assert!(f
+                    .svm
+                    .get_account(&f.level(outcome, maker_side, price))
+                    .is_none());
+            }
+            assert_eq!(
+                f.svm.get_account(&rent_payer).unwrap().lamports,
+                owner_before + rent
+            );
+            let fees: MarketFees = read(&f.svm, f.fees);
+            assert_eq!(fees.accrued_quote_fees, prices.iter().sum::<u64>() / 100);
+            f.assert_trade_conservation(maker_position);
+        }
+    }
+}
+
+/// A third-step failure must undo the two earlier successful fills and rent transfers.
+///
+/// # Inputs
+/// No external arguments; a three-price buy batch has an intentionally non-crossing final limit.
+///
+/// # Errors
+/// Panics if the final step succeeds, the wrong error occurs or any tracked account survives changed.
+///
+/// # Returns
+/// Unit after all three invocations are observed and ledger/fee/book/rent snapshots match pre-batch state.
+#[test]
+fn prediction_third_match_failure_rolls_back_the_entire_three_price_batch() {
+    let mut f = Fixture::new();
+    f.set_fee_rate(100);
+    let first = f.ix(PredictionOutcome::Yes, OrderSide::Ask, 600000, 1, 1);
+    send(&mut f.svm, &f.owner, &[first]).unwrap();
+    for (price, better) in [(610000, 600000), (620000, 610000)] {
+        let ix = f.insert(
+            PredictionOutcome::Yes,
+            OrderSide::Ask,
+            price,
+            1,
+            (Some(better), None),
+        );
+        send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    }
+    let maker_position = f.position;
+    let maker_owner = f.owner.pubkey();
+    f.switch_to_funded_trader();
+    let before = f.snapshot();
+    let keys = [
+        maker_position,
+        maker_owner,
+        f.order_key(1),
+        f.order_key(2),
+        f.order_key(3),
+        f.level(PredictionOutcome::Yes, OrderSide::Ask, 600000),
+        f.level(PredictionOutcome::Yes, OrderSide::Ask, 610000),
+        f.level(PredictionOutcome::Yes, OrderSide::Ask, 620000),
+    ];
+    let accounts: Vec<_> = keys.iter().map(|key| f.svm.get_account(key)).collect();
+    let instructions = [
+        f.match_ix(1, PredictionOutcome::Yes, OrderSide::Bid, 700000, 3),
+        f.match_ix(2, PredictionOutcome::Yes, OrderSide::Bid, 700000, 2),
+        f.match_ix(3, PredictionOutcome::Yes, OrderSide::Bid, 600000, 1),
+    ];
+    let result = send(&mut f.svm, &f.owner, &instructions).unwrap_err();
+    assert_eq!(
+        result
+            .meta
+            .logs
+            .iter()
+            .filter(|line| line.contains("Instruction: MatchPredictionOrder"))
+            .count(),
+        3
+    );
+    assert!(result
+        .meta
+        .logs
+        .iter()
+        .any(|line| line.contains("PredictionOrdersDoNotCross")));
+    assert_eq!(f.snapshot(), before);
+    for (key, before) in keys.iter().zip(accounts) {
+        assert_eq!(f.svm.get_account(key), before);
+    }
+    f.assert_trade_conservation(maker_position);
+}
+
 #[test]
 fn full_fills_promote_fifo_then_worse_price_without_creating_taker_orders() {
     for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {

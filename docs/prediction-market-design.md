@@ -5,7 +5,8 @@ collateral deposits/withdrawals and complete-set splitting/merging are implement
 locally, along with active-admin creator-controlled market opening and first
 resting orders on empty sides, same-price FIFO append, sorted new-price insertion
 and owner-only cancellation. One-maker matching with taker fees is implemented
-locally; multi-maker planning and resolution remain planned. This program version
+locally, and the client can compose up to three makers atomically. Remainder
+posting and resolution remain planned. This program version
 has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -773,13 +774,14 @@ the level closes and rent returns to its original payer. Partial fills reject
 all removal accounts; full fills reject missing, stale or unnecessary hints.
 
 This instruction touches one maker, two positions and at most one FIFO successor
-or worse price. The bounded account set keeps compute predictable. Its tradeoff
-is that an oversized request needs another transaction to continue. Multi-maker
-planning and atomic remainder posting will be separate steps.
+or worse price. The bounded account set keeps compute predictable. The client
+can now compose up to three of these instructions; larger requests may still
+need another transaction. Automatic remainder posting remains separate work.
 
 The position panel now has a separate Buy or sell now form with a maximum buy
 price or minimum sell price. Its preview shows the fill, fee, net collateral and
-unposted quantity. It refreshes the maker, positions and fee rate before signing.
+unposted quantity across the selected makers. It refreshes the plan, positions
+and fee rate before signing.
 The local clock disables trading at close without polling RPC every second.
 Previews are advisory: concurrent fills can change execution, and the fee rate
 at execution comes from the global config. Confirmation refreshes balances,
@@ -796,10 +798,74 @@ priority rejection, lifecycle boundaries, account substitutions, malformed hints
 funding/overflow failures, real partial-fill cancellation and transaction rollback.
 Conservation tests sum both actual traders, reserve and fees against the vault.
 
+### Bounded multi-maker planning (implemented locally)
+
+`app/lib/prediction-matching-plan.ts` plans up to three `match_prediction_order`
+instructions in one legacy transaction. The Rust matching primitive and account
+layouts are unchanged. The client decides which accounts to supply; each on-chain
+instruction still verifies the current best opposing FIFO head and its backing.
+
+The planner keeps a disposable account overlay. It reads each needed order,
+level and maker position once, then replaces cached values after each simulated
+fill. It never changes the RPC records or caller snapshots. A filled maker's
+successor has its previous link cleared in this overlay; an emptied price level
+promotes its worse neighbor and clears that level's better link. This is why the
+second instruction can target an order that is not the stored head before the
+transaction starts. Simply calling the one-maker RPC reader three times would
+keep selecting the same original head.
+
+Example: buy 7 contracts with a 0.62 limit against sells of 2 at 0.60, 3 at 0.61,
+and 4 at 0.62. The plan executes 2, then 3, then 2; instruction quantities are
+7, 5 and 2. The last maker remains Open with 2 contracts. Notional is 4.27
+collateral tokens. Fees are calculated and rounded separately for each fill,
+then summed. Three one-atom fills at a nonzero tiny rate can owe three fee atoms,
+even when rounding once on their combined notional would give only one.
+
+Virtual maker positions are cached by owner, not by order. An owner with several
+orders therefore receives cumulative credits/debits; the planner cannot reset
+its balance on a later visit. It also updates the taker's free balances, outcome
+credits and accrued fee claim after each step. Insufficient cumulative funding,
+receiving overflow, missing accounts, broken links, wrong ownership, self-trades
+or RPC failures reject the whole plan. They are not treated as missing liquidity.
+
+Every plan reports one stop reason:
+
+| Reason | Meaning |
+| --- | --- |
+| `filled` | Requested quantity was consumed in the preview |
+| `book-exhausted` | No opposing price remains |
+| `non-crossing` | The next best price is outside the taker's limit |
+| `match-cap` | Three makers were planned and crossing liquidity remains |
+
+After the third fill, the planner checks the virtual head to classify this
+boundary. It does not plan a fourth fill, although the fourth order may be read
+as the third maker's required FIFO successor. All unfilled quantity stays
+unposted in this milestone, including book-exhausted or non-crossing remainders.
+The UI shows the reason and quantity so the wallet can submit again deliberately.
+
+The builder requests at most 600,000 compute units and measures the complete
+unsigned legacy transaction, including its compute-budget instruction, against
+the 1,232-byte packet limit before prompting the wallet. A dummy blockhash is
+used only on the measurement copy; the provider supplies the real recent hash
+for normal preflight and signing. Three is a conservative account/compute bound,
+not a promise that every future program version will fit the same budget.
+
+All selected fills, fees, FIFO repairs, level closures and rent returns execute
+in one transaction. If the third step fails, the first two also roll back.
+Concurrent changes can invalidate hints; smaller maker remainders can instead
+produce a smaller actual fill. The UI reports confirmation and refreshed state
+rather than presenting the preview as a guaranteed execution receipt.
+
+Client tests exercise all four lists, multiple prices, repeated/distinct owners,
+per-fill rounding, cumulative funding, exact stop reasons, malformed state,
+immutable inputs, account encoding and packet size. LiteSVM tests execute
+three-fill batches with partial/full final makers, price promotion, custody
+conservation, rent refunds and rollback on a third-step failure.
+
 ### Trading still to implement
 
-Multi-maker transaction planning, automatic safe remainder posting, an aggregated
-prediction order book and typed prediction events/indexer decoding remain.
+Automatic safe remainder posting, an aggregated prediction order book and typed
+prediction events/indexer decoding remain.
 Fee accrual is implemented, but the existing spot fee-withdrawal instruction
 accepts spot market accounts only; prediction fee withdrawal needs a separate
 collateral-vault adapter. Prediction fills do not emit events yet.
@@ -988,7 +1054,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
 3. **Trading — started locally.** Opening, atomic book initialization, empty-side
    placement, same-price FIFO append, new-price insertion and cancellation are implemented.
    One-maker matching, taker fees and an immediate-trade UI are also implemented.
-   Next: multi-maker planning, remainder posting, book display, prediction fee
+   Bounded three-maker planning and atomic batch execution are implemented.
+   Next: remainder posting, book display, prediction fee
    withdrawal, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution

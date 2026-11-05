@@ -143,12 +143,17 @@ works after trading closes. The program refunds the remaining lock, repairs the
 queue and closes an empty price level, returning its rent to the original payer.
 Confirmation refreshes the position, order list and public book.
 
-The separate Buy or sell now form trades with one best opposing FIFO order at
-its resting price. It previews executed contracts, collateral, global taker fee
-and unposted quantity. Buys pay notional plus fee; sells receive notional minus
-fee. A partial maker stays at the head; a full maker promotes the next order or
-price. No taker order or automatic remainder is created. Confirmations refresh
-positions, orders and public heads; previews are not claimed as confirmed fills.
+The separate Buy or sell now form trades with up to three best opposing FIFO
+orders in one atomic transaction. Each fill uses its resting price. The planner
+in `lib/prediction-matching-plan.ts` simulates promoted heads and cumulative
+balances without changing fetched accounts. The preview sums separately rounded
+fees and shows unposted quantity plus its stop reason. Buys pay notional plus
+fees; sells receive notional minus fees. A cap-blocked remainder stays free for
+retry; exhausted/non-crossing remainders also stay unposted for now.
+The builder sets a 600,000-CU ceiling and checks the 1,232-byte legacy packet
+before wallet signing. No taker order or automatic remainder is created.
+Confirmations refresh positions, orders and public heads; previews are not
+claimed as confirmed fills.
 
 Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until this program
 version is deployed. Explicit local tests may enable it alongside the
@@ -159,8 +164,8 @@ Disabling new orders therefore leaves cancellation available. No admin role is r
 trading. Rebuild/redeploy the program before using the updated client on devnet.
 `NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` separately controls immediate trades
 and requires draft, funding and cancellation flags. It defaults false until
-`match_prediction_order` is deployed. Multi-maker planning, automatic remainder
-posting and prediction fee withdrawal are not included in this milestone.
+`match_prediction_order` is deployed. Automatic remainder posting and prediction
+fee withdrawal are not included in this milestone.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 

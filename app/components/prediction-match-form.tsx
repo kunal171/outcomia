@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { AnchorProvider, BN, type Program } from "@anchor-lang/core";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import {
   derivePredictionBookPda,
   derivePredictionPositionPda,
   PREDICTION_MATCHING_ENABLED,
-  readPredictionMatchTarget,
-  validatePredictionMatch,
   type PredictionOutcome,
 } from "../lib/prediction";
+import {
+  buildPredictionMatchTransaction,
+  MAX_PREDICTION_MATCHES_PER_TRANSACTION,
+  planPredictionMatches,
+} from "../lib/prediction-matching-plan";
 import {
   deriveMarketFeesPda,
   deriveProtocolConfigPda,
@@ -31,7 +34,7 @@ interface Props {
   onMatched: (signature: string) => void;
 }
 
-/** One maker per submission; unfilled quantity is never silently posted.
+/** Bounded atomic matching; unfilled quantity is never silently posted.
  * Pre-signing reads refresh the quote, but concurrent fills can still change
  * the result. Confirmation reports the transaction, not a fabricated fill. */
 export function PredictionMatchForm({
@@ -67,7 +70,7 @@ export function PredictionMatchForm({
     const rawQuantity = new BN(quantity.trim());
     const limit = parseTokenAmount(price, decimals, "Limit price");
     const accounts = getTidebookAccounts(program);
-    const [book, config, terms, position] = await Promise.all([
+    const [book, config, terms, position, fees] = await Promise.all([
       accounts.predictionOrderBook.fetchNullable(
         derivePredictionBookPda(market),
       ),
@@ -76,33 +79,39 @@ export function PredictionMatchForm({
       accounts.predictionPosition.fetchNullable(
         derivePredictionPositionPda(market, owner),
       ),
+      accounts.marketFees.fetchNullable(deriveMarketFeesPda(market)),
     ]);
-    if (!book || !config || !terms || !position)
-      throw new Error(
-        "Market, book, position or fee configuration is unavailable",
-      );
-    const target = await readPredictionMatchTarget(
+    if (!book || !config || !terms || !position || !fees)
+      throw new Error("Market, book, position or fee accounts are unavailable");
+    if (
+      !fees.market.equals(market) ||
+      !fees.quoteMint.equals(terms.collateralMint)
+    )
+      throw new Error("Fee account belongs to a different market or mint");
+    const plan = await planPredictionMatches(
       accounts,
-      market,
-      book,
-      outcome,
-      side,
-      rawQuantity,
-    );
-    const plan = validatePredictionMatch(
+      {
+        marketAddress: market,
+        taker: owner,
+        outcome,
+        side,
+        limitPrice: limit,
+        quantity: rawQuantity,
+      },
       terms,
       book,
       position,
-      target,
-      outcome,
-      side,
-      limit,
-      rawQuantity,
       config.takerFeeBps,
-      owner,
+      fees.accruedQuoteFees,
       new BN(Math.floor(Date.now() / 1000)),
     );
-    return { target, plan, rawQuantity, limit, closeTs: terms.closeTs };
+    if (!plan.steps.length)
+      throw new Error(
+        plan.stopReason === "book-exhausted"
+          ? "No opposing orders for this outcome"
+          : "Limit price does not cross the best order",
+      );
+    return { plan, closeTs: terms.closeTs };
   }
   useEffect(() => {
     let canceled = false;
@@ -120,7 +129,7 @@ export function PredictionMatchForm({
           if (canceled) return;
           setCloseTs(closeTs);
           setPreview(
-            `${plan.fill.toString()} ${outcome.toUpperCase()} contracts; ${side === "bid" ? "pay" : "receive"} ${formatAtomicAmount(plan.cash, decimals)} ${symbol}, including ${formatAtomicAmount(plan.fee, decimals)} fee. ${plan.unfilled.toString()} requested contracts remain unposted.`,
+            `${plan.request.quantity.sub(plan.remainingQuantity).toString()} ${outcome.toUpperCase()} contracts across ${plan.steps.length} resting orders; ${side === "bid" ? "pay" : "receive"} ${formatAtomicAmount(plan.totalCash, decimals)} ${symbol}, including ${formatAtomicAmount(plan.totalFee, decimals)} fee. ${plan.remainingQuantity.toString()} contracts remain unposted. ${plan.stopReason === "match-cap" ? "Batch limit reached; crossing orders remain. Submit again to continue." : plan.stopReason === "non-crossing" ? "The next price is outside your limit." : plan.stopReason === "book-exhausted" ? "No more opposing orders." : "Requested quantity filled in this preview."}`,
           );
         })
         .catch((cause) => {
@@ -163,35 +172,11 @@ export function PredictionMatchForm({
     setPending(true);
     setError(null);
     try {
-      const { target, rawQuantity, limit } = await quote();
-      const ix = await program.methods
-        .matchPredictionOrder(
-          { [outcome]: {} },
-          { [side]: {} },
-          limit,
-          rawQuantity,
-        )
-        .accountsStrict({
-          taker: owner,
-          market,
-          orderBook: derivePredictionBookPda(market),
-          protocolConfig: deriveProtocolConfigPda(),
-          marketFees: deriveMarketFeesPda(market),
-          makerOrder: target.makerAddress,
-          priceLevel: target.levelAddress,
-          makerPosition: derivePredictionPositionPda(
-            market,
-            target.maker.owner,
-          ),
-          takerPosition: derivePredictionPositionPda(market, owner),
-          nextOrder: target.nextOrder ?? program.programId,
-          worseLevel: target.worseLevel ?? program.programId,
-          levelRentRecipient: target.rentRecipient ?? program.programId,
-        })
-        .instruction();
+      const { plan } = await quote();
+      const transaction = await buildPredictionMatchTransaction(program, plan);
       const signature = await (
         program.provider as AnchorProvider
-      ).sendAndConfirm(new Transaction().add(ix));
+      ).sendAndConfirm(transaction);
       // A concurrent partial fill can reduce execution after the preview. Only
       // a future transaction-event reader can report its exact confirmed fill.
       onMatched(signature);
@@ -212,8 +197,10 @@ export function PredictionMatchForm({
     >
       <h3>Buy or sell now</h3>
       <p>
-        Trades with one resting order at its price. Any unfilled request stays
-        unposted; submit again to continue.
+        Trades with up to {MAX_PREDICTION_MATCHES_PER_TRANSACTION} resting
+        orders in price and FIFO priority, in one transaction. Each fill uses
+        its resting price. Any unfilled request stays unposted; submit again to
+        continue.
       </p>
       {!PREDICTION_MATCHING_ENABLED && (
         <p>Trading is awaiting deployment of this program version.</p>
