@@ -275,8 +275,15 @@ Common validation/funding helpers keep all three paths consistent.
 The client selects a path from actual account reads and revalidates before
 signing. Insertion discovers neighbors by following at most 128 levels; errors
 or stale links stop submission. On-chain insertion touches at most two neighbors
-without traversal. Cancellation and
-matching are not implemented yet; public order entry defaults disabled.
+without traversal. `cancel_prediction_order` requires the order owner's signature
+and Open status, with no market-status or close-time gate. It repairs canonical
+reciprocal FIFO links, refunds only the recorded remaining lock and decreases
+counts atomically. Final-order removal also unlinks the level and returns its
+rent to the original payer. Canceled order accounts remain as history; empty
+levels close, allowing price reuse with a new ID. Cancellation moves no vault
+tokens, reserves or fees. The wallet-scoped order list refreshes after confirmation.
+Its deployment flag is independent of new-order entry. Prediction matching is
+not implemented yet; public order entry defaults disabled.
 
 ### Market vault topology
 

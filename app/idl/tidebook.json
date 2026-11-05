@@ -725,6 +725,264 @@
       ]
     },
     {
+      "name": "cancel_prediction_order",
+      "docs": [
+        "Releases only the signing owner's unfilled claims, even after trading closes."
+      ],
+      "discriminator": [
+        87,
+        122,
+        0,
+        2,
+        168,
+        154,
+        140,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "order"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "order_book",
+            "order",
+            "price_level"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order_book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "order.outcome",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "order.side",
+                "account": "PredictionOrder"
+              },
+              {
+                "kind": "account",
+                "path": "order.price",
+                "account": "PredictionOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "previous_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "docs": [
+            "Only supplied when the final order removes its price level."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "claim_test_tokens",
       "docs": [
         "Mints fixed test-token amounts to any connected wallet."
@@ -5872,6 +6130,31 @@
       "code": 6131,
       "name": "InvalidPredictionTail",
       "msg": "Prediction queue tail identity, status or links are invalid"
+    },
+    {
+      "code": 6132,
+      "name": "PredictionOrderNotOpen",
+      "msg": "Only an open prediction order can be canceled"
+    },
+    {
+      "code": 6133,
+      "name": "UnauthorizedPredictionOrderOwner",
+      "msg": "Only the prediction order owner may cancel it"
+    },
+    {
+      "code": 6134,
+      "name": "InvalidPredictionOrderNeighbor",
+      "msg": "Prediction FIFO neighbors are missing, stale or invalid"
+    },
+    {
+      "code": 6135,
+      "name": "InvalidPredictionRentRecipient",
+      "msg": "Empty prediction level rent must return to its original payer"
+    },
+    {
+      "code": 6136,
+      "name": "PredictionOrderAccountingMismatch",
+      "msg": "Prediction order backing or book counters are inconsistent"
     }
   ],
   "types": [

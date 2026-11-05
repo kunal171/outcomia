@@ -1,4 +1,4 @@
-//! Shared resting-order rules, kept identical for empty placement and FIFO append.
+//! Shared resting-order rules for empty placement, FIFO append and price insertion.
 //! Account/PDA and queue validation stay in each instruction's context/handler.
 
 use crate::{

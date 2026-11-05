@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PredictionOrderForm } from "./prediction-order-form";
+import { PredictionOrders } from "./prediction-orders";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -108,7 +109,7 @@ function ConnectedPosition({
   const [signature, setSignature] = useState<string | null>(null);
   const [lastOrder, setLastOrder] = useState<PublicKey | null>(null);
   const [resultKind, setResultKind] = useState<
-    "position" | "deposit" | "withdraw" | "split" | "merge" | "order"
+    "position" | "deposit" | "withdraw" | "split" | "merge" | "order" | "cancel"
   >("position");
   const [actionError, setActionError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<BN | null>(null);
@@ -495,6 +496,22 @@ function ConnectedPosition({
               }}
             />
           )}
+          <PredictionOrders
+            program={program}
+            owner={wallet.publicKey}
+            market={market}
+            decimals={decimals}
+            symbol={collateralSymbol}
+            pending={pending}
+            setPending={setPending}
+            onCanceled={(confirmed) => {
+              setSignature(confirmed);
+              setLastOrder(null);
+              setResultKind("cancel");
+              setRefresh((value) => value + 1);
+              onOrderPlaced();
+            }}
+          />
           <a
             className="market-explorer-link"
             href={accountExplorerUrl(positionAddress)}
@@ -676,7 +693,9 @@ function ConnectedPosition({
                   ? "Pairs merged into available collateral."
                   : resultKind === "order"
                     ? "Prediction order placed."
-                    : "Position initialized."}{" "}
+                    : resultKind === "cancel"
+                      ? "Prediction order canceled; unfilled funds released."
+                      : "Position initialized."}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"

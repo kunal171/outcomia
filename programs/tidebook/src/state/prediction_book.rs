@@ -4,8 +4,8 @@
 //! Each outcome has independent bid/ask price lists, while one root allocates
 //! market-wide order IDs. Empty-side placement and same-price append check
 //! funding and lifecycle gates; append also verifies the terminal FIFO links.
-//! Future new-price insertion, cancellation and matching must preserve the
-//! same reciprocal links and priority rules.
+//! New-price insertion checks adjacent prices; cancellation unlinks FIFO nodes
+//! and closes empty levels. Future matching must preserve the same links.
 
 use super::{OrderSide, OrderStatus, PredictionOutcome};
 use anchor_lang::prelude::*;

@@ -398,4 +398,14 @@ pub enum TidebookError {
     InvalidPredictionPriceLevel = 130,
     #[msg("Prediction queue tail identity, status or links are invalid")]
     InvalidPredictionTail = 131,
+    #[msg("Only an open prediction order can be canceled")]
+    PredictionOrderNotOpen = 132,
+    #[msg("Only the prediction order owner may cancel it")]
+    UnauthorizedPredictionOrderOwner = 133,
+    #[msg("Prediction FIFO neighbors are missing, stale or invalid")]
+    InvalidPredictionOrderNeighbor = 134,
+    #[msg("Empty prediction level rent must return to its original payer")]
+    InvalidPredictionRentRecipient = 135,
+    #[msg("Prediction order backing or book counters are inconsistent")]
+    PredictionOrderAccountingMismatch = 136,
 }

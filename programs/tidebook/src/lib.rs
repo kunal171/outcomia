@@ -30,6 +30,14 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
+    /// Releases only the signing owner's unfilled claims, even after trading closes.
+    pub fn cancel_prediction_order(
+        ctx: Context<CancelPredictionOrder>,
+        order_id: u64,
+    ) -> Result<()> {
+        instructions::cancel_prediction_order::handle_cancel_prediction_order(ctx, order_id)
+    }
+
     /// Inserts a funded order between verified adjacent prices on an occupied side.
     pub fn insert_prediction_order(
         ctx: Context<InsertPredictionOrder>,

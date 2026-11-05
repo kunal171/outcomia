@@ -9,7 +9,166 @@ export type PredictionOutcome = "yes" | "no";
 export const PREDICTION_ORDERS_ENABLED =
   process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
   process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true" &&
+  process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED === "true" &&
   process.env.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED === "true";
+
+// An exit path has its own rollout flag: disabling new orders must not disable
+// cancellation. Enable only after the matching on-chain instruction is deployed.
+export const PREDICTION_CANCELLATION_ENABLED =
+  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
+  process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED === "true";
+
+/** Read current neighbors just before signing; RPC/decode failures propagate.
+ * These are routing hints, not authorization. The program rechecks all of them
+ * atomically because another order can change the links after these RPC reads. */
+export async function readPredictionCancellationAccounts(
+  accounts: PredictionPlacementReader,
+  market: PublicKey,
+  owner: PublicKey,
+  orderAddress: PublicKey,
+) {
+  const order = await accounts.predictionOrder.fetchNullable(orderAddress);
+  if (
+    !order ||
+    !order.owner.equals(owner) ||
+    !order.market.equals(market) ||
+    !orderAddress.equals(derivePredictionOrderPda(market, order.orderId))
+  )
+    throw new Error(
+      "Order is unavailable or does not belong to this wallet and market",
+    );
+  if (!("open" in order.status))
+    throw new Error("Only open orders can be canceled");
+  if (!("yes" in order.outcome || "no" in order.outcome))
+    throw new Error("Invalid outcome");
+  if (!("bid" in order.side || "ask" in order.side))
+    throw new Error("Invalid side");
+  const outcome: PredictionOutcome = "yes" in order.outcome ? "yes" : "no";
+  const side: OrderSide = "bid" in order.side ? "bid" : "ask";
+  const levelAddress = derivePredictionPriceLevelPda(
+    market,
+    outcome,
+    side,
+    order.price,
+  );
+  if (!order.priceLevel.equals(levelAddress))
+    throw new Error("Order price-level address is invalid");
+  const level = await accounts.predictionPriceLevel.fetchNullable(levelAddress);
+  const validLevel = (value: PredictionPriceLevelAccount | null, price: BN) =>
+    value &&
+    value.market.equals(market) &&
+    outcome in value.outcome &&
+    side in value.side &&
+    value.price.eq(price) &&
+    value.orderCount.gtn(0) &&
+    value.totalRemainingQuantity.gtn(0) &&
+    value.firstOrder &&
+    value.lastOrder;
+  if (!validLevel(level, order.price) || !level)
+    throw new Error("Price level is unavailable or invalid; refresh");
+  const previous = order.previousOrder,
+    next = order.nextOrder;
+  if (
+    previous?.equals(orderAddress) ||
+    next?.equals(orderAddress) ||
+    (previous && next?.equals(previous)) ||
+    level.firstOrder?.equals(orderAddress) !== (previous === null) ||
+    level.lastOrder?.equals(orderAddress) !== (next === null)
+  )
+    throw new Error("Order queue endpoints are invalid; refresh");
+  for (const [address, isPrevious] of [
+    [previous, true],
+    [next, false],
+  ] as const) {
+    if (!address) continue;
+    const neighbor = await accounts.predictionOrder.fetchNullable(address);
+    if (
+      !neighbor ||
+      !address.equals(derivePredictionOrderPda(market, neighbor.orderId)) ||
+      !neighbor.market.equals(market) ||
+      !neighbor.priceLevel.equals(levelAddress) ||
+      !(outcome in neighbor.outcome) ||
+      !(side in neighbor.side) ||
+      !neighbor.price.eq(order.price) ||
+      !("open" in neighbor.status) ||
+      neighbor.remainingQuantity.lten(0) ||
+      neighbor.remainingQuantity.gt(neighbor.quantity) ||
+      (isPrevious
+        ? !neighbor.nextOrder?.equals(orderAddress) ||
+          neighbor.orderId.gte(order.orderId)
+        : !neighbor.previousOrder?.equals(orderAddress) ||
+          neighbor.orderId.lte(order.orderId))
+    )
+      throw new Error("Order queue changed or has invalid neighbors; refresh");
+  }
+  if (
+    order.remainingQuantity.lten(0) ||
+    order.remainingQuantity.gt(order.quantity) ||
+    !order.lockedCollateral.eq(
+      side === "bid"
+        ? order.price.mul(order.remainingQuantity)
+        : order.remainingQuantity,
+    )
+  )
+    throw new Error("Order backing is inconsistent; refresh");
+  const removesLevel = level.orderCount.eqn(1);
+  let betterLevel: PublicKey | null = null,
+    worseLevel: PublicKey | null = null;
+  if (removesLevel) {
+    if (
+      previous ||
+      next ||
+      !level.totalRemainingQuantity.eq(order.remainingQuantity)
+    )
+      throw new Error("Final-order level totals are inconsistent; refresh");
+    for (const [price, isBetter] of [
+      [level.betterPrice, true],
+      [level.worsePrice, false],
+    ] as const) {
+      if (!price) continue;
+      const address = derivePredictionPriceLevelPda(
+        market,
+        outcome,
+        side,
+        price,
+      );
+      const neighbor =
+        await accounts.predictionPriceLevel.fetchNullable(address);
+      const precedes = (a: BN, b: BN) => (side === "bid" ? a.gt(b) : a.lt(b));
+      if (
+        !validLevel(neighbor, price) ||
+        !neighbor ||
+        (isBetter
+          ? !neighbor.worsePrice?.eq(order.price) ||
+            !precedes(price, order.price)
+          : !neighbor.betterPrice?.eq(order.price) ||
+            !precedes(order.price, price))
+      )
+        throw new Error("Price neighbors changed or are invalid; refresh");
+      if (isBetter) betterLevel = address;
+      else worseLevel = address;
+    }
+  } else if (
+    (!previous && !next) ||
+    level.totalRemainingQuantity.lte(order.remainingQuantity)
+  )
+    throw new Error("Level totals are inconsistent; refresh");
+  // Anchor's optional-account sentinel is the program ID. This also works with
+  // the generic Program type, whose accountsStrict typing does not accept null.
+  return {
+    owner,
+    market,
+    position: derivePredictionPositionPda(market, owner),
+    orderBook: derivePredictionBookPda(market),
+    order: orderAddress,
+    priceLevel: levelAddress,
+    previousOrder: previous ?? PROGRAM_ID,
+    nextOrder: next ?? PROGRAM_ID,
+    betterLevel: betterLevel ?? PROGRAM_ID,
+    worseLevel: worseLevel ?? PROGRAM_ID,
+    levelRentRecipient: removesLevel ? level.rentPayer : PROGRAM_ID,
+  };
+}
 
 export function predictionBestPrice(
   book: PredictionOrderBookAccount,

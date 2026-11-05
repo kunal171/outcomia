@@ -48,6 +48,8 @@ const {
   validatePredictionCreatorResolver,
   validatePredictionRestingOrder,
   readPredictionPlacementTarget,
+  readPredictionCancellationAccounts,
+  PREDICTION_CANCELLATION_ENABLED,
   PREDICTION_ORDERS_ENABLED,
 } = mod.exports;
 
@@ -1007,6 +1009,328 @@ test("insertion IDL encodes optional neighbors and stays within packet limits", 
     assert.equal(ix.keys[8].isWritable, worse !== null);
     const tx = new Transaction({
       feePayer: owner,
+      recentBlockhash: PublicKey.default.toBase58(),
+    }).add(ix);
+    assert.ok(
+      tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+        .length <= 1232,
+    );
+  }
+});
+
+function cancellationFixture(outcome = "yes", side = "bid", size = 1) {
+  const { BN } = require("@anchor-lang/core");
+  const x = appendFixture(outcome, side);
+  const owner = x.append.tail.owner;
+  const address = (id) => derivePredictionOrderPda(x.book.market, new BN(id));
+  const orders = new Map();
+  for (let id = 1; id <= size; id++)
+    orders.set(address(id).toBase58(), {
+      ...x.append.tail,
+      orderId: new BN(id),
+      previousOrder: id === 1 ? null : address(id - 1),
+      nextOrder: id === size ? null : address(id + 1),
+    });
+  const level = {
+    ...x.append.level,
+    firstOrder: address(1),
+    lastOrder: address(size),
+    orderCount: new BN(size),
+    totalRemainingQuantity: new BN(2 * size),
+    rentPayer: owner,
+  };
+  const levels = new Map([[x.append.levelAddress.toBase58(), level]]);
+  const reader = {
+    predictionOrder: {
+      fetchNullable: async (key) => orders.get(key.toBase58()) ?? null,
+    },
+    predictionPriceLevel: {
+      fetchNullable: async (key) => levels.get(key.toBase58()) ?? null,
+    },
+  };
+  return { ...x, owner, address, orders, levels, level, reader };
+}
+
+test("cancellation selects exact FIFO neighbors and omits price accounts for surviving levels", async () => {
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const x = cancellationFixture(outcome, side, 3);
+      for (const id of [1, 2, 3]) {
+        const accounts = await readPredictionCancellationAccounts(
+          x.reader,
+          x.book.market,
+          x.owner,
+          x.address(id),
+        );
+        assert.equal(
+          accounts.previousOrder.toBase58(),
+          (id === 1 ? PublicKey.default : x.address(id - 1)).toBase58(),
+        );
+        assert.equal(
+          accounts.nextOrder.toBase58(),
+          (id === 3 ? PublicKey.default : x.address(id + 1)).toBase58(),
+        );
+        for (const field of ["betterLevel", "worseLevel", "levelRentRecipient"])
+          assert.equal(
+            accounts[field].toBase58(),
+            PublicKey.default.toBase58(),
+          );
+        assert.equal(
+          accounts.position.toBase58(),
+          derivePredictionPositionPda(x.book.market, x.owner).toBase58(),
+        );
+        assert.equal(
+          accounts.orderBook.toBase58(),
+          derivePredictionBookPda(x.book.market).toBase58(),
+        );
+      }
+    }
+  assert.equal(PREDICTION_CANCELLATION_ENABLED, false);
+});
+
+test("turning off order entry or funding never turns off deployed cancellation", () => {
+  function flags(env) {
+    const loaded = { exports: {} };
+    runInNewContext(code, {
+      module: loaded,
+      exports: loaded.exports,
+      Buffer,
+      TextEncoder,
+      TextDecoder,
+      crypto: webcrypto,
+      process: { env },
+      require: (specifier) =>
+        specifier === "./solana"
+          ? { PROGRAM_ID: PublicKey.default }
+          : require(specifier),
+    });
+    return loaded.exports;
+  }
+  const draft = {
+    NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED: "true",
+    NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED: "true",
+  };
+  const exitsOnly = flags(draft);
+  assert.equal(exitsOnly.PREDICTION_CANCELLATION_ENABLED, true);
+  assert.equal(exitsOnly.PREDICTION_ORDERS_ENABLED, false);
+  const localTrading = {
+    ...draft,
+    NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED: "true",
+    NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED: "true",
+  };
+  assert.equal(flags(localTrading).PREDICTION_ORDERS_ENABLED, true);
+  localTrading.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED = "false";
+  assert.equal(flags(localTrading).PREDICTION_ORDERS_ENABLED, false);
+  assert.equal(flags(localTrading).PREDICTION_CANCELLATION_ENABLED, false);
+});
+
+test("final-order cancellation discovers reciprocal price neighbors and preserves the rent payer", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      for (const shape of ["only", "best", "middle", "worst"]) {
+        const x = cancellationFixture(outcome, side);
+        const better = new BN(side === "bid" ? 800000 : 400000);
+        const worse = new BN(side === "bid" ? 400000 : 800000);
+        const rentPayer = new PublicKey(new Uint8Array(32).fill(7));
+        x.level.rentPayer = rentPayer;
+        const address = (price) =>
+          derivePredictionPriceLevelPda(x.book.market, outcome, side, price);
+        if (shape === "middle" || shape === "worst") {
+          x.level.betterPrice = better;
+          x.levels.set(address(better).toBase58(), {
+            ...x.level,
+            price: better,
+            betterPrice: null,
+            worsePrice: x.level.price,
+          });
+        }
+        if (shape === "middle" || shape === "best") {
+          x.level.worsePrice = worse;
+          x.levels.set(address(worse).toBase58(), {
+            ...x.level,
+            price: worse,
+            betterPrice: x.level.price,
+            worsePrice: null,
+          });
+        }
+        const result = await readPredictionCancellationAccounts(
+          x.reader,
+          x.book.market,
+          x.owner,
+          x.address(1),
+        );
+        assert.equal(
+          result.levelRentRecipient.toBase58(),
+          rentPayer.toBase58(),
+        );
+        assert.equal(
+          result.betterLevel.toBase58(),
+          (x.level.betterPrice
+            ? address(better)
+            : PublicKey.default
+          ).toBase58(),
+        );
+        assert.equal(
+          result.worseLevel.toBase58(),
+          (x.level.worsePrice ? address(worse) : PublicKey.default).toBase58(),
+        );
+      }
+    }
+});
+
+test("cancellation rejects foreign owners, closed orders, bad backing and broken FIFO endpoints", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const mutate of [
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).owner = PublicKey.default;
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).market = PublicKey.default;
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).status = { canceled: {} };
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).status = { filled: {} };
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).lockedCollateral = new BN(1);
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).remainingQuantity = new BN(0);
+    },
+    (x) => {
+      x.orders.get(x.address(1).toBase58()).previousOrder = x.address(1);
+    },
+    (x) => {
+      x.level.firstOrder = null;
+    },
+    (x) => {
+      x.level.orderCount = new BN(2);
+    },
+    (x) => {
+      x.level.totalRemainingQuantity = new BN(3);
+    },
+    (x) => {
+      x.levels.clear();
+    },
+    (x) => {
+      x.orders.clear();
+    },
+  ]) {
+    const x = cancellationFixture();
+    mutate(x);
+    await assert.rejects(
+      () =>
+        readPredictionCancellationAccounts(
+          x.reader,
+          x.book.market,
+          x.owner,
+          x.address(1),
+        ),
+      /unavailable|open orders|backing|endpoints|totals/i,
+    );
+  }
+  const x = cancellationFixture("yes", "bid", 3);
+  x.orders.get(x.address(1).toBase58()).nextOrder = null;
+  await assert.rejects(
+    () =>
+      readPredictionCancellationAccounts(
+        x.reader,
+        x.book.market,
+        x.owner,
+        x.address(2),
+      ),
+    /neighbors/,
+  );
+  x.orders.delete(x.address(1).toBase58());
+  await assert.rejects(
+    () =>
+      readPredictionCancellationAccounts(
+        x.reader,
+        x.book.market,
+        x.owner,
+        x.address(2),
+      ),
+    /neighbors/,
+  );
+});
+
+test("cancellation never guesses neighbors on missing accounts or RPC failures", async () => {
+  const { BN } = require("@anchor-lang/core");
+  const x = cancellationFixture();
+  x.level.betterPrice = new BN(800000);
+  await assert.rejects(
+    () =>
+      readPredictionCancellationAccounts(
+        x.reader,
+        x.book.market,
+        x.owner,
+        x.address(1),
+      ),
+    /Price neighbors/,
+  );
+  x.reader.predictionPriceLevel.fetchNullable = async () => {
+    throw new Error("RPC unavailable");
+  };
+  await assert.rejects(
+    () =>
+      readPredictionCancellationAccounts(
+        x.reader,
+        x.book.market,
+        x.owner,
+        x.address(1),
+      ),
+    /RPC unavailable/,
+  );
+});
+
+test("cancellation IDL requires only the owner signature and fits the maximum account set", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, Transaction } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const keys = Array.from(
+    { length: 11 },
+    (_, i) => new PublicKey(new Uint8Array(32).fill(i + 1)),
+  );
+  const names = [
+    "owner",
+    "market",
+    "position",
+    "orderBook",
+    "order",
+    "priceLevel",
+    "previousOrder",
+    "nextOrder",
+    "betterLevel",
+    "worseLevel",
+    "levelRentRecipient",
+  ];
+  for (const optional of [true, false]) {
+    const accounts = Object.fromEntries(
+      names.map((name, i) => [
+        name,
+        i >= 6 && !optional ? program.programId : keys[i],
+      ]),
+    );
+    const ix = await program.methods
+      .cancelPredictionOrder(new BN("18446744073709551614"))
+      .accountsStrict(accounts)
+      .instruction();
+    const decoded = program.coder.instruction.decode(ix.data);
+    assert.equal(decoded.name, "cancelPredictionOrder");
+    assert.equal(decoded.data.orderId.toString(), "18446744073709551614");
+    assert.equal(ix.keys.filter((key) => key.isSigner).length, 1);
+    assert.equal(ix.keys[0].pubkey.toBase58(), keys[0].toBase58());
+    for (let i = 6; i < 11; i++) assert.equal(ix.keys[i].isWritable, optional);
+    const tx = new Transaction({
+      feePayer: keys[0],
       recentBlockhash: PublicKey.default.toBase58(),
     }).add(ix);
     assert.ok(

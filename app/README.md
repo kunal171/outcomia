@@ -137,12 +137,18 @@ prices and checks free funds and exact integer bounds. Buys lock collateral;
 sells lock outcome contracts. Confirmations refresh the ledger and public book.
 Appending preserves older orders' priority; the prior tail's owner does not sign
 and its balances do not change. Queue/totals, ownership and packet-size checks
-are covered in Rust/client tests. Cancellation remains unavailable.
+are covered in Rust/client tests. The wallet's order list shows price, quantity,
+remaining quantity and status. Only Open orders show Cancel; cancellation also
+works after trading closes. The program refunds the remaining lock, repairs the
+queue and closes an empty price level, returning its rent to the original payer.
+Confirmation refreshes the position, order list and public book.
 
-Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until cancellation
-and matching are implemented. Explicit local tests may enable it alongside the
-draft/funding flags after deploying this version. The form states that placed
-orders cannot yet be canceled and remain locked. No admin role is required for
+Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until matching is
+implemented and deployed. Explicit local tests may enable it alongside the
+draft/funding/cancellation flags after deploying this version.
+`NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED` defaults false until deployment;
+it requires the draft flag but does not depend on new-order or funding flags.
+Disabling new orders therefore leaves cancellation available. No admin role is required for
 trading. Rebuild/redeploy the program before using the updated client on devnet.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:

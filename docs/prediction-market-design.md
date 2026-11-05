@@ -3,8 +3,8 @@
 Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
 locally, along with active-admin creator-controlled market opening and first
-resting orders on empty sides, same-price FIFO append and sorted new-price insertion. Cancellation, matching
-and resolution remain planned. This program version
+resting orders on empty sides, same-price FIFO append, sorted new-price insertion
+and owner-only cancellation. Matching and resolution remain planned. This program version
 has not been deployed to devnet.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
@@ -16,7 +16,7 @@ Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
 atomically. Empty-side placement, same-price FIFO append and new-price insertion
-are implemented locally; cancellation and matching remain unavailable.
+and cancellation are implemented locally; matching remains unavailable.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -299,7 +299,7 @@ An order stores its owner, market, ID, outcome, side, raw price, level address,
 previous/next order, submitted/remaining quantities, locked collateral, status
 and bump. Quantities are whole contracts. For bids, locked collateral uses mint
 atoms and includes any reserved fee budget. For asks, it counts the chosen
-outcome's whole contracts. Future fills/cancellation must use those exact units.
+outcome's whole contracts. Cancellation and future fills must use those exact units.
 
 | Account | Payload | With Anchor discriminator |
 | --- | ---: | ---: |
@@ -335,7 +335,7 @@ order flow. Existing market/position layouts and funds are unchanged.
 
 `PredictionPriceLevel` and `PredictionOrder` are exposed through the placement
 instruction and registered in the frontend reader. Order submission is a separate
-rollout gate; it remains disabled on public deployments while cancellation is missing.
+rollout gate; public order submission stays disabled while matching is unfinished.
 
 The new tests cover maximum/optional serialization, outcome/side isolation,
 spot discriminator rejection, integer boundaries, namespace separation and
@@ -562,10 +562,10 @@ after confirmation. A stale concurrent submission still fails on chain and must
 refresh/retry. The receipt is held outside the loading form so refreshing cannot
 erase a confirmed transaction.
 
-`NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED` defaults false and requires the draft and
-funding flags. It is for explicit local resting-order tests only until cancellation
-and matching are implemented/deployed. Orders already placed cannot be canceled
-in this version, so their claims stay locked. This flag is rollout, not on-chain
+`NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED` defaults false and requires the draft,
+funding and cancellation flags. It is for explicit local resting-order tests until
+matching is implemented and deployed. Open orders can now be canceled to release
+their remaining locks. This flag is rollout, not on-chain
 authorization. Do not enable public order entry with this incomplete lifecycle.
 
 Example: buying 10 YES at 0.60 locks 6 collateral tokens. Selling 10 YES locks
@@ -596,7 +596,7 @@ previous link and an exact remaining total; longer queues require a distinct
 first order and a previous link on the tail. The best level has no better
 neighbor; a non-best level must retain a better link and agree with best-price
 ordering. These bounded checks do not traverse or re-audit the entire price list;
-insertion and future cancellation must preserve that program-owned structure.
+insertion and cancellation preserve that program-owned structure.
 
 The new order receives `previous_order = old_tail` and `next_order = None`.
 Only `old_tail.next_order` changes on the existing order. The level keeps its
@@ -619,8 +619,8 @@ falls back to another path. Before signing, the client reads fresh market,
 position, book, level and tail data; another transaction can still invalidate
 that snapshot, in which case the chain rejects it atomically and the user retries.
 
-The existing order rollout flag remains false publicly while cancellation is
-missing. Tests verify three-order FIFO queues for both outcomes and sides,
+The order rollout flag remains false publicly while matching is unfinished.
+Tests verify three-order FIFO queues for both outcomes and sides,
 different traders, unchanged maker balances, reserve conservation, substituted
 and stale tails, corrupt endpoints/identity, timing/funding/counter failures,
 real cross-outcome orders, signatures and multi-append rollback. Client tests
@@ -668,6 +668,58 @@ crossing rejection, forged identities, stale/nonadjacent hints, counter bounds
 and transaction rollback. Client tests cover routing, bad links, the search cap,
 RPC failures, optional-account encoding and transaction size.
 
+### Cancellation (implemented locally)
+
+`cancel_prediction_order(order_id)` requires the signing order owner and the
+canonical market, position, book, order and price level. Only Open orders can
+be canceled. There is no market-status, admin or Clock gate: cancellation works
+at close time and in Frozen, Proposed or Resolved state. No vault tokens,
+outcome supply, payout reserve or fees move.
+
+Cancellation verifies the recorded unfilled backing. Current bids reserve exactly
+`price * remaining_quantity` collateral atoms; asks reserve that many whole YES
+or NO contracts. The refund uses the recorded amount, never original quantity.
+Adding fee reserves later must explicitly update this backing rule. Checked
+arithmetic moves the remaining lock back to the same owner's free bucket.
+
+FIFO hints must exactly match the order's previous/next links. Their canonical
+addresses, identity, status, ID ordering and reciprocal links are verified.
+Removing a head, middle or tail repairs the surviving links and level endpoints.
+The level quantity, level count and market count decrease together. Canceled
+orders keep their account, original quantity and ID for history, but have zero
+remaining quantity, zero locked backing and no FIFO links. IDs are never reused.
+
+Only the final order at a price supplies price neighbors and a rent recipient.
+The program verifies the exact stored better/worse prices, canonical accounts,
+ordering and reciprocal links. It unlinks the empty level, promotes the worse
+price when removing the best, then closes the level. Rent goes to its original
+`rent_payer`, which may differ from the canceling trader. The same price can then
+be created again under a fresh order ID. Extra price/rent hints are rejected when
+the level survives. Missing or stale hints reject the whole transaction.
+
+The instruction touches at most two FIFO neighbors and two price neighbors;
+boxed accounts keep the parser within Solana's stack limit. Retaining canceled
+order accounts costs rent but preserves queryable history; reclaiming their rent
+would need a separate closure policy. No prediction events are emitted yet.
+
+The position panel lists this wallet's orders for this market, including price,
+original quantity, remaining quantity and status. Only Open orders show Cancel.
+The client refreshes hints before signing and refreshes the ledger, orders and
+public book after confirmation. RPC or decode failures never become guessed
+neighbors. The parent keeps the transaction receipt during refresh.
+
+`NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED` defaults false until this program
+version is deployed. It requires the draft flag, but is independent of funding
+and new-order flags. Turning off new orders therefore leaves cancellation
+available. Local order-entry testing now also requires this cancellation flag.
+
+Tests cover every FIFO removal shape and price-level position on both outcomes
+and sides, rent refunds to another trader, closed/foreign orders, missing signers,
+canonical account bindings, malformed links and totals, checked ledger arithmetic,
+expired/closed market states and whole-transaction rollback. A synthetic partial-fill
+snapshot verifies remainder-only refunds; it does not execute matching. Client tests
+cover neighbor selection, failure handling, rollout flags and IDL packet size.
+
 ### Trading still to implement
 
 The resting paths above are implemented without taker fees. Future crossing
@@ -677,8 +729,8 @@ Matching will transfer an internal outcome position from seller to buyer and mov
 the maker-price collateral from buyer to seller. It does not transfer SPL
 tokens because both traders already hold claims against the same vault.
 
-Cancellation must remain available after the market freezes or resolves. It will
-release only the unfilled collateral or positions. Planned redemption initially
+Cancellation remains available after the market freezes or resolves and releases
+only the unfilled collateral or positions. Planned redemption initially
 requires positions to be free, so users cancel resting orders before redeeming.
 
 ### Resolution and redemption
@@ -859,8 +911,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
 3. **Trading — started locally.** Opening, atomic book initialization, empty-side
-   placement, same-price FIFO append and new-price insertion are implemented. Next: cancellation,
-   bounded matching, fees, trading UI, typed events and indexer decoding.
+   placement, same-price FIFO append, new-price insertion and cancellation are implemented.
+   Next: bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution
    limits and rollback tests, then run a full devnet lifecycle. Oracle adapters
