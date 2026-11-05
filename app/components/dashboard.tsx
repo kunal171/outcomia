@@ -99,8 +99,44 @@ function OrderFlow() {
   );
 }
 
+// Fictional market drafts for the landing demo, not listed markets or forecasts.
+const PREDICTION_EXAMPLES = [
+  {
+    category: "Space",
+    icon: "↗",
+    question: "Will the same rocket booster launch twice in 24 hours?",
+    criteria: "Two orbital launches · same booster · by 31 Dec 2027",
+    evidence: "Operator flight records & launch timestamps",
+    yes: "0.60",
+    no: "0.40",
+    cost: "6",
+  },
+  {
+    category: "Energy",
+    icon: "☀",
+    question: "Will solar supply half of Spain’s electricity for a full day?",
+    criteria: "24-hour generation share ≥ 50% · by 31 Dec 2027",
+    evidence: "National grid operator’s generation data",
+    yes: "0.35",
+    no: "0.65",
+    cost: "3.50",
+  },
+  {
+    category: "Gaming",
+    icon: "⚑",
+    question: "Will a Super Mario Bros. speedrun break 4 minutes 54 seconds?",
+    criteria: "Original game · human any% run · by 31 Dec 2027",
+    evidence: "Verified leaderboard entry & run recording",
+    yes: "0.55",
+    no: "0.45",
+    cost: "5.50",
+  },
+] as const;
+
 /** Scroll changes only this illustration. Prices are examples, never fetched quotes. */
 function PredictionJourney() {
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const example = PREDICTION_EXAMPLES[exampleIndex];
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     const node = section.current;
@@ -205,41 +241,53 @@ function PredictionJourney() {
               <span>EXAMPLE MARKET</span>
               <span className="journey-demo">Illustration only</span>
             </div>
-            <div className="journey-question-icon" aria-hidden="true">
-              ↗
+            <div
+              className="journey-example-tabs"
+              role="group"
+              aria-label="Choose an example market"
+            >
+              {PREDICTION_EXAMPLES.map((item, index) => (
+                <button
+                  key={item.category}
+                  type="button"
+                  aria-pressed={index === exampleIndex}
+                  onClick={() => setExampleIndex(index)}
+                >
+                  {item.category}
+                </button>
+              ))}
             </div>
-            <h3>
-              Will Solana hit
-              <br />
-              its next milestone?
-            </h3>
-            <p className="journey-question-note">
-              One question. Two possible outcomes.
-            </p>
+            <div className="journey-question-icon" aria-hidden="true">
+              {example.icon}
+            </div>
+            <h3>{example.question}</h3>
+            <p className="journey-question-note">{example.criteria}</p>
             <div className="journey-outcomes">
               <div>
                 <span>YES</span>
                 <strong>
-                  0.60 <small>tUSDC</small>
+                  {example.yes} <small>tUSDC</small>
                 </strong>
               </div>
               <div>
                 <span>NO</span>
                 <strong>
-                  0.40 <small>tUSDC</small>
+                  {example.no} <small>tUSDC</small>
                 </strong>
               </div>
             </div>
             <div className="journey-order">
               <span>Example limit buy</span>
-              <strong>10 YES × 0.60 = 6 tUSDC</strong>
+              <strong>
+                10 YES × {example.yes} = {example.cost} tUSDC
+              </strong>
               <small>Before fees · only if the order fills</small>
             </div>
             <div className="journey-terms">
               <span aria-hidden="true">✓</span>
               <div>
                 <strong>Know what decides the outcome</strong>
-                <small>Evidence · resolver · closing time</small>
+                <small>{example.evidence}</small>
               </div>
             </div>
             <div className="journey-progress" aria-hidden="true">

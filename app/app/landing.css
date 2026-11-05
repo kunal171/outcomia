@@ -782,3 +782,30 @@
     opacity: 1;
   }
 }
+
+.journey-example-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+.journey-example-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.journey-example-tabs button[aria-pressed="true"] {
+  color: var(--ink);
+  background: rgb(var(--accent-rgb) / 0.16);
+  border-color: rgb(var(--accent-rgb) / 0.5);
+}
+.journey-terms > div {
+  min-width: 0;
+}
+.journey-terms small {
+  line-height: 1.6;
+}
