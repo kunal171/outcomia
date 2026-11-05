@@ -39,7 +39,12 @@ export function PredictionRulesEditor({
   }
   return (
     <fieldset className="rules-editor" disabled={disabled}>
-      <legend>Market rules</legend>
+      <legend>
+        <span className="section-marker" aria-hidden="true">
+          02
+        </span>{" "}
+        Market rules
+      </legend>
       <p className="rules-help">
         Start with these terms, then make the criteria specific to your
         question. All rules are public after upload.

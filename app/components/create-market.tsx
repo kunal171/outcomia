@@ -157,7 +157,7 @@ export function CreateMarket() {
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell route-shell-narrow">
-        <Link className="text-button" href="/markets/new">
+        <Link className="market-type-back" href="/markets/new">
           ← Change market type
         </Link>
         <div className="route-heading">

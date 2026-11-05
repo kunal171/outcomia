@@ -572,9 +572,9 @@ export function MarketDetail({ address }: { address: string }) {
       const opposingBest = side === "bid" ? market.bestAsk : market.bestBid;
       const crossesBest = Boolean(
         opposingBest &&
-          (side === "bid"
-            ? rawPrice.gte(opposingBest)
-            : rawPrice.lte(opposingBest)),
+        (side === "bid"
+          ? rawPrice.gte(opposingBest)
+          : rawPrice.lte(opposingBest)),
       );
 
       if (crossesBest && opposingBest) {
@@ -1048,7 +1048,9 @@ export function MarketDetail({ address }: { address: string }) {
                       {inversePrice(reference.price, market.quoteDecimals)}{" "}
                       {labels.base}
                     </p>
-                    <small>{reference.label}</small>
+                    <span className="price-source">
+                      <span aria-hidden="true">●</span> {reference.label}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -1063,6 +1065,16 @@ export function MarketDetail({ address }: { address: string }) {
                   labeled by its book source.
                 </p>
               )}
+              <details className="inline-explainer rate-explainer">
+                <summary>How is this price calculated?</summary>
+                <p>
+                  The last traded price is the most recent fill found in recent
+                  history. If none is available, we show an indicative quote
+                  from the order book, labeled by its source. The reverse rate
+                  is 1 divided by that price. Your order fills at available
+                  resting prices, so the final execution price can differ.
+                </p>
+              </details>
             </section>
             <div className="market-detail-layout">
               <section className="admin-card market-information">

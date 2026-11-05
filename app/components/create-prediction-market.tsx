@@ -243,7 +243,7 @@ export function CreatePredictionMarket() {
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell route-shell-narrow">
-        <Link className="text-button" href="/markets/new">
+        <Link className="market-type-back" href="/markets/new">
           ← Change market type
         </Link>
         <div className="route-heading">
@@ -281,6 +281,15 @@ export function CreatePredictionMarket() {
             className="admin-card market-create-form"
             onSubmit={(event) => void create(event)}
           >
+            <div className="form-section-heading">
+              <span className="section-marker" aria-hidden="true">
+                01
+              </span>
+              <div>
+                <h2>Market details</h2>
+                <p>Name the question and choose its collateral.</p>
+              </div>
+            </div>
             <label>
               Short display name
               <input
@@ -322,6 +331,15 @@ export function CreatePredictionMarket() {
                 inputMode="decimal"
               />
             </label>
+            <details className="inline-explainer">
+              <summary>How does the price increment work?</summary>
+              <p>
+                Prices are quoted in collateral per contract. A 0.01 increment
+                allows prices such as 0.40 or 0.41. A winning contract is
+                designed to pay 1 collateral token after settlement; resolution
+                and claims are still in development.
+              </p>
+            </details>
             <PredictionRulesEditor
               value={draft}
               creator={creator}
