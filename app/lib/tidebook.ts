@@ -15,6 +15,7 @@ import { PROGRAM_ID } from "./solana";
 import type {
   PredictionMarketAccount,
   PredictionPositionAccount,
+  PredictionOrderBookAccount,
 } from "./prediction";
 
 export const PROTOCOL_CONFIG_SEED = "protocol_config";
@@ -198,6 +199,7 @@ interface AccountClient<T> {
 interface TidebookAccounts {
   predictionMarket: AccountClient<PredictionMarketAccount>;
   predictionPosition: AccountClient<PredictionPositionAccount>;
+  predictionOrderBook: AccountClient<PredictionOrderBookAccount>;
   protocolConfig: AccountClient<ProtocolConfigAccount>;
   adminRecord: AccountClient<AdminRecordAccount>;
   market: AccountClient<MarketAccount>;

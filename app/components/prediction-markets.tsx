@@ -11,12 +11,15 @@ import { useProtocolRole } from "./protocol-role-provider";
 import {
   predictionStatus,
   predictionTime,
+  derivePredictionBookPda,
+  type PredictionOrderBookAccount,
   type PredictionMarketAccount,
 } from "../lib/prediction";
 import {
   accountExplorerUrl,
   getTidebookAccounts,
   getTidebookReadProgram,
+  formatAtomicAmount,
   type MarketMetadataAccount,
 } from "../lib/tidebook";
 
@@ -24,6 +27,7 @@ type Record = {
   address: PublicKey;
   market: PredictionMarketAccount;
   metadata: MarketMetadataAccount | null;
+  book: PredictionOrderBookAccount | null;
 };
 
 /** Public discovery and account inspection; RPC failure never becomes an empty book. */
@@ -61,13 +65,19 @@ export function PredictionMarkets({ address }: { address?: string }) {
           markets = await accounts.predictionMarket.all();
         }
         const rows = await Promise.all(
-          markets.map(async ({ publicKey, account }) => ({
-            address: publicKey,
-            market: account,
-            metadata: await accounts.marketMetadata.fetchNullable(
-              account.metadata,
-            ),
-          })),
+          markets.map(async ({ publicKey, account }) => {
+            const [metadata, book] = await Promise.all([
+              accounts.marketMetadata.fetchNullable(account.metadata),
+              accounts.predictionOrderBook.fetchNullable(
+                derivePredictionBookPda(publicKey),
+              ),
+            ]);
+            if (book && !book.market.equals(publicKey))
+              throw new Error(
+                "Order book belongs to a different prediction market",
+              );
+            return { address: publicKey, market: account, metadata, book };
+          }),
         );
         if (!canceled)
           setRecords(
@@ -146,8 +156,9 @@ export function PredictionMarkets({ address }: { address?: string }) {
           className={address ? "prediction-detail-grid" : "markets-grid"}
           aria-live="polite"
         >
-          {records.map(({ address: key, market, metadata }) => {
+          {records.map(({ address: key, market, metadata, book }) => {
             const status = predictionStatus(market);
+            const decimals = market.payoutPerContract.toString().length - 1;
             const fields = [
               ["Collateral mint", market.collateralMint.toBase58()],
               ["Collateral vault", market.collateralVault.toBase58()],
@@ -235,6 +246,57 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     View account ↗
                   </a>
                 </div>
+                {address && (
+                  <section className="admin-card">
+                    <h3>Order book</h3>
+                    {book ? (
+                      <>
+                        <p>
+                          Book initialized. Order placement will be added next.
+                        </p>
+                        <dl className="market-metadata">
+                          <div>
+                            <dt>Next order ID</dt>
+                            <dd>{book.nextOrderId.toString()}</dd>
+                          </div>
+                          {(
+                            [
+                              ["Best YES buy", book.yesBestBid],
+                              ["Best YES sell", book.yesBestAsk],
+                              ["Best NO buy", book.noBestBid],
+                              ["Best NO sell", book.noBestAsk],
+                            ] as const
+                          ).map(([label, price]) => (
+                            <div key={label}>
+                              <dt>{label}</dt>
+                              <dd>
+                                {price === null
+                                  ? "No orders"
+                                  : `${formatAtomicAmount(price, decimals)} ${metadata?.quoteSymbol ?? "collateral"}`}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <a
+                          className="market-explorer-link"
+                          href={accountExplorerUrl(
+                            derivePredictionBookPda(key),
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View book account ↗
+                        </a>
+                      </>
+                    ) : (
+                      <p>
+                        This older draft has no book root. Create a fresh draft
+                        with the updated program before placing orders; existing
+                        funds are unchanged.
+                      </p>
+                    )}
+                  </section>
+                )}
                 {address && (
                   <PredictionLifecycle
                     address={key}

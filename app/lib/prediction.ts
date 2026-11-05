@@ -6,7 +6,7 @@ import type { OrderSide } from "./tidebook";
 
 export type PredictionOutcome = "yes" | "no";
 
-/** Storage foundation only: initialization/placement instructions come next. */
+/** Created atomically with new drafts; placement remains a later step. */
 export interface PredictionOrderBookAccount {
   market: PublicKey;
   nextOrderId: BN;

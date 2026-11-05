@@ -10,14 +10,14 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     constants::{
-        ADMIN_SEED, MARKET_FEES_SEED, MARKET_METADATA_SEED, PREDICTION_MARKET_SEED,
-        VAULT_AUTHORITY_SEED, VAULT_SEED,
+        ADMIN_SEED, MARKET_FEES_SEED, MARKET_METADATA_SEED, PREDICTION_BOOK_SEED,
+        PREDICTION_MARKET_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     errors::{admin, prediction},
     prediction_config::{validate_prediction_market_config, PredictionMarketConfig},
     state::{
         AdminRecord, AdminStatus, MarketFees, MarketKind, MarketMetadata, PredictionMarket,
-        PredictionResolutionPhase, PredictionStatus,
+        PredictionOrderBook, PredictionResolutionPhase, PredictionStatus,
     },
 };
 
@@ -54,6 +54,12 @@ pub struct InitializePredictionMarket<'info> {
     #[account(init, payer = authority, space = 8 + MarketFees::INIT_SPACE,
         seeds = [MARKET_FEES_SEED, market.key().as_ref()], bump)]
     pub market_fees: Box<Account<'info, MarketFees>>,
+    /// Created with the draft, so a successfully initialized market always has
+    /// its canonical index. Plain `init` deliberately rejects an existing root:
+    /// resetting a counter could reuse IDs or detach live price queues.
+    #[account(init, payer = authority, space = 8 + PredictionOrderBook::INIT_SPACE,
+        seeds = [PREDICTION_BOOK_SEED, market.key().as_ref()], bump)]
+    pub order_book: Box<Account<'info, PredictionOrderBook>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -125,6 +131,15 @@ pub fn handle_initialize_prediction_market(
         quote_mint: ctx.accounts.collateral_mint.key(),
         accrued_quote_fees: 0,
         bump: ctx.bumps.market_fees,
+    });
+    ctx.accounts.order_book.set_inner(PredictionOrderBook {
+        market: market_key,
+        next_order_id: 1,
+        yes_best_bid: None,
+        yes_best_ask: None,
+        no_best_bid: None,
+        no_best_ask: None,
+        bump: ctx.bumps.order_book,
     });
     Ok(())
 }

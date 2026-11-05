@@ -39,7 +39,7 @@
           <mxGeometry x="930" y="275" width="200" height="95" as="geometry"/>
         </mxCell>
 
-        <mxCell id="bookRoot" value="PredictionOrderBook root (layout only)&lt;br&gt;4 best-price heads + market-wide ID counter; 77-byte payload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontSize=11;" vertex="1" parent="1">
+        <mxCell id="bookRoot" value="PredictionOrderBook root (initialized with draft)&lt;br&gt;Next ID = 1; four empty heads; 77-byte payload + 8-byte discriminator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="650" y="405" width="480" height="55" as="geometry"/>
         </mxCell>
         <mxCell id="rootYes" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="1" source="bookRoot" target="yesBook"><mxGeometry relative="1" as="geometry"/></mxCell>
@@ -104,7 +104,7 @@
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
 
-        <mxCell id="legend" value="Target architecture: cash/opening local; book layouts defined. Book initialization, matching and resolution remain planned. Existing spot layouts are unchanged." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;dashed=1;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
+        <mxCell id="legend" value="Local: cash/opening and atomic book initialization. Level/order layouts defined; placement, matching and resolution planned. Existing market layouts are unchanged." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;dashed=1;fontSize=11;fontColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="40" y="820" width="1090" height="45" as="geometry"/>
         </mxCell>
       </root>

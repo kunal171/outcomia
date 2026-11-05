@@ -823,6 +823,7 @@ test("creation arguments encode against the checked-in IDL within transaction li
       collateralVault: derive("vault", market.toBuffer(), mint.toBuffer()),
       marketMetadata: derive("market_metadata", market.toBuffer()),
       marketFees: derive("market_fees", market.toBuffer()),
+      orderBook: derive("prediction_book", market.toBuffer()),
       tokenProgram: new PublicKey(
         "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
       ),
@@ -833,6 +834,12 @@ test("creation arguments encode against the checked-in IDL within transaction li
     program.coder.instruction.decode(instruction.data).name,
     "initializePredictionMarket",
   );
+  assert.equal(
+    instruction.keys[8].pubkey.toBase58(),
+    derive("prediction_book", market.toBuffer()).toBase58(),
+  );
+  assert.equal(instruction.keys[8].isWritable, true);
+  assert.equal(instruction.keys[8].isSigner, false);
   const tx = new Transaction({
     feePayer: authority,
     recentBlockhash: PublicKey.default.toBase58(),
@@ -841,4 +848,44 @@ test("creation arguments encode against the checked-in IDL within transaction li
     tx.serialize({ requireAllSignatures: false, verifySignatures: false })
       .length <= 1232,
   );
+});
+
+test("book account IDL round-trips four empty/populated heads and full-width IDs", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  const fields = ["yesBestBid", "yesBestAsk", "noBestBid", "noBestAsk"];
+  for (const populated of [false, true]) {
+    const book = {
+      market,
+      nextOrderId: new BN(populated ? "18446744073709551615" : "1"),
+      bump: 255,
+    };
+    for (const [i, field] of fields.entries())
+      book[field] = populated ? new BN(String((i + 1) * 10000)) : null;
+    const data = await program.coder.accounts.encode(
+      "predictionOrderBook",
+      book,
+    );
+    if (populated) assert.equal(data.length, 85);
+    else assert.equal(data.length, 53); // Empty Options serialize only their tags.
+    const decoded = program.coder.accounts.decode(
+      "predictionOrderBook",
+      Buffer.concat([data, Buffer.alloc(85 - data.length)]),
+    );
+    assert.equal(decoded.market.toBase58(), market.toBase58());
+    assert.equal(decoded.nextOrderId.toString(), book.nextOrderId.toString());
+    assert.equal(decoded.bump, 255);
+    for (const field of fields)
+      assert.equal(
+        decoded[field]?.toString() ?? null,
+        book[field]?.toString() ?? null,
+      );
+  }
 });

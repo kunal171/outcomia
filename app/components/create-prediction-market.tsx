@@ -10,6 +10,7 @@ import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
 import {
   derivePredictionMarketPda,
+  derivePredictionBookPda,
   parsePredictionRules,
   PREDICTION_DRAFTS_ENABLED,
   validatePredictionCreatorResolver,
@@ -140,6 +141,7 @@ export function CreatePredictionMarket() {
           collateralVault: deriveVaultPda(market, collateralMint),
           marketMetadata: deriveMarketMetadataPda(market),
           marketFees: deriveMarketFeesPda(market),
+          orderBook: derivePredictionBookPda(market),
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })

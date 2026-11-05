@@ -29,7 +29,7 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
-    /// Creates a draft prediction market, metadata, fees and collateral vault.
+    /// Creates a draft prediction market, book, metadata, fees and collateral vault.
     pub fn initialize_prediction_market(
         ctx: Context<InitializePredictionMarket>,
         market_id: [u8; 32],

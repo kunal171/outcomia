@@ -185,6 +185,7 @@ impl Fixture {
                 .0,
                 market_metadata: tidebook::derive_market_metadata_pda(&tidebook::ID, &market).0,
                 market_fees: tidebook::derive_market_fees_pda(&tidebook::ID, &market).0,
+                order_book: tidebook::derive_prediction_book_pda(&tidebook::ID, &market).0,
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
             }
@@ -193,9 +194,13 @@ impl Fixture {
     }
 
     fn send(&mut self, instruction: Instruction) -> litesvm::types::TransactionResult {
+        self.send_many(&[instruction])
+    }
+
+    fn send_many(&mut self, instructions: &[Instruction]) -> litesvm::types::TransactionResult {
         self.svm.expire_blockhash();
         let message = Message::new_with_blockhash(
-            &[instruction],
+            instructions,
             Some(&self.admin.pubkey()),
             &self.svm.latest_blockhash(),
         );
@@ -205,8 +210,8 @@ impl Fixture {
     }
 
     fn assert_no_created_accounts(&self, instruction: &Instruction) {
-        // Canonical market, vault, metadata and fee PDAs must all roll back.
-        for index in [2, 5, 6, 7] {
+        // Market, vault, metadata, fees and book must all roll back together.
+        for index in [2, 5, 6, 7, 8] {
             assert!(self
                 .svm
                 .get_account(&instruction.accounts[index].pubkey)
@@ -226,7 +231,7 @@ fn opening_an_initialized_draft_changes_only_its_status() {
     });
     let initialize = f.instruction(config);
     assert!(f.send(initialize.clone()).is_ok());
-    let keys: Vec<_> = [5, 6, 7].map(|i| initialize.accounts[i].pubkey).into();
+    let keys: Vec<_> = [5, 6, 7, 8].map(|i| initialize.accounts[i].pubkey).into();
     let side_accounts: Vec<_> = keys.iter().map(|k| f.svm.get_account(k).unwrap()).collect();
     let mut expected = f.market();
     expected.status = PredictionStatus::Open;
@@ -475,6 +480,25 @@ fn active_admin_creates_draft_with_zeroed_accounting_and_pda_controlled_vault() 
     let fees = MarketFees::try_deserialize(&mut fees.data.as_slice()).unwrap();
     assert_eq!(fees.accrued_quote_fees, 0);
     assert_eq!(fees.quote_mint, f.mint);
+    let (book_key, book_bump) =
+        tidebook::derive_prediction_book_pda(&tidebook::ID, &instruction.accounts[2].pubkey);
+    assert_eq!(instruction.accounts[8].pubkey, book_key);
+    let book_account = f.svm.get_account(&book_key).unwrap();
+    assert_eq!(book_account.owner, tidebook::ID);
+    assert_eq!(book_account.data.len(), 8 + PredictionOrderBook::INIT_SPACE);
+    assert_eq!(book_account.data.len(), 85);
+    let book = PredictionOrderBook::try_deserialize(&mut book_account.data.as_slice()).unwrap();
+    assert_eq!(book.market, instruction.accounts[2].pubkey);
+    assert_eq!((book.next_order_id, book.bump), (1, book_bump));
+    assert_eq!(
+        [
+            book.yes_best_bid,
+            book.yes_best_ask,
+            book.no_best_bid,
+            book.no_best_ask
+        ],
+        [None; 4]
+    );
     // Duplicate initialization must preserve all original account data.
     let before = account.data;
     assert!(f.send(instruction.clone()).is_err());
@@ -541,7 +565,7 @@ fn invalid_config_and_mint_scaled_payout_roll_back_every_created_account() {
 
 #[test]
 fn non_mint_and_noncanonical_vault_or_authority_are_rejected() {
-    for index in [3, 4, 5, 6, 7] {
+    for index in [3, 4, 5, 6, 7, 8] {
         let mut f = Fixture::new();
         let mut instruction = f.instruction(f.config());
         let canonical = instruction.clone();
@@ -549,4 +573,94 @@ fn non_mint_and_noncanonical_vault_or_authority_are_rejected() {
         assert!(f.send(instruction).is_err());
         f.assert_no_created_accounts(&canonical);
     }
+}
+
+#[test]
+fn duplicate_draft_initialization_cannot_reset_a_book_counter() {
+    let mut f = Fixture::new();
+    let ix = f.instruction(f.config());
+    assert!(f.send(ix.clone()).is_ok());
+    let book_key = ix.accounts[8].pubkey;
+    let mut account = f.svm.get_account(&book_key).unwrap();
+    let mut book = PredictionOrderBook::try_deserialize(&mut account.data.as_slice()).unwrap();
+    // Model a previously used, currently empty book; IDs must not return to 1.
+    book.next_order_id = 42;
+    account.data.clear();
+    book.try_serialize(&mut account.data).unwrap();
+    account.data.resize(8 + PredictionOrderBook::INIT_SPACE, 0);
+    f.svm.set_account(book_key, account).unwrap();
+    let keys = [2, 5, 6, 7, 8].map(|i| ix.accounts[i].pubkey);
+    let before: Vec<_> = keys.iter().map(|k| f.svm.get_account(k).unwrap()).collect();
+    assert!(f.send(ix).is_err());
+    for (key, account) in keys.iter().zip(before) {
+        assert_eq!(f.svm.get_account(key).unwrap(), account);
+    }
+}
+
+#[test]
+fn an_existing_book_cannot_be_overwritten_and_rolls_back_new_side_accounts() {
+    let mut f = Fixture::new();
+    let ix = f.instruction(f.config());
+    let book_key = ix.accounts[8].pubkey;
+    let mut data = Vec::new();
+    PredictionOrderBook {
+        market: ix.accounts[2].pubkey,
+        next_order_id: 42,
+        yes_best_bid: None,
+        yes_best_ask: None,
+        no_best_bid: None,
+        no_best_ask: None,
+        bump: tidebook::derive_prediction_book_pda(&tidebook::ID, &ix.accounts[2].pubkey).1,
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    data.resize(8 + PredictionOrderBook::INIT_SPACE, 0);
+    let existing = Account {
+        lamports: f.svm.minimum_balance_for_rent_exemption(data.len()),
+        data,
+        owner: tidebook::ID,
+        executable: false,
+        rent_epoch: 0,
+    };
+    f.svm.set_account(book_key, existing.clone()).unwrap();
+    assert!(f.send(ix.clone()).is_err());
+    assert_eq!(f.svm.get_account(&book_key).unwrap(), existing);
+    for index in [2, 5, 6, 7] {
+        assert!(f.svm.get_account(&ix.accounts[index].pubkey).is_none());
+    }
+}
+
+#[test]
+fn book_address_is_seed_checked_and_creation_is_atomic_across_a_batch() {
+    let mut f = Fixture::new();
+    let ix = f.instruction(f.config());
+    let mut wrong = ix.clone();
+    wrong.accounts[8].pubkey = Pubkey::new_unique();
+    let failure = f.send(wrong.clone()).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("ConstraintSeeds")),
+        "{failure:?}"
+    );
+    f.assert_no_created_accounts(&ix);
+    assert!(f.svm.get_account(&wrong.accounts[8].pubkey).is_none());
+    // A short second instruction reaches an actual account-validation failure,
+    // rather than failing packet-size checks before creation can execute.
+    let mut invalid_open = f.opening();
+    invalid_open.accounts[0].pubkey = f.mint;
+    invalid_open.accounts[0].is_signer = false;
+    let failure = f.send_many(&[ix.clone(), invalid_open]).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("AccountNotSigner")),
+        "{failure:?}"
+    );
+    // Solana must discard the first market's book and all its other accounts.
+    f.assert_no_created_accounts(&ix);
 }

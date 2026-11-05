@@ -13,8 +13,8 @@ account layouts are unchanged.
 
 Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook`,
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
-on fixed test vectors. This is a layout-only step: these accounts are not yet
-created by an instruction, and order placement/matching remain unavailable.
+on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
+atomically. Order/level layouts exist, but placement/matching remain unavailable.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -316,16 +316,31 @@ per-level accounts keep edits bounded but cost rent and require clients to
 supply validated neighbors. All four queues remain independent: complementary
 YES/NO prices do not automatically match against each other in this version.
 
-Initialization is next. It must create the root atomically with new drafts and
-must not allow an existing root to be reset. Client interfaces and PDA helpers
-exist now, but account readers will be registered only when real instruction
-contexts expose these account types in the generated IDL. No fake order-book
-UI or unsupported transaction instruction is added in this step.
+Draft creation initializes the root atomically with the market, collateral
+vault, metadata and fee account. The creator pays rent for the 85-byte root.
+It stores the canonical market and bump, starts `next_order_id` at 1 and sets
+all four best-price heads to `None`. Plain Anchor `init` rejects an existing
+account; there is no `init_if_needed` or reset route. A failure anywhere in
+creation, or later in the same transaction, rolls back the complete account graph.
+
+The generated IDL now exposes `PredictionOrderBook`, and the browser account
+reader registers it. Draft creation supplies its canonical PDA in the same
+instruction. The detail page shows the root account, next order ID and best-price
+heads. Missing roots on older drafts are reported explicitly, not displayed as
+an initialized empty book; RPC failures remain errors. This version provides no
+backfill/reset instruction for older drafts. Create a fresh draft for the new
+order flow. Existing market/position layouts and funds are unchanged.
+
+`PredictionPriceLevel` and `PredictionOrder` will enter the IDL when placement
+uses them. No order submission or matching UI is exposed yet.
 
 The new tests cover maximum/optional serialization, outcome/side isolation,
 spot discriminator rejection, integer boundaries, namespace separation and
 shared Rust/TypeScript PDA vectors. They do not prove queue mutation or matching
 correctness; those require the placement and matching instructions.
+Initialization tests additionally cover canonical binding, the empty root,
+unchanged roots on duplicate creation/opening, pre-existing account rejection,
+whole-graph rollback and the enlarged creation transaction's packet size.
 
 These accounts follow the spot book's sorted-level and FIFO-link design.
 Pure linked-list validation helpers can be shared later, after both versions are
@@ -341,13 +356,13 @@ working.
 4. `withdraw_prediction_collateral`
 5. `open_prediction_market`
 
-Initialization creates the market, collateral vault, metadata, and fee account
+Initialization creates the market, collateral vault, metadata, fee account and book
 in one transaction. `MarketKind::Prediction` becomes available only through
 this instruction; the existing spot initializer must continue rejecting it.
 
 `initialize_prediction_market` is implemented for the draft milestone. It checks
 the caller's active `AdminRecord`, validates configuration with Solana Clock,
-and creates all four accounts atomically. Any validation failure rolls back
+and creates all five accounts atomically. Any validation failure rolls back
 account creation and token CPIs. The vault uses the existing canonical
 `["vault-authority", market]` signer and `["vault", market, collateral_mint]`
 address. The admin pays rent but does not control the vault's token authority.
@@ -355,7 +370,8 @@ Mint decimals must make `payout_per_contract` exactly one collateral token;
 zero-decimal mints cannot satisfy the exact Invalid half-payout rule.
 
 The result is `Draft`, with zero supplies, reserve, fees and orders, primary
-resolution phase, and no proposal or final outcome. Metadata uses `YES-NO` as
+resolution phase, and no proposal or final outcome. Its book starts at order
+ID 1 with four absent best prices. Metadata uses `YES-NO` as
 the internal base label and immutable `Prediction` classification. The fee
 record reuses `MarketFees`, with collateral in its `quote_mint` field. Existing
 spot deposit, matching, metadata-update and fee-withdrawal instructions require
@@ -704,8 +720,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    withdrawals, with owner checks and atomic SPL custody.
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
-3. **Trading — started locally.** Opening and book/order/level layouts are
-   implemented. Next: atomic book initialization, YES/NO queue insertion, cancellation,
+3. **Trading — started locally.** Opening, atomic book initialization and
+   book/order/level layouts are implemented. Next: YES/NO queue insertion, cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution

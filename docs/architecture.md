@@ -257,8 +257,12 @@ sorted price links and FIFO head/tail pointers; `PredictionOrder` holds one
 submission and its collateral claim. Their payload sizes are 77, 175 and 206
 bytes. The root adds rent and a shared write lock but preserves existing market
 layouts. Rust and browser helpers use identical textual outcome/side seeds and
-eight-byte little-endian numeric seeds. These are storage definitions only;
-root initialization, placement and matching are not implemented yet.
+eight-byte little-endian numeric seeds. Draft creation initializes the book root
+atomically, with next ID 1 and four absent best-price heads. Its Anchor `init`
+constraint prevents counter resets, and any failure rolls back all five created
+accounts. The generated IDL and frontend reader expose the root; older drafts
+without one are identified explicitly. Price-level/order creation, placement and
+matching are not implemented yet.
 
 ### Market vault topology
 

@@ -51,7 +51,8 @@ updated client against devnet.
 ## Prediction draft foundation
 
 - `/predictions`: public prediction-market discovery, including open markets.
-- `/predictions/new`: active-admin form for atomic draft creation.
+- `/predictions/new`: active-admin form creating the draft, vault, metadata,
+  fees and empty book root in one instruction.
 - `/predictions/[address]`: public inspection of collateral, resolution windows,
   resolver keys, rules URI and content hashes; connected-wallet position
   initialization and display of all six free/locked balance fields.
@@ -121,9 +122,13 @@ outcome once settlement is implemented; traders will claim payouts themselves.
 `lib/prediction.ts` also defines the upcoming book, price-level and order account
 interfaces and their PDA helpers. Outcome and side use textual seeds; prices
 and IDs use exact eight-byte little-endian BN encoding. Shared Rust/browser
-test vectors protect that contract. Book initialization and order placement are
-still pending, so these types are not yet registered in the IDL-backed account
-reader and no prediction order form is exposed.
+test vectors protect that contract. The IDL-backed reader now exposes the root,
+which is initialized with the draft at next ID 1 and four absent best-price heads.
+The detail page shows these fields and its Explorer link. Older drafts missing
+the root are identified explicitly; create a fresh draft for the new order flow.
+Order/level creation and placement are pending, so those accounts are not yet
+registered and no prediction order form is exposed. Rebuild/redeploy the program
+before using this changed creation transaction against devnet.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 
