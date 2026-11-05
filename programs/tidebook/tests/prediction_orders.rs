@@ -69,6 +69,75 @@ struct Fixture {
     fees: Pubkey,
 }
 impl Fixture {
+    fn level(&self, outcome: PredictionOutcome, side: OrderSide, price: u64) -> Pubkey {
+        tidebook::derive_prediction_price_level_pda(
+            &tidebook::ID,
+            &self.market,
+            outcome,
+            side,
+            price,
+        )
+        .0
+    }
+    fn insert(
+        &self,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        neighbors: (Option<u64>, Option<u64>),
+    ) -> Instruction {
+        let book: PredictionOrderBook = read(&self.svm, self.book);
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::InsertPredictionOrder {
+                order_id: book.next_order_id,
+                outcome,
+                side,
+                price,
+                quantity,
+            }
+            .data(),
+            tidebook::accounts::InsertPredictionOrder {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+                order_book: self.book,
+                price_level: self.level(outcome, side, price),
+                order: tidebook::derive_prediction_order_pda(
+                    &tidebook::ID,
+                    &self.market,
+                    book.next_order_id,
+                )
+                .0,
+                system_program: system_program::ID,
+                better_level: neighbors.0.map(|p| self.level(outcome, side, p)),
+                worse_level: neighbors.1.map(|p| self.level(outcome, side, p)),
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// Compare all supplied state accounts as well as custody/ledger snapshots.
+    /// Payer SOL is excluded because failed transactions still charge fees.
+    fn reject_insert(&mut self, ix: Instruction, code: &str) {
+        let before = self.snapshot();
+        let keys: Vec<_> = ix.accounts.iter().skip(1).map(|a| a.pubkey).collect();
+        let stored: Vec<_> = keys.iter().map(|k| self.svm.get_account(k)).collect();
+        let failure = send(&mut self.svm, &self.owner, &[ix]).unwrap_err();
+        assert!(
+            failure
+                .meta
+                .logs
+                .iter()
+                .any(|s| s.contains(&format!("Error Code: {code}"))),
+            "{failure:?}"
+        );
+        assert_eq!(self.snapshot(), before);
+        for (key, old) in keys.iter().zip(stored) {
+            assert_eq!(self.svm.get_account(key), old);
+        }
+    }
     fn append(
         &self,
         outcome: PredictionOutcome,
@@ -433,6 +502,458 @@ impl Fixture {
             assert!(self.svm.get_account(&ix.accounts[index].pubkey).is_none());
         }
     }
+}
+
+#[test]
+fn sorted_insertion_and_non_best_fifo_append_preserve_all_four_lists_and_backing() {
+    let mut f = Fixture::new();
+    let vault = f.svm.get_account(&f.vault);
+    let fees = f.svm.get_account(&f.fees);
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for side in [OrderSide::Bid, OrderSide::Ask] {
+            // Separate bid/ask ranges keep this a non-crossing resting book.
+            let prices = if side == OrderSide::Bid {
+                [300000, 400000, 200000, 350000]
+            } else {
+                [700000, 600000, 800000, 650000]
+            };
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            let ix = f.ix(outcome, side, prices[0], 1, book.next_order_id);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let maker_position = f.position;
+            let maker_before = f.svm.get_account(&maker_position);
+            // An unrelated funded trader may insert without the first trader signing.
+            f.switch_to_funded_trader();
+            for (price, hints) in [
+                (prices[1], (None, Some(prices[0]))),
+                (prices[2], (Some(prices[0]), None)),
+                (prices[3], (Some(prices[1]), Some(prices[0]))),
+            ] {
+                let custody_before = f.svm.get_account(&f.vault);
+                let market_before: PredictionMarket = read(&f.svm, f.market);
+                let balance_before: PredictionPosition = read(&f.svm, f.position);
+                let ix = f.insert(outcome, side, price, 1, hints);
+                send(&mut f.svm, &f.owner, std::slice::from_ref(&ix)).unwrap();
+                assert_eq!(f.svm.get_account(&f.vault), custody_before);
+                let after: PredictionMarket = read(&f.svm, f.market);
+                assert_eq!(
+                    (after.backing_reserve, after.yes_supply, after.no_supply),
+                    (
+                        market_before.backing_reserve,
+                        market_before.yes_supply,
+                        market_before.no_supply
+                    )
+                );
+                let balance: PredictionPosition = read(&f.svm, f.position);
+                assert_eq!(
+                    balance.collateral_free + balance.collateral_locked,
+                    balance_before.collateral_free + balance_before.collateral_locked
+                );
+                assert_eq!(
+                    balance.yes_free + balance.yes_locked,
+                    balance_before.yes_free + balance_before.yes_locked
+                );
+                assert_eq!(
+                    balance.no_free + balance.no_locked,
+                    balance_before.no_free + balance_before.no_locked
+                );
+                let level: PredictionPriceLevel = read(&f.svm, ix.accounts[4].pubkey);
+                let order: PredictionOrder = read(&f.svm, ix.accounts[5].pubkey);
+                assert_eq!(
+                    (level.first_order, level.last_order),
+                    (Some(ix.accounts[5].pubkey), Some(ix.accounts[5].pubkey))
+                );
+                assert_eq!((level.order_count, level.total_remaining_quantity), (1, 1));
+                assert_eq!((level.better_price, level.worse_price), hints);
+                assert_eq!((order.previous_order, order.next_order), (None, None));
+                assert_eq!(
+                    order.locked_collateral,
+                    if side == OrderSide::Bid { price } else { 1 }
+                );
+                assert_eq!(level.rent_payer, f.owner.pubkey());
+            }
+            assert_eq!(f.svm.get_account(&maker_position), maker_before);
+            let sorted = [prices[1], prices[3], prices[0], prices[2]];
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            assert_eq!(book.best_price(outcome, side), Some(sorted[0]));
+            for (i, price) in sorted.iter().enumerate() {
+                let level: PredictionPriceLevel = read(&f.svm, f.level(outcome, side, *price));
+                assert_eq!(level.better_price, i.checked_sub(1).map(|j| sorted[j]));
+                assert_eq!(level.worse_price, sorted.get(i + 1).copied());
+            }
+            // The insertion-produced middle level is immediately append-compatible.
+            let level: PredictionPriceLevel = read(&f.svm, f.level(outcome, side, prices[3]));
+            let ix = f.append(
+                outcome,
+                side,
+                prices[3],
+                1,
+                book.next_order_id,
+                level.last_order.unwrap(),
+            );
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let level: PredictionPriceLevel = read(&f.svm, f.level(outcome, side, prices[3]));
+            assert_eq!((level.order_count, level.total_remaining_quantity), (2, 2));
+        }
+    }
+    assert_eq!(f.svm.get_account(&f.fees), fees);
+    // Only the explicit test funding deposits moved vault tokens, never insertion.
+    let before = TokenAccount::unpack(&vault.unwrap().data).unwrap().amount;
+    let after = TokenAccount::unpack(&f.svm.get_account(&f.vault).unwrap().data)
+        .unwrap()
+        .amount;
+    assert_eq!(after, before + 4 * 20_000_000);
+    let market: PredictionMarket = read(&f.svm, f.market);
+    assert_eq!(
+        (
+            market.open_order_count,
+            market.yes_supply,
+            market.no_supply,
+            market.backing_reserve
+        ),
+        (20, 30, 30, 30_000_000)
+    );
+    let book: PredictionOrderBook = read(&f.svm, f.book);
+    assert_eq!(book.next_order_id, 21);
+}
+
+#[test]
+fn insertion_rejects_missing_reversed_nonadjacent_and_stale_neighbors_atomically() {
+    let mut f = Fixture::new();
+    let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 1, 1);
+    send(&mut f.svm, &f.owner, &[first]).unwrap();
+    for hints in [
+        (None, None),
+        (Some(600000), None),
+        (Some(600000), Some(600000)),
+    ] {
+        let ix = f.insert(PredictionOutcome::Yes, OrderSide::Bid, 700000, 1, hints);
+        f.reject_insert(
+            ix,
+            if hints.0 == hints.1 && hints.0.is_some() {
+                "ConstraintDuplicateMutableAccount"
+            } else {
+                "InvalidPredictionPriceLevel"
+            },
+        );
+    }
+    let stale = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    let next = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        800000,
+        1,
+        (None, Some(600000)),
+    );
+    send(&mut f.svm, &f.owner, &[next]).unwrap();
+    // Refresh only the order ID to isolate stale adjacency from stale counter.
+    let mut stale = stale;
+    let fresh = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    stale.data = fresh.data;
+    stale.accounts[5] = fresh.accounts[5].clone();
+    f.reject_insert(stale, "InvalidPredictionPriceLevel");
+    let worst = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        400000,
+        1,
+        (Some(600000), None),
+    );
+    send(&mut f.svm, &f.owner, &[worst]).unwrap();
+    let skipped = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (Some(800000), Some(400000)),
+    );
+    f.reject_insert(skipped, "InvalidPredictionPriceLevel");
+}
+
+#[test]
+fn insertion_rejects_forged_neighbor_identity_links_and_empty_queues() {
+    for mutation in 0..10 {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 1, 1);
+        send(&mut f.svm, &f.owner, &[first]).unwrap();
+        let address = f.level(PredictionOutcome::Yes, OrderSide::Bid, 600000);
+        let mut level: PredictionPriceLevel = read(&f.svm, address);
+        match mutation {
+            0 => level.market = Pubkey::new_unique(),
+            1 => level.outcome = PredictionOutcome::No,
+            2 => level.side = OrderSide::Ask,
+            3 => level.price = 500000,
+            4 => level.bump = level.bump.wrapping_sub(1),
+            5 => level.order_count = 0,
+            6 => level.total_remaining_quantity = 0,
+            7 => level.first_order = None,
+            8 => level.last_order = None,
+            _ => level.better_price = Some(800000),
+        }
+        write(&mut f.svm, address, &level);
+        let ix = f.insert(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            700000,
+            1,
+            (None, Some(600000)),
+        );
+        f.reject_insert(ix, "InvalidPredictionPriceLevel");
+    }
+}
+
+#[test]
+fn insertion_binds_signed_owner_position_ids_and_every_neighbor_namespace() {
+    let mut f = Fixture::new();
+    for (id, outcome, side, price) in [
+        (1, PredictionOutcome::Yes, OrderSide::Bid, 600000),
+        (2, PredictionOutcome::No, OrderSide::Bid, 600000),
+        (3, PredictionOutcome::Yes, OrderSide::Ask, 900000),
+    ] {
+        let ix = f.ix(outcome, side, price, 1, id);
+        send(&mut f.svm, &f.owner, &[ix]).unwrap();
+    }
+    for (outcome, side, price) in [
+        (PredictionOutcome::No, OrderSide::Bid, 600000),
+        (PredictionOutcome::Yes, OrderSide::Ask, 900000),
+    ] {
+        let mut ix = f.insert(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            700000,
+            1,
+            (None, Some(600000)),
+        );
+        ix.accounts[8].pubkey = f.level(outcome, side, price);
+        f.reject_insert(ix, "InvalidPredictionPriceLevel");
+    }
+    // Even a byte-for-byte valid level at a different address is not canonical.
+    let fake = Pubkey::new_unique();
+    let original = f.level(PredictionOutcome::Yes, OrderSide::Bid, 600000);
+    f.svm
+        .set_account(fake, f.svm.get_account(&original).unwrap())
+        .unwrap();
+    let mut ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    ix.accounts[8].pubkey = fake;
+    f.reject_insert(ix, "InvalidPredictionPriceLevel");
+    let mut ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    ix.accounts[0].is_signer = false;
+    // Another payer signs; otherwise Message promotes its fee payer to signer.
+    let payer = Keypair::new();
+    f.svm.airdrop(&payer.pubkey(), 2_000_000_000).unwrap();
+    let before = f.snapshot();
+    let failure = send(&mut f.svm, &payer, &[ix]).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|s| s.contains("AccountNotSigner")),
+        "{failure:?}"
+    );
+    assert_eq!(f.snapshot(), before);
+    let mut position: PredictionPosition = read(&f.svm, f.position);
+    let old_owner = position.owner;
+    position.owner = Pubkey::new_unique();
+    write(&mut f.svm, f.position, &position);
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(ix, "PredictionPositionOwnerMismatch");
+    position.owner = old_owner;
+    write(&mut f.svm, f.position, &position);
+    let mut ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    ix.accounts[4].pubkey = f.level(PredictionOutcome::No, OrderSide::Bid, 700000);
+    f.reject_insert(ix, "ConstraintSeeds");
+    let mut ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    ix.accounts[5].pubkey = tidebook::derive_prediction_order_pda(&tidebook::ID, &f.market, 5).0;
+    f.reject_insert(ix, "ConstraintSeeds");
+    let mut book: PredictionOrderBook = read(&f.svm, f.book);
+    let mut ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    book.next_order_id += 1;
+    write(&mut f.svm, f.book, &book);
+    f.reject_insert(ix.clone(), "InvalidPredictionOrderId");
+    book.next_order_id = u64::MAX;
+    write(&mut f.svm, f.book, &book);
+    ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(ix, "PredictionAccountingOverflow");
+}
+
+#[test]
+fn insertion_enforces_funding_lifecycle_crossing_counters_and_transaction_rollback() {
+    let mut f = Fixture::new();
+    let empty = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, None),
+    );
+    f.reject_insert(empty, "InvalidPredictionPriceLevel");
+    let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 1, 1);
+    send(&mut f.svm, &f.owner, &[first]).unwrap();
+    for (price, qty, code) in [
+        (700000, 0, "InvalidPredictionContractQuantity"),
+        (700001, 1, "InvalidPredictionOrderPrice"),
+        (1000000, 1, "InvalidPredictionOrderPrice"),
+        (700000, 1000, "InsufficientFreeBalance"),
+        (700000, u64::MAX, "PredictionAccountingOverflow"),
+    ] {
+        let ix = f.insert(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            price,
+            qty,
+            (None, Some(600000)),
+        );
+        f.reject_insert(ix, code);
+    }
+    let ask = f.ix(PredictionOutcome::Yes, OrderSide::Ask, 700000, 1, 2);
+    send(&mut f.svm, &f.owner, &[ask]).unwrap();
+    let unfunded = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Ask,
+        800000,
+        10,
+        (Some(700000), None),
+    );
+    f.reject_insert(unfunded, "InsufficientPredictionPositions");
+    let original_position: PredictionPosition = read(&f.svm, f.position);
+    let mut overflow: PredictionPosition = read(&f.svm, f.position);
+    overflow.collateral_locked = u64::MAX;
+    write(&mut f.svm, f.position, &overflow);
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        650000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(ix, "LockedBalanceOverflow");
+    write(&mut f.svm, f.position, &original_position);
+    let crossing = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        700000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(crossing, "PredictionOrderWouldCross");
+    let initial: PredictionMarket = read(&f.svm, f.market);
+    for status in [
+        PredictionStatus::Draft,
+        PredictionStatus::Frozen,
+        PredictionStatus::Proposed,
+        PredictionStatus::Resolved,
+    ] {
+        let mut market: PredictionMarket = read(&f.svm, f.market);
+        market.status = status;
+        write(&mut f.svm, f.market, &market);
+        let ix = f.insert(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            650000,
+            1,
+            (None, Some(600000)),
+        );
+        f.reject_insert(ix, "PredictionOrderUnavailable");
+    }
+    write(&mut f.svm, f.market, &initial);
+    let mut clock = f.svm.get_sysvar::<Clock>();
+    clock.unix_timestamp = initial.close_ts;
+    f.svm.set_sysvar(&clock);
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        650000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(ix, "PredictionOrderUnavailable");
+    clock.unix_timestamp = 100;
+    f.svm.set_sysvar(&clock);
+    let mut full: PredictionMarket = read(&f.svm, f.market);
+    full.open_order_count = u64::MAX;
+    write(&mut f.svm, f.market, &full);
+    let ix = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        650000,
+        1,
+        (None, Some(600000)),
+    );
+    f.reject_insert(ix, "PredictionAccountingOverflow");
+    write(&mut f.svm, f.market, &initial);
+    let before = f.snapshot();
+    let first = f.insert(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        650000,
+        1,
+        (None, Some(600000)),
+    );
+    // Duplicate IDs in the second instruction force rollback after the splice.
+    assert!(send(&mut f.svm, &f.owner, &[first.clone(), first.clone()]).is_err());
+    assert_eq!(f.snapshot(), before);
+    assert!(f.svm.get_account(&first.accounts[4].pubkey).is_none());
+    assert!(f.svm.get_account(&first.accounts[5].pubkey).is_none());
+    let level: PredictionPriceLevel = read(
+        &f.svm,
+        f.level(PredictionOutcome::Yes, OrderSide::Bid, 600000),
+    );
+    assert_eq!(level.better_price, None);
 }
 
 #[test]

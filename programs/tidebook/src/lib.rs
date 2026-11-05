@@ -30,6 +30,20 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
+    /// Inserts a funded order between verified adjacent prices on an occupied side.
+    pub fn insert_prediction_order(
+        ctx: Context<InsertPredictionOrder>,
+        order_id: u64,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::insert_prediction_order::handle_insert_prediction_order(
+            ctx, order_id, outcome, side, price, quantity,
+        )
+    }
+
     /// Appends a funded order after the verified tail at an existing price.
     pub fn append_prediction_order(
         ctx: Context<AppendPredictionOrder>,

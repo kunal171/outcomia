@@ -3,7 +3,7 @@
 Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
 locally, along with active-admin creator-controlled market opening and first
-resting orders on empty sides and same-price FIFO append. New-price insertion, cancellation, matching
+resting orders on empty sides, same-price FIFO append and sorted new-price insertion. Cancellation, matching
 and resolution remain planned. This program version
 has not been deployed to devnet.
 
@@ -15,8 +15,8 @@ account layouts are unchanged.
 Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook`,
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
-atomically. Empty-side placement and same-price FIFO append are implemented
-locally; insertion of new prices, cancellation and matching remain unavailable.
+atomically. Empty-side placement, same-price FIFO append and new-price insertion
+are implemented locally; cancellation and matching remain unavailable.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -538,7 +538,7 @@ positive whole u64. Price is positive, below payout and divisible by the tick.
 This first path accepts only an empty selected outcome/side list. A buy at or
 above that outcome's best ask, or a sell at or below its best bid, is rejected.
 There is no cross-outcome matching. Same-price append uses its own instruction;
-new-price insertion and crossing orders still need later instructions. The program does not silently create a crossed
+new-price insertion uses a separate instruction, and crossing orders still need matching. The program does not silently create a crossed
 book or skip existing priority.
 
 A buy locks exactly `price * quantity` collateral atoms. A sell locks exactly
@@ -596,7 +596,7 @@ previous link and an exact remaining total; longer queues require a distinct
 first order and a previous link on the tail. The best level has no better
 neighbor; a non-best level must retain a better link and agree with best-price
 ordering. These bounded checks do not traverse or re-audit the entire price list;
-future insertion/cancellation must preserve that program-owned structure.
+insertion and future cancellation must preserve that program-owned structure.
 
 The new order receives `previous_order = old_tail` and `next_order = None`.
 Only `old_tail.next_order` changes on the existing order. The level keeps its
@@ -613,8 +613,8 @@ for his new order. Appending never buys an earlier position in the FIFO queue.
 
 The form reads the canonical requested price level. If it exists, it reads the
 stored last order and chooses append. If it is absent and that side is empty,
-it chooses first placement. An absent price on an occupied side remains
-unsupported until sorted insertion is implemented. RPC/decode failure never
+it chooses first placement. An absent price on an occupied side selects sorted
+insertion using the neighboring levels described below. RPC/decode failure never
 falls back to another path. Before signing, the client reads fresh market,
 position, book, level and tail data; another transaction can still invalidate
 that snapshot, in which case the chain rejects it atomically and the user retries.
@@ -626,23 +626,59 @@ and stale tails, corrupt endpoints/identity, timing/funding/counter failures,
 real cross-outcome orders, signatures and multi-append rollback. Client tests
 cover routing, failed RPC reads, queue preflight, account roles and packet size.
 
+### New-price insertion (implemented locally)
+
+`insert_prediction_order(order_id, outcome, side, price, quantity)` creates a
+new level and its first order on an occupied side. It uses the shared price,
+time, funding and counter checks. Existing levels must use append; Anchor
+`init` prevents overwriting an existing queue. Empty sides use first placement.
+
+Buys sort highest first; sells sort lowest first. The client supplies:
+
+| Position  | Better neighbor    | Worse neighbor |
+| --------- | ------------------ | -------------- |
+| New best  | Absent             | Current best   |
+| Middle    | Previous level     | Next level     |
+| New worst | Current last level | Absent         |
+
+Each neighbor must be a canonical prediction level for the market, outcome and
+side, with an active queue. Middle insertion requires reciprocal links proving
+that the levels are adjacent. Best insertion verifies the book head; worst
+insertion requires the better neighbor's terminal link. Strict ordering prevents
+equal prices and reversed hints. Invalid hints return `InvalidPredictionPriceLevel`;
+Anchor rejects duplicate mutable neighbors before the handler runs.
+
+The instruction rewires both neighbors and creates the one-order FIFO queue.
+Only a new best changes the head. Funding, IDs, counts and links commit together;
+a stale hint or later failing instruction rolls everything back, including new
+accounts. Existing traders need not sign and their balances do not change.
+No token transfer, reserve change or fee accrual occurs.
+
+This costs two new rent-funded accounts and up to two neighbor write locks.
+On-chain insertion is O(1). The browser follows the existing list from its head,
+validates reciprocal links and ordering, and stops after 128 levels. This bounded
+off-chain search is O(n); exceeding its limit disables submission rather than
+guessing a gap. A future indexer can supply hints without changing on-chain
+validation. RPC/decode errors propagate, and pre-signing reads refresh hints;
+concurrent changes can still require a retry.
+
+Tests cover best/middle/worst insertion on all four lists, FIFO append at an
+inserted middle price, unrelated traders, funding and lifecycle failures,
+crossing rejection, forged identities, stale/nonadjacent hints, counter bounds
+and transaction rollback. Client tests cover routing, bad links, the search cap,
+RPC failures, optional-account encoding and transaction size.
+
 ### Trading still to implement
 
-`place_prediction_order(outcome, side, price, quantity)` checks:
+The resting paths above are implemented without taker fees. Future crossing
+orders need bounded matching, fee checks and a safe resting-remainder path.
 
-- the market is open and before `close_ts`;
-- `0 < price < payout_per_contract`;
-- price follows `price_tick`;
-- a bid can lock `price * quantity` collateral plus its maximum fee;
-- an ask can lock the requested YES or NO quantity;
-- the supplied price-level and FIFO neighbours are canonical.
-
-Matching transfers an internal outcome position from seller to buyer and moves
+Matching will transfer an internal outcome position from seller to buyer and move
 the maker-price collateral from buyer to seller. It does not transfer SPL
 tokens because both traders already hold claims against the same vault.
 
-Cancellation remains available after the market freezes or resolves. It
-releases only the unfilled collateral or positions. Redemption initially
+Cancellation must remain available after the market freezes or resolves. It will
+release only the unfilled collateral or positions. Planned redemption initially
 requires positions to be free, so users cancel resting orders before redeeming.
 
 ### Resolution and redemption
@@ -823,7 +859,7 @@ its tests, frontend and documentation; grouping does not remove the safety check
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
 3. **Trading — started locally.** Opening, atomic book initialization, empty-side
-   placement and same-price FIFO append are implemented. Next: new-price insertion, cancellation,
+   placement, same-price FIFO append and new-price insertion are implemented. Next: cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution

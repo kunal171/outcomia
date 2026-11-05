@@ -253,7 +253,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
                       <>
                         <p>
                           Book initialized. Empty-side placement and same-price
-                          FIFO appending are available for local testing.
+                          FIFO appending and sorted new-price insertion are
+                          available for local testing.
                         </p>
                         <dl className="market-metadata">
                           <div>

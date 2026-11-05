@@ -10,7 +10,7 @@ import {
   PREDICTION_ORDERS_ENABLED,
   validatePredictionRestingOrder,
   readPredictionPlacementTarget,
-  type PredictionAppendTarget,
+  type PredictionPlacementTarget,
   type PredictionMarketAccount,
   type PredictionOrderBookAccount,
   type PredictionOutcome,
@@ -36,7 +36,7 @@ interface Props {
   onPlaced: (signature: string, order: PublicKey) => void;
 }
 
-/** Select empty-side placement or same-price FIFO append from actual accounts. */
+/** Select empty placement, FIFO append or sorted insertion from actual accounts. */
 export function PredictionOrderForm({
   program,
   owner,
@@ -53,9 +53,7 @@ export function PredictionOrderForm({
   const [loading, setLoading] = useState(true);
   const [readError, setReadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [target, setTarget] = useState<
-    PredictionAppendTarget | { kind: "place" } | null
-  >(null);
+  const [target, setTarget] = useState<PredictionPlacementTarget | null>(null);
   const [targetLoading, setTargetLoading] = useState(false);
   const [targetError, setTargetError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<PredictionOutcome>("yes");
@@ -187,7 +185,7 @@ export function PredictionOrderForm({
         parsed.price,
         parsed.quantity,
         new BN(now),
-        target.kind === "append" ? target : undefined,
+        target.kind === "place" ? undefined : target,
       );
     } catch (cause) {
       issue = cause instanceof Error ? cause.message : "Invalid order";
@@ -236,7 +234,7 @@ export function PredictionOrderForm({
         parsed.price,
         parsed.quantity,
         new BN(Math.floor(Date.now() / 1000)),
-        latestTarget.kind === "append" ? latestTarget : undefined,
+        latestTarget.kind === "place" ? undefined : latestTarget,
       );
       const order = derivePredictionOrderPda(
         marketAddress,
@@ -245,7 +243,9 @@ export function PredictionOrderForm({
       const method =
         latestTarget.kind === "append"
           ? program.methods.appendPredictionOrder
-          : program.methods.placePredictionOrder;
+          : latestTarget.kind === "insert"
+            ? program.methods.insertPredictionOrder
+            : program.methods.placePredictionOrder;
       const builder = method(
         latestBook.nextOrderId,
         { [outcome]: {} },
@@ -271,7 +271,29 @@ export function PredictionOrderForm({
         .accountsStrict(
           latestTarget.kind === "append"
             ? { ...common, tailOrder: latestTarget.tailAddress }
-            : common,
+            : latestTarget.kind === "insert"
+              ? {
+                  ...common,
+                  // Anchor represents an absent optional account by this
+                  // instruction's program ID; it is never a writable neighbor.
+                  betterLevel: latestTarget.better
+                    ? derivePredictionPriceLevelPda(
+                        marketAddress,
+                        outcome,
+                        side,
+                        latestTarget.better.price,
+                      )
+                    : program.programId,
+                  worseLevel: latestTarget.worse
+                    ? derivePredictionPriceLevelPda(
+                        marketAddress,
+                        outcome,
+                        side,
+                        latestTarget.worse.price,
+                      )
+                    : program.programId,
+                }
+              : common,
         )
         .instruction();
       const signature = await (
@@ -296,8 +318,8 @@ export function PredictionOrderForm({
     >
       <h3>Place a limit order</h3>
       <p>
-        Resting-order testing supports empty sides or appending at an existing
-        price. Matching and cancellation are not available yet; placed orders
+        Resting-order testing supports new prices and FIFO queues at existing
+        prices. Matching and cancellation are not available yet; placed orders
         keep their funds locked.
       </p>
       {!PREDICTION_ORDERS_ENABLED && (
@@ -380,6 +402,9 @@ export function PredictionOrderForm({
       )}
       {target?.kind === "append" && (
         <p>This order joins the back of the existing FIFO queue.</p>
+      )}
+      {target?.kind === "insert" && (
+        <p>This order starts a new price level in price priority.</p>
       )}
       {error && (
         <p className="access-denied" role="alert">

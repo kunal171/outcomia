@@ -268,9 +268,14 @@ the canonical order, level, head, next ID and market count. No vault transfer,
 reserve change or fee accrual occurs. `append_prediction_order` adds at an existing
 price's verified FIFO tail, preserving its first order, neighbors and rent payer.
 The old tail may belong to another trader and needs no signature; only its next
-link changes. Common validation/funding helpers keep both paths consistent.
-The client selects a path from actual level/tail reads and revalidates before
-signing. New-price insertion, cancellation and
+link changes. `insert_prediction_order` splices a new price between canonical,
+reciprocal adjacent levels, or at the best/worst edge. Funding, level/order
+creation and neighbor rewiring are atomic; only a new best changes the head.
+Common validation/funding helpers keep all three paths consistent.
+The client selects a path from actual account reads and revalidates before
+signing. Insertion discovers neighbors by following at most 128 levels; errors
+or stale links stop submission. On-chain insertion touches at most two neighbors
+without traversal. Cancellation and
 matching are not implemented yet; public order entry defaults disabled.
 
 ### Market vault topology

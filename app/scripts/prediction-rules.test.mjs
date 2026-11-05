@@ -736,6 +736,286 @@ test("append IDL writes the old tail without requiring its owner's signature", a
     }
 });
 
+test("new-price routing finds best, middle and worst gaps for both outcomes and sides", async () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const x = appendFixture(outcome, side);
+      const prices = side === "bid" ? [600000, 400000] : [600000, 800000];
+      const levels = prices.map((price, i) => ({
+        ...x.append.level,
+        price: new BN(price),
+        betterPrice: i ? new BN(prices[0]) : null,
+        worsePrice: i ? null : new BN(prices[1]),
+      }));
+      const byAddress = new Map(
+        levels.map((level) => [
+          derivePredictionPriceLevelPda(
+            x.book.market,
+            outcome,
+            side,
+            level.price,
+          ).toBase58(),
+          level,
+        ]),
+      );
+      const reader = {
+        predictionPriceLevel: {
+          fetchNullable: async (address) =>
+            byAddress.get(address.toBase58()) ?? null,
+        },
+        predictionOrder: {
+          fetchNullable: async () => {
+            throw new Error("Insertion must not read queue tails");
+          },
+        },
+      };
+      const requested =
+        side === "bid" ? [700000, 500000, 300000] : [500000, 700000, 900000];
+      for (const [i, price] of requested.entries()) {
+        const target = await readPredictionPlacementTarget(
+          reader,
+          x.book.market,
+          x.book,
+          outcome,
+          side,
+          new BN(price),
+        );
+        assert.equal(target.kind, "insert");
+        assert.equal(
+          target.better?.price.toNumber() ?? null,
+          i === 0 ? null : prices[i - 1],
+        );
+        assert.equal(
+          target.worse?.price.toNumber() ?? null,
+          i === 2 ? null : prices[i],
+        );
+        const amount = validatePredictionRestingOrder(
+          x.market,
+          x.book,
+          x.position,
+          outcome,
+          side,
+          new BN(price),
+          new BN(1),
+          new BN(99),
+          target,
+        );
+        assert.equal(amount.toNumber(), side === "bid" ? price : 1);
+      }
+      levels[1].betterPrice = null;
+      await assert.rejects(
+        () =>
+          readPredictionPlacementTarget(
+            reader,
+            x.book.market,
+            x.book,
+            outcome,
+            side,
+            new BN(requested[1]),
+          ),
+        /invalid|changed/i,
+      );
+      levels[1].betterPrice = new BN(prices[0]);
+      levels[0].worsePrice = new BN(prices[0]);
+      await assert.rejects(
+        () =>
+          readPredictionPlacementTarget(
+            reader,
+            x.book.market,
+            x.book,
+            outcome,
+            side,
+            new BN(requested[2]),
+          ),
+        /ordering|cycle/i,
+      );
+    }
+});
+
+test("insertion preflight rejects stale adjacency, identities, empty levels and crossing", () => {
+  const { BN } = require("@anchor-lang/core");
+  const run = (x, target, price = 700000) =>
+    validatePredictionRestingOrder(
+      x.market,
+      x.book,
+      x.position,
+      "yes",
+      "bid",
+      new BN(price),
+      new BN(1),
+      new BN(99),
+      target,
+    );
+  for (const mutate of [
+    (x, t) => {
+      t.worse.market = PublicKey.default;
+    },
+    (x, t) => {
+      t.worse.outcome = { no: {} };
+    },
+    (x, t) => {
+      t.worse.side = { ask: {} };
+    },
+    (x, t) => {
+      t.worse.firstOrder = null;
+    },
+    (x, t) => {
+      t.worse.orderCount = new BN(0);
+    },
+    (x, t) => {
+      t.worse.totalRemainingQuantity = new BN(0);
+    },
+    (x, t) => {
+      t.worse.betterPrice = new BN(800000);
+    },
+    (x, t) => {
+      t.worse = null;
+    },
+    (x, t) => {
+      x.book.yesBestBid = null;
+    },
+  ]) {
+    const x = appendFixture();
+    const target = { kind: "insert", better: null, worse: x.append.level };
+    mutate(x, target);
+    assert.throws(() => run(x, target), /invalid|stale|occupied/i);
+  }
+  const x = appendFixture();
+  const target = { kind: "insert", better: null, worse: x.append.level };
+  x.book.yesBestAsk = new BN(700000);
+  assert.throws(() => run(x, target), /cross/);
+});
+
+test("insertion neighbor discovery stops at its RPC bound and propagates failures", async () => {
+  const { BN } = require("@anchor-lang/core");
+  const x = appendFixture();
+  const levels = new Map();
+  for (let i = 0; i < 129; i++) {
+    const price = new BN(600000 - i * 1000);
+    levels.set(
+      derivePredictionPriceLevelPda(
+        x.book.market,
+        "yes",
+        "bid",
+        price,
+      ).toBase58(),
+      {
+        ...x.append.level,
+        price,
+        betterPrice: i === 0 ? null : price.addn(1000),
+        worsePrice: price.subn(1000),
+      },
+    );
+  }
+  let reads = 0;
+  const reader = {
+    predictionPriceLevel: {
+      fetchNullable: async (address) => {
+        reads++;
+        return levels.get(address.toBase58()) ?? null;
+      },
+    },
+    predictionOrder: { fetchNullable: async () => null },
+  };
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        reader,
+        x.book.market,
+        x.book,
+        "yes",
+        "bid",
+        new BN(10000),
+      ),
+    /128 levels/,
+  );
+  assert.equal(reads, 129); // Requested price plus at most 128 list accounts.
+  reader.predictionPriceLevel.fetchNullable = async (address) => {
+    if (address.equals(x.append.levelAddress))
+      throw new Error("neighbor RPC failed");
+    return null;
+  };
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        reader,
+        x.book.market,
+        x.book,
+        "yes",
+        "bid",
+        new BN(500000),
+      ),
+    /neighbor RPC failed/,
+  );
+});
+
+test("insertion IDL encodes optional neighbors and stays within packet limits", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const owner = new PublicKey(new Uint8Array(32).fill(5));
+  const market = new PublicKey(new Uint8Array(32).fill(3));
+  for (const [better, worse] of [
+    [null, 600000],
+    [800000, 600000],
+    [800000, null],
+  ]) {
+    const level = (price) =>
+      price === null
+        ? null
+        : derivePredictionPriceLevelPda(market, "yes", "bid", new BN(price));
+    const ix = await program.methods
+      .insertPredictionOrder(
+        new BN(7),
+        { yes: {} },
+        { bid: {} },
+        new BN(700000),
+        new BN(2),
+      )
+      .accountsStrict({
+        owner,
+        market,
+        position: derivePredictionPositionPda(market, owner),
+        orderBook: derivePredictionBookPda(market),
+        priceLevel: level(700000),
+        order: derivePredictionOrderPda(market, new BN(7)),
+        systemProgram: SystemProgram.programId,
+        betterLevel: level(better) ?? program.programId,
+        worseLevel: level(worse) ?? program.programId,
+      })
+      .instruction();
+    assert.equal(
+      program.coder.instruction.decode(ix.data).name,
+      "insertPredictionOrder",
+    );
+    assert.equal(ix.keys[0].isSigner, true);
+    assert.equal(
+      ix.keys[7].pubkey.toBase58(),
+      (level(better) ?? program.programId).toBase58(),
+    );
+    assert.equal(
+      ix.keys[8].pubkey.toBase58(),
+      (level(worse) ?? program.programId).toBase58(),
+    );
+    assert.equal(ix.keys[7].isWritable, better !== null);
+    assert.equal(ix.keys[8].isWritable, worse !== null);
+    const tx = new Transaction({
+      feePayer: owner,
+      recentBlockhash: PublicKey.default.toBase58(),
+    }).add(ix);
+    assert.ok(
+      tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+        .length <= 1232,
+    );
+  }
+});
+
 test("placement routing reads actual levels and tails and never falls back on RPC failure", async () => {
   const { BN } = require("@anchor-lang/core");
   const x = appendFixture();
@@ -778,7 +1058,7 @@ test("placement routing reads actual levels and tails and never falls back on RP
         "bid",
         new BN(600000),
       ),
-    /insertion path/,
+    /Price list changed or is invalid/,
   );
   book.yesBestBid = null;
   assert.equal(

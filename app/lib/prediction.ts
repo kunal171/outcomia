@@ -33,6 +33,61 @@ export interface PredictionAppendTarget {
   tail: PredictionOrderAccount;
 }
 
+export interface PredictionInsertTarget {
+  kind: "insert";
+  better: PredictionPriceLevelAccount | null;
+  worse: PredictionPriceLevelAccount | null;
+}
+
+export type PredictionPlacementTarget =
+  | PredictionAppendTarget
+  | PredictionInsertTarget
+  | { kind: "place" };
+
+/** Advisory checks mirror the on-chain splice without traversing the list. */
+function validatePredictionNeighbors(
+  book: PredictionOrderBookAccount,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+  price: BN,
+  target: PredictionInsertTarget,
+) {
+  const best = predictionBestPrice(book, outcome, side);
+  const precedes = (a: BN, b: BN) => (side === "bid" ? a.gt(b) : a.lt(b));
+  const { better, worse } = target;
+  if (!best) throw new Error("Insertion requires an occupied side; refresh");
+  for (const level of [better, worse]) {
+    if (!level) continue;
+    if (
+      !level.market.equals(book.market) ||
+      !(outcome in level.outcome) ||
+      !(side in level.side) ||
+      level.orderCount.lte(new BN(0)) ||
+      level.totalRemainingQuantity.lte(new BN(0)) ||
+      !level.firstOrder ||
+      !level.lastOrder ||
+      best.eq(level.price) !== (level.betterPrice === null) ||
+      (side === "bid" ? best.lt(level.price) : best.gt(level.price))
+    )
+      throw new Error("Invalid neighboring price level; refresh");
+  }
+  const valid =
+    !better && worse
+      ? worse.price.eq(best) &&
+        worse.betterPrice === null &&
+        precedes(price, worse.price)
+      : better && worse
+        ? better.worsePrice?.eq(worse.price) &&
+          worse.betterPrice?.eq(better.price) &&
+          precedes(better.price, price) &&
+          precedes(price, worse.price)
+        : better && !worse
+          ? better.worsePrice === null && precedes(better.price, price)
+          : false;
+  if (!valid)
+    throw new Error("Price neighbors are stale or not adjacent; refresh");
+}
+
 interface PredictionPlacementReader {
   predictionPriceLevel: {
     fetchNullable(
@@ -52,7 +107,7 @@ export async function readPredictionPlacementTarget(
   outcome: PredictionOutcome,
   side: OrderSide,
   price: BN,
-): Promise<PredictionAppendTarget | { kind: "place" }> {
+): Promise<PredictionPlacementTarget> {
   if (!book.market.equals(market))
     throw new Error("Book belongs to a different market");
   const levelAddress = derivePredictionPriceLevelPda(
@@ -63,11 +118,61 @@ export async function readPredictionPlacementTarget(
   );
   const level = await accounts.predictionPriceLevel.fetchNullable(levelAddress);
   if (!level) {
-    if (predictionBestPrice(book, outcome, side) !== null)
-      throw new Error(
-        "A new price on this occupied side needs the upcoming insertion path",
-      );
-    return { kind: "place" };
+    let cursor = predictionBestPrice(book, outcome, side);
+    if (cursor === null) return { kind: "place" };
+    let better: PredictionPriceLevelAccount | null = null;
+    // Bounded RPC traversal protects the browser from cycles or very deep
+    // books. Hitting the cap fails closed, never guesses an insertion edge.
+    const seen = new Set<string>();
+    for (let visited = 0; visited < 128; visited++) {
+      if (seen.has(cursor.toString()))
+        throw new Error("Price-list cycle; refresh");
+      seen.add(cursor.toString());
+      const current: PredictionPriceLevelAccount | null =
+        await accounts.predictionPriceLevel.fetchNullable(
+          derivePredictionPriceLevelPda(market, outcome, side, cursor),
+        );
+      if (
+        !current ||
+        !current.price.eq(cursor) ||
+        !current.market.equals(market) ||
+        !(outcome in current.outcome) ||
+        !(side in current.side) ||
+        (better
+          ? !current.betterPrice?.eq(better.price)
+          : current.betterPrice !== null)
+      )
+        throw new Error("Price list changed or is invalid; refresh");
+      if (current.price.eq(price))
+        throw new Error("Price list changed; refresh");
+      if (side === "bid" ? price.gt(current.price) : price.lt(current.price)) {
+        const target: PredictionInsertTarget = {
+          kind: "insert",
+          better,
+          worse: current,
+        };
+        validatePredictionNeighbors(book, outcome, side, price, target);
+        return target;
+      }
+      if (current.worsePrice === null) {
+        const target: PredictionInsertTarget = {
+          kind: "insert",
+          better: current,
+          worse: null,
+        };
+        validatePredictionNeighbors(book, outcome, side, price, target);
+        return target;
+      }
+      if (
+        side === "bid"
+          ? current.worsePrice.gte(current.price)
+          : current.worsePrice.lte(current.price)
+      )
+        throw new Error("Invalid price ordering; refresh");
+      better = current;
+      cursor = current.worsePrice;
+    }
+    throw new Error("Price search exceeds 128 levels; choose a nearer price");
   }
   if (!level.lastOrder)
     throw new Error("Existing price level has no queue tail");
@@ -92,7 +197,7 @@ export function validatePredictionRestingOrder(
   price: BN,
   quantity: BN,
   now: BN,
-  append?: PredictionAppendTarget,
+  target?: PredictionAppendTarget | PredictionInsertTarget,
 ): BN {
   if (!["yes", "no"].includes(outcome) || !["bid", "ask"].includes(side))
     throw new Error("Select a valid outcome and side");
@@ -111,8 +216,10 @@ export function validatePredictionRestingOrder(
     !price.mod(market.priceTick).isZero()
   )
     throw new Error("Price must be positive, below 1 and tick-aligned");
-  if (append) {
-    const { level, tail, levelAddress, tailAddress } = append;
+  if (target?.kind === "insert") {
+    validatePredictionNeighbors(book, outcome, side, price, target);
+  } else if (target?.kind === "append") {
+    const { level, tail, levelAddress, tailAddress } = target;
     const best = predictionBestPrice(book, outcome, side);
     if (
       !best ||
