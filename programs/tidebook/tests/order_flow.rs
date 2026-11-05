@@ -726,6 +726,15 @@ fn load_trader_balance(
 ///
 /// Aggregation uses `u128` so the test itself cannot hide a protocol defect by
 /// overflowing while several valid `u64` balances are summed.
+///
+/// # Inputs
+/// VM, market and a complete unique list of owners in this fixture.
+///
+/// # Errors
+/// Panics for duplicates, missing ledgers or u128 addition overflow.
+///
+/// # Returns
+/// Aggregate base and quote free+locked claims as u128; protocol fees are added separately.
 fn aggregate_market_claims(svm: &LiteSVM, market: Pubkey, owners: &[Pubkey]) -> (u128, u128) {
     for (index, owner) in owners.iter().enumerate() {
         assert!(
@@ -752,6 +761,16 @@ fn aggregate_market_claims(svm: &LiteSVM, market: Pubkey, owners: &[Pubkey]) -> 
 }
 
 /// Makes canonical vault amounts exactly back the injected fixture claims.
+///
+/// # Inputs
+/// Mutable VM, market and all funded owner keys.
+///
+/// # Errors
+/// Panics for missing state, duplicates, overflow or totals too large for a u64 vault amount.
+///
+/// # Returns
+/// Canonical vault amounts are host-set to base claims and quote claims plus fees; this bypasses
+/// deposits and is not an economic transition.
 fn back_market_claims(svm: &mut LiteSVM, market: Pubkey, owners: &[Pubkey]) {
     let market_state = load_market(svm, market);
     let (_, base_vault, quote_vault) = derive_market_vault_addresses(
@@ -781,6 +800,15 @@ fn back_market_claims(svm: &mut LiteSVM, market: Pubkey, owners: &[Pubkey]) {
 }
 
 /// Proves that physical custody equals trader claims plus protocol revenue.
+///
+/// # Inputs
+/// VM, spot market and every owner whose claims are part of the fixture.
+///
+/// # Errors
+/// Panics when accounts are missing, owners repeat or custody differs from claims plus fees.
+///
+/// # Returns
+/// Unit after proving base-vault equality and quote-vault = trader quote claims + protocol fees.
 fn assert_market_asset_conservation(svm: &LiteSVM, market: Pubkey, owners: &[Pubkey]) {
     let market_state = load_market(svm, market);
     let (_, base_vault, quote_vault) = derive_market_vault_addresses(

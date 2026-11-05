@@ -33,6 +33,17 @@ pub enum StorageError {
 /// Exact replays succeed idempotently. A conflicting row with the same identity
 /// but different source data fails and rolls back the complete database
 /// transaction instead of silently accepting inconsistent history.
+///
+/// # Inputs
+/// Pool, authoritative TransactionRecord and all decoded events selected by the processor.
+///
+/// # Errors
+/// Conversion/database errors or TransactionConflict/EventConflict on same-key data differences;
+/// the database transaction rolls back.
+///
+/// # Returns
+/// `Ok(())` for a new write or exact replay. Checkpoint advancement is deliberately the caller's
+/// later operation.
 pub async fn persist_transaction(
     pool: &PgPool,
     transaction: &TransactionRecord,
@@ -46,6 +57,10 @@ pub async fn persist_transaction(
         .map(EventInsert::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
+    // This SQL transaction groups one source transaction with its event rows.
+    // It is distinct from the Solana transaction being indexed. A crash after
+    // SQL commit but before the later checkpoint save replays these same keys;
+    // exact replay succeeds without producing duplicate event identities.
     let mut database_transaction = pool.begin().await?;
 
     // The no-op UPDATE is deliberate. PostgreSQL reports one affected row for

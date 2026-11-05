@@ -7,6 +7,17 @@ use {
 };
 
 /// Decodes all events of type `T` from a successful transaction in log order.
+///
+/// # Inputs
+/// Successful TransactionResult and generic Anchor event type T.
+///
+/// # Errors
+/// Panics for a failed transaction; nonmatching/malformed payloads are filtered. This helper does
+/// not enforce the production indexer's invocation-stack policy.
+///
+/// # Returns
+/// All successfully decoded T payloads in log order; use single_event when cardinality is part of
+/// the assertion.
 pub fn events<T>(result: &TransactionResult) -> Vec<T>
 where
     T: Event + AnchorDeserialize,
@@ -33,6 +44,15 @@ where
 /// Anchor's `emit!` writes `discriminator || borsh_payload` as a base64
 /// `Program data:` log. Other program-data logs are ignored by comparing the
 /// discriminator before deserialization.
+///
+/// # Inputs
+/// Successful transaction result and Anchor event type T.
+///
+/// # Errors
+/// Panics on failed transaction or zero/multiple decoded matching events.
+///
+/// # Returns
+/// The single decoded event for field-level assertions.
 pub fn single_event<T>(result: &TransactionResult) -> T
 where
     T: Event + AnchorDeserialize,

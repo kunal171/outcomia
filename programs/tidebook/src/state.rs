@@ -43,7 +43,7 @@ pub struct Market {
 pub enum MarketKind {
     /// Existing base/quote SPL-token markets.
     Spot,
-    /// Reserved for collateral-backed binary markets with internal positions.
+    /// Collateral-backed binary markets with internal YES/NO positions.
     Prediction,
     /// Explicitly experimental market models.
     Other,
@@ -53,6 +53,11 @@ pub enum MarketKind {
 ///
 /// Separating this account from `Market` lets existing markets opt in without
 /// reallocating or migrating their matching-engine account.
+///
+/// Maximum Borsh payload: 32-byte market + two (4-byte length + 16-byte symbol)
+/// strings + (4 + 64)-byte name + 1-byte kind + 1-byte bump = 142 bytes.
+/// Anchor adds an 8-byte discriminator, so allocation is 150 bytes. InitSpace
+/// computes that bound; write handlers must still reject oversized strings.
 #[account]
 #[derive(InitSpace)]
 pub struct MarketMetadata {
@@ -138,7 +143,10 @@ pub struct ProtocolConfig {
 
 /// Quote-denominated protocol fees accumulated by one market.
 ///
-/// The corresponding tokens remain inside the market's canonical quote vault.
+/// The corresponding tokens remain inside the market's canonical quote vault
+/// for spot, or collateral vault for prediction markets. In the latter case
+/// `quote_mint` denotes the single collateral mint; the shared record layout
+/// does not make spot withdrawal contexts accept prediction-market accounts.
 /// This account records how many quote atoms belong to the protocol instead of
 /// traders, preserving the conservation equation:
 ///
@@ -260,12 +268,21 @@ pub struct TraderBalance {
     /// Quote tokens reserved by open bid orders.
     pub quote_locked: u64,
 
-    /// PDA bump stored for future signer and validation logic.
+    /// Canonical PDA bump used to validate this market/owner ledger.
     pub bump: u8,
 }
 
 impl OrderSide {
     /// Stable PDA seed independent of Rust enum representation.
+    ///
+    /// # Inputs
+    /// `self`: Bid or Ask; no account data is read.
+    ///
+    /// # Errors
+    /// None; this is an infallible enum-to-byte mapping.
+    ///
+    /// # Returns
+    /// Static `b"bid"` or `b"ask"`; these textual seeds are independent of serialized enum tags.
     pub const fn seed(self) -> &'static [u8] {
         match self {
             Self::Bid => b"bid",

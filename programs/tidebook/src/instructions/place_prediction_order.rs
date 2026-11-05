@@ -32,6 +32,18 @@ pub struct PlacePredictionOrder<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Places the first funded resting order on an empty prediction side.
+///
+/// # Inputs
+/// `ctx`: owner/position, Open market/book and new order/level; current ID, outcome, side, raw
+/// price and whole quantity.
+///
+/// # Errors
+/// Closed trading, occupied side, crossing/off-tick price, stale ID, insufficient funds, overflow
+/// or account creation failure.
+///
+/// # Returns
+/// `Ok(())` with updated head/IDs/counts and a backed order; no vault transfer or taker fee.
 pub fn handle_place_prediction_order(
     ctx: Context<PlacePredictionOrder>,
     order_id: u64,

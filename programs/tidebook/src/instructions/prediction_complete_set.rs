@@ -5,6 +5,11 @@
 //! market totals serialize these operations, trading some parallelism for a
 //! simple exact reserve invariant. Orders may later lock outcomes, which are
 //! deliberately excluded from merging.
+//!
+//! With six collateral decimals, payout is 1,000,000 atoms. Splitting 3 pairs
+//! moves 3,000,000 from free cash into reserve and creates 3 YES plus 3 NO.
+//! It does not need 6 tokens: exactly one side ultimately wins, or each side
+//! gets half on Invalid. Merging those free pairs reverses that liability.
 
 use crate::{
     constants::{PREDICTION_MARKET_SEED, PREDICTION_POSITION_SEED},
@@ -26,6 +31,18 @@ pub struct PredictionCompleteSet<'info> {
     pub position: Account<'info, PredictionPosition>,
 }
 
+/// Converts free cash into equally backed YES and NO claims.
+///
+/// # Inputs
+/// `ctx`: owner position and canonical market; `quantity`: positive whole pairs, not token atoms.
+///
+/// # Errors
+/// Not Open, at/after close, zero quantity, insufficient cash or multiplication/supply/reserve
+/// overflow.
+///
+/// # Returns
+/// `Ok(())` after reserving `quantity * payout_per_contract` and issuing equal YES/NO; vault tokens
+/// do not move.
 pub fn handle_split_prediction_complete_set(
     ctx: Context<PredictionCompleteSet>,
     quantity: u64,
@@ -75,6 +92,18 @@ pub fn handle_split_prediction_complete_set(
     Ok(())
 }
 
+/// Returns the fixed collateral backing of free YES/NO pairs.
+///
+/// # Inputs
+/// `ctx`: owner position and canonical market; `quantity`: positive whole free pairs.
+///
+/// # Errors
+/// Status outside Open/Frozen/Proposed, insufficient free pairs, supply/reserve underflow or refund
+/// overflow.
+///
+/// # Returns
+/// `Ok(())` after equal YES/NO burns and a reserve-to-free-cash refund; locked contracts are
+/// excluded.
 pub fn handle_merge_prediction_complete_set(
     ctx: Context<PredictionCompleteSet>,
     quantity: u64,
@@ -90,6 +119,9 @@ pub fn handle_merge_prediction_complete_set(
         prediction::PredictionMergeUnavailable
     );
     require!(quantity > 0, prediction::InvalidPredictionContractQuantity);
+    // A complete pair has a fixed payout regardless of current book prices.
+    // Selling YES at 0.60 is a trade; merging YES+NO releases their full 1.00
+    // backing. Allowing a locked leg here would spend the same claim twice.
     let refund = quantity
         .checked_mul(market.payout_per_contract)
         .ok_or(prediction::PredictionAccountingOverflow)?;

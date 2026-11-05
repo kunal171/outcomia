@@ -40,6 +40,16 @@ pub struct InitializePredictionPosition<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates an empty wallet position for a prediction market.
+///
+/// # Inputs
+/// `ctx`: owner signer/payer, canonical prediction market and new `(market, owner)` position.
+///
+/// # Errors
+/// Duplicate position, incorrect PDA/market, insufficient rent or allocation failure.
+///
+/// # Returns
+/// `Ok(())` with all six cash/YES/NO free and locked buckets zero; no assets are issued.
 pub fn handle_initialize_prediction_position(
     ctx: Context<InitializePredictionPosition>,
 ) -> Result<()> {

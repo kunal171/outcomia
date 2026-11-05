@@ -86,6 +86,17 @@ struct LiveCheckpointRow {
 impl TryFrom<LiveCheckpointRow> for LiveCheckpoint {
     type Error = LiveCheckpointError;
 
+    /// Decodes a database row into typed live progress.
+    ///
+    /// # Inputs
+    /// LiveCheckpointRow containing Base58 signature, signed slot and optional signed transaction
+    /// index.
+    ///
+    /// # Errors
+    /// InvalidSignature, NegativeSlot or NegativeTransactionIndex for unusable persisted values.
+    ///
+    /// # Returns
+    /// A LiveCheckpoint with checked unsigned positions; no lossy integer cast is used.
     fn try_from(row: LiveCheckpointRow) -> Result<Self, Self::Error> {
         let signature = row.latest_finalized_signature.parse::<Signature>()?;
 
@@ -116,6 +127,15 @@ impl TryFrom<LiveCheckpointRow> for LiveCheckpoint {
 ///
 /// `None` means live synchronization has not yet established its initial
 /// high-water mark.
+///
+/// # Inputs
+/// Pool and target program key.
+///
+/// # Errors
+/// Database failures or malformed stored signature/position data.
+///
+/// # Returns
+/// Some typed checkpoint, or None when live ingestion has not established progress.
 pub async fn load_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,
@@ -144,6 +164,21 @@ pub async fn load_live_checkpoint(
 /// indices sort ahead of missing metadata within the newest slot. The
 /// signature provides a deterministic final tie-breaker and an exact RPC
 /// `until` boundary.
+///
+/// Missing same-slot indices cannot be chronologically recovered by sorting
+/// signature text. That final tie-breaker is a repeatable bootstrap choice,
+/// not proof of execution order. Later checkpoint updates reject ambiguous
+/// same-slot advancement rather than inventing an order from those strings.
+///
+/// # Inputs
+/// Pool for this indexer's source database; this query takes no program filter.
+///
+/// # Errors
+/// Database or typed-row decoding failures.
+///
+/// # Returns
+/// Newest source position by slot/index/signature ordering, or None. The database must belong to
+/// the intended program history.
 pub async fn load_latest_source_position(
     pool: &PgPool,
 ) -> Result<Option<LiveCheckpoint>, LiveCheckpointError> {
@@ -167,6 +202,17 @@ pub async fn load_latest_source_position(
     row.map(LiveCheckpoint::try_from).transpose()
 }
 
+/// Checks whether an incoming live checkpoint advances safely.
+///
+/// # Inputs
+/// Stored and incoming signature/slot/optional-index positions.
+///
+/// # Errors
+/// Backward movement, conflicting position for one signature, conflicting same-slot index or
+/// ambiguous same-slot ordering.
+///
+/// # Returns
+/// Keep for exact/less-informative replay; Replace for valid advancement or index enrichment.
 fn decide_update(
     stored: &LiveCheckpoint,
     incoming: &LiveCheckpoint,
@@ -197,6 +243,9 @@ fn decide_update(
         );
     }
 
+    // Signatures are identities, not chronological values. At slot 100, index
+    // 4 -> 5 advances; 4 -> 3 regresses; two different signatures at index 4
+    // conflict. If an index is missing, no signature-string sort can prove order.
     match incoming.slot.cmp(&stored.slot) {
         std::cmp::Ordering::Greater => Ok(UpdateDecision::Replace),
 
@@ -235,6 +284,17 @@ fn decide_update(
 /// A transaction-scoped advisory lock serializes writers even when the program
 /// has no checkpoint row yet. A row lock alone cannot protect that initial
 /// missing-row case.
+///
+/// # Inputs
+/// Pool, target program and incoming completed position.
+///
+/// # Errors
+/// Unsigned-to-SQL range failures, database errors or conflicts/regression/ambiguous ordering from
+/// decide_update.
+///
+/// # Returns
+/// `Ok(())` after a committed insert/advance or accepted replay; the lock also protects an
+/// initially missing row.
 pub async fn save_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,
@@ -335,6 +395,16 @@ pub async fn save_live_checkpoint(
 /// Existing live progress always wins. Source storage may be ahead when the
 /// process crashed after persisting a transaction but before checkpointing it;
 /// starting from the older checkpoint allows that transaction to replay safely.
+///
+/// # Inputs
+/// Pool and target program key; source database is assumed to index this program.
+///
+/// # Errors
+/// Database, decoding or checkpoint bootstrap/save failure.
+///
+/// # Returns
+/// Existing checkpoint first; otherwise a saved newest source position, or None for an empty source
+/// database.
 pub async fn load_or_initialize_live_checkpoint(
     pool: &PgPool,
     program_id: &Pubkey,

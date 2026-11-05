@@ -36,7 +36,7 @@ pub struct InitializePredictionMarket<'info> {
     #[account(init, payer = authority, space = 8 + PredictionMarket::INIT_SPACE,
         seeds = [PREDICTION_MARKET_SEED, market_id.as_ref()], bump)]
     pub market: Box<Account<'info, PredictionMarket>>,
-    /// Account<Mint> validates legacy SPL ownership and initialized mint data.
+    /// `Account<Mint>` validates legacy SPL ownership and initialized mint data.
     pub collateral_mint: Account<'info, Mint>,
     /// CHECK: Stateless authority constrained to this market's signing PDA.
     #[account(seeds = [VAULT_AUTHORITY_SEED, market.key().as_ref()], bump)]
@@ -49,8 +49,9 @@ pub struct InitializePredictionMarket<'info> {
         seeds = [MARKET_METADATA_SEED, market.key().as_ref()], bump)]
     pub market_metadata: Box<Account<'info, MarketMetadata>>,
     /// Reuse the fee record's layout: quote_mint denotes collateral here.
-    /// Existing spot fee-withdrawal instructions require Account<Market> and
-    /// cannot operate on PredictionMarket. Prediction fee operations come later.
+    /// Existing spot fee-withdrawal instructions require `Account<Market>` and
+    /// cannot operate on PredictionMarket. Prediction matching accrues fees;
+    /// a prediction-specific withdrawal adapter remains future work.
     #[account(init, payer = authority, space = 8 + MarketFees::INIT_SPACE,
         seeds = [MARKET_FEES_SEED, market.key().as_ref()], bump)]
     pub market_fees: Box<Account<'info, MarketFees>>,
@@ -64,6 +65,19 @@ pub struct InitializePredictionMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates a Draft and its single-collateral account graph.
+///
+/// # Inputs
+/// `ctx`: active creator, collateral mint and new market/vault/metadata/fees/book; 32-byte ID,
+/// rules config, display name and symbol.
+///
+/// # Errors
+/// Invalid terms/labels/payout, resolver different from creator, role/PDA/duplicate/allocation or
+/// token-account creation failure.
+///
+/// # Returns
+/// `Ok(())` with five new accounts and zero claims/supply/reserve; opening and funding are
+/// separate.
 pub fn handle_initialize_prediction_market(
     ctx: Context<InitializePredictionMarket>,
     market_id: [u8; 32],

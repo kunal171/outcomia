@@ -40,6 +40,21 @@ pub struct AddAdmin<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates the target wallet's active role after Anchor verifies the super-admin.
+///
+/// Authorization lives in `AddAdmin`'s canonical config and `has_one` constraint;
+/// the handler does not need to repeat it. The target need not sign. Plain
+/// `init` rejects an existing role instead of overwriting its status/provenance.
+///
+/// # Inputs
+/// `ctx`: super-admin signer, config and new role PDA; `new_admin`: target wallet key.
+///
+/// # Errors
+/// `InvalidAdmin` for the default key; context checks reject unauthorized callers, wrong PDAs and
+/// duplicate roles.
+///
+/// # Returns
+/// `Ok(())` with the new role and creation event; errors leave no new role.
 pub fn handle_add_admin(ctx: Context<AddAdmin>, new_admin: Pubkey) -> Result<()> {
     // The all-zero key cannot sign and would create an unusable role record.
     require!(new_admin != Pubkey::default(), admin::InvalidAdmin);

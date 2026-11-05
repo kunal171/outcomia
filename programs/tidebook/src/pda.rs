@@ -11,11 +11,33 @@ use crate::{
 };
 
 /// Separate book root: no existing PredictionMarket layout changes are needed.
+///
+/// # Inputs
+/// `program_id`: deployed program; `market`: prediction market key.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_prediction_book_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[crate::PREDICTION_BOOK_SEED, market.as_ref()], program_id)
 }
 
 /// A prediction queue is unique to market, outcome, side and raw price.
+///
+/// # Inputs
+/// Program ID, prediction market, outcome, side and raw u64 collateral price.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_prediction_price_level_pda(
     program_id: &Pubkey,
     market: &Pubkey,
@@ -36,6 +58,17 @@ pub fn derive_prediction_price_level_pda(
 }
 
 /// One monotonically allocated ID across both outcomes and both sides.
+///
+/// # Inputs
+/// Program ID, prediction market and market-wide u64 submission ID.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_prediction_order_pda(
     program_id: &Pubkey,
     market: &Pubkey,
@@ -55,6 +88,17 @@ pub fn derive_prediction_order_pda(
 ///
 /// Explicit side bytes and little-endian price encoding are part of the public
 /// address contract and must remain identical in Rust tests and web clients.
+///
+/// # Inputs
+/// Program ID, spot market, side and raw u64 price.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_price_level_pda(
     program_id: &Pubkey,
     market: &Pubkey,
@@ -79,6 +123,17 @@ pub fn derive_price_level_pda(
 ///
 /// Seeds:
 /// ["trader_balance", market, owner]
+///
+/// # Inputs
+/// Program ID, spot market and owner wallet.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_trader_balance_pda(
     program_id: &Pubkey,
     market: &Pubkey,
@@ -94,6 +149,17 @@ pub fn derive_trader_balance_pda(
 ///
 /// Seeds:
 /// ["market_fees", market]
+///
+/// # Inputs
+/// Program ID and owning spot/prediction market key.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_market_fees_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[MARKET_FEES_SEED, market.as_ref()], program_id)
 }
@@ -101,16 +167,49 @@ pub fn derive_market_fees_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, 
 /// Derives the optional human-readable identity attached to a market.
 ///
 /// Seeds: ["market_metadata", market]
+///
+/// # Inputs
+/// Program ID and market whose presentation metadata is derived.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_market_metadata_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[MARKET_METADATA_SEED, market.as_ref()], program_id)
 }
 
 /// Derives a prediction market from its program-wide, creator-supplied ID.
+///
+/// # Inputs
+/// Program ID and fixed 32-byte, creator-supplied market ID.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_prediction_market_pda(program_id: &Pubkey, market_id: &[u8; 32]) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[PREDICTION_MARKET_SEED, market_id], program_id)
 }
 
 /// Derives the prediction-only ledger for one market and wallet.
+///
+/// # Inputs
+/// Program ID, prediction market and position-owner wallet.
+///
+/// # Errors
+/// No Result error. Seed lengths are fixed within Solana's limits; existence, contents and
+/// authority are not validated here.
+///
+/// # Returns
+/// The canonical `(Pubkey, bump)` tuple; numeric ID/price seeds use eight little-endian bytes where
+/// applicable.
 pub fn derive_prediction_position_pda(
     program_id: &Pubkey,
     market: &Pubkey,

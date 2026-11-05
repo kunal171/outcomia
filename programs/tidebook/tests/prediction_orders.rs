@@ -1,5 +1,11 @@
-//! Empty-side orders through actual draft/open/deposit/split setup.
-//! The trader has no admin record; snapshots exclude only SOL transaction fees.
+//! Resting orders, cancellation and one-maker prediction settlement in LiteSVM.
+//!
+//! Draft/open/deposit/split use real instructions before trading tests. Direct
+//! host account writes are limited to fixture setup, faucet grants and explicit
+//! adversarial/corruption cases; they do not prove those states are reachable
+//! through production instructions. Ordinary traders have no admin record.
+//! Failure snapshots exclude payer SOL because rejected transactions still pay
+//! fees; rent-refund tests separately inspect the affected wallet lamports.
 #![allow(clippy::result_large_err)]
 use anchor_lang::{
     prelude::{Clock, Pubkey},
@@ -19,6 +25,18 @@ const PROGRAM: &[u8] = include_bytes!(concat!(
     "/../../target/deploy/tidebook.so"
 ));
 
+/// Submits a signed instruction batch to the isolated VM.
+///
+/// # Inputs
+/// Mutable LiteSVM, one signer/fee payer and ordered instructions.
+///
+/// # Errors
+/// Returns LiteSVM failure metadata for program rejection; transaction-signing fixture failures
+/// panic.
+///
+/// # Returns
+/// TransactionResult after expiring the previous blockhash; it preserves logs for expected-error
+/// assertions.
 fn send(
     svm: &mut LiteSVM,
     signer: &Keypair,
@@ -34,6 +52,18 @@ fn send(
         VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[signer]).unwrap(),
     )
 }
+/// Installs serialized host fixture state directly.
+///
+/// # Inputs
+/// Mutable VM, address, data bytes and owning program key.
+///
+/// # Errors
+/// Panics if LiteSVM rejects the fixture account; no production instruction validates these
+/// injected bytes.
+///
+/// # Returns
+/// A rent-funded account at the supplied address; this is setup/corruption support, not a simulated
+/// deposit.
 fn account(svm: &mut LiteSVM, key: Pubkey, data: Vec<u8>, owner: Pubkey) {
     svm.set_account(
         key,
@@ -47,9 +77,31 @@ fn account(svm: &mut LiteSVM, key: Pubkey, data: Vec<u8>, owner: Pubkey) {
     )
     .unwrap();
 }
+/// Loads one expected fixture account as an Anchor type.
+///
+/// # Inputs
+/// Borrowed VM, account address and generic deserialization type.
+///
+/// # Errors
+/// Panics on missing/wrong/malformed account; absence is a test failure here.
+///
+/// # Returns
+/// The deserialized value for assertions; the stored account is unchanged.
 fn read<T: AccountDeserialize>(svm: &LiteSVM, key: Pubkey) -> T {
     T::try_deserialize(&mut svm.get_account(&key).unwrap().data.as_slice()).unwrap()
 }
+/// Replaces fixture data while preserving its allocated length.
+///
+/// # Inputs
+/// Mutable VM, existing key and Anchor-serializable state expected to fit the allocation.
+///
+/// # Errors
+/// Panics on missing account, serialization or VM replacement failure; production authorization is
+/// bypassed deliberately.
+///
+/// # Returns
+/// Updated fixture bytes padded to the old length, retaining lamports/owner; only adversarial/setup
+/// cases use this path.
 fn write<T: AccountSerialize>(svm: &mut LiteSVM, key: Pubkey, value: &T) {
     let mut stored = svm.get_account(&key).unwrap();
     let size = stored.data.len();
@@ -69,6 +121,19 @@ struct Fixture {
     fees: Pubkey,
 }
 impl Fixture {
+    /// Injects protocol configuration for fee-boundary tests.
+    ///
+    /// # Inputs
+    /// Mutable fixture and u16 rate, including invalid rates used to test matching's defensive
+    /// checks.
+    ///
+    /// # Errors
+    /// Panics on fixture serialization/install failure; this bypasses the governed setter
+    /// intentionally.
+    ///
+    /// # Returns
+    /// A canonical config account with the selected rate; it does not prove governance would accept
+    /// that rate.
     fn set_fee_rate(&mut self, rate: u16) {
         let (key, bump) =
             Pubkey::find_program_address(&[tidebook::PROTOCOL_CONFIG_SEED], &tidebook::ID);
@@ -83,6 +148,17 @@ impl Fixture {
         account(&mut self.svm, key, data, tidebook::ID);
     }
 
+    /// Builds one matching instruction from the VM's current maker state.
+    ///
+    /// # Inputs
+    /// Fixture's current taker, maker ID, outcome/side, raw limit and whole quantity.
+    ///
+    /// # Errors
+    /// Panics if expected maker/level accounts are missing; building does not execute or authorize
+    /// the trade.
+    ///
+    /// # Returns
+    /// An Instruction with successor/worse/rent hints only when this request would remove them.
     fn match_ix(
         &self,
         id: u64,
@@ -141,6 +217,17 @@ impl Fixture {
         )
     }
 
+    /// Asserts a rejected match leaves claims and supplied state unchanged.
+    ///
+    /// # Inputs
+    /// Mutable fixture, candidate instruction and expected Anchor error-code name.
+    ///
+    /// # Errors
+    /// Panics if execution succeeds, reports another error or any snapshotted account changes.
+    ///
+    /// # Returns
+    /// Unit after checking rollback, including maker/taker ledgers, fees and supplied hints; payer
+    /// transaction fees are excluded.
     fn reject_match(&mut self, ix: Instruction, code: &str) {
         let before = self.snapshot();
         let keys: Vec<_> = ix
@@ -166,6 +253,17 @@ impl Fixture {
     }
 
     /// Sum both traders' cash/outcome claims plus reserve/fees against custody.
+    ///
+    /// # Inputs
+    /// Fixture holding current taker position plus the other maker position address.
+    ///
+    /// # Errors
+    /// Panics on missing accounts or unequal cash/contract totals; assumes these are all traders
+    /// whose claims the fixture funded.
+    ///
+    /// # Returns
+    /// Unit after proving vault = both cash claims + reserve + fees, and each outcome's free/locked
+    /// claims equal its supply.
     fn assert_trade_conservation(&self, maker_position: Pubkey) {
         let maker: PredictionPosition = read(&self.svm, maker_position);
         let taker: PredictionPosition = read(&self.svm, self.position);
@@ -190,11 +288,31 @@ impl Fixture {
             maker.no_free + maker.no_locked + taker.no_free + taker.no_locked
         );
     }
+    /// Derives a fixture prediction order address.
+    ///
+    /// # Inputs
+    /// Fixture market and market-wide numeric ID.
+    ///
+    /// # Errors
+    /// None; this does not check whether the account exists.
+    ///
+    /// # Returns
+    /// Canonical order Pubkey for the Tidebook test program.
     fn order_key(&self, id: u64) -> Pubkey {
         tidebook::derive_prediction_order_pda(&tidebook::ID, &self.market, id).0
     }
 
     /// Discover exactly the stored immediate hints, as a real client must do.
+    ///
+    /// # Inputs
+    /// Fixture's current signer/position and order ID; target order and level must exist.
+    ///
+    /// # Errors
+    /// Panics when expected fixture accounts are absent; authorization/link errors remain for
+    /// program execution.
+    ///
+    /// # Returns
+    /// An Instruction with price/rent hints only for final-order removal.
     fn cancel(&self, id: u64) -> Instruction {
         let order: PredictionOrder = read(&self.svm, self.order_key(id));
         let level: PredictionPriceLevel = read(&self.svm, order.price_level);
@@ -231,6 +349,17 @@ impl Fixture {
         )
     }
 
+    /// Checks cancellation rejection and complete account rollback.
+    ///
+    /// # Inputs
+    /// Mutable fixture, candidate cancellation and expected error-code name.
+    ///
+    /// # Errors
+    /// Panics if execution succeeds, the code differs or state changes.
+    ///
+    /// # Returns
+    /// Unit after comparing custody/book/ledger and supplied accounts, excluding the fee-paying
+    /// wallet's SOL.
     fn reject_cancel(&mut self, ix: Instruction, code: &str) {
         let before = self.snapshot();
         let keys: Vec<_> = ix
@@ -255,6 +384,17 @@ impl Fixture {
         }
     }
 
+    /// Creates a real resting FIFO queue before the scenario under test.
+    ///
+    /// # Inputs
+    /// Mutable fixture, outcome, side and queue size; uses two contracts per order at raw price
+    /// 600,000.
+    ///
+    /// # Errors
+    /// Panics if placement/append setup fails; the helper expects fresh IDs beginning at 1.
+    ///
+    /// # Returns
+    /// A funded queue made through production instructions, not injected linked-list accounts.
     fn seed_queue(&mut self, outcome: PredictionOutcome, side: OrderSide, size: u64) {
         let first = self.ix(outcome, side, 600000, 2, 1);
         send(&mut self.svm, &self.owner, &[first]).unwrap();
@@ -263,6 +403,16 @@ impl Fixture {
             send(&mut self.svm, &self.owner, &[ix]).unwrap();
         }
     }
+    /// Derives a fixture prediction price-level address.
+    ///
+    /// # Inputs
+    /// Fixture market, outcome, side and raw u64 price.
+    ///
+    /// # Errors
+    /// None; no account-existence check occurs.
+    ///
+    /// # Returns
+    /// Canonical level Pubkey with the prediction namespace.
     fn level(&self, outcome: PredictionOutcome, side: OrderSide, price: u64) -> Pubkey {
         tidebook::derive_prediction_price_level_pda(
             &tidebook::ID,
@@ -273,6 +423,17 @@ impl Fixture {
         )
         .0
     }
+    /// Builds sorted insertion using explicit adjacent-price hints.
+    ///
+    /// # Inputs
+    /// Fixture current owner/position, outcome/side/price/quantity and optional better/worse
+    /// prices; reads the current next ID.
+    ///
+    /// # Errors
+    /// Panics if the book fixture is absent; incorrect hints are preserved for rejection tests.
+    ///
+    /// # Returns
+    /// An insertion Instruction; it does not lock funds until the VM executes it.
     fn insert(
         &self,
         outcome: PredictionOutcome,
@@ -314,6 +475,16 @@ impl Fixture {
 
     /// Compare all supplied state accounts as well as custody/ledger snapshots.
     /// Payer SOL is excluded because failed transactions still charge fees.
+    ///
+    /// # Inputs
+    /// Mutable fixture, instruction and expected Anchor error code.
+    ///
+    /// # Errors
+    /// Panics on unexpected success/error or changed snapshotted accounts.
+    ///
+    /// # Returns
+    /// Unit after rollback assertions for market, ledger, custody, neighbors and attempted
+    /// order/level allocations.
     fn reject_insert(&mut self, ix: Instruction, code: &str) {
         let before = self.snapshot();
         let keys: Vec<_> = ix.accounts.iter().skip(1).map(|a| a.pubkey).collect();
@@ -332,6 +503,16 @@ impl Fixture {
             assert_eq!(self.svm.get_account(key), old);
         }
     }
+    /// Builds same-price FIFO append with an explicit tail hint.
+    ///
+    /// # Inputs
+    /// Fixture owner/position, outcome/side/price/quantity, order ID and supplied tail key.
+    ///
+    /// # Errors
+    /// No program Result is returned; runtime validation happens only after submission.
+    ///
+    /// # Returns
+    /// An append Instruction that may intentionally contain stale IDs or tail hints.
     fn append(
         &self,
         outcome: PredictionOutcome,
@@ -372,6 +553,16 @@ impl Fixture {
             .to_account_metas(None),
         )
     }
+    /// Asserts append failure preserves both old queue and attempted new order.
+    ///
+    /// # Inputs
+    /// Mutable fixture, append instruction and expected Anchor error-code name.
+    ///
+    /// # Errors
+    /// Panics on wrong result/code or changed snapshots.
+    ///
+    /// # Returns
+    /// Unit after custody/ledger/book, level, tail and new-order account comparisons.
     fn reject_append(&mut self, ix: Instruction, code: &str) {
         let before = self.snapshot();
         let keys = [
@@ -394,6 +585,17 @@ impl Fixture {
             assert_eq!(self.svm.get_account(key), before);
         }
     }
+    /// Creates a second non-admin trader while retaining the original claims.
+    ///
+    /// # Inputs
+    /// Mutable fixture containing a collateral mint/vault and an open prediction market.
+    ///
+    /// # Errors
+    /// Panics on faucet-fixture packing, ledger initialization, deposit or split failure.
+    ///
+    /// # Returns
+    /// Current owner/position become a new wallet: 20 collateral tokens deposited, 5 pairs split,
+    /// leaving 15 free cash and 5 free YES/NO.
     fn switch_to_funded_trader(&mut self) {
         self.owner = Keypair::new();
         self.svm
@@ -470,6 +672,18 @@ impl Fixture {
         );
         assert!(send(&mut self.svm, &self.owner, &[init, deposit, split]).is_ok());
     }
+    /// Builds a funded and open prediction-market integration fixture.
+    ///
+    /// # Inputs
+    /// No arguments; fresh VM, synthetic mint/admin setup and the compiled SBF artifact.
+    ///
+    /// # Errors
+    /// Panics on fixture installation or any required initialize/open/deposit/split transaction
+    /// failure.
+    ///
+    /// # Returns
+    /// Fixture whose ordinary trader has 90 free collateral tokens and 10 YES/NO pairs backed by a
+    /// 10-token reserve.
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(tidebook::ID, PROGRAM).unwrap();
@@ -629,6 +843,16 @@ impl Fixture {
             fees,
         }
     }
+    /// Builds first-order placement on an expected empty side.
+    ///
+    /// # Inputs
+    /// Fixture owner/position, outcome/side, raw price, whole quantity and explicit order ID.
+    ///
+    /// # Errors
+    /// No program Result; wrong IDs, funding or occupied sides are tested when executing.
+    ///
+    /// # Returns
+    /// PlacePredictionOrder Instruction with canonical market/book/level/order accounts.
     fn ix(
         &self,
         outcome: PredictionOutcome,
@@ -667,6 +891,17 @@ impl Fixture {
             .to_account_metas(None),
         )
     }
+    /// Captures the fixture's principal state for rollback assertions.
+    ///
+    /// # Inputs
+    /// Borrowed fixture with existing market/book/position/vault/source/fees.
+    ///
+    /// # Errors
+    /// Panics if a required fixture account is missing.
+    ///
+    /// # Returns
+    /// Full Account copies, including data/lamports/owner, excluding the signer wallet so SOL fees
+    /// do not create false failures.
     fn snapshot(&self) -> Vec<Account> {
         [
             self.market,
@@ -680,6 +915,17 @@ impl Fixture {
         .map(|k| self.svm.get_account(k).unwrap())
         .collect()
     }
+    /// Checks first-placement rejection and allocation rollback.
+    ///
+    /// # Inputs
+    /// Mutable fixture, placement instruction and expected error-code name.
+    ///
+    /// # Errors
+    /// Panics on unexpected success/code, changed principal state or surviving new level/order.
+    ///
+    /// # Returns
+    /// Unit after confirming no funded order or partially created level escaped the failed
+    /// transaction.
     fn reject(&mut self, ix: Instruction, code: &str) {
         let before = self.snapshot();
         let failure = send(&mut self.svm, &self.owner, std::slice::from_ref(&ix)).unwrap_err();

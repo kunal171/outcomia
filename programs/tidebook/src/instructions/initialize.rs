@@ -108,6 +108,23 @@ pub struct InitializeMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Creates an active spot market with two empty vaults and a zero fee accumulator.
+///
+/// Only a currently active admin may create it. The ordered mint pair determines
+/// its PDA, so base/quote reversal is a different market. Tick and lot are raw
+/// integer increments; for a six-decimal quote mint a price tick of 10,000 is
+/// 0.01 quote tokens per whole base token. All account creation is atomic.
+///
+/// # Inputs
+/// `ctx`: active admin, distinct SPL mints and new market/fees/vaults; raw `price_tick_size` and
+/// `quantity_lot_size`.
+///
+/// # Errors
+/// Zero tick/lot, identical/invalid mints, inactive admin, duplicate/PDA/allocation or
+/// token-account creation failures.
+///
+/// # Returns
+/// `Ok(())` with an Active empty book, next ID 1, two empty vaults and zero accrued fees.
 pub fn handle_initialize_market(
     ctx: Context<InitializeMarket>,
     price_tick_size: u64,

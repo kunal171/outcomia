@@ -35,6 +35,15 @@ pub struct ReconnectBackoff {
 
 impl ReconnectBackoff {
     /// Creates a non-zero delay range whose initial value does not exceed its cap.
+    ///
+    /// # Inputs
+    /// Nonzero initial and maximum Durations, with initial <= maximum.
+    ///
+    /// # Errors
+    /// InvalidInput for zero delays or an inverted range.
+    ///
+    /// # Returns
+    /// ReconnectBackoff starting at the shortest delay.
     pub fn new(initial: Duration, maximum: Duration) -> Result<Self, io::Error> {
         if initial.is_zero() || maximum.is_zero() || initial > maximum {
             return Err(io::Error::new(
@@ -51,12 +60,32 @@ impl ReconnectBackoff {
     }
 
     /// Restores the shortest delay after a healthy subscription made progress.
+    ///
+    /// # Inputs
+    /// Mutable backoff state.
+    ///
+    /// # Errors
+    /// None; no IO or Result is involved.
+    ///
+    /// # Returns
+    /// The next delay is reset to the configured initial duration.
     pub fn reset(&mut self) {
         self.next = self.initial;
     }
 
     /// Returns the current delay and doubles the following delay up to the cap.
+    ///
+    /// # Inputs
+    /// Mutable capped backoff state.
+    ///
+    /// # Errors
+    /// None; saturating multiplication prevents Duration overflow.
+    ///
+    /// # Returns
+    /// Current delay; subsequent delay doubles up to the maximum.
     pub fn next_delay(&mut self) -> Duration {
+        // initial=1s, maximum=30s gives 1,2,4,8,16,30,30... seconds. Saturation
+        // protects arithmetic; min enforces the configured operational cap.
         let current = self.next;
         self.next = self.next.saturating_mul(2).min(self.maximum);
         current
@@ -68,6 +97,15 @@ impl ReconnectBackoff {
 /// Failed transactions emitted logs but rolled their state back, so they are
 /// ignored. Invalid successful signatures are errors because silently dropping
 /// the wake-up could delay recovery until an unrelated later transaction.
+///
+/// # Inputs
+/// WebSocket Response containing execution status, signature text and context slot.
+///
+/// # Errors
+/// A malformed successful signature returns ParseSignatureError; failed executions return Ok(None).
+///
+/// # Returns
+/// An optional typed wake-up, not a durable transaction or event record.
 fn notification_to_wakeup(
     notification: Response<RpcLogsResponse>,
 ) -> Result<Option<LogWakeup>, ParseSignatureError> {
@@ -88,6 +126,17 @@ fn notification_to_wakeup(
 /// buffered by the client, closing the startup race between catch-up and
 /// subscription establishment. Callback failures close the subscription so the
 /// outer runtime can reconnect and recover again from its durable checkpoint.
+///
+/// # Inputs
+/// WebSocket URL, program key and async on_ready/on_wakeup callbacks.
+///
+/// # Errors
+/// Connection/subscription/stream errors, malformed notification signatures, callback failure or
+/// client shutdown error.
+///
+/// # Returns
+/// Runs until failure/end; explicit unsubscribe/shutdown occurs on the normal error-return path.
+/// The outer runtime owns retry policy.
 pub async fn run_log_subscription<OnReady, ReadyFuture, OnWakeup, WakeupFuture>(
     websocket_url: &str,
     program_id: &Pubkey,
@@ -129,6 +178,9 @@ where
     }
     .await;
 
+    // Normal completion/errors reach explicit cleanup. Dropping this future
+    // from the outer shutdown select cancels it instead, so this code must not
+    // be described as a guaranteed asynchronous destructor on every exit path.
     unsubscribe().await;
     drop(notifications);
 

@@ -47,6 +47,16 @@ type BoxError = Box<dyn Error + Send + Sync>;
 /// walks backward. Records are oldest-first only inside each page; append-only
 /// source storage does not depend on global processing order. Future derived
 /// projections must explicitly replay source rows in their required order.
+///
+/// # Inputs
+/// RPC client, PostgreSQL pool, target program and nonzero operational page limits.
+///
+/// # Errors
+/// RPC, decoding, source-write or checkpoint failures propagate; incomplete pages never advance
+/// their cursor.
+///
+/// # Returns
+/// AlreadyComplete, Completed or PageLimitReached; each successful page is durably checkpointed.
 pub async fn run_backfill(
     client: &RpcClient,
     pool: &PgPool,
@@ -79,6 +89,16 @@ pub async fn run_backfill(
 /// Production supplies Solana RPC and PostgreSQL operations. Tests supply
 /// deterministic in-memory functions, allowing failure and page-cap behavior
 /// to be verified without a network endpoint or database.
+///
+/// # Inputs
+/// Optional backward cursor, page limits and injectable fetch/process/save callbacks.
+///
+/// # Errors
+/// Any callback failure aborts before saving that incomplete page; this helper does not validate
+/// all callback/RPC contracts.
+///
+/// # Returns
+/// A terminal/capped outcome. Completed transactions in a retried page may replay idempotently.
 async fn run_pages<Fetch, Process, ProcessFuture, Save, SaveFuture>(
     mut before_signature: Option<solana_signature::Signature>,
     config: BackfillConfig,

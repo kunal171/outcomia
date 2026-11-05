@@ -45,6 +45,17 @@ pub enum LiveCatchupOutcome {
 /// exposed until an empty terminal page confirms the `until` boundary, which
 /// prevents callers from advancing past older transactions that were not yet
 /// fetched.
+///
+/// # Inputs
+/// Live page limits and injectable fetch callback; pages must contain oldest-first records within
+/// each chunk.
+///
+/// # Errors
+/// Zero bounds, RPC/callback failure or a cursor that fails to advance.
+///
+/// # Returns
+/// CaughtUp with reversed page order only after a terminal page, or PageLimitReached without
+/// processing a partial newest slice.
 fn collect_gap_pages<Fetch>(
     config: LiveGapConfig,
     mut fetch_page: Fetch,
@@ -71,6 +82,9 @@ where
         pages.push(page.records);
 
         if next_before.is_none() {
+            // Example: RPC yields chunks [D,E] then [B,C] then [A], each already
+            // oldest-first internally. Reversing chunks gives A,B,C,D,E; sorting
+            // by signature or reversing every record would lose execution order.
             pages.reverse();
 
             return Ok(LiveGapOutcome::CaughtUp(
@@ -93,6 +107,16 @@ where
 /// Source persistence deliberately precedes checkpoint persistence. A crash
 /// between those operations causes an idempotent source replay, whereas the
 /// opposite order could permanently skip an unpersisted transaction.
+///
+/// # Inputs
+/// Collected gap plus injectable transaction-processing and checkpoint-saving callbacks.
+///
+/// # Errors
+/// Invalid signature, processing or checkpoint-save error stops the remaining records.
+///
+/// # Returns
+/// CaughtUp with processed count, or PageLimitReached without processing; source writes always
+/// precede checkpoint advancement.
 async fn process_gap_records<Process, ProcessFuture, Save, SaveFuture>(
     gap: LiveGapOutcome,
     mut process: Process,
@@ -128,6 +152,18 @@ where
     Ok(LiveCatchupOutcome::CaughtUp { processed })
 }
 
+/// Recovers and persists the interval after an optional finalized boundary.
+///
+/// # Inputs
+/// RPC client, pool, program key, optional LiveCheckpoint and bounded gap config.
+///
+/// # Errors
+/// RPC/decoder/storage errors, invalid bounds, ambiguous checkpoint updates or a stuck cursor
+/// propagate.
+///
+/// # Returns
+/// CaughtUp or PageLimitReached. With no boundary, it scans available history under the same safety
+/// cap.
 pub async fn run_live_catchup(
     client: &RpcClient,
     pool: &PgPool,
@@ -169,6 +205,15 @@ pub async fn run_live_catchup(
 /// The boundary is loaded for each wake-up rather than cached in memory. This
 /// makes reconnects and process restarts converge on PostgreSQL as the source
 /// of progress, while an initially empty database remains a valid state.
+///
+/// # Inputs
+/// RPC client, pool, target program and gap bounds.
+///
+/// # Errors
+/// Checkpoint load/bootstrap, RPC collection, processing or checkpoint-save failures.
+///
+/// # Returns
+/// A live catch-up outcome; progress is read from PostgreSQL rather than cached across reconnects.
 pub async fn recover_live_gap(
     client: &RpcClient,
     pool: &PgPool,

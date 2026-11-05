@@ -45,9 +45,9 @@ pub struct CloseMarket<'info> {
     )]
     pub market_fees: Account<'info, MarketFees>,
 
-    /// CHECK: This is always the canonical faucet PDA. It may be an empty
-    /// placeholder when the market never enabled a faucet; the handler safely
-    /// deserializes and closes it only when account data exists.
+    /// CHECK: Always the canonical faucet PDA, including for a market that
+    /// never enabled one. The handler requires empty data; an existing faucet
+    /// must be closed explicitly before this instruction, not silently omitted.
     #[account(
         mut,
         seeds = [TEST_FAUCET_SEED, market.key().as_ref()],
@@ -98,6 +98,24 @@ pub struct CloseMarket<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Closes a paused, fully drained spot market and returns vault/config rent.
+///
+/// Requires the stored authority, no open orders, no accrued fees, empty token
+/// vaults and an already closed faucet. Unsolicited vault deposits also prevent
+/// closure. Metadata has its own closure instruction; this path does not sweep
+/// trader-ledger or historical order accounts. Any failed CPI rolls back both
+/// vault closures and Anchor's subsequent market/fee-account cleanup.
+///
+/// # Inputs
+/// `ctx`: stored authority, Paused market, fee record, canonical vaults and empty faucet PDA.
+///
+/// # Errors
+/// Open orders, nonzero fees/vault tokens, existing faucet, wrong authority/accounts or failed
+/// token close.
+///
+/// # Returns
+/// `Ok(())` after vault closure; Anchor closes market/fees and refunds rent. Historical
+/// orders/ledgers are not swept.
 pub fn handle_close_market(ctx: Context<CloseMarket>) -> Result<()> {
     // The counter protects indexed orders; checking token balances separately
     // also catches unsolicited transfers and accounting bugs before shutdown.
@@ -107,7 +125,7 @@ pub fn handle_close_market(ctx: Context<CloseMarket>) -> Result<()> {
     );
 
     // Protocol revenue is a real claim on quote-vault assets. It must be
-    // withdrawn through the future governed fee-withdrawal instruction rather
+    // withdrawn through the governed fee-withdrawal instruction rather
     // than silently discarded during market shutdown.
     require!(
         ctx.accounts.market_fees.accrued_quote_fees == 0,

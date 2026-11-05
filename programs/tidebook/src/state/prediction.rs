@@ -19,6 +19,15 @@ pub enum PredictionOutcome {
 
 impl PredictionOutcome {
     /// Stable textual PDA seed; independent of Borsh enum discriminant bytes.
+    ///
+    /// # Inputs
+    /// `self`: Yes or No.
+    ///
+    /// # Errors
+    /// None; this is an infallible enum-to-byte mapping.
+    ///
+    /// # Returns
+    /// Static `b"yes"` or `b"no"`, shared by Rust and browser PDA derivation.
     pub const fn seed(self) -> &'static [u8] {
         match self {
             Self::Yes => b"yes",

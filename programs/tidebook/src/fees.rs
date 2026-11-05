@@ -22,6 +22,22 @@ pub const MAX_TAKER_FEE_BPS: u16 = 1_000;
 ///
 /// Rounding upward slightly favors the protocol for very small fills. We accept
 /// that tradeoff because it gives deterministic anti-fragmentation behavior.
+///
+/// # Calculation
+/// `fee = (notional * bps + 9_999) / 10_000` using integer division.
+/// At 25 bps, 1,000,000 atoms produce 2,500 fee atoms. A one-atom notional
+/// at any nonzero allowed rate produces a one-atom fee, not zero. The u128
+/// intermediate keeps the u64 notional multiplication from wrapping.
+///
+/// # Inputs
+/// `quote_quantity`: executed quote/collateral atoms; `fee_bps`: rate with denominator 10,000.
+///
+/// # Errors
+/// `FeeRateTooHigh` above 1,000 bps, or `FeeCalculationOverflow` if checked arithmetic/conversion
+/// fails.
+///
+/// # Returns
+/// `Ok(fee)`; zero notional/rate gives zero, otherwise any fractional atom rounds up.
 pub fn calculate_taker_fee(quote_quantity: u64, fee_bps: u16) -> Result<u64> {
     require!(fee_bps <= MAX_TAKER_FEE_BPS, fee::FeeRateTooHigh);
 

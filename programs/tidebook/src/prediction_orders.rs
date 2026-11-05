@@ -8,6 +8,18 @@ use crate::{
 use anchor_lang::prelude::*;
 
 /// Validate trading terms and return the checked next ID and market count.
+///
+/// # Inputs
+/// Market/book snapshots, expected current order ID, outcome, side, collateral-atom price and whole
+/// quantity; reads chain Clock.
+///
+/// # Errors
+/// Closed/expired trading, zero quantity, off-grid/out-of-range/crossing price, stale ID or counter
+/// overflow.
+///
+/// # Returns
+/// `Ok((next_id, open_count))`; callers still validate PDAs/links and fund the order before
+/// publishing either counter.
 pub(crate) fn validate_resting_order(
     market: &PredictionMarket,
     book: &PredictionOrderBook,
@@ -59,6 +71,21 @@ pub(crate) fn validate_resting_order(
 }
 
 /// Only the new owner's claims move; the maker at the old tail never signs.
+///
+/// Example with six-decimal collateral: a buy of 10 contracts at raw price
+/// 600,000 locks 6,000,000 atoms (6 tokens). A sell of 10 YES locks 10 YES,
+/// not 6 collateral tokens. Whole contracts need no base-decimal division.
+/// Free + locked for that bucket is conserved; reserve and vault are untouched.
+///
+/// # Inputs
+/// Mutable position, chosen outcome/side, collateral-atom price and whole-contract quantity.
+///
+/// # Errors
+/// Not enough free cash/contracts, price-times-quantity overflow or locked-balance overflow.
+///
+/// # Returns
+/// `Ok(locked_amount)` in collateral atoms for bids or whole chosen contracts for asks; no vault
+/// transfer or fee.
 pub(crate) fn lock_resting_funds(
     position: &mut PredictionPosition,
     outcome: PredictionOutcome,

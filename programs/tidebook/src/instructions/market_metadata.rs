@@ -2,8 +2,8 @@
 //!
 //! Any active protocol administrator may manage labels. `MarketKind` is only
 //! accepted during initialization, which makes classification immutable. The
-//! prediction variant remains reserved until its collateral and resolution
-//! invariants are implemented on-chain.
+//! prediction variant is rejected by this spot initializer: prediction drafts
+//! create their own metadata alongside the single-collateral market accounts.
 
 use anchor_lang::prelude::*;
 
@@ -89,6 +89,21 @@ pub struct CloseMarketMetadata<'info> {
     pub market_metadata: Account<'info, MarketMetadata>,
 }
 
+/// Attaches bounded display labels and an immutable kind to an existing spot market.
+///
+/// Any active protocol admin may pay for this PDA; market ownership alone is
+/// insufficient. Prediction classification is reserved for the prediction-market
+/// initializer, so display metadata cannot turn a spot account into that model.
+///
+/// # Inputs
+/// `ctx`: active admin, spot market and new metadata; base/quote symbols, display name and
+/// immutable `kind`.
+///
+/// # Errors
+/// Invalid labels, Prediction kind, inactive/unauthorized admin or duplicate/misbound metadata.
+///
+/// # Returns
+/// `Ok(())` with stored labels/kind and a creation event; economic fields do not change.
 pub fn handle_initialize_market_metadata(
     ctx: Context<InitializeMarketMetadata>,
     base_symbol: String,
@@ -123,6 +138,20 @@ pub fn handle_initialize_market_metadata(
     Ok(())
 }
 
+/// Replaces display labels without changing mints, prices, balances or classification.
+///
+/// The context requires a current active admin and metadata bound to this spot
+/// market. There is deliberately no `kind` argument: updating a name must not
+/// change the market's economic rules or account layout.
+///
+/// # Inputs
+/// `ctx`: active admin, spot market and bound metadata; replacement symbols and display name.
+///
+/// # Errors
+/// Invalid labels, inactive/unauthorized admin or incorrect metadata binding.
+///
+/// # Returns
+/// `Ok(())` after replacing labels and emitting an update; kind and token mints remain unchanged.
 pub fn handle_update_market_metadata(
     ctx: Context<UpdateMarketMetadata>,
     base_symbol: String,
@@ -148,6 +177,20 @@ pub fn handle_update_market_metadata(
     Ok(())
 }
 
+/// Emits the metadata closure event before Anchor returns rent to the authority.
+///
+/// Closure requires the stored spot-market authority and Paused status. This
+/// deletes display metadata only; vaults, trader balances and the market remain
+/// until their separate shutdown requirements are met.
+///
+/// # Inputs
+/// `ctx`: stored authority signer, Paused market and its metadata PDA.
+///
+/// # Errors
+/// Wrong authority, non-Paused market or incorrect metadata binding.
+///
+/// # Returns
+/// `Ok(())` and an event; Anchor returns metadata rent without closing vaults or market.
 pub fn handle_close_market_metadata(ctx: Context<CloseMarketMetadata>) -> Result<()> {
     emit!(MarketMetadataClosedEvent {
         metadata: ctx.accounts.market_metadata.key(),
@@ -161,6 +204,16 @@ pub fn handle_close_market_metadata(ctx: Context<CloseMarketMetadata>) -> Result
 
 /// Restrict labels to a predictable ASCII subset so byte limits and rendered
 /// lengths agree across Rust, TypeScript, wallets, and indexers.
+///
+/// # Inputs
+/// Borrowed base/quote symbols and display name; limits count UTF-8 bytes.
+///
+/// # Errors
+/// `InvalidMarketSymbol` or `InvalidMarketDisplayName` for size, character or edge-whitespace
+/// violations.
+///
+/// # Returns
+/// `Ok(())` for valid labels; inputs are neither trimmed nor rewritten.
 pub(crate) fn validate_labels(
     base_symbol: &str,
     quote_symbol: &str,
@@ -181,6 +234,17 @@ pub(crate) fn validate_labels(
     Ok(())
 }
 
+/// Accepts nonempty ASCII symbols within the byte bound, without spaces or markup.
+/// Examples: `SOL`, `tUSDT` and `YES-NO` pass; `SOL / USD` does not.
+///
+/// # Inputs
+/// `symbol`: candidate UTF-8 text.
+///
+/// # Errors
+/// None; invalid text is represented by `false`.
+///
+/// # Returns
+/// `true` for nonempty bounded ASCII letters/digits/dot/hyphen/underscore; otherwise `false`.
 fn valid_symbol(symbol: &str) -> bool {
     !symbol.is_empty()
         && symbol.len() <= MARKET_SYMBOL_MAX_LENGTH

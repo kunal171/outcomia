@@ -25,6 +25,16 @@ pub struct RawEventLog {
 /// at the top of that stack. This prevents a nested CPI program from emitting
 /// bytes that the Tidebook decoder would otherwise misclassify as protocol
 /// state. The function preserves original log indexes for stable event keys.
+///
+/// # Inputs
+/// Complete ordered runtime logs and the target program key.
+///
+/// # Errors
+/// None; this parser returns a selection, not a full validation result for malformed/truncated log
+/// streams.
+///
+/// # Returns
+/// RawEventLog values in original log order, excluding data emitted by nested foreign programs.
 pub fn extract_program_data(logs: &[String], program_id: &Pubkey) -> Vec<RawEventLog> {
     let target_program = program_id.to_string();
     let mut invocation_stack: Vec<&str> = Vec::new();
@@ -67,6 +77,17 @@ pub fn extract_program_data(logs: &[String], program_id: &Pubkey) -> Vec<RawEven
     events
 }
 
+/// Borrows the program name from a runtime invocation marker.
+///
+/// # Inputs
+/// One log line such as `Program <key> invoke [1]`.
+///
+/// # Errors
+/// None; nonmatching lines return `None`. This helper does not validate the key or numeric call
+/// depth.
+///
+/// # Returns
+/// A borrowed program-name slice used to push the invocation stack; no allocation.
 fn parse_invocation(log: &str) -> Option<&str> {
     let remainder = log.strip_prefix(PROGRAM_PREFIX)?;
     let (program_id, _) = remainder.split_once(INVOKE_MARKER)?;
@@ -74,6 +95,16 @@ fn parse_invocation(log: &str) -> Option<&str> {
     Some(program_id)
 }
 
+/// Borrows the program name from success or failure markers.
+///
+/// # Inputs
+/// One runtime log line ending in ` success` or containing ` failed: `.
+///
+/// # Errors
+/// None; noncompletion lines return `None`; stack matching is the caller's responsibility.
+///
+/// # Returns
+/// The completed program-name slice, for both successful and failed exits.
 fn parse_completion(log: &str) -> Option<&str> {
     let remainder = log.strip_prefix(PROGRAM_PREFIX)?;
 

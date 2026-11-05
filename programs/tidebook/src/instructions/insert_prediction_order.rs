@@ -44,6 +44,18 @@ pub struct InsertPredictionOrder<'info> {
     pub worse_level: Option<Box<Account<'info, PredictionPriceLevel>>>,
 }
 
+/// Splices a new prediction price between verified neighbors.
+///
+/// # Inputs
+/// `ctx`: trader/position, market/book, new order/level and adjacent hints; ID, outcome, side,
+/// price and whole quantity.
+///
+/// # Errors
+/// Closed trading, crossing/bad price, stale ID/adjacency, wrong namespace, empty-side misuse,
+/// insufficient funds or overflow.
+///
+/// # Returns
+/// `Ok(())` after a funded best/middle/worst splice; same-price submissions must append.
 pub fn handle_insert_prediction_order(
     ctx: Context<InsertPredictionOrder>,
     order_id: u64,
@@ -68,6 +80,9 @@ pub fn handle_insert_prediction_order(
         OrderSide::Bid => a > b,
         OrderSide::Ask => a < b,
     };
+    // Bid example: inserting 0.65 between 0.70 and 0.60 requires those exact
+    // adjacent links in both directions. Merely supplying prices above/below
+    // the target could detach a hidden 0.66 level. Asks reverse the inequalities.
     let valid = match (better, worse) {
         (None, Some(worse)) => {
             worse.price == best && worse.better_price.is_none() && precedes(price, worse.price)
@@ -134,6 +149,16 @@ pub fn handle_insert_prediction_order(
 
 /// Ownership alone is insufficient: bind each hint to this outcome/side PDA.
 /// Program-owned links are trusted inductively; traversal stays off-chain.
+///
+/// # Inputs
+/// Program-owned level, expected market/outcome/side and selected book's best price.
+///
+/// # Errors
+/// `InvalidPredictionPriceLevel` for bad PDA/bump/identity, empty queue or head/priority mismatch.
+///
+/// # Returns
+/// `Ok(())` for an eligible live level; the insertion handler separately checks reciprocal
+/// adjacency.
 fn validate_neighbor(
     level: &Account<PredictionPriceLevel>,
     market: Pubkey,

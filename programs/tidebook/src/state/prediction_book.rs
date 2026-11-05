@@ -5,7 +5,14 @@
 //! market-wide order IDs. Empty-side placement and same-price append check
 //! funding and lifecycle gates; append also verifies the terminal FIFO links.
 //! New-price insertion checks adjacent prices; cancellation unlinks FIFO nodes
-//! and closes empty levels. Future matching must preserve the same links.
+//! and closes empty levels. Matching preserves these links on partial fills
+//! and promotes the next FIFO order or price when a maker is fully filled.
+//!
+//! Borsh allocation counts serialized bytes, not Rust struct padding. A Pubkey
+//! uses 32 bytes, u64 uses 8, and an Option adds a one-byte tag: `Option<u64>`
+//! reserves 9 bytes, `Option<Pubkey>` reserves 33. For example, the book's payload
+//! is 32 + 8 + 4*9 + 1 = 77 bytes, plus Anchor's 8-byte discriminator = 85.
+//! None encodes only its tag, but allocation must still fit all Some values.
 
 use super::{OrderSide, OrderStatus, PredictionOutcome};
 use anchor_lang::prelude::*;
@@ -34,6 +41,15 @@ pub struct PredictionOrderBook {
 
 impl PredictionOrderBook {
     /// Select exactly one outcome/side list; complementary outcomes stay separate.
+    ///
+    /// # Inputs
+    /// Borrowed root plus the outcome/side selector.
+    ///
+    /// # Errors
+    /// None; an empty side is represented by `None`, not an error.
+    ///
+    /// # Returns
+    /// Highest bid or lowest ask as `Option<u64>`; no other book state is inspected.
     pub fn best_price(&self, outcome: PredictionOutcome, side: OrderSide) -> Option<u64> {
         match (outcome, side) {
             (PredictionOutcome::Yes, OrderSide::Bid) => self.yes_best_bid,
@@ -43,6 +59,17 @@ impl PredictionOrderBook {
         }
     }
 
+    /// Replaces exactly one prediction book head.
+    ///
+    /// # Inputs
+    /// Mutable root, outcome/side and new `Option<u64>` price; `None` marks an empty list.
+    ///
+    /// # Errors
+    /// None; caller must validate the canonical level and repaired links before changing its entry
+    /// point.
+    ///
+    /// # Returns
+    /// Updates the selected head in place; other heads and the global order ID stay unchanged.
     pub fn set_best_price(
         &mut self,
         outcome: PredictionOutcome,
@@ -78,7 +105,7 @@ pub struct PredictionPriceLevel {
     /// Whole outcome contracts, including partially filled order remainders.
     pub total_remaining_quantity: u64,
     pub order_count: u64,
-    /// Receives rent when this empty level is eventually closed.
+    /// Original payer receiving rent when cancellation or matching empties this level.
     pub rent_payer: Pubkey,
     pub bump: u8,
 }
@@ -103,8 +130,8 @@ pub struct PredictionOrder {
     /// Whole contracts, never mint atoms or fractional positions.
     pub quantity: u64,
     pub remaining_quantity: u64,
-    /// Bid: collateral atoms reserved for the order, including any reserved
-    /// fee budget. Ask: whole YES or NO contracts selected by `outcome`.
+    /// Bid: exactly price * remaining_quantity collateral atoms; no maker fee
+    /// reserve. Ask: whole YES or NO contracts selected by `outcome`.
     /// Cancellation/fills must release the recorded amount, not guess units.
     pub locked_collateral: u64,
     pub status: OrderStatus,

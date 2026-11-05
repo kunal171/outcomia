@@ -32,6 +32,16 @@ impl Config {
     ///
     /// `DATABASE_URL` remains mandatory because silently choosing a database
     /// could write source history into an unintended local or shared instance.
+    ///
+    /// # Inputs
+    /// Public RPC/WebSocket/program/health overrides plus required `DATABASE_URL`.
+    ///
+    /// # Errors
+    /// `ConfigError::DatabaseUrl` when the database variable is absent or not valid Unicode.
+    ///
+    /// # Returns
+    /// A Config value; endpoint syntax, program-key parsing and network connectivity are checked
+    /// later.
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             rpc_url: env::var("SOLANA_RPC_URL").unwrap_or_else(|_| DEFAULT_RPC_URL.to_owned()),

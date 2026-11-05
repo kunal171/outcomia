@@ -59,7 +59,20 @@ pub enum StorageModelError {
 impl TryFrom<&TransactionRecord> for TransactionInsert {
     type Error = StorageModelError;
 
+    /// Checks transaction values before binding SQL parameters.
+    ///
+    /// # Inputs
+    /// Borrowed TransactionRecord with unsigned Solana positions and ordered raw logs.
+    ///
+    /// # Errors
+    /// SlotExceedsBigInt or TransactionIndexExceedsInteger instead of wrapping signed PostgreSQL
+    /// values.
+    ///
+    /// # Returns
+    /// TransactionInsert with checked positions and lossless logs in JSONB form.
     fn try_from(record: &TransactionRecord) -> Result<Self, Self::Error> {
+        // PostgreSQL BIGINT is signed. u64::MAX cannot be preserved by `as i64`
+        // (it would become -1), so reject it before opening a write transaction.
         let slot = i64::try_from(record.slot)
             .map_err(|_| StorageModelError::SlotExceedsBigInt { slot: record.slot })?;
 
@@ -87,6 +100,16 @@ impl TryFrom<&TransactionRecord> for TransactionInsert {
 impl TryFrom<&DecodedEventLog> for EventInsert {
     type Error = StorageModelError;
 
+    /// Checks one decoded event for source-table insertion.
+    ///
+    /// # Inputs
+    /// Borrowed DecodedEventLog with usize log index, Base64 and typed event.
+    ///
+    /// # Errors
+    /// LogIndexExceedsInteger when the original source position cannot fit PostgreSQL INTEGER.
+    ///
+    /// # Returns
+    /// EventInsert with stable event name, checked index, original Base64 and typed JSONB.
     fn try_from(event: &DecodedEventLog) -> Result<Self, Self::Error> {
         let log_index = i32::try_from(event.log_index).map_err(|_| {
             StorageModelError::LogIndexExceedsInteger {

@@ -5,6 +5,12 @@
 //! neither posted nor reserved. No SPL transfer or payout-reserve change occurs.
 //! Taker fees use the existing global rate and collateral-denominated market
 //! accumulator. Maker backing excludes fees: the arriving taker pays them.
+//!
+//! Example with six-decimal collateral and 25 bps: 3 contracts at maker price
+//! 600,000 exchange 1,800,000 cash atoms, and the fee is 4,500. A buying taker
+//! spends 1,804,500; a selling taker receives 1,795,500. The protocol owns the
+//! 4,500 fee atoms in the same vault. YES/NO supply and payout reserve do not
+//! change: this trades existing claims rather than splitting new pairs.
 
 use crate::{
     constants::*,
@@ -59,6 +65,19 @@ pub struct MatchPredictionOrder<'info> {
     pub level_rent_recipient: Option<UncheckedAccount<'info>>,
 }
 
+/// Settles one prediction maker and collateral-denominated taker fee.
+///
+/// # Inputs
+/// `ctx`: taker, market/book/config/fees, best FIFO maker, two positions and removal hints;
+/// outcome, side, limit and whole quantity.
+///
+/// # Errors
+/// Closed trading, invalid grid/backing/accounts, skipped priority, self/same-side/noncrossing
+/// trade, insufficient claims, overflow or stale hints.
+///
+/// # Returns
+/// `Ok(())` after up to one maker fills at its resting price; excess stays unposted and next order
+/// ID is unchanged.
 pub fn handle_match_prediction_order(
     ctx: Context<MatchPredictionOrder>,
     outcome: PredictionOutcome,
@@ -147,6 +166,8 @@ pub fn handle_match_prediction_order(
         },
         prediction::PredictionOrderAccountingMismatch
     );
+    // An oversized request is bounded by this one maker. Requesting 10 when
+    // the maker has 3 executes 3; the other 7 create no order or locked claim.
     let fill = quantity.min(maker.remaining_quantity);
     // Whole contracts make notional exact; no decimal rescaling or rounding.
     let notional = maker

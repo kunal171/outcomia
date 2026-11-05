@@ -6,6 +6,11 @@
 //! reciprocal links. Work stays bounded even when a book has many orders.
 //! Orders remain as canceled history; empty levels close so their price can be
 //! reused. Level rent belongs to its original payer, not the last canceler.
+//!
+//! Example: a 10-contract bid at 0.60 originally locks 6 collateral tokens.
+//! After 4 contracts trade, cancellation returns only the 3.6 tokens backing
+//! the other 6 contracts. It does not repay the already executed 2.4 tokens.
+//! For an ask, the corresponding refund is 6 remaining YES or NO contracts.
 
 use crate::{
     constants::*,
@@ -51,6 +56,19 @@ pub struct CancelPredictionOrder<'info> {
     pub level_rent_recipient: Option<UncheckedAccount<'info>>,
 }
 
+/// Cancels an owner's unfilled prediction order.
+///
+/// # Inputs
+/// `ctx`: owner, position/book/order/level, FIFO hints and final-level price/rent hints; existing
+/// `order_id`.
+///
+/// # Errors
+/// Foreign/non-Open order, bad backing/counts/links, stale or redundant hints, wrong rent
+/// recipient, refund overflow or locked underflow.
+///
+/// # Returns
+/// `Ok(())` after refunding only the remainder and retaining Canceled history; final levels close
+/// without a trading-time gate.
 pub fn handle_cancel_prediction_order(
     ctx: Context<CancelPredictionOrder>,
     order_id: u64,
@@ -196,6 +214,9 @@ pub fn handle_cancel_prediction_order(
             prediction::InvalidPredictionPriceLevel
         );
     }
+    // Order backing determines this refund, not all of the owner's locked
+    // bucket: that bucket may also fund other orders. Free + locked stays
+    // constant here; only withdrawal can move these cash claims out of custody.
     let amount = order.locked_collateral;
     let position: &mut PredictionPosition = &mut ctx.accounts.position;
     let (free, locked) = match (order.outcome, order.side) {
@@ -266,6 +287,17 @@ pub fn handle_cancel_prediction_order(
     Ok(())
 }
 
+/// Validates one immediate prediction FIFO neighbor.
+///
+/// # Inputs
+/// Program-owned neighbor, target order and `previous` flag selecting older/newer direction.
+///
+/// # Errors
+/// `InvalidPredictionOrderNeighbor` for noncanonical identity, wrong queue/status or broken
+/// reciprocal/ID ordering.
+///
+/// # Returns
+/// `Ok(())` when this hint can participate in O(1) unlinking; no mutation occurs.
 fn validate_fifo_neighbor(
     neighbor: &Account<PredictionOrder>,
     order: &Account<PredictionOrder>,
@@ -294,6 +326,17 @@ fn validate_fifo_neighbor(
     Ok(())
 }
 
+/// Validates one price neighbor for prediction-level removal.
+///
+/// # Inputs
+/// Candidate level, level being removed, book best price and `better` direction flag.
+///
+/// # Errors
+/// `InvalidPredictionPriceLevel` for wrong identity/bump, empty queue, head mismatch or broken
+/// priority/reciprocity.
+///
+/// # Returns
+/// `Ok(())` when this immediate hint is eligible for rewiring; the full list is not traversed.
 fn validate_price_neighbor(
     neighbor: &Account<PredictionPriceLevel>,
     level: &Account<PredictionPriceLevel>,

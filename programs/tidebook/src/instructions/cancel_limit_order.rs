@@ -96,6 +96,19 @@ pub struct CancelLimitOrder<'info> {
     pub trader_balance: Box<Account<'info, TraderBalance>>,
 }
 
+/// Unlinks an Open spot order and returns its remaining lock.
+///
+/// # Inputs
+/// `ctx`: owner, ledger, order/level, exact FIFO hints and final-level price/rent hints;
+/// `_order_id`: PDA-bound ID.
+///
+/// # Errors
+/// Wrong owner/status, stale links, inconsistent backing/counters, refund overflow, locked
+/// underflow or incorrect rent recipient.
+///
+/// # Returns
+/// `Ok(())` with a Canceled history account and refunded free balance; an empty level closes, even
+/// while paused.
 pub fn handle_cancel_limit_order(ctx: Context<CancelLimitOrder>, _order_id: u64) -> Result<()> {
     // Cancellation deliberately does not require an active market: owners
     // must retain an exit path while trading is paused.

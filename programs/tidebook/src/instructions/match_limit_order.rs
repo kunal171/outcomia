@@ -158,6 +158,19 @@ pub struct MatchLimitOrder<'info> {
     pub taker_balance: Box<Account<'info, TraderBalance>>,
 }
 
+/// Settles one best FIFO spot maker.
+///
+/// # Inputs
+/// `ctx`: taker, Active market/config/fees, maker/level, two ledgers and removal hints; side, raw
+/// limit and base-atom quantity.
+///
+/// # Errors
+/// Same-side/noncrossing/self trade, skipped priority, incorrect grid/backing/accounts,
+/// insufficient funds, overflow or stale hints.
+///
+/// # Returns
+/// `Ok(())` after one maker-price fill and fee accrual; partial priority is preserved and excess
+/// taker quantity is not posted.
 pub fn handle_match_limit_order(
     ctx: Context<MatchLimitOrder>,
     taker_side: OrderSide,

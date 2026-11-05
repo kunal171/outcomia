@@ -8,6 +8,15 @@ use tokio::signal;
 ///
 /// Interactive terminals normally send SIGINT through Ctrl+C. Kubernetes and
 /// Docker send SIGTERM before forcibly stopping a container.
+///
+/// # Inputs
+/// Operating-system signal delivery; no application arguments.
+///
+/// # Errors
+/// IO errors while installing/waiting for signal handlers.
+///
+/// # Returns
+/// The received signal name: SIGINT or, on Unix, SIGTERM.
 pub async fn wait_for_shutdown() -> io::Result<&'static str> {
     #[cfg(unix)]
     {

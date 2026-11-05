@@ -48,6 +48,17 @@ fn program_data_address() -> Pubkey {
     Pubkey::find_program_address(&[tidebook::id().as_ref()], &bpf_loader_upgradeable::ID).0
 }
 
+/// Rewrites loader metadata to isolate initialization authorization tests.
+///
+/// # Inputs
+/// Mutable VM and synthetic authority key; the loaded program-data account must exist.
+///
+/// # Errors
+/// Panics on missing/non-ProgramData account, codec failure or account replacement failure.
+///
+/// # Returns
+/// Program-data address with its old program bytes preserved and its authority host-replaced; this
+/// is not a deployment/upgrade transaction.
 fn set_program_upgrade_authority(svm: &mut LiteSVM, authority: Pubkey) -> Pubkey {
     let address = program_data_address();
     let mut account = svm.get_account(&address).unwrap();

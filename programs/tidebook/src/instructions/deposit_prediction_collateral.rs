@@ -48,6 +48,17 @@ pub struct DepositPredictionCollateral<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Credits free prediction cash from a checked token transfer.
+///
+/// # Inputs
+/// `ctx`: owner/position, collateral mint, owner source and canonical vault; positive raw `amount`.
+///
+/// # Errors
+/// Resolved market, zero amount, wrong source/mint/PDA, insufficient tokens, credit overflow or
+/// failed CPI.
+///
+/// # Returns
+/// `Ok(())` after custody/free cash increase equally; supply and payout reserve do not change.
 pub fn handle_deposit_prediction_collateral(
     ctx: Context<DepositPredictionCollateral>,
     amount: u64,

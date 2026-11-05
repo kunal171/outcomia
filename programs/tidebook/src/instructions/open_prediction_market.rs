@@ -28,6 +28,16 @@ pub struct OpenPredictionMarket<'info> {
     pub admin_record: Account<'info, AdminRecord>,
 }
 
+/// Opens an unexpired Draft under its active-admin creator.
+///
+/// # Inputs
+/// `ctx`: stored creator signer, canonical Draft and that creator's Active admin record.
+///
+/// # Errors
+/// Wrong creator/admin/resolver, `PredictionNotDraft` or `PredictionOpeningClosed` at/after close.
+///
+/// # Returns
+/// `Ok(())` after changing only status to Open; rules, claims and counters are preserved.
 pub fn handle_open_prediction_market(ctx: Context<OpenPredictionMarket>) -> Result<()> {
     require!(
         ctx.accounts.market.status == PredictionStatus::Draft,

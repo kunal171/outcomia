@@ -82,6 +82,24 @@ pub struct WithdrawProtocolFees<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Pays an accrued spot-market fee claim to the super-admin's quote token account.
+///
+/// The maximum is the fee accumulator, not the quote vault's pooled balance.
+/// With vault=1,000 and accrued fees=10, governance can withdraw at most 10;
+/// the other 990 may back trader claims. The transfer and accumulator debit are
+/// atomic. This spot `Market` context cannot withdraw prediction-market fees.
+///
+/// # Inputs
+/// `ctx`: super-admin, spot market/fees, quote mint/vault and governance destination; positive raw
+/// `amount`.
+///
+/// # Errors
+/// Unauthorized governance, incorrect mint/destination, insufficient accrued fees/vault funds or
+/// failed token CPI.
+///
+/// # Returns
+/// `Ok(())` after transferring fees and reducing the accumulator equally; trader claims are not
+/// debited.
 pub fn handle_withdraw_protocol_fees(
     ctx: Context<WithdrawProtocolFees>,
     amount: u64,

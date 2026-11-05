@@ -74,6 +74,22 @@ pub struct Deposit<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Transfers base/quote mint atoms from the owner and credits that asset's free bucket.
+///
+/// `amount` is not a human token count: 1.5 tokens with six decimals is 1,500,000
+/// atoms. The mint must belong to this market. Funding is allowed while paused;
+/// it neither places an order nor changes locked balance. Credit is written only
+/// after the checked token transfer succeeds, with transaction-wide rollback.
+///
+/// # Inputs
+/// `ctx`: owner, ledger, selected market mint, source and vault; `amount`: positive mint atoms.
+///
+/// # Errors
+/// Invalid amount/mint/owner, insufficient source funds, credit overflow or a failed SPL transfer.
+///
+/// # Returns
+/// `Ok(())` after custody and the selected free bucket increase equally; locked buckets stay
+/// unchanged.
 pub fn handle_deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, balance::InvalidDepositAmount);
 

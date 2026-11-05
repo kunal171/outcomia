@@ -10,6 +10,16 @@ use crate::decoder::{
 /// These lines are intended for development and operations only. Durable event
 /// identity and payloads live in PostgreSQL, so changing formatting must never
 /// affect checkpoint progression or indexed state.
+///
+/// # Inputs
+/// Borrowed decoded event with its original log index and Base64 payload.
+///
+/// # Errors
+/// No Result error is returned; stdout failures follow Rust printing behavior rather than storage
+/// retry policy.
+///
+/// # Returns
+/// Human-readable output only; no database writes, projections or checkpoint changes.
 pub fn report_event(decoded: &DecodedEventLog) {
     println!(
         "  event_log_index={} event_type={} payload={}",

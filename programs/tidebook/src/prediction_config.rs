@@ -35,11 +35,25 @@ pub struct PredictionMarketConfig {
 ///
 /// `now` must come from Clock in an instruction; accepting it as an argument
 /// here permits deterministic boundary tests without RPC or token transfers.
+///
+/// # Inputs
+/// Borrowed `config` and Unix-second `now`; instructions supply chain Clock, while tests may fix
+/// it.
+///
+/// # Errors
+/// Invalid close/resolution/fallback windows, resolver, delay, payout, tick, URI/hash commitments
+/// or timestamp overflow.
+///
+/// # Returns
+/// `Ok(())` without allocating or mutating accounts. Creator equality, mint decimals and admin
+/// authority are checked by the initializer.
 pub fn validate_prediction_market_config(config: &PredictionMarketConfig, now: i64) -> Result<()> {
     require!(
         config.close_ts > now,
         prediction::InvalidPredictionCloseTime
     );
+    // None means "use close time", not timestamp zero. With close=200 and no
+    // earliest override, a 10-second review delay may first finish at 210.
     let earliest = config.earliest_resolution_ts.unwrap_or(config.close_ts);
     require!(
         earliest >= config.close_ts,
@@ -59,6 +73,9 @@ pub fn validate_prediction_market_config(config: &PredictionMarketConfig, now: i
         .checked_add(delay)
         .ok_or(prediction::PredictionTimestampOverflow)?;
 
+    // The optional group keeps resolver and activation time inseparable. A
+    // missing deadline is an intentionally unbounded fallback window, not an
+    // already expired one; this validator must preserve that distinction.
     if let Some(fallback) = &config.fallback {
         require!(
             fallback.resolver != Pubkey::default() && fallback.resolver != config.resolver,

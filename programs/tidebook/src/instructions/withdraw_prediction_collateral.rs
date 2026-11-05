@@ -44,6 +44,18 @@ pub struct WithdrawPredictionCollateral<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+/// Returns only free prediction cash to its owner.
+///
+/// # Inputs
+/// `ctx`: owner/position, collateral mint, owner destination and canonical vault; positive raw
+/// `amount`.
+///
+/// # Errors
+/// Zero amount, wrong destination/mint/PDA, insufficient free cash/vault funds or rejected CPI.
+///
+/// # Returns
+/// `Ok(())` after token transfer and free-claim debit; no lifecycle gate blocks existing free-cash
+/// recovery.
 pub fn handle_withdraw_prediction_collateral(
     ctx: Context<WithdrawPredictionCollateral>,
     amount: u64,

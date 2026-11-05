@@ -38,6 +38,16 @@ pub struct ManageAdmin<'info> {
 }
 
 /// Moves an active role to the reversible disabled state.
+///
+/// # Inputs
+/// `ctx`: super-admin/config and target role; `_target_admin`: wallet key constrained by the
+/// context.
+///
+/// # Errors
+/// Unauthorized governance, protected super-admin, incorrect target or `AdminAlreadyDisabled`.
+///
+/// # Returns
+/// `Ok(())` after status becomes Disabled and an event is emitted.
 pub fn handle_disable_admin(ctx: Context<ManageAdmin>, _target_admin: Pubkey) -> Result<()> {
     require!(
         ctx.accounts.admin_record.status == AdminStatus::Active,
@@ -57,6 +67,16 @@ pub fn handle_disable_admin(ctx: Context<ManageAdmin>, _target_admin: Pubkey) ->
 }
 
 /// Restores a disabled role without replacing its provenance record.
+///
+/// # Inputs
+/// `ctx`: super-admin/config and target role; `_target_admin`: wallet key constrained by the
+/// context.
+///
+/// # Errors
+/// Unauthorized governance, protected super-admin, incorrect target or `AdminAlreadyActive`.
+///
+/// # Returns
+/// `Ok(())` after status becomes Active while preserving who originally added the role.
 pub fn handle_enable_admin(ctx: Context<ManageAdmin>, _target_admin: Pubkey) -> Result<()> {
     require!(
         ctx.accounts.admin_record.status == AdminStatus::Disabled,

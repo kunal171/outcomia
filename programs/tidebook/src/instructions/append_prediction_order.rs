@@ -39,6 +39,19 @@ pub struct AppendPredictionOrder<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Extends an existing prediction price's FIFO queue.
+///
+/// # Inputs
+/// `ctx`: trader/position, market/book, existing level/tail and new order; ID, outcome, side, price
+/// and whole quantity.
+///
+/// # Errors
+/// Closed trading, invalid price/ID/funding, wrong level, stale tail, counter overflow or account
+/// initialization failure.
+///
+/// # Returns
+/// `Ok(())` after locking only this trader's claims and appending a node; first order and price
+/// neighbors are retained.
 pub fn handle_append_prediction_order(
     ctx: Context<AppendPredictionOrder>,
     order_id: u64,
@@ -102,6 +115,9 @@ pub fn handle_append_prediction_order(
             prediction::InvalidPredictionTail
         );
     }
+    // Totals use remaining whole contracts, not original submitted quantities.
+    // An older partially filled order keeps its FIFO place; adding 3 to a level
+    // with 5 remaining contracts publishes total 8, regardless of earlier fills.
     let total = level
         .total_remaining_quantity
         .checked_add(quantity)
