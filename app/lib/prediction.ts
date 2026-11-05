@@ -493,7 +493,7 @@ function validatePredictionNeighbors(
     throw new Error("Price neighbors are stale or not adjacent; refresh");
 }
 
-interface PredictionPlacementReader {
+export interface PredictionPlacementReader {
   predictionPriceLevel: {
     fetchNullable(
       address: PublicKey,
@@ -755,7 +755,7 @@ export interface PredictionOrderAccount {
   nextOrder: PublicKey | null;
   quantity: BN;
   remainingQuantity: BN;
-  /** Bid collateral atoms (including any fee budget), or ask outcome contracts. */
+  /** Bid collateral atoms at the limit price, or ask outcome contracts; no maker fee. */
   lockedCollateral: BN;
   status: { open?: object; filled?: object; canceled?: object };
   bump: number;

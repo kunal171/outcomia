@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PredictionOrderForm } from "./prediction-order-form";
 import { PredictionOrders } from "./prediction-orders";
 import { PredictionMatchForm } from "./prediction-match-form";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -474,7 +473,7 @@ function ConnectedPosition({
       )}
       {!loading && !error && position && (
         <>
-          <dl className="market-metadata">
+          <dl className="market-metadata prediction-balances">
             {balances.map(([label, amount]) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -482,28 +481,6 @@ function ConnectedPosition({
               </div>
             ))}
           </dl>
-          {marketState && (
-            <PredictionOrderForm
-              program={program}
-              owner={wallet.publicKey}
-              marketAddress={market}
-              market={marketState}
-              positionAddress={positionAddress}
-              position={position}
-              symbol={collateralSymbol}
-              pending={pending}
-              setPending={setPending}
-              onPlaced={(confirmed, order) => {
-                // Keep the receipt outside the loading section: a ledger refresh
-                // unmounts the form, but must not lose a confirmed transaction.
-                setSignature(confirmed);
-                setLastOrder(order);
-                setResultKind("order");
-                setRefresh((value) => value + 1);
-                onOrderPlaced();
-              }}
-            />
-          )}
           <PredictionMatchForm
             program={program}
             owner={wallet.publicKey}
@@ -512,9 +489,9 @@ function ConnectedPosition({
             symbol={collateralSymbol}
             pending={pending}
             setPending={setPending}
-            onMatched={(confirmed) => {
+            onMatched={(confirmed, order) => {
               setSignature(confirmed);
-              setLastOrder(null);
+              setLastOrder(order);
               setResultKind("match");
               setRefresh((value) => value + 1);
               onOrderPlaced();
@@ -551,6 +528,7 @@ function ConnectedPosition({
               void fund();
             }}
           >
+            <h3>Deposit &amp; withdraw</h3>
             <p>
               {collateralSymbol} in wallet:{" "}
               {walletLoading
@@ -616,7 +594,7 @@ function ConnectedPosition({
             </button>
           </form>
           <form
-            className="market-create-form"
+            className="market-create-form prediction-convert"
             onSubmit={(event) => {
               event.preventDefault();
               void convert();
@@ -720,7 +698,7 @@ function ConnectedPosition({
                     : resultKind === "cancel"
                       ? "Prediction order canceled; unfilled funds released."
                       : resultKind === "match"
-                        ? "Trade confirmed. See updated balances and orders below."
+                        ? "Order transaction confirmed. Check your refreshed balances and orders for its result."
                         : "Position initialized."}{" "}
           <a
             href={transactionExplorerUrl(signature)}
@@ -729,7 +707,7 @@ function ConnectedPosition({
           >
             View transaction ↗
           </a>
-          {resultKind === "order" && lastOrder && (
+          {lastOrder && (
             <>
               {" "}
               ·{" "}
@@ -745,8 +723,9 @@ function ConnectedPosition({
         </p>
       )}
       <p>
-        Matching, cancellation and redemption will be added in later milestones.
-        The market authority must open a draft before pairs can be created.
+        Cancel open orders to release their remaining funds. Resolution and
+        reward claims are not available in this version. The creator must open a
+        draft before trading begins.
       </p>
     </section>
   );

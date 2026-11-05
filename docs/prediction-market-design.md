@@ -776,10 +776,11 @@ all removal accounts; full fills reject missing, stale or unnecessary hints.
 This instruction touches one maker, two positions and at most one FIFO successor
 or worse price. The bounded account set keeps compute predictable. The client
 can now compose up to three of these instructions; larger requests may still
-need another transaction. Automatic remainder posting remains separate work.
+need another transaction. The primitive never posts; the client can append safe
+resting placement in the same transaction, as described below.
 
-The position panel now has a separate Buy or sell now form with a maximum buy
-price or minimum sell price. Its preview shows the fill, fee, net collateral and
+The position panel has one Buy/Sell form with a maximum buy price or minimum
+sell price. Its preview shows matching fees, net collateral, any resting lock and
 unposted quantity across the selected makers. It refreshes the plan, positions
 and fee rate before signing.
 The local clock disables trading at close without polling RPC every second.
@@ -839,9 +840,37 @@ Every plan reports one stop reason:
 
 After the third fill, the planner checks the virtual head to classify this
 boundary. It does not plan a fourth fill, although the fourth order may be read
-as the third maker's required FIFO successor. All unfilled quantity stays
-unposted in this milestone, including book-exhausted or non-crossing remainders.
+as the third maker's required FIFO successor. Cap-blocked quantity stays unposted.
 The UI shows the reason and quantity so the wallet can submit again deliberately.
+
+### Limit execution and public depth (implemented locally)
+
+One Buy/Sell form offers two execution choices. Limit mode matches first, then
+posts a positive remainder only for `book-exhausted` or `non-crossing`. Immediate
+only never posts. The planner exposes disposable final market, book and position
+snapshots. Placement validates those post-fill balances, including each taker
+fee, and selects empty-side placement, FIFO append or sorted insertion.
+Matching changes the opposing side only, so own-side placement neighbors are
+read from RPC. The final opposing head comes from the simulation. All accounts
+are revalidated by the program; stale hints fail atomically.
+
+For example, buying three YES contracts with a 0.70 limit against one contract
+at 0.60 and a 1% fee spends 0.606 collateral immediately and locks 1.40 for the
+remaining two contracts. If the available balance cannot cover both, the client
+rejects the combined request. A failed placement rolls back matching and fees.
+
+The complete packet, including placement and compute budget, is measured before
+signing. Some three-maker combinations plus placement may exceed 1,232 bytes.
+The user must reduce quantity or select immediate-only execution; instructions
+are never silently removed. Previews are estimates, not confirmed fill receipts.
+
+Public depth needs no wallet. It reads up to 20 linked levels per outcome/side,
+validates canonical identity and reciprocal price order, and shows aggregated
+remaining contracts and order counts. Longer books are labeled as truncated.
+RPC failures or concurrent splices produce an error and refresh action. Market
+terms are expandable, balances distinguish free from locked, and cancellation
+remains available after trading closes. No last-trade price is fabricated from
+the book; prediction fill events are still pending.
 
 The builder requests at most 600,000 compute units and measures the complete
 unsigned legacy transaction, including its compute-budget instruction, against
@@ -864,8 +893,7 @@ conservation, rent refunds and rollback on a third-step failure.
 
 ### Trading still to implement
 
-Automatic safe remainder posting, an aggregated prediction order book and typed
-prediction events/indexer decoding remain.
+Typed prediction events/indexer decoding remain.
 Fee accrual is implemented, but the existing spot fee-withdrawal instruction
 accepts spot market accounts only; prediction fee withdrawal needs a separate
 collateral-vault adapter. Prediction fills do not emit events yet.
@@ -1055,8 +1083,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    placement, same-price FIFO append, new-price insertion and cancellation are implemented.
    One-maker matching, taker fees and an immediate-trade UI are also implemented.
    Bounded three-maker planning and atomic batch execution are implemented.
-   Next: remainder posting, book display, prediction fee
-   withdrawal, typed events and indexer decoding.
+   Safe remainder posting, public book depth and the unified trading UI are implemented.
+   Next: prediction fee withdrawal, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution
    limits and rollback tests, then run a full devnet lifecycle. Oracle adapters

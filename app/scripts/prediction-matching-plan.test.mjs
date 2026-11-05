@@ -54,12 +54,19 @@ const {
   buildPredictionMatchTransaction,
   MAX_PREDICTION_MATCHES_PER_TRANSACTION,
   PREDICTION_MATCH_COMPUTE_UNITS,
+  canPostPredictionRemainder,
 } = load("../lib/prediction-matching-plan.ts", {
   "./prediction": prediction,
   "./tidebook": {
     deriveMarketFeesPda: (market) => derive("market_fees", market),
     deriveProtocolConfigPda: () => derive("protocol_config"),
   },
+});
+const { buildPredictionPlacement } = load("../lib/prediction-placement.ts", {
+  "./prediction": prediction,
+});
+const { readPredictionDepth } = load("../lib/prediction-book.ts", {
+  "./prediction": prediction,
 });
 const key = (seed) => new PublicKey(new Uint8Array(32).fill(seed));
 const bn = (value) => new BN(String(value));
@@ -578,4 +585,328 @@ test("three-price transactions with distinct maker owners fit the legacy packet 
         key(32).toBase58(),
       );
     }
+});
+
+test("safe remainders use post-fee balances and append placement after fills on all four lists", async () => {
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const f = fixture({
+        outcome,
+        side,
+        levels: [{ price: 600000, quantities: [1] }],
+      });
+      const before = f.snapshot();
+      const plan = await f.run(3);
+      assert.equal(canPostPredictionRemainder(plan), true);
+      assert.equal(plan.finalMarket.openOrderCount.toString(), "0");
+      assert.equal(plan.finalBook.nextOrderId.toString(), "2");
+      assert.equal(
+        plan.finalPosition.collateralFree.toString(),
+        side === "bid" ? "9394000" : "10594000",
+      );
+      const placement = await buildPredictionPlacement(
+        program,
+        f.accounts,
+        f.request.marketAddress,
+        f.request.taker,
+        plan.finalMarket,
+        plan.finalBook,
+        plan.finalPosition,
+        outcome,
+        side,
+        plan.request.limitPrice,
+        plan.remainingQuantity,
+        bn(100),
+      );
+      assert.equal(
+        placement.locked.toString(),
+        side === "bid" ? "1800000" : "2",
+      );
+      const tx = await buildPredictionMatchTransaction(
+        program,
+        plan,
+        placement.instruction,
+      );
+      assert.deepEqual(
+        tx.instructions
+          .slice(1)
+          .map((ix) => program.coder.instruction.decode(ix.data).name),
+        ["matchPredictionOrder", "placePredictionOrder"],
+      );
+      const decoded = program.coder.instruction.decode(
+        tx.instructions.at(-1).data,
+      );
+      assert.equal(decoded.data.quantity.toString(), "2");
+      assert.equal(f.snapshot(), before);
+    }
+});
+
+test("empty books accept a standalone limit order but immediate-only needs liquidity", async () => {
+  const f = fixture({ levels: [] });
+  const plan = await f.run(2);
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const placement = await buildPredictionPlacement(
+    program,
+    f.accounts,
+    f.request.marketAddress,
+    f.request.taker,
+    plan.finalMarket,
+    plan.finalBook,
+    plan.finalPosition,
+    "yes",
+    "bid",
+    plan.request.limitPrice,
+    plan.remainingQuantity,
+    bn(100),
+  );
+  const tx = await buildPredictionMatchTransaction(
+    program,
+    plan,
+    placement.instruction,
+  );
+  assert.equal(tx.instructions.length, 2);
+  await assert.rejects(
+    () => buildPredictionMatchTransaction(program, plan),
+    /No crossing/,
+  );
+});
+
+test("resting routing encodes FIFO append and sorted insertion from final snapshots", async () => {
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      for (const samePrice of [true, false]) {
+        // The fixture seeds the opposite of its requested side. Reverse only the
+        // request so these existing orders become own-side resting liquidity.
+        const f = fixture({
+          outcome,
+          side: side === "bid" ? "ask" : "bid",
+          levels: [{ price: 600000, quantities: [1] }],
+        });
+        f.request.side = side;
+        f.request.limitPrice = bn(
+          samePrice ? 600000 : side === "bid" ? 700000 : 500000,
+        );
+        const plan = await f.run(2);
+        assert.equal(plan.steps.length, 0);
+        const placement = await buildPredictionPlacement(
+          program,
+          f.accounts,
+          f.request.marketAddress,
+          f.request.taker,
+          plan.finalMarket,
+          plan.finalBook,
+          plan.finalPosition,
+          outcome,
+          side,
+          plan.request.limitPrice,
+          plan.remainingQuantity,
+          bn(100),
+        );
+        const tx = await buildPredictionMatchTransaction(
+          program,
+          plan,
+          placement.instruction,
+        );
+        const decoded = program.coder.instruction.decode(
+          tx.instructions.at(-1).data,
+        );
+        assert.equal(
+          decoded.name,
+          samePrice ? "appendPredictionOrder" : "insertPredictionOrder",
+        );
+        assert.equal(decoded.data.orderId.toString(), "2");
+      }
+    }
+});
+
+test("a complete three-price transaction with remainder is either packet-safe or rejected before signing", async () => {
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const f = fixture({
+    owners: [11, 12, 13],
+    levels: [600000, 610000, 620000].map((price) => ({
+      price,
+      quantities: [1],
+    })),
+  });
+  const plan = await f.run(4);
+  const placement = await buildPredictionPlacement(
+    program,
+    f.accounts,
+    f.request.marketAddress,
+    f.request.taker,
+    plan.finalMarket,
+    plan.finalBook,
+    plan.finalPosition,
+    "yes",
+    "bid",
+    plan.request.limitPrice,
+    plan.remainingQuantity,
+    bn(100),
+  );
+  try {
+    const tx = await buildPredictionMatchTransaction(
+      program,
+      plan,
+      placement.instruction,
+    );
+    const bytes = new Transaction({
+      feePayer: f.request.taker,
+      recentBlockhash: PublicKey.default.toBase58(),
+    })
+      .add(...tx.instructions)
+      .serialize({ requireAllSignatures: false, verifySignatures: false });
+    assert.ok(bytes.length <= 1232);
+    assert.equal(tx.instructions.length, 5);
+  } catch (cause) {
+    assert.match(cause.message, /packet limit/);
+  }
+});
+
+test("a remainder cannot spend the pre-fill cash or ignore taker fees", async () => {
+  const f = fixture({
+    cash: 1500000,
+    levels: [{ price: 600000, quantities: [1] }],
+  });
+  const plan = await f.run(2); // 606000 paid; only 894000 remains for a 900000 lock.
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  await assert.rejects(
+    () =>
+      buildPredictionPlacement(
+        program,
+        f.accounts,
+        f.request.marketAddress,
+        f.request.taker,
+        plan.finalMarket,
+        plan.finalBook,
+        plan.finalPosition,
+        "yes",
+        "bid",
+        plan.request.limitPrice,
+        plan.remainingQuantity,
+        bn(100),
+      ),
+    /available collateral/i,
+  );
+});
+
+test("filled and cap-blocked plans reject any appended placement instruction", async () => {
+  const f = fixture();
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const dummy = ComputeBudgetProgram.setComputeUnitLimit({ units: 100000 });
+  const filled = await f.run(1);
+  assert.equal(canPostPredictionRemainder(filled), false);
+  await assert.rejects(
+    () => buildPredictionMatchTransaction(program, filled, dummy),
+    /Unsafe/,
+  );
+  const capped = await fixture({
+    levels: [{ price: 600000, quantities: [1, 1, 1, 1] }],
+  }).run(10);
+  assert.equal(capped.stopReason, "match-cap");
+  assert.equal(canPostPredictionRemainder(capped), false);
+  await assert.rejects(
+    () => buildPredictionMatchTransaction(program, capped, dummy),
+    /Unsafe/,
+  );
+});
+
+test("public depth aggregates canonical levels and rejects broken or missing links", async () => {
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const prices = side === "bid" ? [600000, 610000] : [600000, 590000];
+      const f = fixture({
+        outcome,
+        side,
+        levels: prices.map((price) => ({ price, quantities: [2, 3] })),
+      });
+      const makerSide = side === "bid" ? "ask" : "bid";
+      const depth = await readPredictionDepth(
+        f.accounts.predictionPriceLevel,
+        f.request.marketAddress,
+        f.book,
+        outcome,
+        makerSide,
+      );
+      assert.equal(depth.levels.length, 2);
+      assert.equal(depth.levels[0].totalRemainingQuantity.toString(), "5");
+      assert.equal(depth.hasMore, false);
+      depth.levels[1].betterPrice = null;
+      await assert.rejects(
+        () =>
+          readPredictionDepth(
+            f.accounts.predictionPriceLevel,
+            f.request.marketAddress,
+            f.book,
+            outcome,
+            makerSide,
+          ),
+        /invalid links/,
+      );
+      f.priceLevels.clear();
+      await assert.rejects(
+        () =>
+          readPredictionDepth(
+            f.accounts.predictionPriceLevel,
+            f.request.marketAddress,
+            f.book,
+            outcome,
+            makerSide,
+          ),
+        /invalid links/,
+      );
+    }
+  const f = fixture({ levels: [] });
+  const depth = await readPredictionDepth(
+    f.accounts.predictionPriceLevel,
+    f.request.marketAddress,
+    f.book,
+    "yes",
+    "bid",
+  );
+  assert.equal(depth.levels.length, 0);
+  const many = fixture({
+    levels: Array.from({ length: 21 }, (_, i) => ({
+      price: 10000 + i * 10000,
+      quantities: [1],
+    })),
+  });
+  const bounded = await readPredictionDepth(
+    many.accounts.predictionPriceLevel,
+    many.request.marketAddress,
+    many.book,
+    "yes",
+    "ask",
+  );
+  assert.equal(bounded.levels.length, 20);
+  assert.equal(bounded.hasMore, true);
+  const brokenReader = {
+    fetchNullable: async () => {
+      throw new Error("RPC unavailable");
+    },
+  };
+  await assert.rejects(
+    () =>
+      readPredictionDepth(
+        brokenReader,
+        many.request.marketAddress,
+        many.book,
+        "yes",
+        "ask",
+      ),
+    /RPC unavailable/,
+  );
 });

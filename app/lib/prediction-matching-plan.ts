@@ -1,6 +1,11 @@
 /** Bounded prediction matching over a disposable, read-only account overlay. */
 import { BN, type Program } from "@anchor-lang/core";
-import { ComputeBudgetProgram, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  PublicKey,
+  Transaction,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import {
   derivePredictionBookPda,
   derivePredictionPositionPda,
@@ -71,6 +76,18 @@ export interface PredictionMatchPlan {
   /** Total taker cash paid (buy) or received (sell), including fees. */
   totalCash: BN;
   stopReason: PredictionMatchStopReason;
+  /** Disposable final snapshots for funding and non-crossing remainder checks. */
+  finalMarket: PredictionMarketAccount;
+  finalBook: PredictionOrderBookAccount;
+  finalPosition: PredictionPositionAccount;
+}
+
+/** A cap-blocked request must never rest across still-crossing liquidity. */
+export function canPostPredictionRemainder(plan: PredictionMatchPlan): boolean {
+  return (
+    plan.remainingQuantity.gtn(0) &&
+    (plan.stopReason === "book-exhausted" || plan.stopReason === "non-crossing")
+  );
 }
 
 /** Reject invalid requests even when there is no opposing liquidity. */
@@ -196,6 +213,9 @@ export async function planPredictionMatches(
       totalFee,
       totalCash,
       stopReason,
+      finalMarket: { ...market },
+      finalBook: { ...book },
+      finalPosition: { ...taker },
     };
   }
   while (steps.length < MAX_PREDICTION_MATCHES_PER_TRANSACTION) {
@@ -352,8 +372,8 @@ export async function planPredictionMatches(
     totalCash = totalCash.add(quote.cash);
     if (remaining.isZero()) return result("filled");
   }
-  // Classify the cap boundary without fetching a fourth maker. Even a safe
-  // empty/non-crossing remainder is left unposted in this milestone.
+  // Classify the cap boundary without fetching a fourth maker. Posting is safe
+  // only when the final opposing head is absent or outside the limit.
   const nextPrice = predictionBestPrice(book, request.outcome, makerSide);
   return result(
     !nextPrice
@@ -372,8 +392,12 @@ export async function planPredictionMatches(
 export async function buildPredictionMatchTransaction(
   program: Program,
   plan: PredictionMatchPlan,
+  remainder?: TransactionInstruction,
 ): Promise<Transaction> {
-  if (plan.steps.length === 0) throw new Error("No crossing orders to trade");
+  if (remainder && !canPostPredictionRemainder(plan))
+    throw new Error("Unsafe prediction remainder");
+  if (plan.steps.length === 0 && !remainder)
+    throw new Error("No crossing orders to trade");
   if (plan.steps.length > MAX_PREDICTION_MATCHES_PER_TRANSACTION)
     throw new Error("Too many prediction match steps");
   const { marketAddress, taker, outcome, side, limitPrice } = plan.request;
@@ -412,14 +436,22 @@ export async function buildPredictionMatchTransaction(
         .instruction(),
     );
   }
+  if (remainder) transaction.add(remainder);
   const measured = new Transaction({
     feePayer: taker,
     recentBlockhash: PublicKey.default.toBase58(),
   }).add(...transaction.instructions);
-  const bytes = measured.serialize({
-    requireAllSignatures: false,
-    verifySignatures: false,
-  });
+  let bytes: Buffer;
+  try {
+    bytes = measured.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+  } catch {
+    throw new Error(
+      "Trade exceeds the transaction packet limit; reduce the quantity or use immediate-only execution",
+    );
+  }
   if (bytes.length > 1232)
     throw new Error(
       "Trade exceeds the transaction packet limit; reduce the request",

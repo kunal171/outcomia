@@ -290,17 +290,25 @@ is credited to this market's collateral-denominated accumulator: buys pay
 notional plus fee, sells receive notional minus fee. Supply and payout reserve
 stay unchanged. Partial makers retain priority; full fills promote their FIFO
 successor or remove the empty best level and return rent to its original payer.
-No taker order is created and excess requested quantity stays unposted. The
-immediate-trade form uses `prediction-matching-plan.ts` to compose up to three
+The primitive creates no taker order. The Buy/Sell form uses
+`prediction-matching-plan.ts` to compose up to three
 existing matching instructions atomically. A read-only overlay simulates FIFO
 and price promotion, cumulative trader claims and per-fill rounded fees without
 changing caller snapshots. The plan distinguishes filled, exhausted,
-non-crossing and match-cap outcomes; all remainders stay unposted. The builder
+non-crossing and match-cap outcomes. In limit mode, positive exhausted or
+non-crossing remainders use the final simulated market/book/position to select
+and validate place/append/insert. The placement runs after all fills in the same
+transaction. Cap-blocked remainders stay unposted. Immediate-only mode never
+posts. Post-fill fees reduce the funds available to back a resting buy. The builder
 sets a 600,000-CU ceiling and checks the complete legacy packet before signing.
 Third-step failure rolls back earlier fills, fees and rent refunds. The UI
 refreshes the whole plan before signing and balances/book after confirmation.
-Deployment flags default false. Remainder posting, prediction fee withdrawal,
-events/indexer support and resolution remain planned.
+Public depth follows canonical price links and shows up to 20 aggregated levels
+per side, best first. It validates identity and reciprocal ordering; missing or
+changed accounts produce a refresh error, not an empty book. YES and NO books
+are separate. Depth is an account snapshot, not a last-trade price.
+Deployment flags default false. Prediction fee withdrawal, events/indexer
+support and resolution remain planned.
 
 ### Market vault topology
 

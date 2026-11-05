@@ -7,6 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import { AppHeader } from "./app-header";
 import { PredictionPositionPanel } from "./prediction-position";
 import { PredictionLifecycle } from "./prediction-lifecycle";
+import { PredictionBook } from "./prediction-book";
 import { useProtocolRole } from "./protocol-role-provider";
 import {
   predictionStatus,
@@ -19,7 +20,6 @@ import {
   accountExplorerUrl,
   getTidebookAccounts,
   getTidebookReadProgram,
-  formatAtomicAmount,
   type MarketMetadataAccount,
 } from "../lib/tidebook";
 
@@ -42,6 +42,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [bookRevision, setBookRevision] = useState(0);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let canceled = false;
@@ -76,6 +78,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
               throw new Error(
                 "Order book belongs to a different prediction market",
               );
+            if (metadata && !metadata.market.equals(publicKey))
+              throw new Error("Metadata belongs to a different market");
             return { address: publicKey, market: account, metadata, book };
           }),
         );
@@ -103,6 +107,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
   }, [program, address, refresh]);
 
   const isAdmin = !roleLoading && (role === "admin" || role === "super-admin");
+  const visibleRecords = records.filter(
+    (row) =>
+      address ||
+      `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+  );
   return (
     <div className="app-shell">
       <AppHeader />
@@ -114,13 +125,32 @@ export function PredictionMarkets({ address }: { address?: string }) {
         )}
         <div className="route-heading">
           <div className="eyebrow">Binary outcomes</div>
-          <h1>{address ? "Prediction market" : "Prediction markets"}</h1>
+          <h1>
+            {address
+              ? (records[0]?.metadata?.displayName ?? "Prediction market")
+              : "Trade your view."}
+          </h1>
           <p>
-            Inspect market terms, fund your position and create backed YES/NO
-            pairs in open markets. Outcome trading and resolution are being
-            built.
+            {address
+              ? "Buy and sell YES or NO contracts using one collateral asset. Read the rules before taking a position."
+              : "Explore questions with on-chain order books. Choose an outcome, set your price, and trade with other participants."}
+          </p>
+          <p className="prediction-release-note">
+            Prediction trading is in development. Resolution and reward claims
+            are not available yet.
           </p>
         </div>
+        {!address && (
+          <label className="prediction-search">
+            Find a market
+            <input
+              type="search"
+              placeholder="Search questions or market addresses"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        )}
         <div className="market-list-heading">
           <h2>{address ? "Market terms" : "On-chain markets"}</h2>
           <div className="admin-actions">
@@ -152,11 +182,17 @@ export function PredictionMarkets({ address }: { address?: string }) {
             No prediction markets exist on this network yet.
           </div>
         )}
+        {!loading &&
+          !error &&
+          records.length > 0 &&
+          visibleRecords.length === 0 && (
+            <div className="access-card">No markets match your search.</div>
+          )}
         <section
           className={address ? "prediction-detail-grid" : "markets-grid"}
           aria-live="polite"
         >
-          {records.map(({ address: key, market, metadata, book }) => {
+          {visibleRecords.map(({ address: key, market, metadata }) => {
             const status = predictionStatus(market);
             const decimals = market.payoutPerContract.toString().length - 1;
             const fields = [
@@ -207,14 +243,35 @@ export function PredictionMarkets({ address }: { address?: string }) {
                 </div>
                 <p className="market-address-caption">{key.toBase58()}</p>
                 {address ? (
-                  <dl className="market-metadata prediction-terms">
-                    {fields.map(([label, value]) => (
-                      <div key={label}>
-                        <dt>{label}</dt>
-                        <dd>{value}</dd>
+                  <>
+                    <div className="prediction-market-summary">
+                      <div>
+                        <span className="card-label">Trading closes</span>
+                        <strong>{predictionTime(market.closeTs)}</strong>
                       </div>
-                    ))}
-                  </dl>
+                      <div>
+                        <span className="card-label">Winning contract</span>
+                        <strong>
+                          1 {metadata?.quoteSymbol ?? "collateral token"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="card-label">Open orders</span>
+                        <strong>{market.openOrderCount.toString()}</strong>
+                      </div>
+                    </div>
+                    <details className="prediction-rules">
+                      <summary>Market rules &amp; resolution terms</summary>
+                      <dl className="market-metadata prediction-terms">
+                        {fields.map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
+                  </>
                 ) : (
                   <p>
                     Trading closes {predictionTime(market.closeTs)}. Collateral:{" "}
@@ -247,57 +304,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
                   </a>
                 </div>
                 {address && (
-                  <section className="admin-card">
-                    <h3>Order book</h3>
-                    {book ? (
-                      <>
-                        <p>
-                          Book initialized. Empty-side placement and same-price
-                          FIFO appending and sorted new-price insertion are
-                          available for local testing.
-                        </p>
-                        <dl className="market-metadata">
-                          <div>
-                            <dt>Next order ID</dt>
-                            <dd>{book.nextOrderId.toString()}</dd>
-                          </div>
-                          {(
-                            [
-                              ["Best YES buy", book.yesBestBid],
-                              ["Best YES sell", book.yesBestAsk],
-                              ["Best NO buy", book.noBestBid],
-                              ["Best NO sell", book.noBestAsk],
-                            ] as const
-                          ).map(([label, price]) => (
-                            <div key={label}>
-                              <dt>{label}</dt>
-                              <dd>
-                                {price === null
-                                  ? "No orders"
-                                  : `${formatAtomicAmount(price, decimals)} ${metadata?.quoteSymbol ?? "collateral"}`}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                        <a
-                          className="market-explorer-link"
-                          href={accountExplorerUrl(
-                            derivePredictionBookPda(key),
-                          )}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          View book account ↗
-                        </a>
-                      </>
-                    ) : (
-                      <p>
-                        This older draft has no book root. Create a fresh draft
-                        with the updated program before placing orders; existing
-                        funds are unchanged.
-                      </p>
-                    )}
-                  </section>
+                  <PredictionBook
+                    program={program}
+                    market={key}
+                    decimals={decimals}
+                    symbol={metadata?.quoteSymbol ?? "collateral"}
+                    revision={`${refresh}:${bookRevision}`}
+                  />
                 )}
                 {address && (
                   <PredictionLifecycle
@@ -323,6 +336,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     payoutPerContract={market.payoutPerContract}
                     collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
                     onOrderPlaced={() => {
+                      setBookRevision((value) => value + 1);
                       const accounts = getTidebookAccounts(program);
                       void Promise.all([
                         accounts.predictionMarket.fetchNullable(key),

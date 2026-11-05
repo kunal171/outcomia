@@ -7,13 +7,16 @@ import {
   derivePredictionBookPda,
   derivePredictionPositionPda,
   PREDICTION_MATCHING_ENABLED,
+  PREDICTION_ORDERS_ENABLED,
   type PredictionOutcome,
 } from "../lib/prediction";
 import {
   buildPredictionMatchTransaction,
   MAX_PREDICTION_MATCHES_PER_TRANSACTION,
   planPredictionMatches,
+  canPostPredictionRemainder,
 } from "../lib/prediction-matching-plan";
+import { buildPredictionPlacement } from "../lib/prediction-placement";
 import {
   deriveMarketFeesPda,
   deriveProtocolConfigPda,
@@ -31,10 +34,10 @@ interface Props {
   symbol: string;
   pending: boolean;
   setPending: (value: boolean) => void;
-  onMatched: (signature: string) => void;
+  onMatched: (signature: string, order: PublicKey | null) => void;
 }
 
-/** Bounded atomic matching; unfilled quantity is never silently posted.
+/** Bounded atomic matching with explicit limit or immediate-only execution.
  * Pre-signing reads refresh the quote, but concurrent fills can still change
  * the result. Confirmation reports the transaction, not a fabricated fill. */
 export function PredictionMatchForm({
@@ -51,6 +54,7 @@ export function PredictionMatchForm({
   const [side, setSide] = useState<OrderSide>("bid");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [execution, setExecution] = useState<"limit" | "immediate">("limit");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -105,13 +109,41 @@ export function PredictionMatchForm({
       fees.accruedQuoteFees,
       new BN(Math.floor(Date.now() / 1000)),
     );
-    if (!plan.steps.length)
+    const post = execution === "limit" && canPostPredictionRemainder(plan);
+    if (post && !PREDICTION_ORDERS_ENABLED)
+      throw new Error(
+        "Resting orders await deployment. Select immediate only to match without posting.",
+      );
+    const placement = post
+      ? await buildPredictionPlacement(
+          program,
+          accounts,
+          market,
+          owner,
+          plan.finalMarket,
+          plan.finalBook,
+          plan.finalPosition,
+          outcome,
+          side,
+          limit,
+          plan.remainingQuantity,
+          new BN(Math.floor(Date.now() / 1000)),
+        )
+      : null;
+    if (!plan.steps.length && !placement)
       throw new Error(
         plan.stopReason === "book-exhausted"
           ? "No opposing orders for this outcome"
           : "Limit price does not cross the best order",
       );
-    return { plan, closeTs: terms.closeTs };
+    // Measure the complete transaction before presenting it as signable. In
+    // particular three makers plus a new level can exceed the legacy packet.
+    const transaction = await buildPredictionMatchTransaction(
+      program,
+      plan,
+      placement?.instruction,
+    );
+    return { plan, closeTs: terms.closeTs, placement, transaction };
   }
   useEffect(() => {
     let canceled = false;
@@ -125,11 +157,11 @@ export function PredictionMatchForm({
     setLoading(true);
     const timer = setTimeout(() => {
       void quote()
-        .then(({ plan, closeTs }) => {
+        .then(({ plan, closeTs, placement }) => {
           if (canceled) return;
           setCloseTs(closeTs);
           setPreview(
-            `${plan.request.quantity.sub(plan.remainingQuantity).toString()} ${outcome.toUpperCase()} contracts across ${plan.steps.length} resting orders; ${side === "bid" ? "pay" : "receive"} ${formatAtomicAmount(plan.totalCash, decimals)} ${symbol}, including ${formatAtomicAmount(plan.totalFee, decimals)} fee. ${plan.remainingQuantity.toString()} contracts remain unposted. ${plan.stopReason === "match-cap" ? "Batch limit reached; crossing orders remain. Submit again to continue." : plan.stopReason === "non-crossing" ? "The next price is outside your limit." : plan.stopReason === "book-exhausted" ? "No more opposing orders." : "Requested quantity filled in this preview."}`,
+            `${plan.request.quantity.sub(plan.remainingQuantity).toString()} ${outcome.toUpperCase()} contracts matched across ${plan.steps.length} orders. ${side === "bid" ? "Pay" : "Receive"} ${formatAtomicAmount(plan.totalCash, decimals)} ${symbol}, including ${formatAtomicAmount(plan.totalFee, decimals)} fee. ${placement ? `${plan.remainingQuantity.toString()} contracts rest at your limit, locking ${side === "bid" ? `${formatAtomicAmount(placement.locked, decimals)} ${symbol}` : `${placement.locked.toString()} contracts`}.` : `${plan.remainingQuantity.toString()} contracts remain unposted.`} ${plan.stopReason === "match-cap" ? "Three-order limit reached. Crossing orders remain; submit again to continue." : ""}`,
           );
         })
         .catch((cause) => {
@@ -157,6 +189,7 @@ export function PredictionMatchForm({
     side,
     price,
     quantity,
+    execution,
     refresh,
   ]);
   const closed = closeTs !== null && new BN(now).gte(closeTs);
@@ -172,14 +205,13 @@ export function PredictionMatchForm({
     setPending(true);
     setError(null);
     try {
-      const { plan } = await quote();
-      const transaction = await buildPredictionMatchTransaction(program, plan);
+      const { transaction, placement } = await quote();
       const signature = await (
         program.provider as AnchorProvider
       ).sendAndConfirm(transaction);
       // A concurrent partial fill can reduce execution after the preview. Only
       // a future transaction-event reader can report its exact confirmed fill.
-      onMatched(signature);
+      onMatched(signature, placement?.order ?? null);
       setRefresh((value) => value + 1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Trade failed");
@@ -189,22 +221,40 @@ export function PredictionMatchForm({
   }
   return (
     <form
-      className="market-create-form"
+      className={`market-create-form prediction-trade prediction-trade-${side}`}
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
-      <h3>Buy or sell now</h3>
+      <div>
+        <span className="eyebrow">Trade contracts</span>
+        <h3>Take a position</h3>
+      </div>
       <p>
-        Trades with up to {MAX_PREDICTION_MATCHES_PER_TRANSACTION} resting
-        orders in price and FIFO priority, in one transaction. Each fill uses
-        its resting price. Any unfilled request stays unposted; submit again to
-        continue.
+        Choose YES or NO, then set your price. Orders match up to{" "}
+        {MAX_PREDICTION_MATCHES_PER_TRANSACTION} resting orders at their prices.
+        A winning contract pays 1 {symbol} after resolution.
       </p>
       {!PREDICTION_MATCHING_ENABLED && (
         <p>Trading is awaiting deployment of this program version.</p>
       )}
+      <label>
+        Execution
+        <select
+          value={execution}
+          disabled={pending}
+          onChange={(event) => {
+            setPreview(null);
+            setExecution(event.target.value as "limit" | "immediate");
+          }}
+        >
+          <option value="limit">Limit — match, then rest the remainder</option>
+          <option value="immediate">
+            Immediate only — leave remainder unposted
+          </option>
+        </select>
+      </label>
       <label>
         Outcome
         <select
@@ -261,7 +311,7 @@ export function PredictionMatchForm({
       </label>
       {loading && <p role="status">Reading the best order and fees…</p>}
       {preview && (
-        <p>
+        <p className="prediction-preview" role="status">
           Preview: {preview} Refreshes before signing; execution can change.
         </p>
       )}

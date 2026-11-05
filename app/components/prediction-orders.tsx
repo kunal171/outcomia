@@ -147,7 +147,10 @@ export function PredictionOrders({
       {!loading &&
         !error &&
         orders.map(({ publicKey, account }) => (
-          <article className="admin-card" key={publicKey.toBase58()}>
+          <article
+            className="admin-card prediction-order-row"
+            key={publicKey.toBase58()}
+          >
             <h4>
               #{account.orderId.toString()} ·{" "}
               {"yes" in account.outcome ? "YES" : "NO"} ·{" "}

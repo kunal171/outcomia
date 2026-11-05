@@ -126,14 +126,14 @@ test vectors protect that contract. The IDL-backed reader now exposes the root,
 which is initialized with the draft at next ID 1 and four absent best-price heads.
 The detail page shows these fields and its Explorer link. Older drafts missing
 the root are identified explicitly; create a fresh draft for the new order flow.
-The reader also exposes prediction levels and orders. The position panel has a
-resting-order form for any connected trader: YES/NO, buy/sell, human-unit price
-and whole quantity. It selects empty-side placement, same-price FIFO append or
+The reader also exposes prediction levels and orders. The position panel has one
+Buy/Sell form for any connected trader: YES/NO, human-unit price and whole
+quantity. Its limit mode selects empty-side placement, same-price FIFO append or
 sorted new-price insertion from actual accounts. New-price discovery follows
 at most 128 linked levels and validates ordering and reciprocal links. The
 program rechecks adjacent hints and rejects stale ones atomically.
-RPC errors never trigger a fallback path. It rejects crossing
-prices and checks free funds and exact integer bounds. Buys lock collateral;
+RPC errors never trigger a fallback path. Resting placement rejects crossing
+prices and checks post-fill free funds and exact integer bounds. Buys lock collateral;
 sells lock outcome contracts. Confirmations refresh the ledger and public book.
 Appending preserves older orders' priority; the prior tail's owner does not sign
 and its balances do not change. Queue/totals, ownership and packet-size checks
@@ -143,15 +143,18 @@ works after trading closes. The program refunds the remaining lock, repairs the
 queue and closes an empty price level, returning its rent to the original payer.
 Confirmation refreshes the position, order list and public book.
 
-The separate Buy or sell now form trades with up to three best opposing FIFO
+The form first trades with up to three best opposing FIFO
 orders in one atomic transaction. Each fill uses its resting price. The planner
 in `lib/prediction-matching-plan.ts` simulates promoted heads and cumulative
 balances without changing fetched accounts. The preview sums separately rounded
 fees and shows unposted quantity plus its stop reason. Buys pay notional plus
 fees; sells receive notional minus fees. A cap-blocked remainder stays free for
-retry; exhausted/non-crossing remainders also stay unposted for now.
+retry. In limit mode, exhausted/non-crossing remainders rest at the requested
+price using the simulated final balance. Immediate-only mode never posts.
 The builder sets a 600,000-CU ceiling and checks the 1,232-byte legacy packet
-before wallet signing. No taker order or automatic remainder is created.
+before wallet signing, including any placement instruction. If placement fails,
+the preceding fills also roll back. Oversized transactions require a smaller
+request or immediate-only mode; the client never drops instructions silently.
 Confirmations refresh positions, orders and public heads; previews are not
 claimed as confirmed fills.
 
@@ -164,8 +167,12 @@ Disabling new orders therefore leaves cancellation available. No admin role is r
 trading. Rebuild/redeploy the program before using the updated client on devnet.
 `NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` separately controls immediate trades
 and requires draft, funding and cancellation flags. It defaults false until
-`match_prediction_order` is deployed. Automatic remainder posting and prediction
-fee withdrawal are not included in this milestone.
+`match_prediction_order` is deployed. Limit posting also requires the new-order
+flag. Public depth needs no wallet: it shows up to 20 canonical price levels per
+side, aggregated contract quantities and order counts, with YES/NO switching and
+explicit refresh/error states. Trading refreshes depth and wallet orders after
+confirmation. Resolution, reward claims and prediction fee withdrawal remain
+unimplemented; the UI says so explicitly.
 
 Verify the JSON parser, exact-byte hashing and PDA derivation with:
 

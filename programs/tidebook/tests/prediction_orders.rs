@@ -1058,6 +1058,129 @@ fn prediction_partial_and_full_fills_settle_both_outcomes_at_maker_price_with_fe
     }
 }
 
+/// Execute matching followed by safe remainder placement in the same transaction.
+///
+/// # Inputs
+/// Fresh fixtures for YES/NO, buy/sell, an empty own side or an existing worse price.
+///
+/// # Errors
+/// Panics on rejected valid execution, incorrect lock/IDs or broken asset conservation.
+///
+/// # Returns
+/// Unit after proving the remaining two contracts rest using post-fill funds.
+#[test]
+fn prediction_match_then_remainder_place_or_insert_is_atomic_and_conserves_assets() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for side in [OrderSide::Bid, OrderSide::Ask] {
+            for occupied in [false, true] {
+                let mut f = Fixture::new();
+                f.set_fee_rate(100);
+                let maker_side = if side == OrderSide::Bid {
+                    OrderSide::Ask
+                } else {
+                    OrderSide::Bid
+                };
+                let maker = f.ix(outcome, maker_side, 600000, 1, 1);
+                send(&mut f.svm, &f.owner, &[maker]).unwrap();
+                let maker_position = f.position;
+                f.switch_to_funded_trader();
+                let worse = if side == OrderSide::Bid {
+                    400000
+                } else {
+                    800000
+                };
+                if occupied {
+                    let own = f.ix(outcome, side, worse, 1, 2);
+                    send(&mut f.svm, &f.owner, &[own]).unwrap();
+                }
+                let limit = if side == OrderSide::Bid {
+                    700000
+                } else {
+                    500000
+                };
+                let next_id = if occupied { 3 } else { 2 };
+                let fill = f.match_ix(1, outcome, side, limit, 3);
+                let placement = if occupied {
+                    f.insert(outcome, side, limit, 2, (None, Some(worse)))
+                } else {
+                    f.ix(outcome, side, limit, 2, next_id)
+                };
+                let custody = f.svm.get_account(&f.vault);
+                let result = send(&mut f.svm, &f.owner, &[fill, placement]).unwrap();
+                assert!(result.compute_units_consumed <= 600_000);
+                let order: PredictionOrder = read(&f.svm, f.order_key(next_id));
+                assert_eq!(order.owner, f.owner.pubkey());
+                assert_eq!(
+                    (order.status, order.remaining_quantity),
+                    (OrderStatus::Open, 2)
+                );
+                assert_eq!(
+                    order.locked_collateral,
+                    if side == OrderSide::Bid { 1400000 } else { 2 }
+                );
+                let book: PredictionOrderBook = read(&f.svm, f.book);
+                assert_eq!(book.next_order_id, next_id + 1);
+                let fees: MarketFees = read(&f.svm, f.fees);
+                assert_eq!(fees.accrued_quote_fees, 6000);
+                assert_eq!(f.svm.get_account(&f.vault), custody);
+                f.assert_trade_conservation(maker_position);
+            }
+        }
+    }
+}
+
+/// A rejected remainder must roll back the preceding fill and its fee.
+///
+/// # Inputs
+/// One crossing maker followed by an intentionally underfunded remainder.
+///
+/// # Errors
+/// Panics if execution succeeds or any maker, ledger, book or fee state changes.
+///
+/// # Returns
+/// Unit after proving atomic rollback for both outcome assets and directions.
+#[test]
+fn prediction_failed_remainder_rolls_back_matching_and_fees() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for side in [OrderSide::Bid, OrderSide::Ask] {
+            let mut f = Fixture::new();
+            f.set_fee_rate(100);
+            let maker_side = if side == OrderSide::Bid {
+                OrderSide::Ask
+            } else {
+                OrderSide::Bid
+            };
+            let ix = f.ix(outcome, maker_side, 600000, 1, 1);
+            send(&mut f.svm, &f.owner, &[ix]).unwrap();
+            let maker_position = f.position;
+            f.switch_to_funded_trader();
+            let keys = [
+                f.market,
+                f.book,
+                f.position,
+                maker_position,
+                f.fees,
+                f.order_key(1),
+                f.level(outcome, maker_side, 600000),
+                f.vault,
+            ];
+            let before: Vec<_> = keys.iter().map(|key| f.svm.get_account(key)).collect();
+            let limit = if side == OrderSide::Bid {
+                700000
+            } else {
+                500000
+            };
+            let fill = f.match_ix(1, outcome, side, limit, 1001);
+            let rest = f.ix(outcome, side, limit, 1000, 2);
+            assert!(send(&mut f.svm, &f.owner, &[fill, rest]).is_err());
+            let after: Vec<_> = keys.iter().map(|key| f.svm.get_account(key)).collect();
+            assert_eq!(before, after);
+            assert!(f.svm.get_account(&f.order_key(2)).is_none());
+            f.assert_trade_conservation(maker_position);
+        }
+    }
+}
+
 /// Execute promoted heads within one transaction, not a sequence of committed fills.
 ///
 /// # Inputs
