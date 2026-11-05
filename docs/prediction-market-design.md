@@ -3,7 +3,7 @@
 Status: draft and wallet-position initialization, creation validation and
 collateral deposits/withdrawals and complete-set splitting/merging are implemented
 locally, along with active-admin creator-controlled market opening and first
-resting orders on empty sides. Existing-side insertion, cancellation, matching
+resting orders on empty sides and same-price FIFO append. New-price insertion, cancellation, matching
 and resolution remain planned. This program version
 has not been deployed to devnet.
 
@@ -15,8 +15,8 @@ account layouts are unchanged.
 Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook`,
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
-atomically. First resting orders on empty sides are implemented locally;
-insertion into existing queues, cancellation and matching remain unavailable.
+atomically. Empty-side placement and same-price FIFO append are implemented
+locally; insertion of new prices, cancellation and matching remain unavailable.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
@@ -537,8 +537,8 @@ positive whole u64. Price is positive, below payout and divisible by the tick.
 
 This first path accepts only an empty selected outcome/side list. A buy at or
 above that outcome's best ask, or a sell at or below its best bid, is rejected.
-There is no cross-outcome matching. Occupied-side insertion and crossing orders
-must wait for later instructions; the program does not silently create a crossed
+There is no cross-outcome matching. Same-price append uses its own instruction;
+new-price insertion and crossing orders still need later instructions. The program does not silently create a crossed
 book or skip existing priority.
 
 A buy locks exactly `price * quantity` collateral atoms. A sell locks exactly
@@ -563,7 +563,7 @@ refresh/retry. The receipt is held outside the loading form so refreshing cannot
 erase a confirmed transaction.
 
 `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED` defaults false and requires the draft and
-funding flags. It is for explicit local first-order tests only until cancellation
+funding flags. It is for explicit local resting-order tests only until cancellation
 and matching are implemented/deployed. Orders already placed cannot be canceled
 in this version, so their claims stay locked. This flag is rollout, not on-chain
 authorization. Do not enable public order entry with this incomplete lifecycle.
@@ -578,6 +578,53 @@ custody/backing/fees, role independence, invalid timing/grid/quantity, funding
 shortfalls, occupied/crossing rejection, checked arithmetic, account binding,
 ID reuse and full rollback of multi-instruction placements. Client tests check
 preflight bounds, exact units, account metadata, enum encoding and packet size.
+
+### Same-price FIFO append (implemented locally)
+
+`append_prediction_order(order_id, outcome, side, price, quantity)` uses the
+same signer, canonical market/position/book, lifecycle, price, quantity, ID and
+funding rules as empty-side placement. Those rules live in a shared internal
+module so the two instructions cannot silently disagree about funding or close
+time. A canonical existing level and its current tail are additionally required.
+
+The level's stored market/outcome/side/price must match its seeds. Its endpoints
+and counters must describe a nonempty queue. The supplied tail must be a
+canonical prediction order for this market and equal `level.last_order`. It
+must be Open with positive remaining quantity, matching outcome/side/price/level,
+no next order and an older ID. Single-order queues require first = last, no
+previous link and an exact remaining total; longer queues require a distinct
+first order and a previous link on the tail. The best level has no better
+neighbor; a non-best level must retain a better link and agree with best-price
+ordering. These bounded checks do not traverse or re-audit the entire price list;
+future insertion/cancellation must preserve that program-owned structure.
+
+The new order receives `previous_order = old_tail` and `next_order = None`.
+Only `old_tail.next_order` changes on the existing order. The level keeps its
+first order, rent payer and price neighbors, moves its last pointer to the new
+order and adds the new remaining quantity and order count. The book heads stay
+unchanged while its ID and market-wide order count advance. Counter overflow,
+insufficient funds or stale links roll back all changes and new account rent.
+Tokens, backing, supplies and accrued fees do not move.
+
+The tail may belong to another trader: Bob can append after Alice without her
+signature. Alice's balances and every order field except `next_order` stay
+unchanged. Bob signs, locks only his own free cash/contracts and pays rent only
+for his new order. Appending never buys an earlier position in the FIFO queue.
+
+The form reads the canonical requested price level. If it exists, it reads the
+stored last order and chooses append. If it is absent and that side is empty,
+it chooses first placement. An absent price on an occupied side remains
+unsupported until sorted insertion is implemented. RPC/decode failure never
+falls back to another path. Before signing, the client reads fresh market,
+position, book, level and tail data; another transaction can still invalidate
+that snapshot, in which case the chain rejects it atomically and the user retries.
+
+The existing order rollout flag remains false publicly while cancellation is
+missing. Tests verify three-order FIFO queues for both outcomes and sides,
+different traders, unchanged maker balances, reserve conservation, substituted
+and stale tails, corrupt endpoints/identity, timing/funding/counter failures,
+real cross-outcome orders, signatures and multi-append rollback. Client tests
+cover routing, failed RPC reads, queue preflight, account roles and packet size.
 
 ### Trading still to implement
 
@@ -775,8 +822,8 @@ its tests, frontend and documentation; grouping does not remove the safety check
    withdrawals, with owner checks and atomic SPL custody.
 2. **Complete sets — implemented locally.** Split/merge with exact backing,
    free/locked separation and conservation tests.
-3. **Trading — started locally.** Opening, atomic book initialization and first
-   resting orders on empty sides are implemented. Next: existing-side queue insertion, cancellation,
+3. **Trading — started locally.** Opening, atomic book initialization, empty-side
+   placement and same-price FIFO append are implemented. Next: new-price insertion, cancellation,
    bounded matching, fees, trading UI, typed events and indexer decoding.
 4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
    handling, redemption and its UI. Add atomic position switching with execution

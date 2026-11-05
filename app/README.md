@@ -127,10 +127,15 @@ which is initialized with the draft at next ID 1 and four absent best-price head
 The detail page shows these fields and its Explorer link. Older drafts missing
 the root are identified explicitly; create a fresh draft for the new order flow.
 The reader also exposes prediction levels and orders. The position panel has a
-first-order form for any connected trader: YES/NO, buy/sell, human-unit price
-and whole quantity. It supports an empty outcome/side only, rejects crossing
-prices, and checks free funds and exact integer bounds. Buys lock collateral;
+resting-order form for any connected trader: YES/NO, buy/sell, human-unit price
+and whole quantity. It selects empty-side placement or same-price FIFO append
+from the actual level/tail accounts. A new price on an occupied side remains
+unsupported. RPC errors never trigger a fallback path. It rejects crossing
+prices and checks free funds and exact integer bounds. Buys lock collateral;
 sells lock outcome contracts. Confirmations refresh the ledger and public book.
+Appending preserves older orders' priority; the prior tail's owner does not sign
+and its balances do not change. Queue/totals, ownership and packet-size checks
+are covered in Rust/client tests. Cancellation remains unavailable.
 
 Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until cancellation
 and matching are implemented. Explicit local tests may enable it alongside the

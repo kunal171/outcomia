@@ -5,11 +5,7 @@
 //! Funding moves only internal free/locked claims; vault tokens and payout
 //! reserves do not move. Resting orders incur no taker fee.
 
-use crate::{
-    constants::*,
-    errors::{balance, prediction},
-    state::*,
-};
+use crate::{constants::*, errors::prediction, state::*};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
@@ -45,85 +41,21 @@ pub fn handle_place_prediction_order(
     quantity: u64,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
-    require!(
-        market.status == PredictionStatus::Open && Clock::get()?.unix_timestamp < market.close_ts,
-        prediction::PredictionOrderUnavailable
-    );
-    require!(quantity > 0, prediction::InvalidPredictionContractQuantity);
-    require!(
-        price > 0 && price < market.payout_per_contract && market.price_tick > 0,
-        prediction::InvalidPredictionOrderPrice
-    );
-    require!(
-        price.is_multiple_of(market.price_tick),
-        prediction::InvalidPredictionOrderPrice
-    );
     let book = &mut ctx.accounts.order_book;
-    require!(
-        order_id > 0 && order_id == book.next_order_id,
-        prediction::InvalidPredictionOrderId
-    );
+    let (next_id, count) = crate::prediction_orders::validate_resting_order(
+        market, book, order_id, outcome, side, price, quantity,
+    )?;
     require!(
         book.best_price(outcome, side).is_none(),
         prediction::PredictionSideNotEmpty
     );
-    let opposite = match side {
-        OrderSide::Bid => OrderSide::Ask,
-        OrderSide::Ask => OrderSide::Bid,
-    };
-    if let Some(other_price) = book.best_price(outcome, opposite) {
-        require!(
-            match side {
-                OrderSide::Bid => price < other_price,
-                OrderSide::Ask => price > other_price,
-            },
-            prediction::PredictionOrderWouldCross
-        );
-    }
-    // Compute counters before touching claims; checked arithmetic is required
-    // even when the browser preflight reported enough cash or contracts.
-    let next_id = order_id
-        .checked_add(1)
-        .ok_or(prediction::PredictionAccountingOverflow)?;
-    let count = market
-        .open_order_count
-        .checked_add(1)
-        .ok_or(prediction::PredictionAccountingOverflow)?;
-    let position = &mut ctx.accounts.position;
-    let (free, locked, amount) = match (outcome, side) {
-        (_, OrderSide::Bid) => (
-            position.collateral_free,
-            position.collateral_locked,
-            price
-                .checked_mul(quantity)
-                .ok_or(prediction::PredictionAccountingOverflow)?,
-        ),
-        (PredictionOutcome::Yes, OrderSide::Ask) => {
-            (position.yes_free, position.yes_locked, quantity)
-        }
-        (PredictionOutcome::No, OrderSide::Ask) => (position.no_free, position.no_locked, quantity),
-    };
-    let next_free = free.checked_sub(amount).ok_or(match side {
-        OrderSide::Bid => error!(balance::InsufficientFreeBalance),
-        OrderSide::Ask => error!(prediction::InsufficientPredictionPositions),
-    })?;
-    let next_locked = locked
-        .checked_add(amount)
-        .ok_or(balance::LockedBalanceOverflow)?;
-    match (outcome, side) {
-        (_, OrderSide::Bid) => {
-            position.collateral_free = next_free;
-            position.collateral_locked = next_locked;
-        }
-        (PredictionOutcome::Yes, OrderSide::Ask) => {
-            position.yes_free = next_free;
-            position.yes_locked = next_locked;
-        }
-        (PredictionOutcome::No, OrderSide::Ask) => {
-            position.no_free = next_free;
-            position.no_locked = next_locked;
-        }
-    }
+    let amount = crate::prediction_orders::lock_resting_funds(
+        &mut ctx.accounts.position,
+        outcome,
+        side,
+        price,
+        quantity,
+    )?;
     let order_key = ctx.accounts.order.key();
     let market_key = market.key();
     ctx.accounts.price_level.set_inner(PredictionPriceLevel {

@@ -69,6 +69,144 @@ struct Fixture {
     fees: Pubkey,
 }
 impl Fixture {
+    fn append(
+        &self,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+        tail: Pubkey,
+    ) -> Instruction {
+        Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::AppendPredictionOrder {
+                order_id,
+                outcome,
+                side,
+                price,
+                quantity,
+            }
+            .data(),
+            tidebook::accounts::AppendPredictionOrder {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+                order_book: self.book,
+                price_level: tidebook::derive_prediction_price_level_pda(
+                    &tidebook::ID,
+                    &self.market,
+                    outcome,
+                    side,
+                    price,
+                )
+                .0,
+                tail_order: tail,
+                order: tidebook::derive_prediction_order_pda(&tidebook::ID, &self.market, order_id)
+                    .0,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+    fn reject_append(&mut self, ix: Instruction, code: &str) {
+        let before = self.snapshot();
+        let keys = [
+            ix.accounts[4].pubkey,
+            ix.accounts[5].pubkey,
+            ix.accounts[6].pubkey,
+        ];
+        let accounts: Vec<_> = keys.iter().map(|key| self.svm.get_account(key)).collect();
+        let failure = send(&mut self.svm, &self.owner, std::slice::from_ref(&ix)).unwrap_err();
+        assert!(
+            failure
+                .meta
+                .logs
+                .iter()
+                .any(|line| line.contains(&format!("Error Code: {code}"))),
+            "{failure:?}"
+        );
+        assert_eq!(self.snapshot(), before);
+        for (key, before) in keys.iter().zip(accounts) {
+            assert_eq!(self.svm.get_account(key), before);
+        }
+    }
+    fn switch_to_funded_trader(&mut self) {
+        self.owner = Keypair::new();
+        self.svm
+            .airdrop(&self.owner.pubkey(), 2_000_000_000)
+            .unwrap();
+        let mint_key = TokenAccount::unpack(&self.svm.get_account(&self.vault).unwrap().data)
+            .unwrap()
+            .mint;
+        // Model another faucet grant without changing existing trader claims.
+        let mut mint = Mint::unpack(&self.svm.get_account(&mint_key).unwrap().data).unwrap();
+        mint.supply += 20_000_000;
+        let mut data = vec![0; Mint::LEN];
+        Mint::pack(mint, &mut data).unwrap();
+        account(&mut self.svm, mint_key, data, anchor_spl::token::ID);
+        let source = Pubkey::new_unique();
+        let mut data = vec![0; TokenAccount::LEN];
+        TokenAccount::pack(
+            TokenAccount {
+                mint: mint_key,
+                owner: self.owner.pubkey(),
+                amount: 20_000_000,
+                state: AccountState::Initialized,
+                ..TokenAccount::default()
+            },
+            &mut data,
+        )
+        .unwrap();
+        account(&mut self.svm, source, data, anchor_spl::token::ID);
+        self.position = tidebook::derive_prediction_position_pda(
+            &tidebook::ID,
+            &self.market,
+            &self.owner.pubkey(),
+        )
+        .0;
+        let init = Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::InitializePredictionPosition {}.data(),
+            tidebook::accounts::InitializePredictionPosition {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+                system_program: system_program::ID,
+            }
+            .to_account_metas(None),
+        );
+        let deposit = Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::DepositPredictionCollateral { amount: 20_000_000 }.data(),
+            tidebook::accounts::DepositPredictionCollateral {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+                collateral_mint: mint_key,
+                source,
+                vault_authority: Pubkey::find_program_address(
+                    &[b"vault-authority", self.market.as_ref()],
+                    &tidebook::ID,
+                )
+                .0,
+                collateral_vault: self.vault,
+                token_program: anchor_spl::token::ID,
+            }
+            .to_account_metas(None),
+        );
+        let split = Instruction::new_with_bytes(
+            tidebook::ID,
+            &tidebook::instruction::SplitPredictionCompleteSet { quantity: 5 }.data(),
+            tidebook::accounts::PredictionCompleteSet {
+                owner: self.owner.pubkey(),
+                market: self.market,
+                position: self.position,
+            }
+            .to_account_metas(None),
+        );
+        assert!(send(&mut self.svm, &self.owner, &[init, deposit, split]).is_ok());
+    }
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(tidebook::ID, PROGRAM).unwrap();
@@ -647,4 +785,422 @@ fn an_existing_order_id_cannot_be_overwritten_or_reused_on_another_outcome() {
     assert_eq!(f.svm.get_account(&first.accounts[5].pubkey).unwrap(), order);
     assert_eq!(f.svm.get_account(&first.accounts[4].pubkey).unwrap(), level);
     assert!(f.svm.get_account(&retry.accounts[4].pubkey).is_none());
+}
+
+#[test]
+fn different_traders_append_three_fifo_orders_on_every_outcome_and_side() {
+    for outcome in [PredictionOutcome::Yes, PredictionOutcome::No] {
+        for side in [OrderSide::Bid, OrderSide::Ask] {
+            let mut f = Fixture::new();
+            let first = f.ix(outcome, side, 600000, 2, 1);
+            assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+            let alice_position = f.position;
+            let alice_before = f.svm.get_account(&alice_position).unwrap();
+            let mut expected_first: PredictionOrder = read(&f.svm, first.accounts[5].pubkey);
+            let first_owner = expected_first.owner;
+            let rent_payer: PredictionPriceLevel = read(&f.svm, first.accounts[4].pubkey);
+            f.switch_to_funded_trader();
+            assert_ne!(first_owner, f.owner.pubkey());
+            let vault = f.svm.get_account(&f.vault).unwrap();
+            let fees = f.svm.get_account(&f.fees).unwrap();
+            let second = f.append(outcome, side, 600000, 2, 2, first.accounts[5].pubkey);
+            assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&second)).is_ok());
+            let third = f.append(outcome, side, 600000, 1, 3, second.accounts[6].pubkey);
+            assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&third)).is_ok());
+            expected_first.next_order = Some(second.accounts[6].pubkey);
+            let mut expected = Vec::new();
+            expected_first.try_serialize(&mut expected).unwrap();
+            expected.resize(214, 0);
+            assert_eq!(
+                f.svm.get_account(&first.accounts[5].pubkey).unwrap().data,
+                expected
+            );
+            let second_order: PredictionOrder = read(&f.svm, second.accounts[6].pubkey);
+            let third_order: PredictionOrder = read(&f.svm, third.accounts[6].pubkey);
+            assert_eq!(
+                (second_order.previous_order, second_order.next_order),
+                (
+                    Some(first.accounts[5].pubkey),
+                    Some(third.accounts[6].pubkey)
+                )
+            );
+            assert_eq!(
+                (third_order.previous_order, third_order.next_order),
+                (Some(second.accounts[6].pubkey), None)
+            );
+            for order in [&second_order, &third_order] {
+                assert_eq!(
+                    (
+                        order.owner,
+                        order.outcome,
+                        order.side,
+                        order.price,
+                        order.status
+                    ),
+                    (f.owner.pubkey(), outcome, side, 600000, OrderStatus::Open)
+                );
+            }
+            let level: PredictionPriceLevel = read(&f.svm, first.accounts[4].pubkey);
+            assert_eq!(
+                (
+                    level.first_order,
+                    level.last_order,
+                    level.order_count,
+                    level.total_remaining_quantity
+                ),
+                (
+                    Some(first.accounts[5].pubkey),
+                    Some(third.accounts[6].pubkey),
+                    3,
+                    5
+                )
+            );
+            assert_eq!(
+                (level.better_price, level.worse_price, level.rent_payer),
+                (None, None, rent_payer.rent_payer)
+            );
+            let book: PredictionOrderBook = read(&f.svm, f.book);
+            assert_eq!(book.next_order_id, 4);
+            assert_eq!(book.best_price(outcome, side), Some(600000));
+            assert_eq!(f.svm.get_account(&alice_position).unwrap(), alice_before);
+            assert_eq!(f.svm.get_account(&f.vault).unwrap(), vault);
+            assert_eq!(f.svm.get_account(&f.fees).unwrap(), fees);
+            let alice: PredictionPosition = read(&f.svm, alice_position);
+            let bob: PredictionPosition = read(&f.svm, f.position);
+            let market: PredictionMarket = read(&f.svm, f.market);
+            assert_eq!(market.open_order_count, 3);
+            assert_eq!(market.backing_reserve, 15_000_000);
+            assert_eq!(
+                alice.collateral_free
+                    + alice.collateral_locked
+                    + bob.collateral_free
+                    + bob.collateral_locked
+                    + market.backing_reserve,
+                120_000_000
+            );
+            assert_eq!(
+                alice.yes_free + alice.yes_locked + bob.yes_free + bob.yes_locked,
+                market.yes_supply
+            );
+            assert_eq!(
+                alice.no_free + alice.no_locked + bob.no_free + bob.no_locked,
+                market.no_supply
+            );
+        }
+    }
+}
+
+#[test]
+fn stale_or_substituted_tails_and_corrupt_tail_fields_are_rejected() {
+    let mut f = Fixture::new();
+    let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+    assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+    let second = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        2,
+        first.accounts[5].pubkey,
+    );
+    assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&second)).is_ok());
+    let stale = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        3,
+        first.accounts[5].pubkey,
+    );
+    f.reject_append(stale, "InvalidPredictionTail");
+    for case in 0..9 {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+        let mut tail: PredictionOrder = read(&f.svm, first.accounts[5].pubkey);
+        match case {
+            0 => tail.market = Pubkey::new_unique(),
+            1 => tail.price_level = Pubkey::new_unique(),
+            2 => tail.outcome = PredictionOutcome::No,
+            3 => tail.side = OrderSide::Ask,
+            4 => tail.price = 610000,
+            5 => tail.status = OrderStatus::Filled,
+            6 => tail.remaining_quantity = 0,
+            7 => tail.next_order = Some(Pubkey::new_unique()),
+            _ => tail.previous_order = Some(Pubkey::new_unique()),
+        }
+        write(&mut f.svm, first.accounts[5].pubkey, &tail);
+        let ix = f.append(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            600000,
+            1,
+            2,
+            first.accounts[5].pubkey,
+        );
+        f.reject_append(ix, "InvalidPredictionTail");
+    }
+}
+
+#[test]
+fn append_binds_canonical_level_tail_book_and_position_accounts() {
+    for index in 1..7 {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+        let mut ix = f.append(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            600000,
+            1,
+            2,
+            first.accounts[5].pubkey,
+        );
+        let replacement = Pubkey::new_unique();
+        if let Some(existing) = f.svm.get_account(&ix.accounts[index].pubkey) {
+            f.svm.set_account(replacement, existing).unwrap();
+        }
+        ix.accounts[index].pubkey = replacement;
+        f.reject_append(ix, "ConstraintSeeds");
+    }
+    for case in 0..8 {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+        let mut level: PredictionPriceLevel = read(&f.svm, first.accounts[4].pubkey);
+        match case {
+            0 => level.market = Pubkey::new_unique(),
+            1 => level.outcome = PredictionOutcome::No,
+            2 => level.side = OrderSide::Ask,
+            3 => level.price = 610000,
+            4 => level.first_order = None,
+            5 => level.last_order = None,
+            6 => level.order_count = 0,
+            _ => level.total_remaining_quantity = 1,
+        }
+        write(&mut f.svm, first.accounts[4].pubkey, &level);
+        let ix = f.append(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            600000,
+            1,
+            2,
+            first.accounts[5].pubkey,
+        );
+        f.reject_append(
+            ix,
+            if case < 4 {
+                "InvalidPredictionPriceLevel"
+            } else {
+                "InvalidPredictionTail"
+            },
+        );
+    }
+}
+
+#[test]
+fn append_rejects_closed_zero_stale_underfunded_and_overflowing_requests() {
+    for side in [OrderSide::Bid, OrderSide::Ask] {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, side, 600000, 2, 1);
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+        for (qty, id, code) in [
+            (0, 2, "InvalidPredictionContractQuantity"),
+            (1, 3, "InvalidPredictionOrderId"),
+            (
+                151,
+                2,
+                if side == OrderSide::Bid {
+                    "InsufficientFreeBalance"
+                } else {
+                    "InsufficientPredictionPositions"
+                },
+            ),
+        ] {
+            let ix = f.append(
+                PredictionOutcome::Yes,
+                side,
+                600000,
+                qty,
+                id,
+                first.accounts[5].pubkey,
+            );
+            f.reject_append(ix, code);
+        }
+        for status in [
+            PredictionStatus::Draft,
+            PredictionStatus::Frozen,
+            PredictionStatus::Proposed,
+            PredictionStatus::Resolved,
+        ] {
+            let mut m: PredictionMarket = read(&f.svm, f.market);
+            m.status = status;
+            write(&mut f.svm, f.market, &m);
+            let ix = f.append(
+                PredictionOutcome::Yes,
+                side,
+                600000,
+                1,
+                2,
+                first.accounts[5].pubkey,
+            );
+            f.reject_append(ix, "PredictionOrderUnavailable");
+        }
+        let mut m: PredictionMarket = read(&f.svm, f.market);
+        m.status = PredictionStatus::Open;
+        write(&mut f.svm, f.market, &m);
+        let mut clock = f.svm.get_sysvar::<Clock>();
+        clock.unix_timestamp = 10000;
+        f.svm.set_sysvar(&clock);
+        let ix = f.append(
+            PredictionOutcome::Yes,
+            side,
+            600000,
+            1,
+            2,
+            first.accounts[5].pubkey,
+        );
+        f.reject_append(ix, "PredictionOrderUnavailable");
+    }
+    for case in 0..5 {
+        let mut f = Fixture::new();
+        let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+        let second = f.append(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            600000,
+            1,
+            2,
+            first.accounts[5].pubkey,
+        );
+        assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&second)).is_ok());
+        let mut id = 3;
+        match case {
+            0 => {
+                let mut b: PredictionOrderBook = read(&f.svm, f.book);
+                b.next_order_id = u64::MAX;
+                id = u64::MAX;
+                write(&mut f.svm, f.book, &b);
+            }
+            1 => {
+                let mut m: PredictionMarket = read(&f.svm, f.market);
+                m.open_order_count = u64::MAX;
+                write(&mut f.svm, f.market, &m);
+            }
+            2 | 3 => {
+                let mut l: PredictionPriceLevel = read(&f.svm, first.accounts[4].pubkey);
+                if case == 2 {
+                    l.total_remaining_quantity = u64::MAX;
+                } else {
+                    l.order_count = u64::MAX;
+                }
+                write(&mut f.svm, first.accounts[4].pubkey, &l);
+            }
+            _ => {
+                let mut p: PredictionPosition = read(&f.svm, f.position);
+                p.collateral_locked = u64::MAX;
+                write(&mut f.svm, f.position, &p);
+            }
+        }
+        let ix = f.append(
+            PredictionOutcome::Yes,
+            OrderSide::Bid,
+            600000,
+            1,
+            id,
+            second.accounts[6].pubkey,
+        );
+        f.reject_append(
+            ix,
+            if case == 4 {
+                "LockedBalanceOverflow"
+            } else {
+                "PredictionAccountingOverflow"
+            },
+        );
+    }
+}
+
+#[test]
+fn failed_append_batch_restores_original_tail_and_all_ledger_totals() {
+    let mut f = Fixture::new();
+    let first = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+    assert!(send(&mut f.svm, &f.owner, std::slice::from_ref(&first)).is_ok());
+    let before = f.snapshot();
+    let tail = f.svm.get_account(&first.accounts[5].pubkey).unwrap();
+    let level = f.svm.get_account(&first.accounts[4].pubkey).unwrap();
+    let second = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        2,
+        first.accounts[5].pubkey,
+    );
+    let bad = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1000,
+        3,
+        second.accounts[6].pubkey,
+    );
+    let failure = send(&mut f.svm, &f.owner, &[second.clone(), bad.clone()]).unwrap_err();
+    assert!(
+        failure
+            .meta
+            .logs
+            .iter()
+            .any(|line| line.contains("InsufficientFreeBalance")),
+        "{failure:?}"
+    );
+    assert_eq!(f.snapshot(), before);
+    assert_eq!(f.svm.get_account(&first.accounts[5].pubkey).unwrap(), tail);
+    assert_eq!(f.svm.get_account(&first.accounts[4].pubkey).unwrap(), level);
+    for ix in [second, bad] {
+        assert!(f.svm.get_account(&ix.accounts[6].pubkey).is_none());
+    }
+}
+
+#[test]
+fn append_rejects_other_outcome_tails_unsigned_callers_and_crossed_snapshots() {
+    let mut f = Fixture::new();
+    let yes = f.ix(PredictionOutcome::Yes, OrderSide::Bid, 600000, 2, 1);
+    let no = f.ix(PredictionOutcome::No, OrderSide::Bid, 300000, 2, 2);
+    assert!(send(&mut f.svm, &f.owner, &[yes.clone(), no.clone()]).is_ok());
+    let wrong = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        3,
+        no.accounts[5].pubkey,
+    );
+    f.reject_append(wrong, "InvalidPredictionTail");
+    let mut unsigned = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        3,
+        yes.accounts[5].pubkey,
+    );
+    unsigned.accounts[0].pubkey = f.source;
+    unsigned.accounts[0].is_signer = false;
+    f.reject_append(unsigned, "AccountNotSigner");
+    // A malformed crossed snapshot must not bypass the resting-only rule,
+    // including when appending at a price that was valid when first submitted.
+    let mut book: PredictionOrderBook = read(&f.svm, f.book);
+    book.yes_best_ask = Some(600000);
+    write(&mut f.svm, f.book, &book);
+    let ix = f.append(
+        PredictionOutcome::Yes,
+        OrderSide::Bid,
+        600000,
+        1,
+        3,
+        yes.accounts[5].pubkey,
+    );
+    f.reject_append(ix, "PredictionOrderWouldCross");
 }

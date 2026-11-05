@@ -11,6 +11,7 @@ pub mod instructions;
 pub mod matching;
 pub mod pda;
 pub mod prediction_config;
+mod prediction_orders;
 pub mod state;
 
 use anchor_lang::prelude::*;
@@ -28,6 +29,20 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 #[program]
 pub mod tidebook {
     use super::*;
+
+    /// Appends a funded order after the verified tail at an existing price.
+    pub fn append_prediction_order(
+        ctx: Context<AppendPredictionOrder>,
+        order_id: u64,
+        outcome: PredictionOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::append_prediction_order::handle_append_prediction_order(
+            ctx, order_id, outcome, side, price, quantity,
+        )
+    }
 
     /// Locks trader claims and seeds the first resting order on an empty side.
     pub fn place_prediction_order(

@@ -252,8 +252,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     {book ? (
                       <>
                         <p>
-                          Book initialized. First orders on empty sides are
-                          available for local testing.
+                          Book initialized. Empty-side placement and same-price
+                          FIFO appending are available for local testing.
                         </p>
                         <dl className="market-metadata">
                           <div>

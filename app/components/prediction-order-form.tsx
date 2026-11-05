@@ -9,6 +9,8 @@ import {
   derivePredictionPriceLevelPda,
   PREDICTION_ORDERS_ENABLED,
   validatePredictionRestingOrder,
+  readPredictionPlacementTarget,
+  type PredictionAppendTarget,
   type PredictionMarketAccount,
   type PredictionOrderBookAccount,
   type PredictionOutcome,
@@ -34,7 +36,7 @@ interface Props {
   onPlaced: (signature: string, order: PublicKey) => void;
 }
 
-/** A resting-only first-order form. No UI permission substitutes for chain checks. */
+/** Select empty-side placement or same-price FIFO append from actual accounts. */
 export function PredictionOrderForm({
   program,
   owner,
@@ -51,6 +53,11 @@ export function PredictionOrderForm({
   const [loading, setLoading] = useState(true);
   const [readError, setReadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [target, setTarget] = useState<
+    PredictionAppendTarget | { kind: "place" } | null
+  >(null);
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<PredictionOutcome>("yes");
   const [side, setSide] = useState<OrderSide>("bid");
   const [price, setPrice] = useState("");
@@ -88,6 +95,67 @@ export function PredictionOrderForm({
     };
   }, [program, marketAddress]);
   const decimals = market.payoutPerContract.toString().length - 1;
+  function readTarget(currentBook: PredictionOrderBookAccount, rawPrice: BN) {
+    return readPredictionPlacementTarget(
+      getTidebookAccounts(program),
+      marketAddress,
+      currentBook,
+      outcome,
+      side,
+      rawPrice,
+    );
+  }
+  useEffect(() => {
+    let canceled = false;
+    setTarget(null);
+    setTargetError(null);
+    if (!book || loading || readError || !price.trim()) {
+      setTargetLoading(false);
+      return;
+    }
+    let rawPrice: BN;
+    try {
+      rawPrice = parseTokenAmount(price, decimals, "Price");
+    } catch {
+      setTargetLoading(false);
+      return;
+    }
+    setTargetLoading(true);
+    // Avoid an RPC request on every digit. A missing account is distinct from
+    // an RPC/decode failure, which never triggers an empty-side fallback.
+    const timer = setTimeout(() => {
+      void readTarget(book, rawPrice)
+        .then((value) => {
+          if (!canceled) setTarget(value);
+        })
+        .catch((cause) => {
+          if (!canceled)
+            setTargetError(
+              cause instanceof Error
+                ? cause.message
+                : "Unable to select placement path",
+            );
+        })
+        .finally(() => {
+          if (!canceled) setTargetLoading(false);
+        });
+    }, 200);
+    return () => {
+      canceled = true;
+      clearTimeout(timer);
+    };
+    // readTarget uses exactly these book, program and selection values.
+  }, [
+    book,
+    loading,
+    readError,
+    program,
+    marketAddress,
+    outcome,
+    side,
+    price,
+    decimals,
+  ]);
   function amounts() {
     if (!/^\d+$/.test(quantity.trim()))
       throw new Error("Enter a positive whole contract quantity");
@@ -98,7 +166,16 @@ export function PredictionOrderForm({
   }
   let locked: BN | null = null;
   let issue: string | null = null;
-  if (book && !loading && !readError && price.trim() && quantity.trim()) {
+  if (
+    book &&
+    target &&
+    !targetLoading &&
+    !targetError &&
+    !loading &&
+    !readError &&
+    price.trim() &&
+    quantity.trim()
+  ) {
     try {
       const parsed = amounts();
       locked = validatePredictionRestingOrder(
@@ -110,13 +187,21 @@ export function PredictionOrderForm({
         parsed.price,
         parsed.quantity,
         new BN(now),
+        target.kind === "append" ? target : undefined,
       );
     } catch (cause) {
       issue = cause instanceof Error ? cause.message : "Invalid order";
     }
   }
   const canSubmit =
-    PREDICTION_ORDERS_ENABLED && !!locked && !loading && !readError && !pending;
+    PREDICTION_ORDERS_ENABLED &&
+    !!locked &&
+    !!target &&
+    !targetLoading &&
+    !targetError &&
+    !loading &&
+    !readError &&
+    !pending;
   async function submit() {
     if (!canSubmit) return;
     setPending(true);
@@ -141,6 +226,7 @@ export function PredictionOrderForm({
       )
         throw new Error("Book or position ownership mismatch");
       const parsed = amounts();
+      const latestTarget = await readTarget(latestBook, parsed.price);
       validatePredictionRestingOrder(
         latestMarket,
         latestBook,
@@ -150,33 +236,43 @@ export function PredictionOrderForm({
         parsed.price,
         parsed.quantity,
         new BN(Math.floor(Date.now() / 1000)),
+        latestTarget.kind === "append" ? latestTarget : undefined,
       );
       const order = derivePredictionOrderPda(
         marketAddress,
         latestBook.nextOrderId,
       );
-      const ix = await program.methods
-        .placePredictionOrder(
-          latestBook.nextOrderId,
-          { [outcome]: {} },
-          { [side]: {} },
+      const method =
+        latestTarget.kind === "append"
+          ? program.methods.appendPredictionOrder
+          : program.methods.placePredictionOrder;
+      const builder = method(
+        latestBook.nextOrderId,
+        { [outcome]: {} },
+        { [side]: {} },
+        parsed.price,
+        parsed.quantity,
+      );
+      const common = {
+        owner,
+        market: marketAddress,
+        position: positionAddress,
+        orderBook: derivePredictionBookPda(marketAddress),
+        priceLevel: derivePredictionPriceLevelPda(
+          marketAddress,
+          outcome,
+          side,
           parsed.price,
-          parsed.quantity,
+        ),
+        order,
+        systemProgram: SystemProgram.programId,
+      };
+      const ix = await builder
+        .accountsStrict(
+          latestTarget.kind === "append"
+            ? { ...common, tailOrder: latestTarget.tailAddress }
+            : common,
         )
-        .accountsStrict({
-          owner,
-          market: marketAddress,
-          position: positionAddress,
-          orderBook: derivePredictionBookPda(marketAddress),
-          priceLevel: derivePredictionPriceLevelPda(
-            marketAddress,
-            outcome,
-            side,
-            parsed.price,
-          ),
-          order,
-          systemProgram: SystemProgram.programId,
-        })
         .instruction();
       const signature = await (
         program.provider as AnchorProvider
@@ -200,8 +296,9 @@ export function PredictionOrderForm({
     >
       <h3>Place a limit order</h3>
       <p>
-        First-order testing supports empty sides only. Matching and cancellation
-        are not available yet; placed orders keep their funds locked.
+        Resting-order testing supports empty sides or appending at an existing
+        price. Matching and cancellation are not available yet; placed orders
+        keep their funds locked.
       </p>
       {!PREDICTION_ORDERS_ENABLED && (
         <p>Public order submission is disabled until cancellation is ready.</p>
@@ -223,9 +320,10 @@ export function PredictionOrderForm({
         <select
           value={outcome}
           disabled={pending}
-          onChange={(event) =>
-            setOutcome(event.target.value as PredictionOutcome)
-          }
+          onChange={(event) => {
+            setTarget(null);
+            setOutcome(event.target.value as PredictionOutcome);
+          }}
         >
           <option value="yes">YES</option>
           <option value="no">NO</option>
@@ -236,7 +334,10 @@ export function PredictionOrderForm({
         <select
           value={side}
           disabled={pending}
-          onChange={(event) => setSide(event.target.value as OrderSide)}
+          onChange={(event) => {
+            setTarget(null);
+            setSide(event.target.value as OrderSide);
+          }}
         >
           <option value="bid">Buy contracts</option>
           <option value="ask">Sell contracts</option>
@@ -248,7 +349,10 @@ export function PredictionOrderForm({
           inputMode="decimal"
           value={price}
           disabled={pending}
-          onChange={(event) => setPrice(event.target.value)}
+          onChange={(event) => {
+            setTarget(null);
+            setPrice(event.target.value);
+          }}
           placeholder="0.60"
         />
       </label>
@@ -268,6 +372,15 @@ export function PredictionOrderForm({
             ? `Locks ${side === "bid" ? `${formatAtomicAmount(locked, decimals)} ${symbol}` : `${locked.toString()} ${outcome.toUpperCase()} contracts`}. No fee for resting placement.`
             : "Choose a tick-aligned price below 1 and a whole quantity.")}
       </small>
+      {targetLoading && <p>Checking price level and queue tail…</p>}
+      {targetError && (
+        <p className="access-denied" role="alert">
+          {targetError}
+        </p>
+      )}
+      {target?.kind === "append" && (
+        <p>This order joins the back of the existing FIFO queue.</p>
+      )}
       {error && (
         <p className="access-denied" role="alert">
           {error}

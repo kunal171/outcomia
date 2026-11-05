@@ -47,6 +47,7 @@ const {
   predictionOpeningIssue,
   validatePredictionCreatorResolver,
   validatePredictionRestingOrder,
+  readPredictionPlacementTarget,
   PREDICTION_ORDERS_ENABLED,
 } = mod.exports;
 
@@ -506,6 +507,335 @@ test("placement IDL binds a signed trader to exact units and canonical order/lev
           .length <= 1232,
       );
     }
+});
+
+function appendFixture(outcome = "yes", side = "bid") {
+  const { BN } = require("@anchor-lang/core");
+  const fixture = restingFixture();
+  const { book, position } = fixture;
+  const price = new BN(600000),
+    id = new BN(1);
+  const levelAddress = derivePredictionPriceLevelPda(
+      book.market,
+      outcome,
+      side,
+      price,
+    ),
+    tailAddress = derivePredictionOrderPda(book.market, id);
+  book.nextOrderId = new BN(2);
+  book[
+    outcome === "yes"
+      ? side === "bid"
+        ? "yesBestBid"
+        : "yesBestAsk"
+      : side === "bid"
+        ? "noBestBid"
+        : "noBestAsk"
+  ] = price;
+  const level = {
+    market: book.market,
+    outcome: { [outcome]: {} },
+    side: { [side]: {} },
+    price,
+    betterPrice: null,
+    worsePrice: null,
+    firstOrder: tailAddress,
+    lastOrder: tailAddress,
+    totalRemainingQuantity: new BN(2),
+    orderCount: new BN(1),
+  };
+  const tail = {
+    owner: new PublicKey(new Uint8Array(32).fill(5)),
+    market: book.market,
+    orderId: id,
+    outcome: { [outcome]: {} },
+    side: { [side]: {} },
+    price,
+    priceLevel: levelAddress,
+    previousOrder: null,
+    nextOrder: null,
+    quantity: new BN(2),
+    remainingQuantity: new BN(2),
+    lockedCollateral: new BN(side === "bid" ? 1200000 : 2),
+    status: { open: {} },
+  };
+  return {
+    ...fixture,
+    append: { kind: "append", levelAddress, tailAddress, level, tail },
+  };
+}
+
+test("append preflight preserves FIFO identity and uses the new trader's selected asset", () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const { market, book, position, append } = appendFixture(outcome, side);
+      assert.equal(
+        validatePredictionRestingOrder(
+          market,
+          book,
+          position,
+          outcome,
+          side,
+          new BN(600000),
+          new BN(3),
+          new BN(99),
+          append,
+        ).toString(),
+        side === "bid" ? "1800000" : "3",
+      );
+      assert.equal(append.tail.nextOrder, null);
+      assert.equal(append.level.orderCount.toString(), "1");
+      assert.equal(book.nextOrderId.toString(), "2");
+    }
+});
+
+test("append preflight rejects stale tails, wrong identities, closed orders and bad endpoints", () => {
+  const { BN } = require("@anchor-lang/core");
+  for (const corrupt of [
+    (x) => (x.append.tail.nextOrder = PublicKey.default),
+    (x) => (x.append.tail.status = { filled: {} }),
+    (x) => (x.append.tail.outcome = { no: {} }),
+    (x) => (x.append.tail.side = { ask: {} }),
+    (x) => (x.append.tail.market = PublicKey.default),
+    (x) => (x.append.tail.priceLevel = PublicKey.default),
+    (x) => (x.append.tail.remainingQuantity = new BN(0)),
+    (x) => (x.append.tail.remainingQuantity = new BN(3)),
+    (x) => (x.append.level.lastOrder = PublicKey.default),
+    (x) => (x.append.tailAddress = PublicKey.default),
+    (x) => (x.append.tail.previousOrder = PublicKey.default),
+    (x) => (x.append.level.firstOrder = null),
+    (x) => (x.append.level.totalRemainingQuantity = new BN(1)),
+    (x) => (x.append.level.outcome = { no: {} }),
+    (x) => (x.append.level.market = PublicKey.default),
+    (x) => (x.append.level.price = new BN(610000)),
+    (x) => (x.append.levelAddress = PublicKey.default),
+    (x) => (x.book.yesBestBid = null),
+  ]) {
+    const x = appendFixture();
+    corrupt(x);
+    assert.throws(
+      () =>
+        validatePredictionRestingOrder(
+          x.market,
+          x.book,
+          x.position,
+          "yes",
+          "bid",
+          new BN(600000),
+          new BN(1),
+          new BN(99),
+          x.append,
+        ),
+      /invalid|stale/,
+    );
+  }
+  for (const field of ["orderCount", "totalRemainingQuantity"]) {
+    const x = appendFixture();
+    x.append.level.firstOrder = PublicKey.default;
+    x.append.tail.previousOrder = PublicKey.default;
+    x.append.level.orderCount = new BN(2);
+    x.append.level.totalRemainingQuantity = new BN(3);
+    x.append.level[field] = new BN("18446744073709551615");
+    assert.throws(
+      () =>
+        validatePredictionRestingOrder(
+          x.market,
+          x.book,
+          x.position,
+          "yes",
+          "bid",
+          new BN(600000),
+          new BN(1),
+          new BN(99),
+          x.append,
+        ),
+      /counter limit/,
+    );
+  }
+});
+
+test("append IDL writes the old tail without requiring its owner's signature", async () => {
+  const { Program, BN } = require("@anchor-lang/core");
+  const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
+  const idl = JSON.parse(
+    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  );
+  const program = new Program(idl, {
+    connection: new Connection("http://127.0.0.1:8899"),
+  });
+  const market = new PublicKey(new Uint8Array(32).fill(3)),
+    owner = new PublicKey(new Uint8Array(32).fill(4));
+  const derive = (seed, ...keys) =>
+    PublicKey.findProgramAddressSync(
+      [Buffer.from(seed), ...keys],
+      program.programId,
+    )[0];
+  for (const outcome of ["yes", "no"])
+    for (const side of ["bid", "ask"]) {
+      const price = new BN(600000),
+        id = new BN(2),
+        old = new BN(1);
+      const tailOrder = derive(
+        "prediction_order",
+        market.toBuffer(),
+        old.toArrayLike(Buffer, "le", 8),
+      );
+      const ix = await program.methods
+        .appendPredictionOrder(
+          id,
+          { [outcome]: {} },
+          { [side]: {} },
+          price,
+          new BN(3),
+        )
+        .accountsStrict({
+          owner,
+          market,
+          position: derive(
+            "prediction_position",
+            market.toBuffer(),
+            owner.toBuffer(),
+          ),
+          orderBook: derive("prediction_book", market.toBuffer()),
+          priceLevel: derive(
+            "prediction_level",
+            market.toBuffer(),
+            Buffer.from(outcome),
+            Buffer.from(side),
+            price.toArrayLike(Buffer, "le", 8),
+          ),
+          tailOrder,
+          order: derive(
+            "prediction_order",
+            market.toBuffer(),
+            id.toArrayLike(Buffer, "le", 8),
+          ),
+          systemProgram: SystemProgram.programId,
+        })
+        .instruction();
+      const decoded = program.coder.instruction.decode(ix.data);
+      assert.equal(decoded.name, "appendPredictionOrder");
+      assert.equal(decoded.data.orderId.toString(), "2");
+      assert.equal(decoded.data.quantity.toString(), "3");
+      assert.equal(ix.keys.length, 8);
+      assert.equal(ix.keys[0].isSigner, true);
+      assert.equal(ix.keys[5].pubkey.toBase58(), tailOrder.toBase58());
+      assert.equal(ix.keys[5].isSigner, false);
+      assert.equal(ix.keys[5].isWritable, true);
+      for (let i = 1; i < ix.keys.length; i++)
+        assert.equal(ix.keys[i].isSigner, false);
+      const tx = new Transaction({
+        feePayer: owner,
+        recentBlockhash: PublicKey.default.toBase58(),
+      }).add(ix);
+      assert.ok(
+        tx.serialize({ requireAllSignatures: false, verifySignatures: false })
+          .length <= 1232,
+      );
+    }
+});
+
+test("placement routing reads actual levels and tails and never falls back on RPC failure", async () => {
+  const { BN } = require("@anchor-lang/core");
+  const x = appendFixture();
+  const { book } = x;
+  const readers = {
+    predictionPriceLevel: {
+      fetchNullable: async (address) => {
+        assert.equal(address.toBase58(), x.append.levelAddress.toBase58());
+        return x.append.level;
+      },
+    },
+    predictionOrder: {
+      fetchNullable: async (address) => {
+        assert.equal(address.toBase58(), x.append.tailAddress.toBase58());
+        return x.append.tail;
+      },
+    },
+  };
+  const selected = await readPredictionPlacementTarget(
+    readers,
+    book.market,
+    book,
+    "yes",
+    "bid",
+    new BN(600000),
+  );
+  assert.equal(selected.kind, "append");
+  assert.equal(
+    selected.tailAddress.toBase58(),
+    x.append.tailAddress.toBase58(),
+  );
+  readers.predictionPriceLevel.fetchNullable = async () => null;
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        readers,
+        book.market,
+        book,
+        "yes",
+        "bid",
+        new BN(600000),
+      ),
+    /insertion path/,
+  );
+  book.yesBestBid = null;
+  assert.equal(
+    (
+      await readPredictionPlacementTarget(
+        readers,
+        book.market,
+        book,
+        "yes",
+        "bid",
+        new BN(600000),
+      )
+    ).kind,
+    "place",
+  );
+  readers.predictionPriceLevel.fetchNullable = async () => {
+    throw new Error("RPC unavailable");
+  };
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        readers,
+        book.market,
+        book,
+        "yes",
+        "bid",
+        new BN(600000),
+      ),
+    /RPC unavailable/,
+  );
+  readers.predictionPriceLevel.fetchNullable = async () => x.append.level;
+  readers.predictionOrder.fetchNullable = async () => null;
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        readers,
+        book.market,
+        book,
+        "yes",
+        "bid",
+        new BN(600000),
+      ),
+    /tail account is unavailable/,
+  );
+  x.append.level.lastOrder = null;
+  await assert.rejects(
+    () =>
+      readPredictionPlacementTarget(
+        readers,
+        book.market,
+        book,
+        "yes",
+        "bid",
+        new BN(600000),
+      ),
+    /no queue tail/,
+  );
 });
 
 test("deposit preflight rejects zero, unavailable balance, overspending and u64 overflow", () => {

@@ -265,7 +265,12 @@ without one are identified explicitly. `place_prediction_order` creates the firs
 resting order on an empty outcome/side, rejects crossing prices and locks only
 the signing trader's free collateral or outcome contracts. It atomically updates
 the canonical order, level, head, next ID and market count. No vault transfer,
-reserve change or fee accrual occurs. Existing-side insertion, cancellation and
+reserve change or fee accrual occurs. `append_prediction_order` adds at an existing
+price's verified FIFO tail, preserving its first order, neighbors and rent payer.
+The old tail may belong to another trader and needs no signature; only its next
+link changes. Common validation/funding helpers keep both paths consistent.
+The client selects a path from actual level/tail reads and revalidates before
+signing. New-price insertion, cancellation and
 matching are not implemented yet; public order entry defaults disabled.
 
 ### Market vault topology

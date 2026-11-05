@@ -394,4 +394,8 @@ pub enum TidebookError {
     PredictionOrderWouldCross = 128,
     #[msg("Prediction order ID must match the book's next positive ID")]
     InvalidPredictionOrderId = 129,
+    #[msg("Prediction level identity or book linkage is invalid")]
+    InvalidPredictionPriceLevel = 130,
+    #[msg("Prediction queue tail identity, status or links are invalid")]
+    InvalidPredictionTail = 131,
 }

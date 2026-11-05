@@ -2,9 +2,10 @@
 //!
 //! A separate root keeps index pointers out of already-created market accounts.
 //! Each outcome has independent bid/ask price lists, while one root allocates
-//! market-wide order IDs. The empty-side placement instruction checks funding
-//! and lifecycle gates. Future insertion, cancellation and matching must also
-//! validate reciprocal links and FIFO priority before changing existing queues.
+//! market-wide order IDs. Empty-side placement and same-price append check
+//! funding and lifecycle gates; append also verifies the terminal FIFO links.
+//! Future new-price insertion, cancellation and matching must preserve the
+//! same reciprocal links and priority rules.
 
 use super::{OrderSide, OrderStatus, PredictionOutcome};
 use anchor_lang::prelude::*;

@@ -25,7 +25,64 @@ export function predictionBestPrice(
       : book.noBestAsk;
 }
 
-/** Advisory empty-side placement checks; all arithmetic stays exact in BN. */
+export interface PredictionAppendTarget {
+  kind: "append";
+  levelAddress: PublicKey;
+  tailAddress: PublicKey;
+  level: PredictionPriceLevelAccount;
+  tail: PredictionOrderAccount;
+}
+
+interface PredictionPlacementReader {
+  predictionPriceLevel: {
+    fetchNullable(
+      address: PublicKey,
+    ): Promise<PredictionPriceLevelAccount | null>;
+  };
+  predictionOrder: {
+    fetchNullable(address: PublicKey): Promise<PredictionOrderAccount | null>;
+  };
+}
+
+/** RPC errors propagate; only an actually absent level can select new placement. */
+export async function readPredictionPlacementTarget(
+  accounts: PredictionPlacementReader,
+  market: PublicKey,
+  book: PredictionOrderBookAccount,
+  outcome: PredictionOutcome,
+  side: OrderSide,
+  price: BN,
+): Promise<PredictionAppendTarget | { kind: "place" }> {
+  if (!book.market.equals(market))
+    throw new Error("Book belongs to a different market");
+  const levelAddress = derivePredictionPriceLevelPda(
+    market,
+    outcome,
+    side,
+    price,
+  );
+  const level = await accounts.predictionPriceLevel.fetchNullable(levelAddress);
+  if (!level) {
+    if (predictionBestPrice(book, outcome, side) !== null)
+      throw new Error(
+        "A new price on this occupied side needs the upcoming insertion path",
+      );
+    return { kind: "place" };
+  }
+  if (!level.lastOrder)
+    throw new Error("Existing price level has no queue tail");
+  const tail = await accounts.predictionOrder.fetchNullable(level.lastOrder);
+  if (!tail) throw new Error("Price-level tail account is unavailable");
+  return {
+    kind: "append",
+    levelAddress,
+    tailAddress: level.lastOrder,
+    level,
+    tail,
+  };
+}
+
+/** Advisory resting-order checks; all arithmetic stays exact in BN. */
 export function validatePredictionRestingOrder(
   market: PredictionMarketAccount,
   book: PredictionOrderBookAccount,
@@ -35,6 +92,7 @@ export function validatePredictionRestingOrder(
   price: BN,
   quantity: BN,
   now: BN,
+  append?: PredictionAppendTarget,
 ): BN {
   if (!["yes", "no"].includes(outcome) || !["bid", "ask"].includes(side))
     throw new Error("Select a valid outcome and side");
@@ -53,7 +111,59 @@ export function validatePredictionRestingOrder(
     !price.mod(market.priceTick).isZero()
   )
     throw new Error("Price must be positive, below 1 and tick-aligned");
-  if (predictionBestPrice(book, outcome, side) !== null)
+  if (append) {
+    const { level, tail, levelAddress, tailAddress } = append;
+    const best = predictionBestPrice(book, outcome, side);
+    if (
+      !best ||
+      !levelAddress.equals(
+        derivePredictionPriceLevelPda(book.market, outcome, side, price),
+      ) ||
+      !level.market.equals(book.market) ||
+      !(outcome in level.outcome) ||
+      !(side in level.side) ||
+      !level.price.eq(price) ||
+      best.eq(price) !== (level.betterPrice === null) ||
+      (side === "bid" ? best.lt(price) : best.gt(price))
+    )
+      throw new Error("Price level identity or book linkage is invalid");
+    if (
+      level.orderCount.lte(new BN(0)) ||
+      !level.firstOrder ||
+      !level.lastOrder?.equals(tailAddress) ||
+      !tailAddress.equals(
+        derivePredictionOrderPda(book.market, tail.orderId),
+      ) ||
+      !tail.market.equals(book.market) ||
+      !tail.priceLevel.equals(levelAddress) ||
+      !(outcome in tail.outcome) ||
+      !(side in tail.side) ||
+      !tail.price.eq(price) ||
+      !("open" in tail.status) ||
+      tail.remainingQuantity.lte(new BN(0)) ||
+      tail.remainingQuantity.gt(tail.quantity) ||
+      tail.nextOrder !== null ||
+      tail.orderId.lte(new BN(0)) ||
+      tail.orderId.gte(book.nextOrderId)
+    )
+      throw new Error("Queue tail is stale or invalid; refresh");
+    if (
+      level.orderCount.eqn(1)
+        ? !level.firstOrder.equals(tailAddress) ||
+          tail.previousOrder !== null ||
+          !level.totalRemainingQuantity.eq(tail.remainingQuantity)
+        : level.firstOrder.equals(tailAddress) ||
+          !tail.previousOrder ||
+          tail.previousOrder.equals(tailAddress) ||
+          level.totalRemainingQuantity.lt(tail.remainingQuantity)
+    )
+      throw new Error("Queue endpoints or totals are invalid");
+    if (
+      level.orderCount.addn(1).bitLength() > 64 ||
+      level.totalRemainingQuantity.add(quantity).bitLength() > 64
+    )
+      throw new Error("Price-level counter limit reached");
+  } else if (predictionBestPrice(book, outcome, side) !== null)
     throw new Error("This step supports only the first order on an empty side");
   const opposing = predictionBestPrice(
     book,
