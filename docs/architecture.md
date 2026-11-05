@@ -65,8 +65,22 @@ active on-chain record. Role-aware routes are:
 | `/markets`           | Public                                                                                | Discover active and paused on-chain markets without connecting a wallet                                                                                               |
 | `/markets/[address]` | Public viewing; connected wallet for trading; market authority for lifecycle controls | Inspect one market, match up to three crossing FIFO makers atomically or place a resting order while active, and pause, unpause, or safely close an authorized market |
 | `/admin`             | Super-admin                                                                           | Initialize governance and add, disable, enable, or remove admins                                                                                                      |
-| `/markets/new`       | Active admin or super-admin                                                           | Create a market for two SPL mints                                                                                                                                     |
+| `/markets/new` | Public chooser; creation requires an active admin | Choose Spot or Prediction before entering the corresponding form |
+| `/markets/new/spot` | Active admin or super-admin | Create a Spot market for two SPL mints |
+| `/predictions/new` | Active admin or super-admin; deployment gate | Create a single-collateral prediction draft |
 | `/orders`            | Any connected wallet                                                                  | List wallet-owned orders and cancel orders whose status is `Open`                                                                                                     |
+
+The browser uses the configured Helius devnet RPC first, with verified public
+HTTP read fallbacks. The shared transport verifies genesis, coalesces in-flight
+duplicates, paces requests and cools down throttled providers. Account reads are
+not TTL-cached; discovery and transaction history have short caches. Writes are
+not automatically replayed after network failure. WebSockets use the primary.
+
+Market labels come from metadata or the documented devnet test-mint registry.
+Display prices use quote decimals and quantities use base decimals. Forward and
+inverse quotes identify their source: a recent fill, or an indicative book price.
+Recent fills are decoded using Anchor's camel-cased event name and at most six
+sequential transaction reads. No external/global price is implied.
 
 The market page derives the connected wallet's canonical `TraderBalance` PDA.
 It can initialize the ledger, deposit or withdraw either asset, and displays
@@ -228,6 +242,15 @@ instruction accepts `kind`. The market authority closes metadata before closing
 a paused market so the separate PDA does not retain orphaned rent.
 
 ### Prediction collateral and complete sets
+
+Prediction creation includes an editable rules template and custom text/JSON
+fields. The browser validates and serializes one document, uploads it to Arweave
+through Turbo with the creator's message signature, and fetches it back for an
+exact-byte comparison. Only then does it build the market transaction with that
+URI and hash. Uploads and Solana transactions are separate: an accepted upload
+cannot be undone by cancelling creation. A retained, downloadable receipt lets
+same-document retries reuse the upload. See the prediction design for storage
+limits, timing policies, fees and deployment gates.
 
 Prediction markets use a separate `PredictionMarket` and per-wallet
 `PredictionPosition`, plus one collateral vault. Spot account layouts do not

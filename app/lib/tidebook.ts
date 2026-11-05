@@ -383,7 +383,7 @@ export async function fetchLatestTrade(
   connection: Connection,
   program: Program,
   market: PublicKey,
-  signatureLimit = 25,
+  signatureLimit = 8,
 ): Promise<LastTradeView | null> {
   const signatures = await connection.getSignaturesForAddress(market, {
     limit: signatureLimit,
@@ -391,27 +391,30 @@ export async function fetchLatestTrade(
   const successful = signatures.filter((entry) => entry.err === null);
   if (successful.length === 0) return null;
 
-  const transactions = await connection.getTransactions(
-    successful.map((entry) => entry.signature),
-    { commitment: "confirmed", maxSupportedTransactionVersion: 0 },
-  );
   const parser = new EventParser(program.programId, program.coder);
 
-  for (let index = 0; index < transactions.length; index += 1) {
-    const logs = transactions[index]?.meta?.logMessages;
+  // Stop at the newest fill instead of blasting 25 transaction requests at a
+  // shared RPC. A bounded recent window is not a complete historical index.
+  for (const entry of successful.slice(0, 6)) {
+    const transaction = await connection.getTransaction(entry.signature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    const logs = transaction?.meta?.logMessages;
     if (!logs) continue;
 
     let latestPrice: BN | null = null;
     for (const event of parser.parseLogs(logs)) {
-      if (event.name !== "FillEvent") continue;
+      // Anchor's JS Program camel-cases IDL event names.
+      if (event.name !== "fillEvent" && event.name !== "FillEvent") continue;
       const data = event.data as { market: PublicKey; executionPrice: BN };
       if (data.market.equals(market)) latestPrice = data.executionPrice;
     }
     if (latestPrice) {
       return {
         price: latestPrice,
-        signature: successful[index].signature,
-        blockTime: successful[index].blockTime ?? null,
+        signature: entry.signature,
+        blockTime: entry.blockTime ?? null,
       };
     }
   }

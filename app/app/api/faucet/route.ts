@@ -16,6 +16,7 @@ import {
   Transaction,
 } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveHeliusDevnetUrl } from "../../../lib/rpc-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,6 +116,10 @@ function readConfig(): FaucetConfig {
     quoteClaimAtoms: positiveAtoms("FAUCET_QUOTE_CLAIM_ATOMS"),
     rpcUrl:
       process.env.FAUCET_SOLANA_RPC_URL?.trim() ||
+      resolveHeliusDevnetUrl(
+        process.env.NEXT_PUBLIC_HELIUS_RPC_URL,
+        process.env.NEXT_PUBLIC_HELIUS_API_KEY,
+      ) ||
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL?.trim() ||
       clusterApiUrl("devnet"),
     walletLimit: positiveInteger("FAUCET_WALLET_LIMIT", 1),
@@ -224,7 +229,7 @@ export async function GET() {
     const config = readConfig();
     const durableRateLimit = Boolean(
       process.env.UPSTASH_REDIS_REST_URL &&
-      process.env.UPSTASH_REDIS_REST_TOKEN,
+        process.env.UPSTASH_REDIS_REST_TOKEN,
     );
 
     return NextResponse.json({

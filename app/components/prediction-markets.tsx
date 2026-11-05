@@ -155,8 +155,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
           <h2>{address ? "Market terms" : "On-chain markets"}</h2>
           <div className="admin-actions">
             {isAdmin && (
-              <Link className="admin-action-button" href="/predictions/new">
-                Create draft
+              <Link className="admin-action-button" href="/markets/new">
+                Create market
               </Link>
             )}
             <button

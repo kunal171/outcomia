@@ -64,7 +64,8 @@ export function AppHeader() {
           href="/markets"
           aria-current={
             pathname === "/markets" ||
-            (pathname.startsWith("/markets/") && pathname !== "/markets/new")
+            (pathname.startsWith("/markets/") &&
+              !pathname.startsWith("/markets/new"))
               ? "page"
               : undefined
           }
@@ -74,7 +75,10 @@ export function AppHeader() {
         <Link
           href="/predictions"
           aria-current={
-            pathname.startsWith("/predictions") ? "page" : undefined
+            pathname.startsWith("/predictions") &&
+            pathname !== "/predictions/new"
+              ? "page"
+              : undefined
           }
         >
           Predictions
@@ -98,7 +102,12 @@ export function AppHeader() {
         {canCreateMarket && (
           <Link
             href="/markets/new"
-            aria-current={pathname === "/markets/new" ? "page" : undefined}
+            aria-current={
+              pathname.startsWith("/markets/new") ||
+              pathname === "/predictions/new"
+                ? "page"
+                : undefined
+            }
           >
             Create market
           </Link>

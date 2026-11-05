@@ -56,31 +56,20 @@ import { AppHeader } from "./app-header";
 import { buildRestingOrderInstruction } from "../lib/resting-order";
 import { useProtocolRole } from "./protocol-role-provider";
 import { ServerTestFaucet } from "./server-test-faucet";
+import {
+  marketLabels,
+  readableAmount,
+  referencePrice,
+  inversePrice,
+} from "../lib/market-display";
+import { rpcErrorMessage } from "../lib/rpc-transport";
 
 function shortAddress(value: string) {
   return `${value.slice(0, 8)}…${value.slice(-8)}`;
 }
 
 function getErrorMessage(cause: unknown) {
-  return cause instanceof Error ? cause.message : "Transaction failed";
-}
-
-function parsePositiveU64(value: string, label: string) {
-  const normalized = value.trim();
-
-  if (!/^[0-9]+$/.test(normalized)) {
-    throw new Error(`${label} must be a positive whole number`);
-  }
-
-  const number = new BN(normalized, 10);
-  if (number.isZero()) {
-    throw new Error(`${label} must be greater than zero`);
-  }
-  if (number.bitLength() > 64) {
-    throw new Error(`${label} exceeds the u64 limit`);
-  }
-
-  return number;
+  return rpcErrorMessage(cause, "Transaction failed");
 }
 
 type SubmissionResult =
@@ -110,6 +99,7 @@ export function MarketDetail({ address }: { address: string }) {
   const [bidLevels, setBidLevels] = useState<PriceLevelView[]>([]);
   const [askLevels, setAskLevels] = useState<PriceLevelView[]>([]);
   const [lastTrade, setLastTrade] = useState<LastTradeView | null>(null);
+  const [tradeError, setTradeError] = useState<string | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
   const [testFaucet, setTestFaucet] = useState<TestFaucetAccount | null>(null);
   const [serverFaucetPair, setServerFaucetPair] = useState<boolean | null>(
@@ -248,12 +238,17 @@ export function MarketDetail({ address }: { address: string }) {
         setBookError(getErrorMessage(cause));
       }
 
-      const recentTrade = await fetchLatestTrade(
-        connection,
-        readProgram,
-        marketAddress,
-      ).catch(() => null);
-      setLastTrade(recentTrade);
+      setTradeError(null);
+      try {
+        setLastTrade(
+          await fetchLatestTrade(connection, readProgram, marketAddress),
+        );
+      } catch (cause) {
+        setLastTrade(null);
+        setTradeError(
+          rpcErrorMessage(cause, "Recent trades could not be loaded"),
+        );
+      }
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
@@ -577,9 +572,9 @@ export function MarketDetail({ address }: { address: string }) {
       const opposingBest = side === "bid" ? market.bestAsk : market.bestBid;
       const crossesBest = Boolean(
         opposingBest &&
-        (side === "bid"
-          ? rawPrice.gte(opposingBest)
-          : rawPrice.lte(opposingBest)),
+          (side === "bid"
+            ? rawPrice.gte(opposingBest)
+            : rawPrice.lte(opposingBest)),
       );
 
       if (crossesBest && opposingBest) {
@@ -781,7 +776,11 @@ export function MarketDetail({ address }: { address: string }) {
     setFeeError(null);
     setFeeSignature(null);
     try {
-      const amount = parsePositiveU64(feeAmount, "Fee amount");
+      const amount = parseTokenAmount(
+        feeAmount,
+        market.quoteDecimals,
+        "Fee amount",
+      );
       if (amount.gt(marketFees.accruedQuoteFees)) {
         throw new Error("Amount exceeds accrued protocol fees");
       }
@@ -907,6 +906,10 @@ export function MarketDetail({ address }: { address: string }) {
   };
 
   const status = market ? decodeMarketStatus(market.status) : null;
+  const labels = market
+    ? marketLabels(market, marketMetadata)
+    : { base: "Base token", quote: "Quote token", name: "Market" };
+  const reference = market ? referencePrice(market, lastTrade?.price) : null;
   const marketKind = marketMetadata
     ? decodeMarketKind(marketMetadata.kind)
     : null;
@@ -934,13 +937,20 @@ export function MarketDetail({ address }: { address: string }) {
     if (!market || !rawPricePreview || !rawQuantityPreview) return null;
 
     if (side === "ask") {
-      return `${formatAtomicAmount(rawQuantityPreview, market.baseDecimals)} base tokens`;
+      return `${readableAmount(rawQuantityPreview, market.baseDecimals)} ${labels.base}`;
     }
 
     const baseScale = new BN(10).pow(new BN(market.baseDecimals));
     const quoteAmount = rawPricePreview.mul(rawQuantityPreview).div(baseScale);
-    return `${formatAtomicAmount(quoteAmount, market.quoteDecimals)} quote tokens`;
-  }, [market, rawPricePreview, rawQuantityPreview, side]);
+    return `${readableAmount(quoteAmount, market.quoteDecimals)} ${labels.quote}`;
+  }, [
+    market,
+    rawPricePreview,
+    rawQuantityPreview,
+    side,
+    labels.base,
+    labels.quote,
+  ]);
   const crossesBest = useMemo(() => {
     if (!market || !rawPricePreview) return false;
     const opposingBest = side === "bid" ? market.bestAsk : market.bestBid;
@@ -977,8 +987,8 @@ export function MarketDetail({ address }: { address: string }) {
   const submitLabel = pending
     ? "Submitting…"
     : side === "bid"
-      ? "Buy base token"
-      : "Sell base token";
+      ? `Buy ${labels.base}`
+      : `Sell ${labels.base}`;
 
   return (
     <div className="app-shell">
@@ -998,10 +1008,7 @@ export function MarketDetail({ address }: { address: string }) {
                 <div className="eyebrow">
                   {marketKind ? `${marketKind} market` : "Market details"}
                 </div>
-                <h1>
-                  {marketMetadata?.displayName ??
-                    shortAddress(marketAddress.toBase58())}
-                </h1>
+                <h1>{labels.name}</h1>
                 <p>
                   Cross the best FIFO maker or post a collateralized limit
                   order. Every completed fill settles internal balances
@@ -1021,27 +1028,75 @@ export function MarketDetail({ address }: { address: string }) {
               </div>
             </div>
 
+            <section
+              className="market-rate-card"
+              aria-label="Pair exchange rate"
+            >
+              <div>
+                <span className="card-label">
+                  {labels.base} / {labels.quote}
+                </span>
+                {reference ? (
+                  <>
+                    <h2>
+                      1 {labels.base} {reference.indicative ? "≈" : "="}{" "}
+                      {readableAmount(reference.price, market.quoteDecimals)}{" "}
+                      {labels.quote}
+                    </h2>
+                    <p>
+                      1 {labels.quote} ≈{" "}
+                      {inversePrice(reference.price, market.quoteDecimals)}{" "}
+                      {labels.base}
+                    </p>
+                    <small>{reference.label}</small>
+                  </>
+                ) : (
+                  <>
+                    <h2>No price yet</h2>
+                    <p>A price appears when an order or trade is available.</p>
+                  </>
+                )}
+              </div>
+              {tradeError && (
+                <p className="market-rate-note">
+                  Recent trade history is unavailable. Any displayed quote is
+                  labeled by its book source.
+                </p>
+              )}
+            </section>
             <div className="market-detail-layout">
               <section className="admin-card market-information">
                 <div className="card-label">Pair</div>
-                <div className="market-detail-pair">
-                  <div>
-                    <span>
-                      {marketMetadata
-                        ? `${marketMetadata.baseSymbol} · base mint`
-                        : "Base mint"}
-                    </span>
-                    <strong>{market.baseMint.toBase58()}</strong>
-                  </div>
-                  <div>
-                    <span>
-                      {marketMetadata
-                        ? `${marketMetadata.quoteSymbol} · quote mint`
-                        : "Quote mint"}
-                    </span>
-                    <strong>{market.quoteMint.toBase58()}</strong>
-                  </div>
+                <div className="market-symbol-pair">
+                  <strong>{labels.base}</strong>
+                  <span>/</span>
+                  <strong>{labels.quote}</strong>
                 </div>
+                <details className="market-mint-details">
+                  <summary>Token mint addresses</summary>
+                  <div className="market-detail-pair">
+                    <div>
+                      <span>{labels.base}</span>
+                      <a
+                        href={accountExplorerUrl(market.baseMint)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {market.baseMint.toBase58()} ↗
+                      </a>
+                    </div>
+                    <div>
+                      <span>{labels.quote}</span>
+                      <a
+                        href={accountExplorerUrl(market.quoteMint)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {market.quoteMint.toBase58()} ↗
+                      </a>
+                    </div>
+                  </div>
+                </details>
 
                 <dl className="market-metadata">
                   <div>
@@ -1057,23 +1112,23 @@ export function MarketDetail({ address }: { address: string }) {
                   <div>
                     <dt>Last traded price</dt>
                     <dd>
-                      {lastTrade
-                        ? (
-                            <a
-                              href={transactionExplorerUrl(
-                                lastTrade.signature,
-                              )}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {formatAtomicAmount(
-                                lastTrade.price,
-                                market.quoteDecimals,
-                              )}{" "}
-                              ↗
-                            </a>
-                          )
-                        : "No recent trade found"}
+                      {lastTrade ? (
+                        <a
+                          href={transactionExplorerUrl(lastTrade.signature)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {readableAmount(
+                            lastTrade.price,
+                            market.quoteDecimals,
+                          )}{" "}
+                          {labels.quote} ↗
+                        </a>
+                      ) : tradeError ? (
+                        "History unavailable"
+                      ) : (
+                        "No recent trade found"
+                      )}
                     </dd>
                   </div>
                   <div>
@@ -1089,53 +1144,53 @@ export function MarketDetail({ address }: { address: string }) {
                     <dd>{market.openOrderCount.toString()}</dd>
                   </div>
                   <div>
-                    <dt>Best bid</dt>
+                    <dt>Highest buy price</dt>
                     <dd>
                       {market.bestBid
-                        ? formatAtomicAmount(
+                        ? `${readableAmount(
                             market.bestBid,
                             market.quoteDecimals,
-                          )
+                          )} ${labels.quote}`
                         : "No open bids"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Best ask</dt>
+                    <dt>Lowest sell price</dt>
                     <dd>
                       {market.bestAsk
-                        ? formatAtomicAmount(
+                        ? `${readableAmount(
                             market.bestAsk,
                             market.quoteDecimals,
-                          )
+                          )} ${labels.quote}`
                         : "No open asks"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Base decimals</dt>
-                    <dd>{market.baseDecimals}</dd>
+                    <dt>{labels.base} precision</dt>
+                    <dd>{market.baseDecimals} decimal places</dd>
                   </div>
                   <div>
-                    <dt>Quote decimals</dt>
-                    <dd>{market.quoteDecimals}</dd>
+                    <dt>{labels.quote} precision</dt>
+                    <dd>{market.quoteDecimals} decimal places</dd>
                   </div>
                   <div>
-                    <dt>Price tick</dt>
+                    <dt>Price step</dt>
                     <dd>
                       {formatAtomicAmount(
                         market.priceTickSize,
                         market.quoteDecimals,
                       )}{" "}
-                      quote
+                      {labels.quote}
                     </dd>
                   </div>
                   <div>
-                    <dt>Quantity lot</dt>
+                    <dt>Order size step</dt>
                     <dd>
                       {formatAtomicAmount(
                         market.quantityLotSize,
                         market.baseDecimals,
                       )}{" "}
-                      base
+                      {labels.base}
                     </dd>
                   </div>
                   {baseVault && (
@@ -1171,7 +1226,11 @@ export function MarketDetail({ address }: { address: string }) {
                     <div>
                       <dt>Protocol fees</dt>
                       <dd>
-                        {marketFees.accruedQuoteFees.toString()} raw quote
+                        {readableAmount(
+                          marketFees.accruedQuoteFees,
+                          market.quoteDecimals,
+                        )}{" "}
+                        {labels.quote}
                       </dd>
                     </div>
                   )}
@@ -1268,13 +1327,13 @@ export function MarketDetail({ address }: { address: string }) {
                           setSide(event.target.value as OrderSide)
                         }
                       >
-                        <option value="bid">Buy base token</option>
-                        <option value="ask">Sell base token</option>
+                        <option value="bid">Buy {labels.base}</option>
+                        <option value="ask">Sell {labels.base}</option>
                       </select>
                     </label>
 
                     <label>
-                      Price per base token
+                      Price per {labels.base} ({labels.quote})
                       <input
                         inputMode="decimal"
                         value={price}
@@ -1288,12 +1347,12 @@ export function MarketDetail({ address }: { address: string }) {
                           market.priceTickSize,
                           market.quoteDecimals,
                         )}{" "}
-                        quote
+                        {labels.quote}
                       </small>
                     </label>
 
                     <label>
-                      Base quantity
+                      Quantity ({labels.base})
                       <input
                         inputMode="decimal"
                         value={quantity}
@@ -1307,7 +1366,7 @@ export function MarketDetail({ address }: { address: string }) {
                           market.quantityLotSize,
                           market.baseDecimals,
                         )}{" "}
-                        base
+                        {labels.base}
                       </small>
                     </label>
 
@@ -1370,8 +1429,8 @@ export function MarketDetail({ address }: { address: string }) {
                 <div className="order-book-side">
                   <h3>Buy orders</h3>
                   <div className="order-book-columns" aria-hidden="true">
-                    <span>Price</span>
-                    <span>Base quantity</span>
+                    <span>Price ({labels.quote})</span>
+                    <span>Quantity ({labels.base})</span>
                     <span>Orders</span>
                   </div>
                   {bidLevels.length === 0 ? (
@@ -1403,8 +1462,8 @@ export function MarketDetail({ address }: { address: string }) {
                 <div className="order-book-side">
                   <h3>Sell orders</h3>
                   <div className="order-book-columns" aria-hidden="true">
-                    <span>Price</span>
-                    <span>Base quantity</span>
+                    <span>Price ({labels.quote})</span>
+                    <span>Quantity ({labels.base})</span>
                     <span>Orders</span>
                   </div>
                   {askLevels.length === 0 ? (
@@ -1435,8 +1494,8 @@ export function MarketDetail({ address }: { address: string }) {
               </div>
 
               <p className="order-book-note">
-                Levels are ordered by the program&apos;s linked price index. Last
-                traded price is recovered from recent successful FillEvent
+                Levels are ordered by the program&apos;s linked price index.
+                Last traded price is recovered from recent successful FillEvent
                 logs; a production indexer will provide complete trade history
                 and candles.
               </p>
@@ -1461,12 +1520,12 @@ export function MarketDetail({ address }: { address: string }) {
                     testFaucet.baseClaimAmount,
                     market.baseDecimals,
                   )}{" "}
-                  base and{" "}
+                  {labels.base} and{" "}
                   {formatAtomicAmount(
                     testFaucet.quoteClaimAmount,
                     market.quoteDecimals,
                   )}{" "}
-                  quote tokens to your wallet.
+                  {labels.quote} to your wallet.
                 </p>
                 <button
                   className="primary-button"
@@ -1579,7 +1638,7 @@ export function MarketDetail({ address }: { address: string }) {
 
                 <dl className="market-metadata balance-metadata">
                   <div>
-                    <dt>Base in wallet</dt>
+                    <dt>{labels.base} in wallet</dt>
                     <dd>
                       {formatAtomicAmount(
                         walletBaseBalance,
@@ -1588,7 +1647,7 @@ export function MarketDetail({ address }: { address: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Quote in wallet</dt>
+                    <dt>{labels.quote} in wallet</dt>
                     <dd>
                       {formatAtomicAmount(
                         walletQuoteBalance,
@@ -1621,7 +1680,7 @@ export function MarketDetail({ address }: { address: string }) {
                   <>
                     <dl className="market-metadata balance-metadata">
                       <div>
-                        <dt>Base free</dt>
+                        <dt>{labels.base} available</dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.baseFree,
@@ -1630,7 +1689,7 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>Base locked</dt>
+                        <dt>{labels.base} in orders</dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.baseLocked,
@@ -1639,7 +1698,7 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>Quote free</dt>
+                        <dt>{labels.quote} available</dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.quoteFree,
@@ -1648,7 +1707,7 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>Quote locked</dt>
+                        <dt>{labels.quote} in orders</dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.quoteLocked,
@@ -1672,12 +1731,13 @@ export function MarketDetail({ address }: { address: string }) {
                             )
                           }
                         >
-                          <option value="base">Base token</option>
-                          <option value="quote">Quote token</option>
+                          <option value="base">{labels.base}</option>
+                          <option value="quote">{labels.quote}</option>
                         </select>
                       </label>
                       <label>
-                        Amount
+                        Amount (
+                        {balanceAsset === "base" ? labels.base : labels.quote})
                         <input
                           inputMode="decimal"
                           value={balanceAmount}
@@ -1766,9 +1826,13 @@ export function MarketDetail({ address }: { address: string }) {
                 <div className="card-label">Protocol treasury</div>
                 <h2>Withdraw accrued fees</h2>
                 <p>
-                  Available: {marketFees.accruedQuoteFees.toString()} raw quote
-                  atoms. The destination may be any token account for this
-                  market&apos;s quote mint.
+                  Available:{" "}
+                  {readableAmount(
+                    marketFees.accruedQuoteFees,
+                    market.quoteDecimals,
+                  )}{" "}
+                  {labels.quote}. The destination may be any token account for
+                  this market&apos;s quote mint.
                 </p>
                 <form className="admin-form" onSubmit={withdrawProtocolFees}>
                   <label>
@@ -1783,9 +1847,9 @@ export function MarketDetail({ address }: { address: string }) {
                     />
                   </label>
                   <label>
-                    Raw quote amount
+                    Amount ({labels.quote})
                     <input
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={feeAmount}
                       onChange={(event) => setFeeAmount(event.target.value)}
                       placeholder="0"
@@ -1844,19 +1908,32 @@ export function MarketDetail({ address }: { address: string }) {
           </div>
         )}
 
-        {result?.kind === "matched" && (
+        {result?.kind === "matched" && market && (
           <div className="transaction-message transaction-success">
-            Filled {result.filledQuantity.toString()} raw base across{" "}
-            {result.makerCount} maker{result.makerCount === 1 ? "" : "s"}.
+            Filled {readableAmount(result.filledQuantity, market.baseDecimals)}{" "}
+            {labels.base} across {result.makerCount} maker
+            {result.makerCount === 1 ? "" : "s"}.
             {result.postedOrder ? (
               <>
                 {" "}
-                Posted {result.remainingQuantity.toString()} as resting order{" "}
+                Posted{" "}
+                {readableAmount(
+                  result.remainingQuantity,
+                  market.baseDecimals,
+                )}{" "}
+                {labels.base} as resting order{" "}
                 {shortAddress(result.postedOrder.toBase58())}.
               </>
             ) : (
               !result.remainingQuantity.isZero() && (
-                <> {result.remainingQuantity.toString()} remains unprocessed.</>
+                <>
+                  {" "}
+                  {readableAmount(
+                    result.remainingQuantity,
+                    market.baseDecimals,
+                  )}{" "}
+                  {labels.base} remains unprocessed.
+                </>
               )
             )}{" "}
             <a

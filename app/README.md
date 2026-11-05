@@ -50,6 +50,11 @@ updated client against devnet.
 
 ## Prediction draft foundation
 
+`/markets/new` asks whether to create a Spot or Prediction market. Spot opens
+`/markets/new/spot`; Prediction opens `/predictions/new`. Both forms link back
+to the chooser and retain administrator checks. The spot form always creates
+Spot metadata; prediction creation retains its deployment gate.
+
 - `/predictions`: public prediction-market discovery, including open markets.
 - `/predictions/new`: active-admin form creating the draft, vault, metadata,
   fees and empty book root in one instruction.
@@ -72,15 +77,35 @@ display fabricated zero balances or offer initialization based on a failed read.
 Wallet changes reset the position panel, and the first wallet render is delayed
 until hydration to match the server HTML.
 
-Upload the rules JSON to Arweave first, then select the exact same local file
-and enter its URI in the form. Use schema version 1 from
-[`prediction-market-design.md`](../docs/prediction-market-design.md). Resolver
-keys and timing come from the file. Hashing uses the original bytes; changing
-whitespace changes the rules hash. The form does not verify the remote copy.
+The prediction form includes an editable rules template, optional fallback
+terms, custom text/JSON key-value fields, a JSON preview and download. It uses
+schema version 1 from [`prediction-market-design.md`](../docs/prediction-market-design.md).
+Local date inputs become Unix seconds; the connected creator is the primary resolver.
+Custom fields are nested under `additionalRules` and cannot replace core terms.
+
+After review, the form validates the rules, admin record, mint and price grid,
+then signs an Arweave data item through the connected wallet using Turbo. It
+uploads the generated UTF-8 JSON, fetches the same item from the gateway and
+compares every byte before constructing the Solana market transaction. The
+on-chain URI and SHA-256 hash refer to those exact bytes. Rules are limited to
+64 KiB. The app checks the provider's free allowance, but final eligibility is
+decided at upload; existing storage credits may be used. It never tops up or
+signs Solana storage payments. No storage private key or API route is needed.
+
+Upload and market creation are separate operations. A failed transaction cannot
+undo a public upload. The accepted receipt stays in page state for same-document,
+same-wallet retries and can be downloaded; editing rules requires a new upload.
+Gateway byte verification is not proof of final Arweave block inclusion.
+Refresh/navigation resets the in-memory receipt; download it before leaving.
+
+Turbo 2.2.0 dynamically imports its optional `x402-fetch` peer even in credit
+upload code. Next.js resolves that import during builds, so the peer is installed
+explicitly. No x402 funding mode is enabled. SDK dependencies retain upstream
+audit advisories; do not interpret a passing build as a clean dependency audit.
 
 Contracts use whole quantities and pay one collateral token per winning
-contract. Prices use the mint's precision. Trading, resolution
-and redemption are later milestones; a newly created account is always Draft.
+contract. Prices use the mint's precision. Trading is implemented locally;
+resolution and redemption remain later milestones. A new account starts Draft.
 
 Prediction deposits, withdrawals and complete sets are implemented locally. Keep
 `NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` against older deployments. After
@@ -115,7 +140,7 @@ Opening preserves all committed terms and balances. After deploying the opening
 instruction, set `NEXT_PUBLIC_PREDICTION_OPENING_ENABLED=true` alongside the draft
 flag and rebuild; this new flag defaults false against older binaries. The
 client reloads the market after confirmation and enables position splitting.
-Opening does not yet enable order placement or settlement. The rules file's
+Opening permits funded trading before close, subject to the client rollout gates. The rules document's
 `primaryResolver` must match the creator wallet. The creator will propose the
 outcome once settlement is implemented; traders will claim payouts themselves.
 
@@ -180,18 +205,40 @@ Verify the JSON parser, exact-byte hashing and PDA derivation with:
 npm run test:prediction
 ```
 
-Configure the public program identity and optionally override the default
-devnet RPC endpoint:
+Configure the public program identity and your primary Helius devnet endpoint:
 
 ```bash
 NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
-NEXT_PUBLIC_SOLANA_RPC_URL=https://your-devnet-endpoint.example
+NEXT_PUBLIC_HELIUS_RPC_URL=https://devnet.helius-rpc.com
+NEXT_PUBLIC_HELIUS_API_KEY=your-browser-restricted-key
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_SOLANA_RPC_FALLBACK_URLS=https://solana-devnet.api.onfinality.io/public,https://api.devnet.solana.com
 ```
 
 Copy `.env.example` to `app/.env.local` or add the variables to the existing
 ignored `app/.env`. Configure the same public program-ID variable in Vercel.
 Next.js inlines `NEXT_PUBLIC_*` values during its build, so changing the program
-identity requires restarting the local server or rebuilding the deployment.
+identity or RPC configuration requires restarting the local server or rebuilding
+the deployment. `.env.local` takes precedence over `.env`. `NEXT_PUBLIC_*` keys
+are browser-visible; apply app-domain restrictions to the Helius key. You may
+instead paste the full Helius URL containing `?api-key=...` and leave the separate
+key blank. Until configured, the generic Solana RPC remains primary.
+
+HTTP reads use Helius first and fail over on rate limits/outages. The transport
+verifies each provider's devnet genesis, coalesces duplicate in-flight reads,
+paces requests, honors cooldowns and briefly caches discovery/history. Balance
+and planning account reads are not TTL-cached. A primary provider is retried
+after its cooldown. Transaction broadcasts are not replayed automatically after
+a failed network request. Standard WebSockets stay on the primary endpoint.
+An explicit `FAUCET_SOLANA_RPC_URL` still overrides the server faucet's default.
+
+Market cards and orders show human units using the stored mint decimals. Token
+labels come from market metadata, with the documented tBTC/tUSDT test mints as
+fallbacks. Unknown mints are never guessed from addresses. Market detail shows
+forward and inverse quotes: a recent fill when available, otherwise an explicitly
+indicative book price. It does not claim to track an external BTC/USD price.
+Recent-fill discovery reads at most six transactions sequentially and stops on
+the newest matching fill, instead of requesting 25 transactions at once.
 
 ## Test faucet safety
 

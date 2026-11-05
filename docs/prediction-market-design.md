@@ -385,10 +385,24 @@ Opening and funding use separate instructions. Term updates and account closure
 are not implemented. Creation events and indexer event decoding are deferred.
 
 The frontend foundation includes `/predictions`, `/predictions/new`, and
-`/predictions/[address]`. The create form reads the original uploaded Arweave
-JSON file, validates its structured rules, computes both hashes, derives mint
-precision and creates a draft. It does not upload to Arweave or establish that
-the URI serves those same bytes. The terms page displays hashes and on-chain
+`/predictions/[address]`. The create form provides an editable schema-v1 template
+and custom text/JSON key-value rules. It serializes one UTF-8 document, validates
+its structured rules and creator, and checks the admin record and mint before
+uploading through Turbo with the connected wallet's message signature. It fetches
+the uploaded item and compares every byte, then creates the draft using that
+`ar://` reference and the hashes of the same bytes. Rules are limited to 64 KiB;
+local date inputs become Unix seconds and custom fields stay under `additionalRules`.
+
+Upload and Solana creation cannot be atomic. Accepted uploads are public and
+permanent even if the market transaction fails. Same-wallet retries reuse the
+in-memory receipt when the document is unchanged. A receipt download supports
+manual recovery after leaving the page. Editing the rules requires another upload.
+Gateway availability and matching bytes do not establish final Arweave inclusion.
+The browser checks Turbo's free allowance before uploading. Eligibility can change
+at acceptance, so the review step discloses possible use of existing credits.
+The app never tops up storage credits or signs Solana storage-payment transactions.
+
+The terms page displays hashes and on-chain
 configuration, without claiming the remote question has been verified.
 
 Draft and position creation are disabled unless

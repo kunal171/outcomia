@@ -13,13 +13,15 @@ import {
   type MarketView,
 } from "../lib/tidebook";
 import { AppHeader } from "./app-header";
+import { marketLabels, readableAmount } from "../lib/market-display";
+import { rpcErrorMessage } from "../lib/rpc-transport";
 
 function shortAddress(value: string) {
   return `${value.slice(0, 6)}…${value.slice(-6)}`;
 }
 
 function getErrorMessage(cause: unknown) {
-  return cause instanceof Error ? cause.message : "Unable to load markets";
+  return rpcErrorMessage(cause, "Unable to load markets");
 }
 
 export function Markets() {
@@ -30,6 +32,7 @@ export function Markets() {
   >(() => new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [labelNotice, setLabelNotice] = useState<string | null>(null);
 
   const program = useMemo(
     () => getTidebookReadProgram(connection),
@@ -39,13 +42,22 @@ export function Markets() {
   const loadMarkets = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setLabelNotice(null);
 
     try {
       const accounts = getTidebookAccounts(program);
-      const [records, metadataRecords] = await Promise.all([
+      const [marketRead, metadataRead] = await Promise.allSettled([
         accounts.market.all(),
         accounts.marketMetadata.all(),
       ]);
+      if (marketRead.status === "rejected") throw marketRead.reason;
+      const records = marketRead.value;
+      const metadataRecords =
+        metadataRead.status === "fulfilled" ? metadataRead.value : [];
+      if (metadataRead.status === "rejected")
+        setLabelNotice(
+          "Market names could not be refreshed. Known test-token labels are shown where available.",
+        );
       setMetadataByMarket(
         new Map(
           metadataRecords.map(({ account }) => [
@@ -105,8 +117,16 @@ export function Markets() {
           </div>
 
           <div className="market-summary" aria-label="Market summary">
-            <strong>{activeCount}</strong>
-            <span>Active of {markets.length}</span>
+            <strong>
+              {markets.length === 0 && (loading || error) ? "—" : activeCount}
+            </strong>
+            <span>
+              {markets.length === 0 && error
+                ? "Status unavailable"
+                : loading && !markets.length
+                  ? "Loading markets"
+                  : `Active of ${markets.length}`}
+            </span>
           </div>
         </div>
 
@@ -129,54 +149,47 @@ export function Markets() {
         {!loading && !error && markets.length === 0 && (
           <div className="access-card">No markets have been created yet.</div>
         )}
+        {labelNotice && (
+          <p className="order-book-note" role="status">
+            {labelNotice}
+          </p>
+        )}
 
         <section className="markets-grid" aria-live="polite">
           {markets.map((market) => {
             const status = decodeMarketStatus(market.status);
             const metadata = metadataByMarket.get(market.address.toBase58());
             const kind = metadata ? decodeMarketKind(metadata.kind) : null;
+            const labels = marketLabels(market, metadata);
 
             return (
               <article className="market-card" key={market.address.toBase58()}>
                 <div className="market-card-heading">
                   <div>
                     <span className="card-label">
-                      {kind ? `${kind} market` : "Unlabelled market"}
+                      {kind ? `${kind} market` : "Spot market"}
                     </span>
-                    <strong>
-                      {metadata?.displayName ??
-                        shortAddress(market.address.toBase58())}
-                    </strong>
-                    {metadata && (
-                      <small className="market-address-caption">
-                        {shortAddress(market.address.toBase58())}
-                      </small>
-                    )}
+                    <strong>{labels.name}</strong>
+                    <small className="market-address-caption">
+                      {shortAddress(market.address.toBase58())}
+                    </small>
                   </div>
-                  <span className={`role-badge market-${status}`}>{status}</span>
+                  <span className={`role-badge market-${status}`}>
+                    {status}
+                  </span>
                 </div>
 
                 <div className="market-pair">
                   <div>
-                    <span>Base mint</span>
-                    <strong>
-                      {metadata?.baseSymbol ??
-                        shortAddress(market.baseMint.toBase58())}
-                    </strong>
-                    {metadata && (
-                      <small>{shortAddress(market.baseMint.toBase58())}</small>
-                    )}
+                    <span>Trading</span>
+                    <strong>{labels.base}</strong>
+                    <small>{shortAddress(market.baseMint.toBase58())}</small>
                   </div>
                   <span aria-hidden="true">/</span>
                   <div>
-                    <span>Quote mint</span>
-                    <strong>
-                      {metadata?.quoteSymbol ??
-                        shortAddress(market.quoteMint.toBase58())}
-                    </strong>
-                    {metadata && (
-                      <small>{shortAddress(market.quoteMint.toBase58())}</small>
-                    )}
+                    <span>Priced in</span>
+                    <strong>{labels.quote}</strong>
+                    <small>{shortAddress(market.quoteMint.toBase58())}</small>
                   </div>
                 </div>
 
@@ -194,20 +207,40 @@ export function Markets() {
                     <dd>{market.openOrderCount.toString()}</dd>
                   </div>
                   <div>
-                    <dt>Price tick</dt>
-                    <dd>{market.priceTickSize.toString()}</dd>
+                    <dt>Price step</dt>
+                    <dd>
+                      {readableAmount(
+                        market.priceTickSize,
+                        market.quoteDecimals,
+                      )}{" "}
+                      {labels.quote}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Quantity lot</dt>
-                    <dd>{market.quantityLotSize.toString()}</dd>
+                    <dt>Order size step</dt>
+                    <dd>
+                      {readableAmount(
+                        market.quantityLotSize,
+                        market.baseDecimals,
+                      )}{" "}
+                      {labels.base}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Best bid</dt>
-                    <dd>{market.bestBid?.toString() ?? "—"}</dd>
+                    <dt>Highest buy price</dt>
+                    <dd>
+                      {market.bestBid
+                        ? `${readableAmount(market.bestBid, market.quoteDecimals)} ${labels.quote}`
+                        : "No buy orders"}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Best ask</dt>
-                    <dd>{market.bestAsk?.toString() ?? "—"}</dd>
+                    <dt>Lowest sell price</dt>
+                    <dd>
+                      {market.bestAsk
+                        ? `${readableAmount(market.bestAsk, market.quoteDecimals)} ${labels.quote}`
+                        : "No sell orders"}
+                    </dd>
                   </div>
                 </dl>
 
