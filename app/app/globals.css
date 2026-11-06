@@ -64,6 +64,8 @@ a {
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
   padding: 24px 0;
@@ -122,6 +124,7 @@ a {
 
 .topbar-actions {
   gap: 12px;
+  margin-left: auto;
 }
 
 .network-pill {
@@ -338,25 +341,6 @@ footer {
   font-family: "DM Mono", monospace;
   font-size: 11px;
   text-transform: uppercase;
-}
-
-.topbar-nav {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-left: auto;
-  margin-right: 18px;
-}
-
-.topbar-nav a {
-  color: var(--muted);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.topbar-nav a:hover,
-.topbar-nav a[aria-current="page"] {
-  color: var(--mint);
 }
 
 .role-badge {
@@ -990,12 +974,6 @@ select:focus-visible {
   .prediction-deposit,
   .prediction-convert {
     padding: 16px;
-  }
-  .topbar-nav {
-    overflow-x: auto;
-    padding-bottom: 8px;
-    max-width: 100%;
-    white-space: nowrap;
   }
   .prediction-position {
     padding: 16px;
@@ -1666,12 +1644,6 @@ select:focus-visible {
   .topbar {
     flex-wrap: wrap;
     gap: 16px;
-  }
-
-  .topbar-nav {
-    order: 3;
-    width: 100%;
-    margin: 0;
   }
 
   footer {

@@ -6,23 +6,39 @@ import type { OrderSide } from "./tidebook";
 
 export type PredictionOutcome = "yes" | "no";
 
+// The current devnet deployment includes prediction trading. Other program IDs
+// require explicit opt-in. An explicit false still disables a feature for rollout.
+const deployedPredictionProgram =
+  PROGRAM_ID.toBase58() === "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL";
+function predictionFeatureEnabled(value: string | undefined): boolean {
+  return value === undefined ? deployedPredictionProgram : value === "true";
+}
+
 export const PREDICTION_ORDERS_ENABLED =
-  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
-  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true" &&
-  process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED === "true" &&
-  process.env.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED === "true";
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED) &&
+  predictionFeatureEnabled(
+    process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED,
+  ) &&
+  predictionFeatureEnabled(
+    process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED,
+  ) &&
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED);
 
 // An exit path has its own rollout flag: disabling new orders must not disable
-// cancellation. Enable only after the matching on-chain instruction is deployed.
+// cancellation. Each flag remains independently configurable.
 export const PREDICTION_CANCELLATION_ENABLED =
-  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true" &&
-  process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED === "true";
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED) &&
+  predictionFeatureEnabled(
+    process.env.NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED,
+  );
 
-// Keep deployment of matching separate from research-only resting order entry.
+// Matching can be disabled independently of resting order entry.
 export const PREDICTION_MATCHING_ENABLED =
   PREDICTION_CANCELLATION_ENABLED &&
-  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true" &&
-  process.env.NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED === "true";
+  predictionFeatureEnabled(
+    process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED,
+  ) &&
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED);
 
 export interface PredictionMatchTarget {
   makerAddress: PublicKey;
@@ -445,9 +461,7 @@ export interface PredictionInsertTarget {
 }
 
 export type PredictionPlacementTarget =
-  | PredictionAppendTarget
-  | PredictionInsertTarget
-  | { kind: "place" };
+  PredictionAppendTarget | PredictionInsertTarget | { kind: "place" };
 
 /** Advisory checks mirror the on-chain splice without traversing the list. */
 function validatePredictionNeighbors(
@@ -809,14 +823,14 @@ export function derivePredictionPriceLevelPda(
   )[0];
 }
 
-export const PREDICTION_DRAFTS_ENABLED =
-  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED === "true";
+export const PREDICTION_DRAFTS_ENABLED = predictionFeatureEnabled(
+  process.env.NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED,
+);
 
-// Separate rollout from draft creation so older deployments cannot expose an
-// opening button for an instruction their binary does not understand.
+// Keep opening independently configurable when switching program deployments.
 export const PREDICTION_OPENING_ENABLED =
   PREDICTION_DRAFTS_ENABLED &&
-  process.env.NEXT_PUBLIC_PREDICTION_OPENING_ENABLED === "true";
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_OPENING_ENABLED);
 
 /** Advisory preflight. Chain Clock and the stored signer binding are authoritative. */
 export function predictionOpeningIssue(
@@ -849,10 +863,10 @@ export function validatePredictionCreatorResolver(
     );
 }
 
-// Enable only against a deployment containing deposits, withdrawals and sets.
+// Funding requires the same deployment as draft and position initialization.
 export const PREDICTION_FUNDING_ENABLED =
   PREDICTION_DRAFTS_ENABLED &&
-  process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED === "true";
+  predictionFeatureEnabled(process.env.NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED);
 
 /** Preflight bounds only; on-chain custody and ledger checks remain required. */
 export function validatePredictionDepositAmount(

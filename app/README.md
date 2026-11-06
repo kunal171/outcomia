@@ -18,11 +18,13 @@ Open `http://localhost:3000`. For checks:
 ```bash
 npm run typecheck
 npm run test:prediction
+npm run test:wallet
 npm run build
 ```
 
 `test:prediction` covers rule parsing, hashes, addresses and matching plans.
-It does not submit devnet transactions.
+`test:wallet` checks portfolio accounting, listing filters, account ownership and
+partial RPC failures. Neither test command submits devnet transactions.
 
 ## RPC and program settings
 
@@ -53,9 +55,9 @@ embeds them at build time. A program upgrade does not update a deployed UI.
 
 ## Prediction rollout
 
-The updated prediction trading program is deployed on devnet. The example
-configuration still defaults to disabled gates for use against older binaries.
-For the updated program, enable the supported features together:
+The updated prediction trading program is deployed on devnet. The UI defaults to enabled prediction gates for this program ID. Other program
+IDs require explicit opt-in. For the updated program, these settings enable all
+supported features:
 
 ```dotenv
 NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true
@@ -66,8 +68,9 @@ NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=true
 NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED=true
 ```
 
-Rebuild after changing them. The “awaiting deployment” message means that the
-corresponding UI gate is disabled; it is not an on-chain version check.
+Rebuild after changing them. A disabled-feature message means the corresponding UI gate is off; it is not
+an on-chain version check. Explicit `false` overrides the default. Disable these
+flags when targeting an older binary, even if it uses the same program ID.
 Cancellation has its own gate so stopping new orders need not block exits.
 The program independently checks roles, signatures, balances and trading times.
 
@@ -77,19 +80,20 @@ is a different step. The UI's help dialogs explain this distinction.
 
 ## Pages
 
-| Route                         | Purpose                                                          |
-| ----------------------------- | ---------------------------------------------------------------- |
-| `/`                           | Prediction-first landing with an illustrative scroll walkthrough |
-| `/predictions`                | Public discovery and a pricing/settlement guide                  |
-| `/predictions/[address]`      | Terms, YES/NO depth, positions, funding and trading              |
-| `/markets`                    | Public spot-market discovery                                     |
-| `/markets/[address]`          | Spot order book, balances, orders and authority controls         |
-| `/markets/[address]/settings` | Admin metadata creation and updates                              |
-| `/markets/new`                | Choose Spot or Prediction                                        |
-| `/markets/new/spot`           | Admin spot-market creation                                       |
-| `/predictions/new`            | Admin prediction draft creation and rules upload                 |
-| `/orders`                     | Connected wallet's spot orders                                   |
-| `/admin`                      | Super-admin governance and administrator management              |
+| Route                         | Purpose                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `/`                           | Prediction-first landing with an illustrative scroll walkthrough                               |
+| `/predictions`                | Public discovery and a pricing/settlement guide                                                |
+| `/predictions/[address]`      | Terms, YES/NO depth, positions, funding and trading                                            |
+| `/markets`                    | Public spot-market discovery                                                                   |
+| `/markets/[address]`          | Spot order book, balances, orders and authority controls                                       |
+| `/markets/[address]/settings` | Admin metadata creation and updates                                                            |
+| `/markets/new`                | Choose Spot or Prediction                                                                      |
+| `/markets/new/spot`           | Admin spot-market creation                                                                     |
+| `/predictions/new`            | Admin prediction draft creation and rules upload                                               |
+| `/wallet`                     | Connected wallet SOL, held/deposited Tidebook assets, market balances and prediction positions |
+| `/orders`                     | Connected wallet's spot orders                                                                 |
+| `/admin`                      | Super-admin governance and administrator management                                            |
 
 Prediction orders are managed inside the relevant market's position panel.
 Creation requires an active admin. Opening a prediction draft requires both
@@ -113,6 +117,30 @@ Symbols come from metadata, with known devnet test-mint labels as fallbacks.
 Spot detail shows the most recent fill found in bounded history, or an
 explicitly labeled indicative book quote, plus its inverse. It does not track
 an external market price. Landing examples are illustrations, not live markets.
+
+## Wallet overview
+
+`/wallet` shows native SOL and token balances for assets listed in Tidebook
+markets. Unrelated wallet tokens are excluded; listed tokens appear before a
+first deposit, and existing deposits stay visible when wallet holdings are zero.
+Amounts are grouped by mint, not symbol, across all owned SPL token accounts.
+Frozen wallet amounts are identified separately.
+
+Spot and prediction ledgers are queried by owner at byte offset 40, checked
+against their canonical PDAs, and shown per market. The asset table combines
+available collateral and order locks without valuing YES/NO contracts as cash.
+The prediction section lists free and locked contracts separately. Missing
+market units or failed reads produce unavailable totals, not fabricated zeros.
+Market links lead to the existing deposit, withdrawal and position controls.
+Each balance account is initialized once per wallet/market pair. A shared quote
+mint does not create a shared spending balance across markets.
+
+The page only reads accounts and never requests a signature. Refresh manually
+after transactions; the confirmed reads may span different slots. Changing or
+disconnecting the wallet clears its view and invalidates older pending results.
+
+The logo mark collapses the desktop sidebar to an icon rail; the preference is
+saved locally. On mobile, the mark inside the navigation drawer closes it.
 
 ## Prediction rules upload
 

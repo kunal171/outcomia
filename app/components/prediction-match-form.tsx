@@ -112,7 +112,7 @@ export function PredictionMatchForm({
     const post = execution === "limit" && canPostPredictionRemainder(plan);
     if (post && !PREDICTION_ORDERS_ENABLED)
       throw new Error(
-        "Resting orders await deployment. Select immediate only to match without posting.",
+        "Resting orders are disabled in this app configuration. Select immediate only to match without posting.",
       );
     const placement = post
       ? await buildPredictionPlacement(
@@ -237,7 +237,7 @@ export function PredictionMatchForm({
         A winning contract pays 1 {symbol} after resolution.
       </p>
       {!PREDICTION_MATCHING_ENABLED && (
-        <p>Trading is awaiting deployment of this program version.</p>
+        <p>Prediction trading is disabled in this app configuration.</p>
       )}
       <label>
         Execution

@@ -1,4 +1,5 @@
 /** Display names supplement addresses; prices always use the market's mint decimals. */
+import type { PublicKey } from "@solana/web3.js";
 import { BN } from "@anchor-lang/core";
 import type { MarketAccount, MarketMetadataAccount } from "./tidebook";
 import { formatAtomicAmount } from "./tidebook";
@@ -9,6 +10,10 @@ const DEVNET_TOKENS: Record<string, string> = {
   FggaZG7eJ5tpr2vmpNMbMCHkWkcw9n2Nhmf54g3wQwGk: "tBTC",
   "8KRa3QwidV2yZspR3wr4p3eNzq2KtejMbU1tZUgNLdtt": "tUSDT",
 };
+
+export function knownTokenSymbol(mint: PublicKey): string | null {
+  return DEVNET_TOKENS[mint.toBase58()] ?? null;
+}
 
 export function marketLabels(
   market: MarketAccount,

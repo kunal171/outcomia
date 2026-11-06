@@ -257,7 +257,7 @@ export function CreatePredictionMarket() {
         </div>
         {!PREDICTION_DRAFTS_ENABLED && (
           <div className="access-card">
-            Draft creation is awaiting the prediction-program deployment.
+            Prediction draft creation is disabled in this app configuration.
           </div>
         )}
         {!wallet ? (

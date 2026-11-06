@@ -145,7 +145,9 @@ function ConnectedLifecycle({
             and resolution are still being built.
           </p>
           {!PREDICTION_OPENING_ENABLED && (
-            <p>Opening awaits deployment of the updated program.</p>
+            <p>
+              Opening prediction markets is disabled in this app configuration.
+            </p>
           )}
           {roleLoading ? (
             <p>Checking administrator role…</p>

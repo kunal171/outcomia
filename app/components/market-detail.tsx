@@ -1523,7 +1523,7 @@ export function MarketDetail({ address }: { address: string }) {
             />
 
             {serverFaucetPair !== true && wallet && testFaucet && (
-              <section className="admin-card market-balance-card">
+              <section className="admin-card market-balance-card" id="balances">
                 <div className="card-label">Devnet test faucet</div>
                 <h2>Get test assets</h2>
                 <p>
