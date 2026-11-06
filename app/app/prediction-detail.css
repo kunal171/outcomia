@@ -1,0 +1,792 @@
+/* Prediction detail uses one spacing scale, flat sections, and one trading surface.
+   This file owns its layout; global card styles do not define the hierarchy. */
+body:has(.prediction-workspace) {
+  background: var(--background);
+}
+.prediction-detail-route {
+  padding-top: 32px;
+}
+.prediction-detail-route > .text-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+}
+.prediction-workspace {
+  --prediction-surface: #181721;
+  width: 100%;
+  max-width: 1120px;
+  margin: 32px auto 0;
+  color: var(--ink);
+}
+.prediction-workspace [hidden] {
+  display: none !important;
+}
+.prediction-workspace :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.prediction-workspace h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.prediction-workspace p {
+  line-height: 1.6;
+}
+.prediction-workspace button {
+  font: inherit;
+  cursor: pointer;
+}
+.prediction-workspace button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.prediction-workspace .admin-card {
+  margin: 0;
+  padding: 24px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.prediction-workspace table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-workspace th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.prediction-workspace td {
+  font-size: 14px;
+}
+.prediction-workspace :is(th, td) {
+  height: 40px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.prediction-workspace summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.prediction-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.prediction-section-title > a {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.prediction-empty-copy {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* The question is the page title. Status and utilities carry less visual weight. */
+.prediction-overview {
+  padding: 0;
+}
+.prediction-overview-top,
+.prediction-market-state,
+.prediction-overview-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.prediction-overview-top {
+  justify-content: space-between;
+}
+.prediction-overview .role-badge {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+}
+.prediction-overview .role-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.prediction-overview .role-badge[data-live="true"]::before {
+  background: var(--buy);
+}
+.prediction-network {
+  color: var(--muted);
+  font-size: 12px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+.prediction-overview h1 {
+  max-width: 32ch;
+  margin: 24px 0;
+  font-size: clamp(26px, 3.3vw, 40px);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.prediction-overview .help-trigger,
+.prediction-refresh {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+.prediction-overview .help-trigger:hover,
+.prediction-refresh:hover {
+  background: rgb(var(--accent-rgb) / 0.08);
+  color: var(--ink);
+}
+.prediction-overview .help-trigger > span {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+.prediction-refresh {
+  font-size: 24px !important;
+}
+.prediction-refreshing {
+  animation: prediction-refresh-spin 1s linear infinite;
+}
+@keyframes prediction-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.prediction-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 40px;
+  margin: 0;
+}
+.prediction-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.prediction-facts dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.prediction-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-facts dd span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* Navigation is a text row with one active underline, rather than another card. */
+.prediction-task-tabs {
+  display: flex;
+  gap: 28px;
+  margin: 32px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.prediction-task-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.prediction-task-tabs button[aria-selected="true"] {
+  color: var(--ink);
+}
+.prediction-task-tabs button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+.prediction-task-tabs button:hover {
+  color: var(--ink);
+}
+
+/* Shared read model, two desktop columns. Mobile places the ticket first. */
+.prediction-trading-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 352px;
+  align-items: start;
+  gap: 32px;
+}
+.prediction-book {
+  min-width: 0;
+  padding: 8px 0;
+}
+.prediction-book .outcome-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+.outcome-yes {
+  color: var(--buy);
+}
+.outcome-no {
+  color: var(--sell);
+}
+.prediction-book-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.prediction-book-side {
+  min-width: 0;
+}
+.prediction-book-side h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.prediction-book-side th:last-child,
+.prediction-book-side td:last-child {
+  text-align: right;
+}
+.prediction-book-side th {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.prediction-ladder-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+}
+.prediction-book-side tbody tr:hover {
+  background: rgb(var(--accent-rgb) / 0.04);
+}
+.prediction-book-side button {
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.book-bid td:first-child {
+  color: var(--buy);
+}
+.book-ask td:first-child {
+  color: var(--sell);
+}
+
+/* The ticket is the only elevated surface in the trading view. */
+.prediction-ticket {
+  position: sticky;
+  top: 24px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--prediction-surface);
+}
+.prediction-ticket h2 {
+  font-size: 17px;
+}
+.prediction-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 24px 0;
+}
+.prediction-choice button {
+  display: grid;
+  gap: 6px;
+  min-height: 66px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+}
+.prediction-choice button > span {
+  font-size: 15px;
+  font-weight: 600;
+}
+.prediction-choice button > small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.prediction-choice button[aria-pressed="true"][data-outcome="yes"] {
+  color: var(--buy);
+  border-color: rgb(121 232 212 / 0.5);
+  background: rgb(121 232 212 / 0.05);
+}
+.prediction-choice button[aria-pressed="true"][data-outcome="no"] {
+  color: var(--sell);
+  border-color: rgb(255 177 156 / 0.5);
+  background: rgb(255 177 156 / 0.05);
+}
+.prediction-action-choice {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.prediction-action-choice button {
+  min-height: 40px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.prediction-action-choice button[aria-pressed="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.prediction-entry-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.prediction-entry-fields label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.prediction-entry-fields input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-inset);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-entry-fields input[aria-invalid="true"] {
+  border-color: var(--sell);
+}
+.prediction-field-error,
+.prediction-feedback [role="alert"] {
+  color: var(--sell);
+  font-size: 12px;
+}
+.prediction-order-estimate {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-order-estimate > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.prediction-order-estimate dt {
+  color: var(--muted);
+}
+.prediction-order-estimate dt small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.prediction-order-estimate dd {
+  flex-shrink: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.prediction-submit {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--buy);
+  color: #111820;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+.prediction-ticket[data-outcome="no"] .prediction-submit {
+  background: var(--sell);
+}
+.prediction-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.prediction-ticket-unavailable {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.prediction-ticket-unavailable button {
+  min-height: 40px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--background);
+  border: 0;
+  border-radius: 6px;
+}
+.prediction-feedback {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.prediction-feedback:empty {
+  display: none;
+}
+.prediction-feedback > a {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--accent);
+}
+.prediction-funding {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.prediction-funding > summary {
+  padding: 16px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.prediction-funding .shared-funds {
+  padding: 16px 0 0;
+}
+.prediction-funding .shared-funds h3 {
+  font-size: 14px;
+}
+.prediction-funding .shared-funds .section-heading button {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+/* Positions and rules use rows and dividers, never nested cards. */
+.prediction-position-intro {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.prediction-contract-balances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin: 24px 0;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.prediction-contract-balances > div {
+  display: grid;
+  gap: 8px;
+}
+.prediction-contract-balances span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.prediction-contract-balances strong {
+  font-size: clamp(20px, 4vw, 32px);
+  overflow-wrap: anywhere;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-contract-balances > div:first-child strong {
+  color: var(--buy);
+}
+.prediction-contract-balances > div:last-child strong {
+  color: var(--sell);
+}
+.prediction-contract-balances small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.prediction-workspace .prediction-settlement details,
+.prediction-workspace .prediction-rules,
+.prediction-workspace .legacy-recovery,
+.prediction-fees {
+  margin: 24px 0 0;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.prediction-workspace .prediction-settlement details > summary,
+.prediction-workspace .legacy-recovery > summary {
+  padding: 0;
+  color: var(--muted);
+}
+.prediction-workspace .prediction-settlement > p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.shared-orders-view {
+  position: relative;
+  margin-top: 32px;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.shared-orders-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+.shared-orders-toolbar button {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.shared-open-orders h2 {
+  margin-bottom: 16px;
+}
+.prediction-table-scroll {
+  overflow-x: auto;
+}
+.shared-open-orders table {
+  min-width: 480px;
+}
+.shared-open-orders td:last-child {
+  text-align: right;
+}
+.prediction-workspace .shared-open-orders button {
+  padding: 4px 0;
+  min-height: 36px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.prediction-workspace .shared-open-orders button:hover {
+  color: var(--sell);
+  background: transparent;
+}
+.prediction-rules-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+}
+.prediction-rule-summary,
+.prediction-resolution-section {
+  min-width: 0;
+}
+.prediction-rule-summary .prediction-section-title {
+  margin: 0 0 24px;
+}
+.prediction-resolution-section {
+  padding-left: 32px;
+  border-left: 1px solid var(--line);
+}
+.prediction-workspace .prediction-resolution-section > .prediction-settlement {
+  padding-top: 0;
+}
+.prediction-payout-table caption {
+  padding: 0 0 12px;
+  color: var(--muted);
+  text-align: left;
+  font-size: 12px;
+}
+.prediction-payout-table :is(th, td):not(:first-child) {
+  text-align: right;
+}
+.prediction-payout-table tbody th {
+  font-size: 13px;
+  color: var(--ink);
+}
+.prediction-rule-facts {
+  margin: 24px 0;
+  display: grid;
+  gap: 16px;
+  font-size: 13px;
+}
+.prediction-rule-facts > div {
+  display: grid;
+  gap: 8px;
+}
+.prediction-rule-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.prediction-rule-facts dd {
+  margin: 0;
+}
+.prediction-risk-note {
+  margin: 24px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--sell);
+  color: var(--muted);
+  font-size: 12px;
+}
+.prediction-empty-state {
+  padding: 32px 0;
+}
+.prediction-empty-state h2 {
+  font-size: 22px;
+}
+.prediction-empty-state p {
+  max-width: 58ch;
+  color: var(--muted);
+  font-size: 14px;
+}
+.prediction-empty-state > .text-button {
+  display: inline-block;
+  margin-left: 20px;
+  font-size: 13px;
+}
+@media (max-width: 1050px) {
+  .prediction-trading-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+  }
+  .prediction-ticket {
+    padding: 20px;
+  }
+  .prediction-book-sides {
+    gap: 16px;
+  }
+}
+@media (max-width: 850px) {
+  .prediction-trading-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .prediction-ticket {
+    grid-row: 1;
+    position: static;
+    width: 100%;
+    max-width: 480px;
+    justify-self: center;
+  }
+  .prediction-book {
+    grid-row: 2;
+    width: 100%;
+  }
+  .prediction-rules-layout {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .prediction-resolution-section {
+    padding: 24px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+@media (max-width: 480px) {
+  .prediction-detail-route {
+    padding-top: 24px;
+  }
+  .prediction-workspace {
+    margin-top: 24px;
+  }
+  .prediction-overview h1 {
+    margin: 20px 0;
+  }
+  .prediction-market-state {
+    gap: 12px;
+  }
+  .prediction-network {
+    padding-left: 12px;
+  }
+  .prediction-overview-actions {
+    gap: 4px;
+  }
+  .prediction-facts {
+    gap: 12px;
+  }
+  .prediction-facts > div {
+    flex-basis: 100%;
+  }
+  .prediction-task-tabs {
+    gap: 24px;
+    margin: 24px 0;
+  }
+  .prediction-task-tabs button {
+    font-size: 12px;
+  }
+  .prediction-ticket {
+    padding: 20px;
+  }
+  .prediction-contract-balances {
+    gap: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prediction-refreshing {
+    animation: none;
+  }
+}
+
+.prediction-claim-value {
+  margin: 24px 0;
+}
+.prediction-claim-value dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.prediction-claim-value dd {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.prediction-workspace .prediction-claim-button {
+  padding-inline: 20px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--accent);
+  color: var(--background);
+}
+.prediction-workspace .prediction-claim-button:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+.prediction-proposal-summary code {
+  display: block;
+  margin-top: 16px;
+  font-size: 11px;
+}

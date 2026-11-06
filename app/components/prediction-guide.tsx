@@ -15,10 +15,12 @@ export function PredictionGuide({
   market,
   book,
   symbol = "collateral",
+  compact = false,
 }: {
   market?: PredictionMarketAccount;
   book?: PredictionOrderBookAccount | null;
   symbol?: string;
+  compact?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -51,8 +53,10 @@ export function PredictionGuide({
         type="button"
         onClick={() => dialog.current?.showModal()}
         aria-haspopup="dialog"
+        aria-label={compact ? "How predictions work" : undefined}
       >
-        <span aria-hidden="true">?</span> How predictions work
+        <span aria-hidden="true">?</span>
+        {!compact && " How predictions work"}
       </button>
       <dialog
         className="prediction-guide"

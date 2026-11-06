@@ -141,8 +141,8 @@ function ConnectedLifecycle({
           <p>
             You must remain an active protocol admin to open your market.
             Opening allows collateral-backed YES/NO pair creation before close.
-            Rules, resolver windows and balances stay unchanged. Order trading
-            and resolution are still being built.
+            Check the published rules and closing time before opening. These
+            terms cannot be changed after creation.
           </p>
           {!PREDICTION_OPENING_ENABLED && (
             <p>

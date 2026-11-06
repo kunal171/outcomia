@@ -9,6 +9,27 @@ failover; signed broadcasts are not replayed. Public devnet WebSockets are
 configured separately. The proxy has request/response limits and a soft
 per-instance request allowance, not a distributed rate-limit store.
 
+## Prediction market page
+
+The detail page has three public sections:
+
+- **Trade:** choose YES or NO, buy or sell, then enter price and contract count.
+  The limit-value estimate excludes fees. The order book sits beside the ticket
+  on desktop and below it on mobile. Funding expands when needed. The book
+  groups open orders by price without treating a midpoint as an execution price.
+- **Your position:** free and locked contracts, open-order cancellation, and
+  redemption after final resolution. Pair creation/merging and older deposits
+  are kept in expandable sections. Shared cash is managed from Wallet.
+- **Rules & outcome:** payout terms, published rules, proposal evidence and
+  permissionless finalization. Addresses and hashes are under technical details.
+
+**Manage market** is shown only to an active-admin creator or configured resolver.
+The program still checks every instruction's actual authority and timing.
+Expired drafts show why trading cannot start. Closing trading does not remove
+order cancellation or claims. Refresh keeps the selected section and entered
+amounts; inactive sections are loaded on first visit.
+See [UI design](ui-design.md) for layout rules and component ownership.
+
 ## Shared custody update
 
 The new execution path uses `AssetBalance(owner, mint)` and one SPL vault per

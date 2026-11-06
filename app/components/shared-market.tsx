@@ -37,11 +37,18 @@ import {
 } from "@solana/spl-token";
 import { readableAmount, inversePrice } from "../lib/market-display";
 import { SharedAssetFunds } from "./shared-wallet";
+import { PredictionTradeWorkspace } from "./prediction/trade-workspace";
+import { SharedOpenOrders } from "./shared-open-orders";
 import { useProtocolRole } from "./protocol-role-provider";
 interface Props {
+  /** Spot keeps its existing combined view; predictions split trading from order management. */
+  view?: "all" | "trade" | "orders";
+  refreshKey?: number;
   market: PublicKey;
   onChanged?: () => void;
   tradingOpen: boolean;
+  /** Data refresh can pause new orders without changing the displayed lifecycle. */
+  entryDisabled?: boolean;
   kind: "spot" | "prediction";
   authority: PublicKey;
   quoteMint: PublicKey;
@@ -85,6 +92,7 @@ function Market(props: Props) {
     ),
     [price, setPrice] = useState(""),
     [quantity, setQuantity] = useState("");
+  const [fundingOpen, setFundingOpen] = useState(false);
   useEffect(() => {
     let dead = false;
     setLoaded(false);
@@ -102,7 +110,7 @@ function Market(props: Props) {
     return () => {
       dead = true;
     };
-  }, [program, props.market, revision]);
+  }, [program, props.market, revision, props.refreshKey]);
   async function transact(
     action: "initialize" | "trade" | "cancel" | "fees",
     order?: PublicKey,
@@ -243,26 +251,138 @@ function Market(props: Props) {
     }
   }
   const canSetup =
-    wallet?.publicKey.equals(props.authority) &&
+    !!wallet?.publicKey.equals(props.authority) &&
+    !role.loading &&
+    !role.error &&
     (role.role === "admin" || role.role === "super-admin");
-  const orders = (snapshot?.orders ?? []).filter(
-    (r) => "open" in r.account.status && outcome in r.account.outcome,
+  const feedback = (
+    <div className="prediction-feedback">
+      {issue && <p role="alert">{issue}</p>}
+      {notice && signature && <p role="status">{notice}</p>}
+      {signature && (
+        <a
+          href={transactionExplorerUrl(signature)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View transaction ↗
+        </a>
+      )}
+    </div>
   );
-  const slot = outcome === "no" ? 2 : 0,
-    bid = snapshot?.book.bestPrices[slot],
-    ask = snapshot?.book.bestPrices[slot + 1];
+  const openOrders = (
+    <SharedOpenOrders
+      snapshot={snapshot}
+      loaded={loaded}
+      owner={wallet?.publicKey}
+      pending={pending}
+      decimals={props.quoteDecimals}
+      quantityDecimals={props.kind === "prediction" ? 0 : props.baseDecimals!}
+      symbol={props.quoteSymbol}
+      onCancel={(order) => void transact("cancel", order)}
+    />
+  );
+  const fees =
+    snapshot && role.role === "super-admin" ? (
+      <details className="prediction-fees">
+        <summary>Protocol fees</summary>
+        <p>
+          {readableAmount(snapshot.book.accruedQuoteFees, props.quoteDecimals)}{" "}
+          {props.quoteSymbol}
+        </p>
+        <button
+          type="button"
+          disabled={pending || snapshot.book.accruedQuoteFees.isZero()}
+          onClick={() => void transact("fees")}
+        >
+          Withdraw earned fees
+        </button>
+      </details>
+    ) : null;
+
+  // Each view owns its markup; all signing and refreshed queue reads stay above.
+  if (props.view === "orders")
+    return (
+      <section className="shared-market shared-orders-view">
+        <div className="shared-orders-toolbar">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setRevision((v) => v + 1)}
+          >
+            Refresh orders
+          </button>
+        </div>
+        {openOrders}
+        {feedback}
+        {fees}
+      </section>
+    );
+  if (props.kind === "prediction" && !props.tradingOpen)
+    return (
+      <div className="prediction-closed-feedback">
+        {pending && <p role="status">Waiting for transaction confirmation…</p>}
+        {feedback}
+      </div>
+    );
+  if (props.kind === "prediction")
+    return (
+      <PredictionTradeWorkspace
+        snapshot={snapshot}
+        loaded={loaded}
+        failed={!!issue}
+        pending={pending}
+        disabled={!!props.entryDisabled || !props.tradingOpen}
+        connected={!!wallet}
+        symbol={props.quoteSymbol}
+        decimals={props.quoteDecimals}
+        outcome={outcome === "no" ? "no" : "yes"}
+        side={side}
+        price={price}
+        quantity={quantity}
+        onOutcome={setOutcome}
+        onSide={setSide}
+        onPrice={setPrice}
+        onQuantity={setQuantity}
+        onSubmit={() => void transact("trade")}
+        onInitialize={
+          canSetup && props.tradingOpen
+            ? () => void transact("initialize")
+            : undefined
+        }
+        feedback={feedback}
+        funding={
+          <details
+            className="prediction-funding"
+            onToggle={(event) =>
+              event.currentTarget.open && setFundingOpen(true)
+            }
+          >
+            <summary>Funds · {props.quoteSymbol}</summary>
+            {fundingOpen && (
+              <SharedAssetFunds
+                key={`quote:${revision}`}
+                mint={props.quoteMint}
+                decimals={props.quoteDecimals}
+                symbol={props.quoteSymbol}
+                onChanged={() => setRevision((v) => v + 1)}
+              />
+            )}
+          </details>
+        }
+      />
+    );
+
+  const orders = (snapshot?.orders ?? []).filter(
+    ({ account }) => "open" in account.status && "spot" in account.outcome,
+  );
+  const bid = snapshot?.book.bestPrices[0],
+    ask = snapshot?.book.bestPrices[1];
   const quote = bid && ask ? bid.add(ask).divn(2) : (bid ?? ask);
-  const quantities = (n: BN) =>
-    readableAmount(n, props.kind === "prediction" ? 0 : props.baseDecimals!);
   return (
     <section className="admin-card shared-market">
       <div className="section-heading">
-        <div>
-          <span className="eyebrow">Shared-wallet trading</span>
-          <h2>
-            {props.kind === "prediction" ? "Trade YES / NO" : "Trade this pair"}
-          </h2>
-        </div>
+        <h2>Trade this pair</h2>
         <button
           type="button"
           disabled={pending}
@@ -273,18 +393,14 @@ function Market(props: Props) {
       </div>
       {!props.tradingOpen && (
         <p role="status">
-          Trading is closed. You can still cancel shared orders and withdraw
-          free funds.
+          Trading is closed. You can still cancel orders and withdraw free
+          funds.
         </p>
       )}
-      <p>
-        Uses your shared {props.quoteSymbol} balance. Legacy market deposits and
-        orders remain below for recovery.
-      </p>
       {!loaded && !issue && <p>Loading shared book…</p>}
       {loaded && !snapshot && (
         <p>
-          {canSetup ? (
+          {canSetup && props.tradingOpen ? (
             <button
               type="button"
               disabled={pending}
@@ -297,38 +413,21 @@ function Market(props: Props) {
           )}
         </p>
       )}
-      {props.kind === "prediction" && (
-        <label>
-          Contract
-          <select
-            value={outcome}
-            onChange={(e) => setOutcome(e.target.value as Outcome)}
-          >
-            <option value="yes">YES</option>
-            <option value="no">NO</option>
-          </select>
-        </label>
-      )}
-      {snapshot && quote && (
+      {quote && (
         <div className="market-rate-card">
           <div>
             <h3>
-              1{" "}
-              {outcome === "spot"
-                ? props.baseSymbol
-                : outcome.toUpperCase() + " contract"}{" "}
-              ≈ {readableAmount(quote, props.quoteDecimals)} {props.quoteSymbol}
+              1 {props.baseSymbol} ≈{" "}
+              {readableAmount(quote, props.quoteDecimals)} {props.quoteSymbol}
             </h3>
-            {props.kind === "spot" && (
-              <p>
-                1 {props.quoteSymbol} ≈{" "}
-                {inversePrice(quote, props.quoteDecimals)} {props.baseSymbol}
-              </p>
-            )}
             <p>
-              Indicative shared-book quote
-              {bid && ask ? " (midpoint)" : " (one side only)"}; execution
-              prices and fees can differ.
+              1 {props.quoteSymbol} ≈ {inversePrice(quote, props.quoteDecimals)}{" "}
+              {props.baseSymbol}
+            </p>
+            <p>
+              Indicative shared-book quote{" "}
+              {bid && ask ? "(midpoint)" : "(one side only)"}; execution prices
+              and fees can differ.
             </p>
           </div>
         </div>
@@ -336,146 +435,85 @@ function Market(props: Props) {
       {snapshot && (
         <>
           <div className="shared-depth">
-            <div>
-              <h3>Buy orders</h3>
-              {orders
-                .filter((r) => "bid" in r.account.side)
-                .sort((a, b) => b.account.price.cmp(a.account.price))
-                .map((r) => (
-                  <p key={r.publicKey.toBase58()}>
-                    {readableAmount(r.account.price, props.quoteDecimals)}{" "}
-                    {props.quoteSymbol} ×{" "}
-                    {quantities(r.account.remainingQuantity)}
-                  </p>
-                ))}
-            </div>
-            <div>
-              <h3>Sell orders</h3>
-              {orders
-                .filter((r) => "ask" in r.account.side)
-                .sort((a, b) => a.account.price.cmp(b.account.price))
-                .map((r) => (
-                  <p key={r.publicKey.toBase58()}>
-                    {readableAmount(r.account.price, props.quoteDecimals)}{" "}
-                    {props.quoteSymbol} ×{" "}
-                    {quantities(r.account.remainingQuantity)}
-                  </p>
-                ))}
-            </div>
+            {(["bid", "ask"] as const).map((value) => (
+              <div key={value}>
+                <h3>{value === "bid" ? "Buy orders" : "Sell orders"}</h3>
+                {orders
+                  .filter(({ account }) => value in account.side)
+                  .sort((a, b) =>
+                    value === "bid"
+                      ? b.account.price.cmp(a.account.price)
+                      : a.account.price.cmp(b.account.price),
+                  )
+                  .map(({ publicKey, account }) => (
+                    <p key={publicKey.toBase58()}>
+                      {readableAmount(account.price, props.quoteDecimals)}{" "}
+                      {props.quoteSymbol} ×{" "}
+                      {readableAmount(
+                        account.remainingQuantity,
+                        props.baseDecimals!,
+                      )}
+                    </p>
+                  ))}
+              </div>
+            ))}
           </div>
           {wallet ? (
             <>
               <label>
-                Action
+                Buy or sell
                 <select
                   value={side}
                   disabled={pending}
-                  onChange={(e) => setSide(e.target.value as Side)}
+                  onChange={(event) => setSide(event.target.value as Side)}
                 >
-                  <option value="bid">
-                    Buy{" "}
-                    {outcome === "spot"
-                      ? props.baseSymbol
-                      : outcome.toUpperCase()}
-                  </option>
-                  <option value="ask">
-                    Sell{" "}
-                    {outcome === "spot"
-                      ? props.baseSymbol
-                      : outcome.toUpperCase()}
-                  </option>
+                  <option value="bid">Buy {props.baseSymbol}</option>
+                  <option value="ask">Sell {props.baseSymbol}</option>
                 </select>
               </label>
               <label>
-                Price ({props.quoteSymbol} per{" "}
-                {props.kind === "prediction" ? "contract" : props.baseSymbol})
+                Price ({props.quoteSymbol} per {props.baseSymbol})
                 <input
                   inputMode="decimal"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(event) => setPrice(event.target.value)}
                   disabled={pending}
                 />
               </label>
               <label>
-                Quantity (
-                {props.kind === "prediction"
-                  ? "whole contracts"
-                  : props.baseSymbol}
-                )
+                Quantity ({props.baseSymbol})
                 <input
                   inputMode="decimal"
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onChange={(event) => setQuantity(event.target.value)}
                   disabled={pending}
                 />
               </label>
               <button
                 type="button"
-                disabled={pending || !props.tradingOpen || !price || !quantity}
+                disabled={
+                  pending ||
+                  !loaded ||
+                  !props.tradingOpen ||
+                  !!props.entryDisabled ||
+                  !price ||
+                  !quantity
+                }
                 onClick={() => void transact("trade")}
               >
                 {pending
                   ? "Confirm in wallet…"
-                  : `${side === "bid" ? "Buy" : "Sell"} ${outcome === "spot" ? props.baseSymbol : outcome.toUpperCase()}`}
+                  : `${side === "bid" ? "Buy" : "Sell"} ${props.baseSymbol}`}
               </button>
-              <p>
-                Up to three FIFO makers fill at their resting price. A
-                noncrossing remainder rests at your limit. Fees are charged on
-                each fill.
-              </p>
-              <h3>Your open shared orders</h3>
-              {snapshot.orders
-                .filter(
-                  (r) =>
-                    r.account.owner.equals(wallet.publicKey) &&
-                    "open" in r.account.status,
-                )
-                .map((r) => (
-                  <p key={r.publicKey.toBase58()}>
-                    {Object.keys(r.account.outcome)[0].toUpperCase()} ·{" "}
-                    {"bid" in r.account.side ? "Buy" : "Sell"} ·{" "}
-                    {readableAmount(r.account.price, props.quoteDecimals)} ×{" "}
-                    {quantities(r.account.remainingQuantity)}{" "}
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => void transact("cancel", r.publicKey)}
-                    >
-                      Cancel
-                    </button>
-                  </p>
-                ))}
             </>
           ) : (
             <p>Connect a wallet to trade.</p>
           )}
+          {openOrders}
         </>
       )}
-      {snapshot && role.role === "super-admin" && (
-        <p>
-          Shared-book fees:{" "}
-          {readableAmount(snapshot.book.accruedQuoteFees, props.quoteDecimals)}{" "}
-          {props.quoteSymbol}{" "}
-          <button
-            type="button"
-            disabled={pending || snapshot.book.accruedQuoteFees.isZero()}
-            onClick={() => void transact("fees")}
-          >
-            Withdraw earned fees
-          </button>
-        </p>
-      )}
-      {issue && <p role="alert">{issue}</p>}
-      {notice && signature && <p role="status">{notice}</p>}
-      {signature && (
-        <a
-          href={transactionExplorerUrl(signature)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          View transaction ↗
-        </a>
-      )}
+      {feedback}
+      {fees}
       <SharedAssetFunds
         key={`quote:${revision}`}
         mint={props.quoteMint}
