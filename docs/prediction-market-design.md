@@ -1,13 +1,12 @@
 # Prediction Market Design
 
-Status: draft and wallet-position initialization, creation validation and
-collateral deposits/withdrawals and complete-set splitting/merging are implemented
-locally, along with active-admin creator-controlled market opening and first
-resting orders on empty sides, same-price FIFO append, sorted new-price insertion
-and owner-only cancellation. One-maker matching with taker fees is implemented
-locally, and the client can compose up to three makers atomically. Remainder
-posting and resolution remain planned. This program version
-has not been deployed to devnet.
+Status: prediction trading and bounded remainder posting are deployed. Shared
+asset custody, evidence-backed delayed resolution, fallback/timeout handling
+and redemption are deployed and smoke-tested on devnet. The UI keeps explicit
+rollout flags for other deployments.
+See [shared balances and settlement](shared-balances-resolution.md) for the
+current path and deployment checklist. The implementation sequence below also
+records earlier design decisions; it is not a deployment log.
 
 The first implementation is in `programs/tidebook/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`

@@ -1,4 +1,5 @@
 "use client";
+import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 
 import { useId, useRef, useState } from "react";
 import { BN } from "@anchor-lang/core";
@@ -176,15 +177,15 @@ export function PredictionGuide({
           <li>
             <strong>Resolution & settlement</strong>
             <p>
-              Planned: the designated resolver proposes the outcome using the
-              published evidence. After review and finalization, the winning
+              The designated active-admin resolver proposes the outcome using
+              the published evidence. After review and finalization, the winning
               contract pays {amount(payout)}; the losing contract pays zero. A
               proposed outcome is not final.
             </p>
             <p className="guide-notice">
-              Outcome resolution and reward claims are not available in this
-              version. Invalid-outcome payouts must be implemented before they
-              can be claimed.
+              {PREDICTION_RESOLUTION_ENABLED
+                ? "Finalized outcomes can be redeemed into your shared wallet. Invalid pays half to each outcome. Cancel locked contracts before claiming."
+                : "Resolution and claims are implemented behind the next program-upgrade rollout flag."}
             </p>
           </li>
         </ol>

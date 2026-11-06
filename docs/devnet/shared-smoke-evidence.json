@@ -1,0 +1,25 @@
+{
+  "environment": "devnet",
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "sourceCommit": "8b5ff414037e8b2a9c9597745cfcaecf4a0c74ec",
+  "deployer": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "taker": "APQmBWdVNsb5mpVJ4DE449aw5p2NaeSjYfGDMthLZaXS",
+  "baseMint": "uK97sK2aXzChnt3HW6ZqyU6GaBoiiuwN6Xh5tUgancy",
+  "quoteMint": "DJFmGRvTn8KFmNtodL8ryQb7kdadU3ncFemzqTajWfzi",
+  "spot": "FbsXNG178NcUEcSu7qmis3cuYWyujMuVozBEQVUensSd",
+  "prediction": "4AhXYjfYy5kVBTyWbmrxFJ7KmydghcaktprU74aVv5kC",
+  "quoteBalanceReused": "GzK9ERXDuhygHX3RV8UEHYuQYaFeYpKSWopDms2XDerX",
+  "closeTs": 1793981084,
+  "reviewDelaySeconds": 5,
+  "spotPartialFill": "5S3AFAFMcBVY2v14mM8gphdgaPYLmjRU8L5TuWcTTbw1woUQfW8ud43PdbpN9s9MBxVj6NNeyCZJPGCr3e6t1vqX",
+  "pausedCancellation": "44bTQfDHMLANNnGbPMgVueP9FnECSRBEUBXfrowgfXuqyzQuEbA8gApH9tFQeE6LyEkcYEA4nKCpBUe9G7xyeGnP",
+  "predictionFill": "385VdCEhijCMKhxgJVe2sGKkTvpiXvsY9yL8ZH7x68WirdBxZmDLe6sU4KmGB9iCLjTP9Kuiw3pYuTvpRYcHCeeN",
+  "assertions": {
+    "sharedVaultsConserved": true,
+    "spotBaseRefund": "1500000",
+    "buyerBase": "500000",
+    "predictionReserve": "1000000",
+    "buyerYes": "1"
+  },
+  "result": "Resolution criteria for YES satisfied; redemption is checked in the completion report."
+}

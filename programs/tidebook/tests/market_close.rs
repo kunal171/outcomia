@@ -450,6 +450,11 @@ fn close_market_instruction_with_accounts(
             base_vault,
             quote_vault,
             token_program: anchor_spl::token::ID,
+            shared_book: Pubkey::find_program_address(
+                &[tidebook::constants::SHARED_BOOK_SEED, market.as_ref()],
+                &tidebook::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
     )
@@ -483,6 +488,14 @@ fn close_market_instruction_with_faucet(
             base_vault: market.base_vault,
             quote_vault: market.quote_vault,
             token_program: anchor_spl::token::ID,
+            shared_book: Pubkey::find_program_address(
+                &[
+                    tidebook::constants::SHARED_BOOK_SEED,
+                    market.market.as_ref(),
+                ],
+                &tidebook::id(),
+            )
+            .0,
         }
         .to_account_metas(None),
     )
@@ -1220,4 +1233,37 @@ fn wrong_mint_treasury_is_rejected() {
         load_market_fees(&context.svm, context.market.market_fees).accrued_quote_fees,
         100
     );
+}
+
+#[test]
+fn source_market_cannot_close_while_shared_root_exists() {
+    let mut context = setup_market();
+    pause_market(&mut context);
+    let book = Pubkey::find_program_address(
+        &[
+            tidebook::constants::SHARED_BOOK_SEED,
+            context.market.market.as_ref(),
+        ],
+        &tidebook::id(),
+    )
+    .0;
+    // The close instruction must inspect the canonical address even if a caller
+    // tries to omit the new execution path. Any live root data blocks deletion.
+    context
+        .svm
+        .set_account(
+            book,
+            Account {
+                lamports: 1_000_000,
+                data: vec![1],
+                owner: tidebook::id(),
+                executable: false,
+                rent_epoch: 0,
+            },
+        )
+        .unwrap();
+    let instruction = close_market_instruction(context.authority.pubkey(), &context.market);
+    let result = send_instruction(&mut context.svm, &context.authority, instruction);
+    assert!(result.is_err());
+    assert!(context.svm.get_account(&context.market.market).is_some());
 }

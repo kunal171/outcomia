@@ -2,21 +2,24 @@
 
 Design notes for the prediction and spot order books, the web app and the
 indexer. Each feature document includes its account model and limitations;
-planned resolution behavior is not a working payout feature.
+shared custody and payout instructions are deployed and verified on devnet.
 
 ## Start here
 
 - [Architecture](architecture.md): accounts, instructions, authorization,
   balances and application routes.
 - [Prediction market design](prediction-market-design.md): single-collateral
-  YES/NO positions, trading, rules commitments and planned resolution/claims.
+  YES/NO positions, trading, rules commitments and resolution/claims.
+- [Shared balances and settlement](shared-balances-resolution.md): reusable asset
+  custody, legacy recovery, resolver windows and redemption.
 - [App setup](../app/README.md): RPC settings, prediction rollout flags and
   wallet flows.
 - [Devnet deployment](deployment.md): upgrade procedure and program identity.
 - [Devnet addresses](devnet-addresses.md): test mints, wallets and markets.
 
-The updated prediction trading program is deployed on devnet. Outcome
-resolution, reward claims and prediction fee withdrawal remain unfinished.
+Shared custody, prediction trading and resolution/claims are deployed on devnet.
+The live smoke report is in [deployment notes](deployment.md). Legacy prediction
+fee withdrawal remains separate from the new shared-book fee path.
 Some design notes describe the earlier implementation sequence; they are not
 live deployment records.
 

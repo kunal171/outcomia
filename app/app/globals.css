@@ -1959,3 +1959,118 @@ textarea {
 body:has(.prediction-guide[open]) {
   overflow: hidden;
 }
+
+/* Shared custody deliberately separates cash from question-specific contracts. */
+.shared-market,
+.prediction-settlement {
+  backdrop-filter: none;
+  margin: 1.5rem 0;
+}
+.shared-actions,
+.shared-depth {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.shared-depth > div {
+  flex: 1;
+  min-width: 180px;
+  padding: 1rem;
+  border: 1px solid var(--border, #353043);
+  border-radius: 12px;
+}
+.shared-funds {
+  margin-top: 1rem;
+}
+.shared-market label,
+.shared-funds label,
+.prediction-settlement label {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.shared-address {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.shared-market .section-heading,
+.shared-funds .section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.shared-market :is(input, select),
+.shared-funds :is(input, select),
+.prediction-settlement :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface-inset);
+  font: inherit;
+}
+.shared-market button,
+.shared-funds button,
+.prediction-settlement button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid rgb(var(--accent-rgb) / 0.3);
+  border-radius: 10px;
+  background: rgb(var(--accent-rgb) / 0.15);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.shared-market button:hover:not(:disabled),
+.shared-funds button:hover:not(:disabled),
+.prediction-settlement button:hover:not(:disabled) {
+  background: rgb(var(--accent-rgb) / 0.28);
+}
+.shared-market button:disabled,
+.shared-funds button:disabled,
+.prediction-settlement button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.shared-market :focus-visible,
+.shared-funds :focus-visible,
+.prediction-settlement :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.shared-market .shared-actions > *,
+.prediction-settlement .shared-actions > * {
+  flex: 1 1 150px;
+}
+.prediction-settlement details {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--surface-inset);
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shared-market button,
+  .prediction-settlement button {
+    transition: none;
+  }
+}
+.legacy-recovery {
+  margin: 1rem 0;
+  backdrop-filter: none;
+}
+.legacy-recovery > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0.5rem 0;
+}
+.market-detail-layout.shared-layout {
+  grid-template-columns: minmax(0, 1fr);
+}

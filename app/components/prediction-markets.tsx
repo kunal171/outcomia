@@ -1,6 +1,17 @@
 "use client";
+import {
+  PREDICTION_RESOLUTION_ENABLED,
+  SHARED_BALANCES_ENABLED,
+  sharedAccounts,
+  sharedBookPda,
+  type SharedBook,
+} from "../lib/shared";
+import { LegacyRecovery } from "./legacy-recovery";
+import { SharedMarket } from "./shared-market";
+import { PredictionSettlement } from "./prediction-settlement";
 
 import { useEffect, useMemo, useState } from "react";
+import { BN } from "@anchor-lang/core";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -29,6 +40,7 @@ type Record = {
   market: PredictionMarketAccount;
   metadata: MarketMetadataAccount | null;
   book: PredictionOrderBookAccount | null;
+  shared: SharedBook | null;
 };
 
 /** Public discovery and account inspection; RPC failure never becomes an empty book. */
@@ -67,6 +79,15 @@ export function PredictionMarkets({ address }: { address?: string }) {
         } else {
           markets = await accounts.predictionMarket.all();
         }
+        const sharedRows = SHARED_BALANCES_ENABLED
+          ? await sharedAccounts(program).sharedBook.all()
+          : [];
+        const sharedByMarket = new Map<string, SharedBook>();
+        for (const r of sharedRows) {
+          if (!sharedBookPda(r.account.market).equals(r.publicKey))
+            throw new Error("Invalid shared book identity");
+          sharedByMarket.set(r.account.market.toBase58(), r.account);
+        }
         const rows = await Promise.all(
           markets.map(async ({ publicKey, account }) => {
             const [metadata, book] = await Promise.all([
@@ -81,7 +102,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
               );
             if (metadata && !metadata.market.equals(publicKey))
               throw new Error("Metadata belongs to a different market");
-            return { address: publicKey, market: account, metadata, book };
+            return {
+              address: publicKey,
+              market: account,
+              metadata,
+              book,
+              shared: sharedByMarket.get(publicKey.toBase58()) ?? null,
+            };
           }),
         );
         if (!canceled)
@@ -137,8 +164,9 @@ export function PredictionMarkets({ address }: { address?: string }) {
               : "Explore questions with on-chain order books. Choose an outcome, set your price, and trade with other participants."}
           </p>
           <p className="prediction-release-note">
-            Prediction trading is in development. Resolution and reward claims
-            are not available yet.
+            {PREDICTION_RESOLUTION_ENABLED
+              ? "Devnet test markets · Outcome payouts follow each market’s published rules and final resolution."
+              : "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade."}
           </p>
         </div>
         {!address && (
@@ -202,7 +230,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
           className={address ? "prediction-detail-grid" : "markets-grid"}
           aria-live="polite"
         >
-          {visibleRecords.map(({ address: key, market, metadata }) => {
+          {visibleRecords.map(({ address: key, market, metadata, shared }) => {
             const status = predictionStatus(market);
             const decimals = market.payoutPerContract.toString().length - 1;
             const fields = [
@@ -267,7 +295,12 @@ export function PredictionMarkets({ address }: { address?: string }) {
                       </div>
                       <div>
                         <span className="card-label">Open orders</span>
-                        <strong>{market.openOrderCount.toString()}</strong>
+                        <strong>
+                          {SHARED_BALANCES_ENABLED
+                            ? (shared?.openOrderCount.toString() ??
+                              "Not enabled")
+                            : market.openOrderCount.toString()}
+                        </strong>
                       </div>
                     </div>
                     <details className="prediction-rules">
@@ -314,13 +347,40 @@ export function PredictionMarkets({ address }: { address?: string }) {
                   </a>
                 </div>
                 {address && (
-                  <PredictionBook
-                    program={program}
-                    market={key}
-                    decimals={decimals}
-                    symbol={metadata?.quoteSymbol ?? "collateral"}
-                    revision={`${refresh}:${bookRevision}`}
-                  />
+                  <>
+                    <SharedMarket
+                      market={key}
+                      onChanged={() => setRefresh((v) => v + 1)}
+                      kind="prediction"
+                      tradingOpen={
+                        status === "open" &&
+                        market.closeTs.gt(
+                          new BN(String(Math.floor(Date.now() / 1000))),
+                        )
+                      }
+                      authority={market.authority}
+                      quoteMint={market.collateralMint}
+                      quoteDecimals={decimals}
+                      quoteSymbol={metadata?.quoteSymbol ?? "collateral"}
+                    />
+                    <PredictionSettlement
+                      address={key}
+                      market={market}
+                      symbol={metadata?.quoteSymbol ?? "collateral"}
+                      onChanged={() => setRefresh((v) => v + 1)}
+                    />
+                  </>
+                )}
+                {address && (
+                  <LegacyRecovery title="Legacy order book">
+                    <PredictionBook
+                      program={program}
+                      market={key}
+                      decimals={decimals}
+                      symbol={metadata?.quoteSymbol ?? "collateral"}
+                      revision={`${refresh}:${bookRevision}`}
+                    />
+                  </LegacyRecovery>
                 )}
                 {address && (
                   <PredictionLifecycle
@@ -338,48 +398,52 @@ export function PredictionMarkets({ address }: { address?: string }) {
                   />
                 )}
                 {address && (
-                  <PredictionPositionPanel
-                    market={key}
-                    collateralMint={market.collateralMint}
-                    collateralVault={market.collateralVault}
-                    status={status}
-                    payoutPerContract={market.payoutPerContract}
-                    collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
-                    onOrderPlaced={() => {
-                      setBookRevision((value) => value + 1);
-                      const accounts = getTidebookAccounts(program);
-                      void Promise.all([
-                        accounts.predictionMarket.fetchNullable(key),
-                        accounts.predictionOrderBook.fetchNullable(
-                          derivePredictionBookPda(key),
-                        ),
-                      ])
-                        .then(([updatedMarket, updatedBook]) => {
-                          if (
-                            !updatedMarket ||
-                            !updatedBook ||
-                            !updatedBook.market.equals(key)
-                          )
-                            throw new Error("Updated market/book unavailable");
-                          setRecords((current) =>
-                            current.map((row) =>
-                              row.address.equals(key)
-                                ? {
-                                    ...row,
-                                    market: updatedMarket,
-                                    book: updatedBook,
-                                  }
-                                : row,
+                  <LegacyRecovery title="Legacy cash and outcome recovery">
+                    <PredictionPositionPanel
+                      market={key}
+                      collateralMint={market.collateralMint}
+                      collateralVault={market.collateralVault}
+                      status={status}
+                      payoutPerContract={market.payoutPerContract}
+                      collateralSymbol={metadata?.quoteSymbol ?? "Collateral"}
+                      onOrderPlaced={() => {
+                        setBookRevision((value) => value + 1);
+                        const accounts = getTidebookAccounts(program);
+                        void Promise.all([
+                          accounts.predictionMarket.fetchNullable(key),
+                          accounts.predictionOrderBook.fetchNullable(
+                            derivePredictionBookPda(key),
+                          ),
+                        ])
+                          .then(([updatedMarket, updatedBook]) => {
+                            if (
+                              !updatedMarket ||
+                              !updatedBook ||
+                              !updatedBook.market.equals(key)
+                            )
+                              throw new Error(
+                                "Updated market/book unavailable",
+                              );
+                            setRecords((current) =>
+                              current.map((row) =>
+                                row.address.equals(key)
+                                  ? {
+                                      ...row,
+                                      market: updatedMarket,
+                                      book: updatedBook,
+                                    }
+                                  : row,
+                              ),
+                            );
+                          })
+                          .catch(() =>
+                            setError(
+                              "Order confirmed; refresh to load the updated book.",
                             ),
                           );
-                        })
-                        .catch(() =>
-                          setError(
-                            "Order confirmed; refresh to load the updated book.",
-                          ),
-                        );
-                    }}
-                  />
+                      }}
+                    />
+                  </LegacyRecovery>
                 )}
               </article>
             );

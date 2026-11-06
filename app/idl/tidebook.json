@@ -10,7 +10,17 @@
     {
       "name": "add_admin",
       "docs": [
-        "Grants an administrator role through an independent PDA record."
+        "Grants an administrator role through an independent PDA record.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin signer, config and new role PDA; `new_admin`: target wallet key.",
+        "",
+        "# Errors",
+        "`InvalidAdmin` for the default key; context checks reject unauthorized callers, wrong PDAs",
+        "and duplicate roles.",
+        "",
+        "# Returns",
+        "`Ok(())` with the new role and creation event; errors leave no new role."
       ],
       "discriminator": [
         177,
@@ -102,9 +112,81 @@
       ]
     },
     {
+      "name": "advance_prediction",
+      "docs": [
+        "Advances a published resolution clock. Inputs: market/action (0 freeze, 1 fallback,",
+        "2 finalize, 3 Invalid timeout). Errors: unmet clock/state. Returns: monotonic transition."
+      ],
+      "discriminator": [
+        209,
+        145,
+        207,
+        232,
+        210,
+        185,
+        200,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "append_limit_order",
       "docs": [
-        "Appends an order behind the current tail of an existing price level."
+        "Appends an order behind the current tail of an existing price level.",
+        "",
+        "# Inputs",
+        "`ctx`: trader, Active market/ledger, canonical level/tail and new order; side, raw price and",
+        "quantity.",
+        "",
+        "# Errors",
+        "Invalid grid/notional, stale tail, misbound accounts, insufficient free funds, overflow or",
+        "initialization failure.",
+        "",
+        "# Returns",
+        "`Ok(())` after locking the trader's funds and extending the queue; earlier owners' claims",
+        "and price links are unchanged."
       ],
       "discriminator": [
         39,
@@ -258,7 +340,19 @@
     {
       "name": "append_prediction_order",
       "docs": [
-        "Appends a funded order after the verified tail at an existing price."
+        "Appends a funded order after the verified tail at an existing price.",
+        "",
+        "# Inputs",
+        "`ctx`: trader/position, market/book, existing level/tail and new order; ID, outcome, side,",
+        "price and whole quantity.",
+        "",
+        "# Errors",
+        "Closed trading, invalid price/ID/funding, wrong level, stale tail, counter overflow or",
+        "account initialization failure.",
+        "",
+        "# Returns",
+        "`Ok(())` after locking only this trader's claims and appending a node; first order and price",
+        "neighbors are retained."
       ],
       "discriminator": [
         187,
@@ -550,7 +644,19 @@
     {
       "name": "cancel_limit_order",
       "docs": [
-        "Lets an order owner cancel an open order, including while paused."
+        "Lets an order owner cancel an open order, including while paused.",
+        "",
+        "# Inputs",
+        "`ctx`: owner, ledger, order/level, exact FIFO hints and final-level price/rent hints;",
+        "`order_id`: PDA-bound ID.",
+        "",
+        "# Errors",
+        "Wrong owner/status, stale links, inconsistent backing/counters, refund overflow, locked",
+        "underflow or incorrect rent recipient.",
+        "",
+        "# Returns",
+        "`Ok(())` with a Canceled history account and refunded free balance; an empty level closes,",
+        "even while paused."
       ],
       "discriminator": [
         132,
@@ -727,7 +833,19 @@
     {
       "name": "cancel_prediction_order",
       "docs": [
-        "Releases only the signing owner's unfilled claims, even after trading closes."
+        "Releases only the signing owner's unfilled claims, even after trading closes.",
+        "",
+        "# Inputs",
+        "`ctx`: owner, position/book/order/level, FIFO hints and final-level price/rent hints;",
+        "existing `order_id`.",
+        "",
+        "# Errors",
+        "Foreign/non-Open order, bad backing/counts/links, stale or redundant hints, wrong rent",
+        "recipient, refund overflow or locked underflow.",
+        "",
+        "# Returns",
+        "`Ok(())` after refunding only the remainder and retaining Canceled history; final levels",
+        "close without a trading-time gate."
       ],
       "discriminator": [
         87,
@@ -983,9 +1101,119 @@
       ]
     },
     {
+      "name": "cancel_shared_order",
+      "docs": [
+        "Cancels a shared order. Inputs: owner, claim accounts and queue removal hints. Errors:",
+        "foreign/non-Open order, stale links or arithmetic. Returns: released remainder and repaired book."
+      ],
+      "discriminator": [
+        238,
+        194,
+        219,
+        223,
+        99,
+        56,
+        18,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book.market",
+                "account": "SharedBook"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_balance",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "quote_balance",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "previous_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "claim_test_tokens",
       "docs": [
-        "Mints fixed test-token amounts to any connected wallet."
+        "Mints fixed test-token amounts to any connected wallet.",
+        "",
+        "# Inputs",
+        "`ctx`: claimant, live faucet config, signing PDA, mints and claimant-owned destinations.",
+        "",
+        "# Errors",
+        "Missing/misbound config, wrong mint/destination owner or either mint CPI failure; no",
+        "cooldown is checked.",
+        "",
+        "# Returns",
+        "`Ok(())` after both raw amounts are minted and an event is emitted."
       ],
       "discriminator": [
         214,
@@ -1095,7 +1323,18 @@
     {
       "name": "close_market",
       "docs": [
-        "Closes a paused market account and returns its rent to its authority."
+        "Closes a paused market account and returns its rent to its authority.",
+        "",
+        "# Inputs",
+        "`ctx`: stored authority, Paused market, fee record, canonical vaults and empty faucet PDA.",
+        "",
+        "# Errors",
+        "Open orders, nonzero fees/vault tokens, existing faucet, wrong authority/accounts or failed",
+        "token close.",
+        "",
+        "# Returns",
+        "`Ok(())` after vault closure; Anchor closes market/fees and refunds rent. Historical",
+        "orders/ledgers are not swept."
       ],
       "discriminator": [
         88,
@@ -1157,8 +1396,8 @@
         {
           "name": "test_faucet",
           "docs": [
-            "placeholder when the market never enabled a faucet; the handler safely",
-            "deserializes and closes it only when account data exists."
+            "never enabled one. The handler requires empty data; an existing faucet",
+            "must be closed explicitly before this instruction, not silently omitted."
           ],
           "writable": true,
           "pda": {
@@ -1274,6 +1513,33 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "shared_book",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
         }
       ],
       "args": []
@@ -1281,7 +1547,16 @@
     {
       "name": "close_market_metadata",
       "docs": [
-        "Reclaims metadata rent before the authority closes a paused market."
+        "Reclaims metadata rent before the authority closes a paused market.",
+        "",
+        "# Inputs",
+        "`ctx`: stored authority signer, Paused market and its metadata PDA.",
+        "",
+        "# Errors",
+        "Wrong authority, non-Paused market or incorrect metadata binding.",
+        "",
+        "# Returns",
+        "`Ok(())` and an event; Anchor returns metadata rent without closing vaults or market."
       ],
       "discriminator": [
         106,
@@ -1344,9 +1619,183 @@
       "args": []
     },
     {
+      "name": "close_prediction_trading",
+      "docs": [
+        "Stops trading early. Inputs: active-admin creator and market. Errors: role/state.",
+        "Returns: Frozen state without accelerating the resolution clock."
+      ],
+      "discriminator": [
+        202,
+        147,
+        23,
+        147,
+        87,
+        25,
+        156,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "resolver"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_shared_book",
+      "docs": [
+        "Closes a drained root. Inputs: active-admin creator, stopped source/root. Errors:",
+        "role, lifecycle or outstanding orders/fees. Returns: root rent; global user funds remain."
+      ],
+      "discriminator": [
+        163,
+        48,
+        208,
+        91,
+        104,
+        243,
+        39,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record",
+            "book"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_test_faucet",
       "docs": [
-        "Permanently disables a market's test faucet before safe market closure."
+        "Permanently disables a market's test faucet before safe market closure.",
+        "",
+        "# Inputs",
+        "`ctx`: stored spot authority and canonical faucet configuration.",
+        "",
+        "# Errors",
+        "Wrong authority or incorrect faucet/market/mint binding.",
+        "",
+        "# Returns",
+        "`Ok(())` and a closure event; config rent is returned without handing mint authority to a",
+        "wallet."
       ],
       "discriminator": [
         12,
@@ -1404,7 +1853,18 @@
     {
       "name": "deposit",
       "docs": [
-        "Deposits base or quote tokens and credits the caller's free balance."
+        "Deposits base or quote tokens and credits the caller's free balance.",
+        "",
+        "# Inputs",
+        "`ctx`: owner, ledger, selected market mint, source and vault; `amount`: positive mint atoms.",
+        "",
+        "# Errors",
+        "Invalid amount/mint/owner, insufficient source funds, credit overflow or a failed SPL",
+        "transfer.",
+        "",
+        "# Returns",
+        "`Ok(())` after custody and the selected free bucket increase equally; locked buckets stay",
+        "unchanged."
       ],
       "discriminator": [
         242,
@@ -1543,9 +2003,159 @@
       ]
     },
     {
+      "name": "deposit_asset",
+      "docs": [
+        "Deposits mint atoms. Inputs: owner/ledger/source/vault, amount. Errors: bad funds/binding or",
+        "overflow/CPI. Returns: equal shared-custody and free-claim credit."
+      ],
+      "discriminator": [
+        107,
+        93,
+        89,
+        87,
+        226,
+        203,
+        154,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_token",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "deposit_prediction_collateral",
       "docs": [
-        "Deposits collateral and atomically credits the owner's free balance."
+        "Deposits collateral and atomically credits the owner's free balance.",
+        "",
+        "# Inputs",
+        "`ctx`: owner/position, collateral mint, owner source and canonical vault; positive raw",
+        "`amount`.",
+        "",
+        "# Errors",
+        "Resolved market, zero amount, wrong source/mint/PDA, insufficient tokens, credit overflow or",
+        "failed CPI.",
+        "",
+        "# Returns",
+        "`Ok(())` after custody/free cash increase equally; supply and payout reserve do not change."
       ],
       "discriminator": [
         235,
@@ -1728,7 +2338,17 @@
     {
       "name": "disable_admin",
       "docs": [
-        "Suspends an administrator without deleting its provenance record."
+        "Suspends an administrator without deleting its provenance record.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin/config and target role; `target_admin`: wallet key constrained by the",
+        "context.",
+        "",
+        "# Errors",
+        "Unauthorized governance, protected super-admin, incorrect target or `AdminAlreadyDisabled`.",
+        "",
+        "# Returns",
+        "`Ok(())` after status becomes Disabled and an event is emitted."
       ],
       "discriminator": [
         68,
@@ -1808,7 +2428,17 @@
     {
       "name": "enable_admin",
       "docs": [
-        "Restores a previously disabled administrator."
+        "Restores a previously disabled administrator.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin/config and target role; `target_admin`: wallet key constrained by the",
+        "context.",
+        "",
+        "# Errors",
+        "Unauthorized governance, protected super-admin, incorrect target or `AdminAlreadyActive`.",
+        "",
+        "# Returns",
+        "`Ok(())` after status becomes Active while preserving who originally added the role."
       ],
       "discriminator": [
         56,
@@ -1886,9 +2516,149 @@
       ]
     },
     {
+      "name": "initialize_asset_balance",
+      "docs": [
+        "Creates the owner's reusable mint ledger. Inputs: owner/mint/vault. Errors: duplicate or",
+        "invalid custody/rent. Returns: zero shared balance; no deposit."
+      ],
+      "discriminator": [
+        199,
+        79,
+        128,
+        97,
+        141,
+        111,
+        110,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_market",
       "docs": [
-        "Creates a configured market and its canonical base/quote token vaults."
+        "Creates a configured market and its canonical base/quote token vaults.",
+        "",
+        "# Inputs",
+        "`ctx`: active admin, distinct SPL mints and new market/fees/vaults; raw `price_tick_size`",
+        "and `quantity_lot_size`.",
+        "",
+        "# Errors",
+        "Zero tick/lot, identical/invalid mints, inactive admin, duplicate/PDA/allocation or",
+        "token-account creation failures.",
+        "",
+        "# Returns",
+        "`Ok(())` with an Active empty book, next ID 1, two empty vaults and zero accrued fees."
       ],
       "discriminator": [
         35,
@@ -2112,7 +2882,17 @@
     {
       "name": "initialize_market_metadata",
       "docs": [
-        "Attaches immutable classification and mutable labels to a market."
+        "Attaches immutable classification and mutable labels to a market.",
+        "",
+        "# Inputs",
+        "`ctx`: active admin, spot market and new metadata; base/quote symbols, display name and",
+        "immutable `kind`.",
+        "",
+        "# Errors",
+        "Invalid labels, Prediction kind, inactive/unauthorized admin or duplicate/misbound metadata.",
+        "",
+        "# Returns",
+        "`Ok(())` with stored labels/kind and a creation event; economic fields do not change."
       ],
       "discriminator": [
         197,
@@ -2220,7 +3000,19 @@
     {
       "name": "initialize_prediction_market",
       "docs": [
-        "Creates a draft prediction market, book, metadata, fees and collateral vault."
+        "Creates a draft prediction market, book, metadata, fees and collateral vault.",
+        "",
+        "# Inputs",
+        "`ctx`: active creator, collateral mint and new market/vault/metadata/fees/book; 32-byte ID,",
+        "rules config, display name and symbol.",
+        "",
+        "# Errors",
+        "Invalid terms/labels/payout, resolver different from creator, role/PDA/duplicate/allocation",
+        "or token-account creation failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with five new accounts and zero claims/supply/reserve; opening and funding are",
+        "separate."
       ],
       "discriminator": [
         248,
@@ -2299,7 +3091,7 @@
         {
           "name": "collateral_mint",
           "docs": [
-            "Account<Mint> validates legacy SPL ownership and initialized mint data."
+            "`Account<Mint>` validates legacy SPL ownership and initialized mint data."
           ]
         },
         {
@@ -2395,8 +3187,9 @@
           "name": "market_fees",
           "docs": [
             "Reuse the fee record's layout: quote_mint denotes collateral here.",
-            "Existing spot fee-withdrawal instructions require Account<Market> and",
-            "cannot operate on PredictionMarket. Prediction fee operations come later."
+            "Existing spot fee-withdrawal instructions require `Account<Market>` and",
+            "cannot operate on PredictionMarket. Prediction matching accrues fees;",
+            "a prediction-specific withdrawal adapter remains future work."
           ],
           "writable": true,
           "pda": {
@@ -2501,7 +3294,16 @@
     {
       "name": "initialize_prediction_position",
       "docs": [
-        "Creates the signing wallet's zeroed prediction-position ledger."
+        "Creates the signing wallet's zeroed prediction-position ledger.",
+        "",
+        "# Inputs",
+        "`ctx`: owner signer/payer, canonical prediction market and new `(market, owner)` position.",
+        "",
+        "# Errors",
+        "Duplicate position, incorrect PDA/market, insufficient rent or allocation failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with all six cash/YES/NO free and locked buckets zero; no assets are issued."
       ],
       "discriminator": [
         222,
@@ -2614,7 +3416,16 @@
     {
       "name": "initialize_protocol",
       "docs": [
-        "Creates singleton governance state and the deployer's admin record."
+        "Creates singleton governance state and the deployer's admin record.",
+        "",
+        "# Inputs",
+        "`ctx`: upgrade-authority signer, program/loader data and new config/deployer-role accounts.",
+        "",
+        "# Errors",
+        "Wrong upgrade authority, duplicate initialization, invalid PDAs, allocation or rent failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with singleton governance, an Active deployer and zero taker fees."
       ],
       "discriminator": [
         188,
@@ -2703,9 +3514,113 @@
       "args": []
     },
     {
+      "name": "initialize_shared_book",
+      "docs": [
+        "Creates an admin-owned shared execution book. Inputs: creator, source market and kind.",
+        "Errors: role/binding/duplicate/rent. Returns: empty namespaced book and zero fee claim."
+      ],
+      "discriminator": [
+        77,
+        173,
+        92,
+        134,
+        4,
+        89,
+        124,
+        17
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "MarketKind"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "initialize_test_faucet",
       "docs": [
-        "Registers valueless test mints and transfers their authorities to a PDA."
+        "Registers valueless test mints and transfers their authorities to a PDA.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin, market, zero-supply mints and new faucet; claim amounts in raw mint",
+        "atoms.",
+        "",
+        "# Errors",
+        "Zero amounts, existing supply, wrong mint/governance authority, account creation or either",
+        "authority-transfer failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with both authorities transferred and the claim configuration stored atomically."
       ],
       "discriminator": [
         220,
@@ -2849,7 +3764,16 @@
     {
       "name": "initialize_trader_balance",
       "docs": [
-        "Creates the caller's canonical zeroed balance ledger for a market."
+        "Creates the caller's canonical zeroed balance ledger for a market.",
+        "",
+        "# Inputs",
+        "`ctx`: owner signer/payer, existing spot market and new `(market, owner)` ledger PDA.",
+        "",
+        "# Errors",
+        "Duplicate ledger, incorrect PDA, insufficient rent or allocation failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with four zero free/locked buckets and an event; no tokens are deposited."
       ],
       "discriminator": [
         239,
@@ -2924,7 +3848,19 @@
     {
       "name": "insert_limit_order",
       "docs": [
-        "Inserts an order at a new distinct sorted price level."
+        "Inserts an order at a new distinct sorted price level.",
+        "",
+        "# Inputs",
+        "`ctx`: trader, Active market/ledger, new order/level and adjacent hints; side, raw price and",
+        "quantity.",
+        "",
+        "# Errors",
+        "Invalid grid/notional/ordering, stale neighbors, insufficient funds, overflow or account",
+        "creation failure.",
+        "",
+        "# Returns",
+        "`Ok(())` after an atomic level/order splice and counter advance; only new-best insertion",
+        "changes the head."
       ],
       "discriminator": [
         143,
@@ -3093,7 +4029,18 @@
     {
       "name": "insert_prediction_order",
       "docs": [
-        "Inserts a funded order between verified adjacent prices on an occupied side."
+        "Inserts a funded order between verified adjacent prices on an occupied side.",
+        "",
+        "# Inputs",
+        "`ctx`: trader/position, market/book, new order/level and adjacent hints; ID, outcome, side,",
+        "price and whole quantity.",
+        "",
+        "# Errors",
+        "Closed trading, crossing/bad price, stale ID/adjacency, wrong namespace, empty-side misuse,",
+        "insufficient funds or overflow.",
+        "",
+        "# Returns",
+        "`Ok(())` after a funded best/middle/worst splice; same-price submissions must append."
       ],
       "discriminator": [
         59,
@@ -3362,7 +4309,19 @@
     {
       "name": "match_limit_order",
       "docs": [
-        "Settles against one best FIFO maker and removes it when fully filled."
+        "Settles against one best FIFO maker and removes it when fully filled.",
+        "",
+        "# Inputs",
+        "`ctx`: taker, Active market/config/fees, maker/level, two ledgers and removal hints; side,",
+        "raw limit and base-atom quantity.",
+        "",
+        "# Errors",
+        "Same-side/noncrossing/self trade, skipped priority, incorrect grid/backing/accounts,",
+        "insufficient funds, overflow or stale hints.",
+        "",
+        "# Returns",
+        "`Ok(())` after one maker-price fill and fee accrual; partial priority is preserved and",
+        "excess taker quantity is not posted."
       ],
       "discriminator": [
         56,
@@ -3657,7 +4616,19 @@
     {
       "name": "match_prediction_order",
       "docs": [
-        "Settles up to one best FIFO maker; excess taker quantity is not posted."
+        "Settles up to one best FIFO maker; excess taker quantity is not posted.",
+        "",
+        "# Inputs",
+        "`ctx`: taker, market/book/config/fees, best FIFO maker, two positions and removal hints;",
+        "outcome, side, limit and whole quantity.",
+        "",
+        "# Errors",
+        "Closed trading, invalid grid/backing/accounts, skipped priority, self/same-side/noncrossing",
+        "trade, insufficient claims, overflow or stale hints.",
+        "",
+        "# Returns",
+        "`Ok(())` after up to one maker fills at its resting price; excess stays unposted and next",
+        "order ID is unchanged."
       ],
       "discriminator": [
         222,
@@ -4020,9 +4991,181 @@
       ]
     },
     {
+      "name": "match_shared_order",
+      "docs": [
+        "Fills one shared-wallet maker. Inputs: taker/book/config, both users' claims, FIFO hints",
+        "and exact order units. Errors: priority/funds/accounts/overflow. Returns: atomic maker-price fill."
+      ],
+      "discriminator": [
+        158,
+        134,
+        201,
+        17,
+        105,
+        209,
+        221,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "maker_base",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "maker_quote",
+          "writable": true
+        },
+        {
+          "name": "maker_position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "taker_base",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "taker_quote",
+          "writable": true
+        },
+        {
+          "name": "taker_position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "merge_prediction_complete_set",
       "docs": [
-        "Burns free YES/NO pairs and releases their backing into free cash."
+        "Burns free YES/NO pairs and releases their backing into free cash.",
+        "",
+        "# Inputs",
+        "`ctx`: owner position and canonical market; `quantity`: positive whole free pairs.",
+        "",
+        "# Errors",
+        "Status outside Open/Frozen/Proposed, insufficient free pairs, supply/reserve underflow or",
+        "refund overflow.",
+        "",
+        "# Returns",
+        "`Ok(())` after equal YES/NO burns and a reserve-to-free-cash refund; locked contracts are",
+        "excluded."
       ],
       "discriminator": [
         223,
@@ -4129,9 +5272,523 @@
       ]
     },
     {
+      "name": "migrate_prediction_asset",
+      "docs": [
+        "Migrates legacy prediction free cash. Inputs: owner/position/two vaults, amount. Errors:",
+        "binding/funds/overflow/CPI. Returns: shared credit, leaving reserves and orders intact."
+      ],
+      "discriminator": [
+        198,
+        58,
+        79,
+        168,
+        71,
+        176,
+        119,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "migrate_spot_asset",
+      "docs": [
+        "Migrates legacy spot free atoms. Inputs: owner, market and shared custody, amount. Errors:",
+        "wrong binding, insufficient free cash or overflow/CPI. Returns: atomic transfer and credit."
+      ],
+      "discriminator": [
+        50,
+        242,
+        243,
+        238,
+        168,
+        97,
+        37,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "trader_balance",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "relations": [
+            "trader_balance"
+          ]
+        },
+        {
+          "name": "trader_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  100,
+                  101,
+                  114,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "open_prediction_market",
       "docs": [
-        "Moves a draft to Open before close under its stored authority."
+        "Moves a draft to Open before close under its stored authority.",
+        "",
+        "# Inputs",
+        "`ctx`: stored creator signer, canonical Draft and that creator's Active admin record.",
+        "",
+        "# Errors",
+        "Wrong creator/admin/resolver, `PredictionNotDraft` or `PredictionOpeningClosed` at/after",
+        "close.",
+        "",
+        "# Returns",
+        "`Ok(())` after changing only status to Open; rules, claims and counters are preserved."
       ],
       "discriminator": [
         150,
@@ -4214,7 +5871,17 @@
     {
       "name": "pause_market",
       "docs": [
-        "Stops new order placement while preserving cancellation access."
+        "Stops new order placement while preserving cancellation access.",
+        "",
+        "# Inputs",
+        "`ctx`: stored spot-market authority signer and Active market.",
+        "",
+        "# Errors",
+        "Wrong authority or `MarketAlreadyPaused` for a non-Active market.",
+        "",
+        "# Returns",
+        "`Ok(())` after Active becomes Paused; orders and owner cancellation/withdrawal rights",
+        "remain."
       ],
       "discriminator": [
         216,
@@ -4244,7 +5911,18 @@
     {
       "name": "place_prediction_order",
       "docs": [
-        "Locks trader claims and seeds the first resting order on an empty side."
+        "Locks trader claims and seeds the first resting order on an empty side.",
+        "",
+        "# Inputs",
+        "`ctx`: owner/position, Open market/book and new order/level; current ID, outcome, side, raw",
+        "price and whole quantity.",
+        "",
+        "# Errors",
+        "Closed trading, occupied side, crossing/off-tick price, stale ID, insufficient funds,",
+        "overflow or account creation failure.",
+        "",
+        "# Returns",
+        "`Ok(())` with updated head/IDs/counts and a backed order; no vault transfer or taker fee."
       ],
       "discriminator": [
         119,
@@ -4495,9 +6173,594 @@
       ]
     },
     {
+      "name": "place_shared_order",
+      "docs": [
+        "Inserts a shared-wallet limit order. Inputs: owner/book/claims/hints and exact order units.",
+        "Errors: closed/crossing/grid/identity/funds/overflow. Returns: funded FIFO order."
+      ],
+      "discriminator": [
+        75,
+        211,
+        228,
+        146,
+        167,
+        134,
+        79,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_balance",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "quote_balance",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tail",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose_prediction",
+      "docs": [
+        "Proposes/corrects a published outcome. Inputs: active resolver, outcome and evidence.",
+        "Errors: role, timing, state or evidence. Returns: restarted delayed proposal, no payout yet."
+      ],
+      "discriminator": [
+        105,
+        131,
+        10,
+        170,
+        197,
+        103,
+        96,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "resolver"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "PredictionResolution"
+            }
+          }
+        },
+        {
+          "name": "evidence_uri",
+          "type": "string"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "correction",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "redeem_prediction",
+      "docs": [
+        "Redeems free outcomes. Inputs: shared custody and YES/NO quantities. Errors: state,",
+        "claims, arithmetic/CPI. Returns: burned contracts and fixed payout in shared free balance."
+      ],
+      "discriminator": [
+        21,
+        59,
+        216,
+        14,
+        130,
+        202,
+        41,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "yes",
+          "type": "u64"
+        },
+        {
+          "name": "no",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "remove_admin",
       "docs": [
-        "Closes a disabled administrator record and returns its rent."
+        "Closes a disabled administrator record and returns its rent.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin/config and role; `target_admin`: wallet key bound by PDA constraints.",
+        "",
+        "# Errors",
+        "Active role, protected super-admin, unauthorized governance or incorrect account binding.",
+        "",
+        "# Returns",
+        "`Ok(())` and a removal event; Anchor then returns role rent to the super-admin."
       ],
       "discriminator": [
         74,
@@ -4578,7 +6841,16 @@
     {
       "name": "set_taker_fee",
       "docs": [
-        "Updates the global quote-denominated taker fee in basis points."
+        "Updates the global quote-denominated taker fee in basis points.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin and canonical config; `taker_fee_bps`: unsigned basis points.",
+        "",
+        "# Errors",
+        "`FeeRateTooHigh` above 1,000 bps; unauthorized or incorrectly bound config.",
+        "",
+        "# Returns",
+        "`Ok(())` after storing the rate and emitting old/new values; accrued fees are unchanged."
       ],
       "discriminator": [
         182,
@@ -4638,9 +6910,296 @@
       ]
     },
     {
+      "name": "shared_complete_set",
+      "docs": [
+        "Splits/merges backed pairs. Inputs: shared custody, quantity, split flag.",
+        "Errors: lifecycle, funds, arithmetic or CPI. Returns: equal cash/reserve movement."
+      ],
+      "discriminator": [
+        34,
+        219,
+        154,
+        228,
+        147,
+        27,
+        201,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "split",
+          "type": "bool"
+        }
+      ]
+    },
+    {
       "name": "split_prediction_complete_set",
       "docs": [
-        "Reserves one payout of cash per newly created YES/NO pair."
+        "Reserves one payout of cash per newly created YES/NO pair.",
+        "",
+        "# Inputs",
+        "`ctx`: owner position and canonical market; `quantity`: positive whole pairs, not token",
+        "atoms.",
+        "",
+        "# Errors",
+        "Not Open, at/after close, zero quantity, insufficient cash or multiplication/supply/reserve",
+        "overflow.",
+        "",
+        "# Returns",
+        "`Ok(())` after reserving `quantity * payout_per_contract` and issuing equal YES/NO; vault",
+        "tokens do not move."
       ],
       "discriminator": [
         170,
@@ -4749,7 +7308,16 @@
     {
       "name": "unpause_market",
       "docs": [
-        "Returns a paused market to active trading state."
+        "Returns a paused market to active trading state.",
+        "",
+        "# Inputs",
+        "`ctx`: stored authority signer and Paused spot market.",
+        "",
+        "# Errors",
+        "Wrong authority or `MarketAlreadyActive` for a non-Paused market.",
+        "",
+        "# Returns",
+        "`Ok(())` after Paused becomes Active, preserving balances, book links and IDs."
       ],
       "discriminator": [
         219,
@@ -4779,7 +7347,17 @@
     {
       "name": "update_market_metadata",
       "docs": [
-        "Updates market labels while preserving its original classification."
+        "Updates market labels while preserving its original classification.",
+        "",
+        "# Inputs",
+        "`ctx`: active admin, spot market and bound metadata; replacement symbols and display name.",
+        "",
+        "# Errors",
+        "Invalid labels, inactive/unauthorized admin or incorrect metadata binding.",
+        "",
+        "# Returns",
+        "`Ok(())` after replacing labels and emitting an update; kind and token mints remain",
+        "unchanged."
       ],
       "discriminator": [
         28,
@@ -4877,7 +7455,19 @@
     {
       "name": "withdraw",
       "docs": [
-        "Withdraws free base or quote tokens to the caller's token account."
+        "Withdraws free base or quote tokens to the caller's token account.",
+        "",
+        "# Inputs",
+        "`ctx`: owner/ledger, market mint, owner destination and vault; `amount`: positive mint",
+        "atoms.",
+        "",
+        "# Errors",
+        "Wrong mint/destination, zero amount, insufficient free balance/vault funds or failed SPL",
+        "transfer.",
+        "",
+        "# Returns",
+        "`Ok(())` after both custody and the free claim decrease by `amount`; locked funds cannot be",
+        "withdrawn."
       ],
       "discriminator": [
         183,
@@ -5015,9 +7605,159 @@
       ]
     },
     {
+      "name": "withdraw_asset",
+      "docs": [
+        "Withdraws only free atoms. Inputs: owner/ledger/destination/vault, amount. Errors: bad",
+        "binding, insufficient free/vault funds or CPI. Returns: equal custody/free debit."
+      ],
+      "discriminator": [
+        78,
+        193,
+        207,
+        125,
+        63,
+        193,
+        129,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet_token",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "withdraw_prediction_collateral",
       "docs": [
-        "Withdraws only free collateral, including after trading or resolution."
+        "Withdraws only free collateral, including after trading or resolution.",
+        "",
+        "# Inputs",
+        "`ctx`: owner/position, collateral mint, owner destination and canonical vault; positive raw",
+        "`amount`.",
+        "",
+        "# Errors",
+        "Zero amount, wrong destination/mint/PDA, insufficient free cash/vault funds or rejected CPI.",
+        "",
+        "# Returns",
+        "`Ok(())` after token transfer and free-claim debit; no lifecycle gate blocks existing",
+        "free-cash recovery."
       ],
       "discriminator": [
         104,
@@ -5193,7 +7933,19 @@
     {
       "name": "withdraw_protocol_fees",
       "docs": [
-        "Transfers accrued quote-denominated protocol revenue to a treasury."
+        "Transfers accrued quote-denominated protocol revenue to a treasury.",
+        "",
+        "# Inputs",
+        "`ctx`: super-admin, spot market/fees, quote mint/vault and governance destination; positive",
+        "raw `amount`.",
+        "",
+        "# Errors",
+        "Unauthorized governance, incorrect mint/destination, insufficient accrued fees/vault funds",
+        "or failed token CPI.",
+        "",
+        "# Returns",
+        "`Ok(())` after transferring fees and reducing the accumulator equally; trader claims are not",
+        "debited."
       ],
       "discriminator": [
         11,
@@ -5374,6 +8126,164 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "withdraw_shared_fees",
+      "docs": [
+        "Withdraws book-earned shared fees. Inputs: super-admin/config, book/vault and raw amount.",
+        "Errors: ownership, amount or CPI. Returns: equal fee/custody debit, no trader claim change."
+      ],
+      "discriminator": [
+        12,
+        107,
+        68,
+        48,
+        109,
+        132,
+        136,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book.market",
+                "account": "SharedBook"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -5388,6 +8298,19 @@
         53,
         107,
         156
+      ]
+    },
+    {
+      "name": "AssetBalance",
+      "discriminator": [
+        148,
+        158,
+        154,
+        187,
+        88,
+        158,
+        26,
+        208
       ]
     },
     {
@@ -5531,6 +8454,45 @@
         179,
         215,
         209
+      ]
+    },
+    {
+      "name": "SharedBook",
+      "discriminator": [
+        80,
+        71,
+        196,
+        171,
+        79,
+        28,
+        197,
+        193
+      ]
+    },
+    {
+      "name": "SharedOrder",
+      "discriminator": [
+        222,
+        228,
+        208,
+        209,
+        238,
+        85,
+        224,
+        12
+      ]
+    },
+    {
+      "name": "SharedPriceLevel",
+      "discriminator": [
+        45,
+        184,
+        207,
+        194,
+        187,
+        122,
+        131,
+        57
       ]
     },
     {
@@ -6545,6 +9507,76 @@
       "code": 6141,
       "name": "PredictionMakerNotHead",
       "msg": "Prediction matching must use the oldest open order at that price"
+    },
+    {
+      "code": 6142,
+      "name": "InvalidAssetBalance",
+      "msg": "Shared balance owner, mint or address is invalid"
+    },
+    {
+      "code": 6143,
+      "name": "SharedMarketKindMismatch",
+      "msg": "Shared book kind or underlying market is invalid"
+    },
+    {
+      "code": 6144,
+      "name": "InvalidSharedBook",
+      "msg": "Shared order book or queue accounts are inconsistent"
+    },
+    {
+      "code": 6145,
+      "name": "InvalidSharedNeighbor",
+      "msg": "A shared price/FIFO neighbor is missing, stale or invalid"
+    },
+    {
+      "code": 6146,
+      "name": "UnauthorizedSharedOrderOwner",
+      "msg": "Only the shared order owner may cancel it"
+    },
+    {
+      "code": 6147,
+      "name": "SharedBookNotEmpty",
+      "msg": "Shared book still has open orders or unwithdrawn fees"
+    },
+    {
+      "code": 6148,
+      "name": "SharedBookMustBeClosed",
+      "msg": "Close the shared book before closing its underlying market"
+    },
+    {
+      "code": 6149,
+      "name": "PredictionResolutionUnavailable",
+      "msg": "Prediction outcome is not ready for proposal or finalization"
+    },
+    {
+      "code": 6150,
+      "name": "UnauthorizedPredictionResolver",
+      "msg": "Only the active configured resolver may propose or correct"
+    },
+    {
+      "code": 6151,
+      "name": "InvalidPredictionEvidence",
+      "msg": "Prediction evidence URI and hash must be nonempty and bounded"
+    },
+    {
+      "code": 6152,
+      "name": "PredictionProposalUnavailable",
+      "msg": "A proposal already exists or the correction window has ended"
+    },
+    {
+      "code": 6153,
+      "name": "PredictionFallbackUnavailable",
+      "msg": "Fallback activation or timeout conditions are not met"
+    },
+    {
+      "code": 6154,
+      "name": "PredictionNotResolved",
+      "msg": "Prediction market has not reached a final outcome"
+    },
+    {
+      "code": 6155,
+      "name": "NothingToRedeem",
+      "msg": "There are no selected free contracts to redeem"
     }
   ],
   "types": [
@@ -6666,6 +9698,43 @@
                 "name": "AdminStatus"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetBalance",
+      "docs": [
+        "Exactly one account per `(wallet, mint)`, with no market in its PDA seeds."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "free",
+            "docs": [
+              "Spendable atoms, backed by the mint's global vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "docs": [
+              "Atoms committed to open shared-wallet orders across all markets."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -6946,7 +10015,10 @@
       "docs": [
         "Quote-denominated protocol fees accumulated by one market.",
         "",
-        "The corresponding tokens remain inside the market's canonical quote vault.",
+        "The corresponding tokens remain inside the market's canonical quote vault",
+        "for spot, or collateral vault for prediction markets. In the latter case",
+        "`quote_mint` denotes the single collateral mint; the shared record layout",
+        "does not make spot withdrawal contexts accept prediction-market accounts.",
         "This account records how many quote atoms belong to the protocol instead of",
         "traders, preserving the conservation equation:",
         "",
@@ -7062,7 +10134,12 @@
         "Human-readable labels and classification kept outside critical book state.",
         "",
         "Separating this account from `Market` lets existing markets opt in without",
-        "reallocating or migrating their matching-engine account."
+        "reallocating or migrating their matching-engine account.",
+        "",
+        "Maximum Borsh payload: 32-byte market + two (4-byte length + 16-byte symbol)",
+        "strings + (4 + 64)-byte name + 1-byte kind + 1-byte bump = 142 bytes.",
+        "Anchor adds an 8-byte discriminator, so allocation is 150 bytes. InitSpace",
+        "computes that bound; write handlers must still reject oversized strings."
       ],
       "type": {
         "kind": "struct",
@@ -7877,8 +10954,8 @@
           {
             "name": "locked_collateral",
             "docs": [
-              "Bid: collateral atoms reserved for the order, including any reserved",
-              "fee budget. Ask: whole YES or NO contracts selected by `outcome`.",
+              "Bid: exactly price * remaining_quantity collateral atoms; no maker fee",
+              "reserve. Ask: whole YES or NO contracts selected by `outcome`.",
               "Cancellation/fills must release the recorded amount, not guess units."
             ],
             "type": "u64"
@@ -8123,7 +11200,7 @@
           {
             "name": "rent_payer",
             "docs": [
-              "Receives rent when this empty level is eventually closed."
+              "Original payer receiving rent when cancellation or matching empties this level."
             ],
             "type": "pubkey"
           },
@@ -8434,6 +11511,283 @@
       }
     },
     {
+      "name": "SharedBook",
+      "docs": [
+        "Book-local indexing and fees; it never owns a trader's available cash."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "MarketKind"
+              }
+            }
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "quote_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "price_tick",
+            "type": "u64"
+          },
+          {
+            "name": "quantity_lot",
+            "type": "u64"
+          },
+          {
+            "name": "payout_per_contract",
+            "type": "u64"
+          },
+          {
+            "name": "best_prices",
+            "docs": [
+              "Spot uses slots 0/1; prediction YES uses 0/1 and NO uses 2/3."
+            ],
+            "type": {
+              "array": [
+                {
+                  "option": "u64"
+                },
+                4
+              ]
+            }
+          },
+          {
+            "name": "next_order_id",
+            "type": "u64"
+          },
+          {
+            "name": "open_order_count",
+            "type": "u64"
+          },
+          {
+            "name": "accrued_quote_fees",
+            "docs": [
+              "Quote atoms backed by the global quote vault, not a legacy market vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharedOrder",
+      "docs": [
+        "History is retained after fills/cancellation. Only Open remainders lock funds."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "book",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "SharedOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "price_level",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "next_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "locked_collateral",
+            "docs": [
+              "Asset atoms for bids/spot asks, whole contracts for prediction asks."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharedOutcome",
+      "docs": [
+        "Spot uses the Spot list; predictions have separate YES and NO lists."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Spot"
+          },
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharedPriceLevel",
+      "docs": [
+        "One price-time queue, with explicit reciprocal links and the original rent payer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "book",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "SharedOutcome"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "better_price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "worse_price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "first_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "last_order",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "total_remaining_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "order_count",
+            "type": "u64"
+          },
+          {
+            "name": "rent_payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "TakerFeeUpdatedEvent",
       "docs": [
         "Records a global taker-fee policy change made by the super-admin."
@@ -8666,7 +12020,7 @@
           {
             "name": "bump",
             "docs": [
-              "PDA bump stored for future signer and validation logic."
+              "Canonical PDA bump used to validate this market/owner ledger."
             ],
             "type": "u8"
           }
@@ -8745,6 +12099,30 @@
       ],
       "type": "bytes",
       "value": "[97, 100, 109, 105, 110]"
+    },
+    {
+      "name": "ASSET_AUTHORITY_SEED",
+      "docs": [
+        "Stateless signing authority: [asset_authority, mint]."
+      ],
+      "type": "bytes",
+      "value": "[97, 115, 115, 101, 116, 95, 97, 117, 116, 104, 111, 114, 105, 116, 121]"
+    },
+    {
+      "name": "ASSET_BALANCE_SEED",
+      "docs": [
+        "Global fungible ledger: [asset_balance, owner, mint]."
+      ],
+      "type": "bytes",
+      "value": "[97, 115, 115, 101, 116, 95, 98, 97, 108, 97, 110, 99, 101]"
+    },
+    {
+      "name": "ASSET_VAULT_SEED",
+      "docs": [
+        "Shared custody: [asset_vault, mint]."
+      ],
+      "type": "bytes",
+      "value": "[97, 115, 115, 101, 116, 95, 118, 97, 117, 108, 116]"
     },
     {
       "name": "MARKET_FEES_SEED",
@@ -8862,6 +12240,24 @@
       ],
       "type": "bytes",
       "value": "[112, 114, 111, 116, 111, 99, 111, 108, 95, 99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "SHARED_BOOK_SEED",
+      "docs": [
+        "Independent execution root; legacy market queues remain recoverable."
+      ],
+      "type": "bytes",
+      "value": "[115, 104, 97, 114, 101, 100, 95, 98, 111, 111, 107]"
+    },
+    {
+      "name": "SHARED_LEVEL_SEED",
+      "type": "bytes",
+      "value": "[115, 104, 97, 114, 101, 100, 95, 108, 101, 118, 101, 108]"
+    },
+    {
+      "name": "SHARED_ORDER_SEED",
+      "type": "bytes",
+      "value": "[115, 104, 97, 114, 101, 100, 95, 111, 114, 100, 101, 114]"
     },
     {
       "name": "TEST_FAUCET_AUTHORITY_SEED",

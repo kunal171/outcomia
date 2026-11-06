@@ -418,4 +418,33 @@ pub enum TidebookError {
     PredictionMakerNotBest = 140,
     #[msg("Prediction matching must use the oldest open order at that price")]
     PredictionMakerNotHead = 141,
+
+    #[msg("Shared balance owner, mint or address is invalid")]
+    InvalidAssetBalance = 142,
+    #[msg("Shared book kind or underlying market is invalid")]
+    SharedMarketKindMismatch = 143,
+    #[msg("Shared order book or queue accounts are inconsistent")]
+    InvalidSharedBook = 144,
+    #[msg("A shared price/FIFO neighbor is missing, stale or invalid")]
+    InvalidSharedNeighbor = 145,
+    #[msg("Only the shared order owner may cancel it")]
+    UnauthorizedSharedOrderOwner = 146,
+    #[msg("Shared book still has open orders or unwithdrawn fees")]
+    SharedBookNotEmpty = 147,
+    #[msg("Close the shared book before closing its underlying market")]
+    SharedBookMustBeClosed = 148,
+    #[msg("Prediction outcome is not ready for proposal or finalization")]
+    PredictionResolutionUnavailable = 149,
+    #[msg("Only the active configured resolver may propose or correct")]
+    UnauthorizedPredictionResolver = 150,
+    #[msg("Prediction evidence URI and hash must be nonempty and bounded")]
+    InvalidPredictionEvidence = 151,
+    #[msg("A proposal already exists or the correction window has ended")]
+    PredictionProposalUnavailable = 152,
+    #[msg("Fallback activation or timeout conditions are not met")]
+    PredictionFallbackUnavailable = 153,
+    #[msg("Prediction market has not reached a final outcome")]
+    PredictionNotResolved = 154,
+    #[msg("There are no selected free contracts to redeem")]
+    NothingToRedeem = 155,
 }

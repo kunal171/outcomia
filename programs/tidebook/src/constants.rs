@@ -95,3 +95,20 @@ pub const TEST_FAUCET_SEED: &[u8] = b"test_faucet";
 /// Stateless PDA that owns the mint authority of faucet-enabled test mints.
 #[constant]
 pub const TEST_FAUCET_AUTHORITY_SEED: &[u8] = b"test_faucet_authority";
+
+/// Global fungible ledger: [asset_balance, owner, mint].
+#[constant]
+pub const ASSET_BALANCE_SEED: &[u8] = b"asset_balance";
+/// Shared custody: [asset_vault, mint].
+#[constant]
+pub const ASSET_VAULT_SEED: &[u8] = b"asset_vault";
+/// Stateless signing authority: [asset_authority, mint].
+#[constant]
+pub const ASSET_AUTHORITY_SEED: &[u8] = b"asset_authority";
+/// Independent execution root; legacy market queues remain recoverable.
+#[constant]
+pub const SHARED_BOOK_SEED: &[u8] = b"shared_book";
+#[constant]
+pub const SHARED_ORDER_SEED: &[u8] = b"shared_order";
+#[constant]
+pub const SHARED_LEVEL_SEED: &[u8] = b"shared_level";

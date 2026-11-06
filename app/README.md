@@ -19,6 +19,8 @@ Open `http://localhost:3000`. For checks:
 npm run typecheck
 npm run test:prediction
 npm run test:wallet
+npm run test:rpc-proxy
+npm run test:shared
 npm run build
 ```
 
@@ -32,22 +34,30 @@ Use the current devnet program and your own Helius endpoint:
 
 ```dotenv
 NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
-NEXT_PUBLIC_HELIUS_RPC_URL=https://devnet.helius-rpc.com
-NEXT_PUBLIC_HELIUS_API_KEY=<your-key>
+HELIUS_RPC_URL=https://devnet.helius-rpc.com
+HELIUS_API_KEY=<your-server-key>
+NEXT_PUBLIC_RPC_PROXY_ENABLED=true
+NEXT_PUBLIC_SOLANA_WS_URL=wss://api.devnet.solana.com/
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 NEXT_PUBLIC_SOLANA_RPC_FALLBACK_URLS=https://solana-devnet.api.onfinality.io/public,https://api.devnet.solana.com
 ```
 
-A full Helius URL containing `?api-key=...` also works; leave the separate key
-blank in that case. If Helius is unconfigured, the generic RPC is primary.
-`NEXT_PUBLIC_*` values are visible in the browser. Restrict the Helius key to
-your app domains; never put private signing keys in these variables.
+A full Helius URL containing `?api-key=...` also works; keep it in the server-only
+`HELIUS_RPC_URL`, never a `NEXT_PUBLIC_` variable. Store both Helius settings as
+Vercel Secrets. The browser uses its own deployment's `/api/solana` endpoint.
+Public Config contains only the proxy flag, program ID and key-free fallbacks.
 
 HTTP reads verify devnet, pace requests, coalesce duplicates and fail over when
 a provider is busy. Discovery/history reads have short caches; balance and
-transaction-planning account reads are not TTL-cached. Broadcasts are not
-replayed automatically after a network failure. WebSockets use the primary
-endpoint. `FAUCET_SOLANA_RPC_URL` overrides the server faucet's RPC.
+planning reads are not TTL-cached. Signed broadcasts are forwarded once and
+are never automatically replayed after a network failure. WebSockets use the
+separate public devnet WS URL; Vercel's HTTP route does not host WebSockets.
+`FAUCET_SOLANA_RPC_URL` still overrides the server faucet's RPC.
+
+The RPC route allows the app's methods, restricts program scans to Tidebook,
+limits request/response sizes and batches, and redacts upstream error URLs.
+Its per-instance rate limit is a soft bound, not a distributed quota. It does
+not replace the durable Redis requirement for public token-faucet claims.
 
 `.env.local` overrides `.env`. Restart the dev server after changing public
 settings. On Vercel, set the same variables in the project and rebuild: Next.js
@@ -74,8 +84,8 @@ flags when targeting an older binary, even if it uses the same program ID.
 Cancellation has its own gate so stopping new orders need not block exits.
 The program independently checks roles, signatures, balances and trading times.
 
-Outcome resolution, reward claims and prediction fee withdrawal are not
-implemented. Trading fills settle internal balances; final outcome settlement
+Resolution and redemption are deployed on devnet and use explicit rollout flags. Legacy
+prediction fee withdrawal remains separate. Trading fills settle internal balances; final outcome settlement
 is a different step. The UI's help dialogs explain this distinction.
 
 ## Pages
@@ -132,8 +142,11 @@ available collateral and order locks without valuing YES/NO contracts as cash.
 The prediction section lists free and locked contracts separately. Missing
 market units or failed reads produce unavailable totals, not fabricated zeros.
 Market links lead to the existing deposit, withdrawal and position controls.
-Each balance account is initialized once per wallet/market pair. A shared quote
-mint does not create a shared spending balance across markets.
+Legacy balances remain per wallet/market. The new shared path initializes one
+`AssetBalance` per wallet/mint; the same USDC is spendable across shared books.
+The wallet page identifies legacy deposits and offers signed transfers of free
+cash. Cancel old orders before moving their released funds. YES/NO contracts
+and their backing remain question-specific.
 
 The page only reads accounts and never requests a signature. Refresh manually
 after transactions; the confirmed reads may span different slots. Changing or
@@ -190,3 +203,30 @@ because Next.js resolves its dynamic import during builds; no x402 funding is
 enabled. Dependencies have upstream audit advisories. Recheck the current audit
 rather than relying on a saved count; forced fixes can replace the Solana stack
 with incompatible versions.
+
+## Shared custody and settlement rollout
+
+The current devnet program passed its live smoke test. Enable these when using
+that program:
+
+```env
+NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true
+NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED=true
+```
+
+Production and Preview enable both flags. Defaults and `.env.example` remain off
+for safe rollout to other program binaries; keep them off for an older deployment. A market's
+active-admin creator enables its shared book from the market detail page.
+The new panel displays shared orders separately from legacy liquidity.
+
+`/wallet` supports shared deposits/withdrawals and legacy free-cash transfers.
+Trading matches up to three FIFO makers and posts only a noncrossing remainder.
+Oversized packets are rejected before signing. Initialize missing mint balances
+separately if a first trade is too large. Failed reads are shown as unavailable.
+
+Prediction detail pages add creator closure, evidence-backed proposals/corrections,
+fallback activation, delayed finalization and free-contract redemption. Proposal
+files are hashed locally; the resolver uploads evidence independently and supplies
+its permanent reference. The app does not verify the remote bytes. Anyone can
+finalize a mature proposal; only the configured active-admin resolver can propose.
+Legacy cash stays withdrawable; redemption credits the shared mint balance.

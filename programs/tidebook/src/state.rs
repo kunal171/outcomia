@@ -5,6 +5,9 @@
 
 use anchor_lang::prelude::*;
 
+pub mod shared;
+pub use shared::*;
+
 pub mod prediction;
 pub use prediction::*;
 pub mod prediction_book;

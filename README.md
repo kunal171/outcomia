@@ -4,9 +4,12 @@ Prediction markets on Solana, with YES/NO order books and one collateral asset
 per market. Tidebook also supports spot trading and includes a Rust indexer
 that stores finalized transactions in PostgreSQL.
 
-This is a devnet research project. The updated prediction trading program has
-been deployed. Outcome resolution, reward claims and prediction fee withdrawal
-are not implemented yet. Use test tokens only.
+This is a devnet research project. Shared asset balances, prediction trading,
+delayed resolution and redemption are deployed and smoke-tested on devnet.
+Use test tokens only.
+
+See [shared balances and settlement](docs/shared-balances-resolution.md) for the
+new custody model, legacy recovery and rollout checks.
 
 ## What works
 

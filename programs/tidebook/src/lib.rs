@@ -22,6 +22,7 @@ pub mod matching;
 pub mod pda;
 pub mod prediction_config;
 mod prediction_orders;
+pub mod shared_trading;
 pub mod state;
 
 use anchor_lang::prelude::*;
@@ -39,6 +40,139 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 #[program]
 pub mod tidebook {
     use super::*;
+
+    /// Proposes/corrects a published outcome. Inputs: active resolver, outcome and evidence.
+    /// Errors: role, timing, state or evidence. Returns: restarted delayed proposal, no payout yet.
+    pub fn propose_prediction(
+        ctx: Context<ResolvePrediction>,
+        outcome: PredictionResolution,
+        evidence_uri: String,
+        evidence_hash: [u8; 32],
+        correction: bool,
+    ) -> Result<()> {
+        instructions::prediction_resolution::handle_propose_prediction(
+            ctx,
+            outcome,
+            evidence_uri,
+            evidence_hash,
+            correction,
+        )
+    }
+    /// Stops trading early. Inputs: active-admin creator and market. Errors: role/state.
+    /// Returns: Frozen state without accelerating the resolution clock.
+    pub fn close_prediction_trading(ctx: Context<ResolvePrediction>) -> Result<()> {
+        instructions::prediction_resolution::handle_close_prediction_trading(ctx)
+    }
+    /// Advances a published resolution clock. Inputs: market/action (0 freeze, 1 fallback,
+    /// 2 finalize, 3 Invalid timeout). Errors: unmet clock/state. Returns: monotonic transition.
+    pub fn advance_prediction(ctx: Context<AdvancePrediction>, action: u8) -> Result<()> {
+        instructions::prediction_resolution::handle_advance_prediction(ctx, action)
+    }
+    /// Splits/merges backed pairs. Inputs: shared custody, quantity, split flag.
+    /// Errors: lifecycle, funds, arithmetic or CPI. Returns: equal cash/reserve movement.
+    pub fn shared_complete_set(
+        ctx: Context<SharedPredictionCustody>,
+        quantity: u64,
+        split: bool,
+    ) -> Result<()> {
+        instructions::shared_prediction::handle_shared_complete_set(ctx, quantity, split)
+    }
+    /// Redeems free outcomes. Inputs: shared custody and YES/NO quantities. Errors: state,
+    /// claims, arithmetic/CPI. Returns: burned contracts and fixed payout in shared free balance.
+    pub fn redeem_prediction(
+        ctx: Context<SharedPredictionCustody>,
+        yes: u64,
+        no: u64,
+    ) -> Result<()> {
+        instructions::shared_prediction::handle_redeem_prediction(ctx, yes, no)
+    }
+
+    /// Fills one shared-wallet maker. Inputs: taker/book/config, both users' claims, FIFO hints
+    /// and exact order units. Errors: priority/funds/accounts/overflow. Returns: atomic maker-price fill.
+    pub fn match_shared_order(
+        ctx: Context<MatchSharedOrder>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::shared_match::handle_match_shared_order(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
+    /// Inserts a shared-wallet limit order. Inputs: owner/book/claims/hints and exact order units.
+    /// Errors: closed/crossing/grid/identity/funds/overflow. Returns: funded FIFO order.
+    pub fn place_shared_order(
+        ctx: Context<PlaceSharedOrder>,
+        outcome: SharedOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+    ) -> Result<()> {
+        instructions::shared_orders::handle_place_shared_order(
+            ctx, outcome, side, price, quantity, order_id,
+        )
+    }
+    /// Cancels a shared order. Inputs: owner, claim accounts and queue removal hints. Errors:
+    /// foreign/non-Open order, stale links or arithmetic. Returns: released remainder and repaired book.
+    pub fn cancel_shared_order(ctx: Context<CancelSharedOrder>) -> Result<()> {
+        instructions::shared_orders::handle_cancel_shared_order(ctx)
+    }
+
+    /// Closes a drained root. Inputs: active-admin creator, stopped source/root. Errors:
+    /// role, lifecycle or outstanding orders/fees. Returns: root rent; global user funds remain.
+    pub fn close_shared_book(ctx: Context<CloseSharedBook>) -> Result<()> {
+        instructions::shared_book::handle_close_shared_book(ctx)
+    }
+
+    /// Creates an admin-owned shared execution book. Inputs: creator, source market and kind.
+    /// Errors: role/binding/duplicate/rent. Returns: empty namespaced book and zero fee claim.
+    pub fn initialize_shared_book(
+        ctx: Context<InitializeSharedBook>,
+        kind: MarketKind,
+    ) -> Result<()> {
+        instructions::shared_book::handle_initialize_shared_book(ctx, kind)
+    }
+    /// Withdraws book-earned shared fees. Inputs: super-admin/config, book/vault and raw amount.
+    /// Errors: ownership, amount or CPI. Returns: equal fee/custody debit, no trader claim change.
+    pub fn withdraw_shared_fees(ctx: Context<WithdrawSharedFees>, amount: u64) -> Result<()> {
+        instructions::shared_book::handle_withdraw_shared_fees(ctx, amount)
+    }
+
+    /// Creates the owner's reusable mint ledger. Inputs: owner/mint/vault. Errors: duplicate or
+    /// invalid custody/rent. Returns: zero shared balance; no deposit.
+    pub fn initialize_asset_balance(ctx: Context<InitializeAssetBalance>) -> Result<()> {
+        instructions::asset_wallet::handle_initialize_asset_balance(ctx)
+    }
+    /// Deposits mint atoms. Inputs: owner/ledger/source/vault, amount. Errors: bad funds/binding or
+    /// overflow/CPI. Returns: equal shared-custody and free-claim credit.
+    pub fn deposit_asset(ctx: Context<TransferAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_deposit_asset(ctx, amount)
+    }
+    /// Withdraws only free atoms. Inputs: owner/ledger/destination/vault, amount. Errors: bad
+    /// binding, insufficient free/vault funds or CPI. Returns: equal custody/free debit.
+    pub fn withdraw_asset(ctx: Context<TransferAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_withdraw_asset(ctx, amount)
+    }
+    /// Migrates legacy spot free atoms. Inputs: owner, market and shared custody, amount. Errors:
+    /// wrong binding, insufficient free cash or overflow/CPI. Returns: atomic transfer and credit.
+    pub fn migrate_spot_asset(ctx: Context<MigrateSpotAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_migrate_spot_asset(ctx, amount)
+    }
+    /// Migrates legacy prediction free cash. Inputs: owner/position/two vaults, amount. Errors:
+    /// binding/funds/overflow/CPI. Returns: shared credit, leaving reserves and orders intact.
+    pub fn migrate_prediction_asset(
+        ctx: Context<MigratePredictionAsset>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::asset_wallet::handle_migrate_prediction_asset(ctx, amount)
+    }
 
     /// Settles up to one best FIFO maker; excess taker quantity is not posted.
     ///

@@ -117,8 +117,8 @@ function readConfig(): FaucetConfig {
     rpcUrl:
       process.env.FAUCET_SOLANA_RPC_URL?.trim() ||
       resolveHeliusDevnetUrl(
-        process.env.NEXT_PUBLIC_HELIUS_RPC_URL,
-        process.env.NEXT_PUBLIC_HELIUS_API_KEY,
+        process.env.HELIUS_RPC_URL,
+        process.env.HELIUS_API_KEY,
       ) ||
       process.env.NEXT_PUBLIC_SOLANA_RPC_URL?.trim() ||
       clusterApiUrl("devnet"),
@@ -229,7 +229,7 @@ export async function GET() {
     const config = readConfig();
     const durableRateLimit = Boolean(
       process.env.UPSTASH_REDIS_REST_URL &&
-        process.env.UPSTASH_REDIS_REST_TOKEN,
+      process.env.UPSTASH_REDIS_REST_TOKEN,
     );
 
     return NextResponse.json({
