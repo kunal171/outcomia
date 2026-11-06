@@ -16,6 +16,9 @@ import {
   createMint,
   getOrCreateAssociatedTokenAccount,
   mintTo,
+  burn,
+  closeAccount,
+  getMint,
   getAccount,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
@@ -214,12 +217,48 @@ async function main() {
   const baseKey = Keypair.fromSecretKey(Uint8Array.from(secrets.base)),
     quoteKey = Keypair.fromSecretKey(Uint8Array.from(secrets.quote)),
     taker = Keypair.fromSecretKey(Uint8Array.from(secrets.taker));
+  if (stage === "prepare" && state.steps.initialize_prediction) {
+    const previous = await a.account.predictionMarket.fetch(
+      new PublicKey(state.prediction),
+    );
+    if (
+      "draft" in previous.status &&
+      previous.closeTs.lte(bn(await chainTime()))
+    ) {
+      assert(
+        previous.authority.equals(payer.publicKey) &&
+          previous.backingReserve.isZero() &&
+          previous.yesSupply.isZero() &&
+          previous.noSupply.isZero(),
+        "Only an unfunded test draft may be replaced",
+      );
+      state.expiredUnfundedDrafts ??= [];
+      state.expiredUnfundedDrafts.push(state.prediction);
+      state.predictionAttempt = (state.predictionAttempt ?? 0) + 1;
+      delete state.closeTs;
+      for (const name of [
+        "initialize_prediction",
+        "initialize_maker_position",
+        "initialize_taker_position",
+        "open_prediction",
+      ])
+        delete state.steps[name];
+      save();
+      console.log(
+        "The unfunded test draft expired; using a fresh question ID without changing its immutable deadline.",
+      );
+    }
+  }
   const b = programFor(taker),
     base = baseKey.publicKey,
     quote = quoteKey.publicKey;
   const spot = pda("market", base, quote),
     spotBook = sdk.sharedBookPda(spot),
-    predId = hash(Buffer.from(`shared-smoke:${base}:${quote}`)),
+    predId = hash(
+      Buffer.from(
+        `shared-smoke:${base}:${quote}${state.predictionAttempt ? ":" + state.predictionAttempt : ""}`,
+      ),
+    ),
     prediction = pda("prediction_market", predId),
     predBook = sdk.sharedBookPda(prediction);
   const predVault = pda("vault", prediction, quote),
@@ -370,7 +409,7 @@ async function main() {
         .initializeMarketMetadata(
           "smBASE",
           "smUSD",
-          "Deployment smoke test · spot",
+          "Deployment smoke test - spot",
           { spot: {} },
         )
         .accountsPartial({
@@ -473,7 +512,7 @@ async function main() {
             ),
             rulesHash: Array.from(hash(rules)),
           },
-          "SMOKE ONLY · shared wallet settlement",
+          "SMOKE ONLY - shared wallet settlement",
           "smUSD",
         )
         .accountsPartial({
@@ -498,6 +537,14 @@ async function main() {
           market: prediction,
           book: predBook,
           systemProgram: SystemProgram.programId,
+        })
+        .instruction(),
+      await a.methods
+        .openPredictionMarket()
+        .accountsPartial({
+          authority: payer.publicKey,
+          market: prediction,
+          adminRecord: admin,
         })
         .instruction(),
     ]);
@@ -746,16 +793,73 @@ async function main() {
       })
       .instruction(),
   ]);
+  // Test assets have no economic value. Burn only this run's two generated
+  // mints, close their empty wallet ATAs, and return the test wallet's spare SOL.
+  for (const [label, key] of [
+    ["maker", payer],
+    ["taker", taker],
+  ])
+    for (const [symbol, mint] of [
+      ["base", base],
+      ["quote", quote],
+    ]) {
+      const token = await getOrCreateAssociatedTokenAccount(
+        connection,
+        payer,
+        mint,
+        key.publicKey,
+      );
+      const amount = await rawTokens(token.address);
+      if (amount > 0n)
+        await step(`burn_${label}_${symbol}`, () =>
+          burn(connection, key, token.address, mint, key, amount),
+        );
+      await step(`close_${label}_${symbol}_ata`, () =>
+        closeAccount(connection, key, token.address, payer.publicKey, key),
+      );
+    }
+  equal((await getMint(connection, base)).supply, 0, "Test base supply burned");
+  equal(
+    (await getMint(connection, quote)).supply,
+    0,
+    "Test quote supply burned",
+  );
+  if (!state.steps.return_test_wallet_sol) {
+    const latest = await connection.getLatestBlockhash(),
+      balance = await connection.getBalance(taker.publicKey);
+    const tx = new Transaction({
+      feePayer: taker.publicKey,
+      recentBlockhash: latest.blockhash,
+    }).add(
+      SystemProgram.transfer({
+        fromPubkey: taker.publicKey,
+        toPubkey: payer.publicKey,
+        lamports: 0,
+      }),
+    );
+    const fee = (await connection.getFeeForMessage(tx.compileMessage())).value;
+    if (fee !== null && balance > fee)
+      await send("return_test_wallet_sol", b, [
+        SystemProgram.transfer({
+          fromPubkey: taker.publicKey,
+          toPubkey: payer.publicKey,
+          lamports: balance - fee,
+        }),
+      ]);
+  }
   const report = {
     ...JSON.parse(evidence),
     evidenceUri,
     evidenceHash: hash(evidence).toString("hex"),
     completedAt: new Date().toISOString(),
     finalOutcome: "Yes",
+    smokeRunnerCommit: gitHead(),
+    testTokenSuppliesBurned: true,
     finalReserve: "0",
     globalBaseVault: "0",
     globalQuoteVault: "0",
     spotClosed: true,
+    expiredUnfundedDrafts: state.expiredUnfundedDrafts ?? [],
     transactions: state.steps,
   };
   fs.writeFileSync(completion, JSON.stringify(report, null, 2) + "\n");
@@ -765,14 +869,18 @@ async function main() {
     "PASS: shared custody, cross-market reuse, paused cancellation, resolution, redemption, fees, withdrawals and safe shutdown.",
   );
 }
-main().catch((error) => {
-  let text = error.stack || String(error);
-  text = text.split(rpc.toString()).join(rpc.origin + "/<redacted>");
-  for (const value of [
-    rpc.searchParams.get("api-key"),
-    env.NEXT_PUBLIC_HELIUS_API_KEY,
-  ])
-    if (value) text = text.split(value).join("<redacted>");
-  console.error(text);
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    setTimeout(() => process.exit(0), 250);
+  })
+  .catch((error) => {
+    let text = error.stack || String(error);
+    text = text.split(rpc.toString()).join(rpc.origin + "/<redacted>");
+    for (const value of [
+      rpc.searchParams.get("api-key"),
+      env.NEXT_PUBLIC_HELIUS_API_KEY,
+    ])
+      if (value) text = text.split(value).join("<redacted>");
+    console.error(text);
+    setTimeout(() => process.exit(1), 250);
+  });
