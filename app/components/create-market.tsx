@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
@@ -48,13 +49,15 @@ export function CreateMarket() {
   const [quoteMint, setQuoteMint] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ signature: string; market: PublicKey } | null>(null);
+  const [result, setResult] = useState<{
+    signature: string;
+    market: PublicKey;
+  } | null>(null);
   const [priceTickSize, setPriceTickSize] = useState("");
   const [quantityLotSize, setQuantityLotSize] = useState("");
   const [baseSymbol, setBaseSymbol] = useState("");
   const [quoteSymbol, setQuoteSymbol] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [marketKind, setMarketKind] = useState<"spot" | "other">("spot");
 
   const program = useMemo(
     () => (wallet ? getTidebookProgram(connection, wallet) : null),
@@ -83,10 +86,14 @@ export function CreateMarket() {
       const normalizedDisplayName = displayName.trim();
 
       if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedBaseSymbol)) {
-        throw new Error("Base symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+        throw new Error(
+          "Base symbol must contain 1-16 letters, digits, '.', '-' or '_'",
+        );
       }
       if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedQuoteSymbol)) {
-        throw new Error("Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+        throw new Error(
+          "Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'",
+        );
       }
       if (!normalizedDisplayName || normalizedDisplayName.length > 64) {
         throw new Error("Display name must contain 1-64 characters");
@@ -121,7 +128,7 @@ export function CreateMarket() {
           normalizedBaseSymbol,
           normalizedQuoteSymbol,
           normalizedDisplayName,
-          marketKind === "other" ? { other: {} } : { spot: {} },
+          { spot: {} },
         )
         .accounts({
           authority: wallet.publicKey,
@@ -150,14 +157,24 @@ export function CreateMarket() {
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell route-shell-narrow">
+        <Link className="market-type-back" href="/markets/new">
+          ← Change market type
+        </Link>
         <div className="route-heading">
-          <div className="eyebrow">Canonical market</div>
-          <h1>Create a market</h1>
-          <p>The connected wallet must have an active on-chain administrator record.</p>
+          <div className="eyebrow">Spot market setup</div>
+          <h1>Create a spot market</h1>
+          <p>
+            The connected wallet must have an active on-chain administrator
+            record.
+          </p>
         </div>
 
-        {!wallet && <div className="access-card">Connect your wallet to continue.</div>}
-        {wallet && roleLoading && <div className="access-card">Checking administrator role…</div>}
+        {!wallet && (
+          <div className="access-card">Connect your wallet to continue.</div>
+        )}
+        {wallet && roleLoading && (
+          <div className="access-card">Checking administrator role…</div>
+        )}
         {wallet && !roleLoading && !roleError && !isAdmin && (
           <div className="access-card access-denied">
             This route requires an active administrator wallet.
@@ -165,7 +182,10 @@ export function CreateMarket() {
         )}
 
         {wallet && !roleLoading && isAdmin && (
-          <form className="admin-card market-create-form" onSubmit={(event) => void createMarket(event)}>
+          <form
+            className="admin-card market-create-form"
+            onSubmit={(event) => void createMarket(event)}
+          >
             <label>
               Base mint
               <input
@@ -218,21 +238,6 @@ export function CreateMarket() {
               />
             </label>
             <label>
-              Market type
-              <select
-                value={marketKind}
-                onChange={(event) =>
-                  setMarketKind(event.target.value as "spot" | "other")
-                }
-              >
-                <option value="spot">Spot</option>
-                <option value="other">Other (experimental)</option>
-                <option value="prediction" disabled>
-                  Prediction (coming later)
-                </option>
-              </select>
-            </label>
-            <label>
               Price tick size
               <input
                 inputMode="numeric"
@@ -269,7 +274,7 @@ export function CreateMarket() {
                 pending
               }
             >
-              {pending ? "Creating market…" : "Create market"}
+              {pending ? "Creating market…" : "Create spot market"}
             </button>
           </form>
         )}
@@ -282,7 +287,11 @@ export function CreateMarket() {
         {result && (
           <div className="transaction-message transaction-success">
             <strong>Market created:</strong> {result.market.toBase58()}{" "}
-            <a href={transactionExplorerUrl(result.signature)} target="_blank" rel="noreferrer">
+            <a
+              href={transactionExplorerUrl(result.signature)}
+              target="_blank"
+              rel="noreferrer"
+            >
               View transaction ↗
             </a>
           </div>

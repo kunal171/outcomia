@@ -447,6 +447,7 @@ function ConnectedPosition({
   return (
     <section
       className="admin-card prediction-position"
+      id="position"
       aria-busy={loading || walletLoading || pending}
     >
       <div className="market-list-heading">
@@ -574,8 +575,8 @@ function ConnectedPosition({
             </small>
             {!PREDICTION_FUNDING_ENABLED && (
               <p>
-                Funding and pair conversion await deployment of the updated
-                program.
+                Funding and pair conversion are disabled in this app
+                configuration.
               </p>
             )}
             {!acceptsDeposits && cashAction === "deposit" && (
@@ -665,8 +666,8 @@ function ConnectedPosition({
           </p>
           {!PREDICTION_DRAFTS_ENABLED && (
             <p>
-              Position initialization is awaiting the matching program
-              deployment.
+              Prediction position initialization is disabled in this app
+              configuration.
             </p>
           )}
           <button

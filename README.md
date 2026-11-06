@@ -1,108 +1,84 @@
 # Tidebook
 
-Tidebook is a research-driven on-chain central limit order book for Solana,
-built incrementally with Anchor, LiteSVM, and a companion web application.
+Prediction markets on Solana, with YES/NO order books and one collateral asset
+per market. Tidebook also supports spot trading and includes a Rust indexer
+that stores finalized transactions in PostgreSQL.
 
-## Current capabilities
+This is a devnet research project. The updated prediction trading program has
+been deployed. Outcome resolution, reward claims and prediction fee withdrawal
+are not implemented yet. Use test tokens only.
 
-- Create a deterministic market PDA for two distinct SPL Token mints.
-- Validate base and quote mint accounts during market initialization.
-- Pause, unpause, and close markets under authority control.
-- Create deterministic bid and ask limit-order PDAs.
-- Enforce fixed-point price ticks, quantity lots, and nonzero quote notional.
-- Maintain canonical per-trader free and locked balances backed by market vaults.
-- Deposit and withdraw base or quote tokens independently of order placement.
-- Lock quote balance for bids and base balance for asks without a token CPI per order.
-- Create canonical price-level PDAs for the first bid and ask on each market side.
-- Append another order at an existing price behind the validated FIFO tail.
-- Cancel open orders under owner control, including while a market is paused.
-- Release collateral to free balance on cancellation and safely close empty, paused markets.
-- Atomically settle against up to three best-price FIFO makers per client
-  transaction, including partial fills, complete maker removal, FIFO-head
-  promotion, multi-level traversal, and empty-level closure.
-- Charge a governance-controlled quote-denominated taker fee, account for it
-  per market, and allow only the super-admin to withdraw accrued fees.
-- Exercise program behavior through LiteSVM integration tests.
+## What works
 
-Sorted multi-price insertion, indexed cancellation, deposits, withdrawals, and
-internal order collateral accounting are implemented. The bounded matching
-instruction settles one maker, while the client safely plans and batches up to
-three instructions in one atomic transaction. When those fills exhaust the
-crossing book or reach a non-crossing price, the client atomically inserts or
-appends any valid remainder at the taker limit. A remainder stays free only when
-more crossing liquidity remains beyond the cap or its bid notional rounds to
-zero. Every successful state transition emits an informational event. Matching
-charges the configured taker fee per fill and preserves vault conservation by
-recording the protocol's quote-token claim in a canonical `MarketFees` PDA.
+- Admin-created prediction markets with named questions, published rules,
+  resolver keys, trading deadlines and optional fallback terms.
+- Wallet-owned positions, collateral deposits and withdrawals, and complete-set
+  split/merge: one collateral token backs one YES plus one NO contract.
+- YES/NO limit orders, price-time priority, partial fills and owner cancellation.
+  The client can match up to three makers atomically and post a safe remainder.
+- Spot markets with base/quote vaults, internal balances, price ticks, quantity
+  lots, matching, cancellation and administrator controls.
+- Configurable taker fees, per-market accounting and spot fee withdrawal.
+- A Next.js UI with market discovery, order books, wallet balances, readable
+  prices, market metadata and prediction guides.
+- Finalized transaction ingestion with historical backfill, live recovery,
+  durable checkpoints and PostgreSQL storage.
 
-## Architecture
+Prediction trades settle internal balances immediately. Determining the final
+YES/NO outcome and paying winning positions are separate, unfinished steps.
+The indexer retains source transactions; it does not yet provide prediction
+trade projections or a public query API.
 
-Detailed account models, instruction flows, invariants, limitations, and the
-editable Draw.io diagram are maintained in [`docs/`](docs/README.md).
+## Run and verify
 
-The principal trading-state PDA schemes are:
-
-```text
-Market = ["market", base_mint, quote_mint]
-Fees  = ["market_fees", market]
-Order  = ["order", market, order_id.to_le_bytes()]
-Level  = ["price_level", market, side, price.to_le_bytes()]
-```
-
-## Repository layout
-
-```text
-tidebook/
-├── app/                         # Companion web application
-├── docs/                        # Architecture and research documentation
-├── programs/tidebook/          # Anchor program and LiteSVM tests
-├── services/indexer/            # Independent finalized-log ingestion service
-├── Anchor.toml
-└── rust-toolchain.toml
-```
-
-## Toolchain
-
-- Rust `1.97.1`
-- Anchor CLI `1.2.0`
-- Solana CLI `4.1.2`
-- LiteSVM `0.16.0`
-
-## Build and test
+The program uses Rust `1.97.1`, Anchor `1.2.0`, Solana CLI `4.1.2` and LiteSVM
+`0.16.0`. The Rust toolchain is pinned in `rust-toolchain.toml`.
 
 ```bash
 anchor build
 anchor test --skip-deploy
 ```
 
-`anchor test --skip-deploy` runs the Rust LiteSVM suite configured in
-`Anchor.toml`; it does not require a local validator and does not deploy to the
-configured devnet cluster. Bare `anchor test` deploys before running the suite
-and must not be used as the local test command.
+The test command runs LiteSVM without a local validator. Bare `anchor test`
+deploys to the configured cluster before running tests; use `--skip-deploy`
+for local verification.
 
-Deploy or upgrade the configured program on devnet with:
+Start the web app:
+
+```bash
+cd app
+npm ci
+cp .env.example .env.local  # First setup only; keep existing configuration.
+npm run dev
+```
+
+Fill in your Helius devnet configuration and review the prediction rollout
+flags before using the app. See the [app guide](app/README.md).
+
+## Devnet program
+
+`AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`
+
+[View on Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+The address matches `declare_id!` and `Anchor.toml`.
+
+For a deliberate upgrade after building and testing:
 
 ```bash
 anchor program deploy --no-idl
 ```
 
-The temporary `--no-idl` flag bypasses an upstream metadata-CLI packaging issue;
-the application consumes the locally generated IDL instead.
+The app uses its checked-in IDL. Deployment details and the IDL-upload
+workaround are in the [deployment guide](docs/deployment.md).
 
-## Program identity
+## Project layout
 
-```text
-BPdNF5CnV8z1EkHo7tcueR6wXmzZV2j6j4wsUTirPgWL
-```
+| Directory                                        | Contents                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------- |
+| [`programs/tidebook`](programs/tidebook)         | Anchor program and LiteSVM tests                            |
+| [`app`](app/README.md)                           | Next.js UI, wallet flows and transaction builders           |
+| [`services/indexer`](services/indexer/README.md) | Separate Rust workspace for ingestion and storage           |
+| [`docs`](docs/README.md)                         | Architecture, design decisions, diagrams and test addresses |
 
-The same address is declared in the program, configured in `Anchor.toml`, and
-derived from `target/deploy/tidebook-keypair.json`.
-
-The program is live on
-[Solana devnet](https://explorer.solana.com/address/BPdNF5CnV8z1EkHo7tcueR6wXmzZV2j6j4wsUTirPgWL?cluster=devnet).
-
-## Development approach
-
-Tidebook is built in small feature branches. Each backend milestone is covered
-by LiteSVM tests, exposed through the web application where appropriate, and
-followed by an architecture-documentation update.
+The indexer has a local [Docker/Kind setup](services/indexer/infra/kubernetes/README.md).
+Cloud infrastructure and Terraform deployment remain separate work.

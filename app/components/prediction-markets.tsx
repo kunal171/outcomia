@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { PredictionGuide } from "./prediction-guide";
 import { AppHeader } from "./app-header";
 import { PredictionPositionPanel } from "./prediction-position";
 import { PredictionLifecycle } from "./prediction-lifecycle";
@@ -151,12 +152,21 @@ export function PredictionMarkets({ address }: { address?: string }) {
             />
           </label>
         )}
+        {(!address || records[0]) && (
+          <div className="prediction-help-row">
+            <PredictionGuide
+              market={address ? records[0]?.market : undefined}
+              book={address ? records[0]?.book : undefined}
+              symbol={address ? records[0]?.metadata?.quoteSymbol : undefined}
+            />
+          </div>
+        )}
         <div className="market-list-heading">
           <h2>{address ? "Market terms" : "On-chain markets"}</h2>
           <div className="admin-actions">
             {isAdmin && (
-              <Link className="admin-action-button" href="/predictions/new">
-                Create draft
+              <Link className="admin-action-button" href="/markets/new">
+                Create market
               </Link>
             )}
             <button

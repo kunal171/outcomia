@@ -9,19 +9,24 @@ import {
   decodeOrderStatus,
   derivePriceLevelPda,
   deriveTraderBalancePda,
+  deriveMarketMetadataPda,
   getTidebookAccounts,
   getTidebookProgram,
   transactionExplorerUrl,
   type OrderView,
+  type MarketAccount,
+  type MarketMetadataAccount,
 } from "../lib/tidebook";
 import { AppHeader } from "./app-header";
+import { marketLabels, readableAmount } from "../lib/market-display";
+import { rpcErrorMessage } from "../lib/rpc-transport";
 
 function shortAddress(value: string) {
   return `${value.slice(0, 6)}…${value.slice(-6)}`;
 }
 
 function getErrorMessage(cause: unknown) {
-  return cause instanceof Error ? cause.message : "Transaction failed";
+  return rpcErrorMessage(cause, "Transaction failed");
 }
 
 export function Orders() {
@@ -29,6 +34,12 @@ export function Orders() {
   const wallet = useAnchorWallet();
 
   const [orders, setOrders] = useState<OrderView[]>([]);
+  const [orderMarkets, setOrderMarkets] = useState<
+    Map<
+      string,
+      { market: MarketAccount; metadata: MarketMetadataAccount | null }
+    >
+  >(() => new Map());
   const [loading, setLoading] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +53,7 @@ export function Orders() {
   const loadOrders = useCallback(async () => {
     if (!program || !wallet) {
       setOrders([]);
+      setOrderMarkets(new Map());
       return;
     }
 
@@ -64,16 +76,63 @@ export function Orders() {
             address: publicKey,
             ...account,
           }))
-          .sort((left, right) =>
-            right.orderId.cmp(left.orderId),
-          ),
+          .sort((left, right) => right.orderId.cmp(left.orderId)),
       );
+      // Batch only the markets referenced by this wallet's orders (50 pairs
+      // per request), rather than fetching each market and mint separately.
+      const keys = [
+        ...new Map(
+          records.map(({ account }) => [
+            account.market.toBase58(),
+            account.market,
+          ]),
+        ).values(),
+      ];
+      const views = new Map<
+        string,
+        { market: MarketAccount; metadata: MarketMetadataAccount | null }
+      >();
+      for (let start = 0; start < keys.length; start += 50) {
+        const batch = keys.slice(start, start + 50);
+        const infos = await connection.getMultipleAccountsInfo(
+          [...batch, ...batch.map(deriveMarketMetadataPda)],
+          "confirmed",
+        );
+        batch.forEach((key, index) => {
+          const info = infos[index];
+          if (!info || !info.owner.equals(program.programId)) return;
+          try {
+            const market = program.coder.accounts.decode<MarketAccount>(
+              "market",
+              info.data,
+            );
+            const metadataInfo = infos[index + batch.length];
+            let metadata: MarketMetadataAccount | null = null;
+            if (metadataInfo?.owner.equals(program.programId)) {
+              try {
+                const value =
+                  program.coder.accounts.decode<MarketMetadataAccount>(
+                    "marketMetadata",
+                    metadataInfo.data,
+                  );
+                if (value.market.equals(key)) metadata = value;
+              } catch {
+                /* Missing/old labels never turn an order into fake units. */
+              }
+            }
+            views.set(key.toBase58(), { market, metadata });
+          } catch {
+            /* Closed or incompatible markets have unavailable units. */
+          }
+        });
+      }
+      setOrderMarkets(views);
     } catch (cause) {
       setError(getErrorMessage(cause));
     } finally {
       setLoading(false);
     }
-  }, [program, wallet]);
+  }, [program, wallet, connection]);
 
   useEffect(() => {
     void loadOrders();
@@ -101,19 +160,11 @@ export function Orders() {
       const removesPriceLevel = priceLevel.orderCount.eqn(1);
       const betterLevel =
         removesPriceLevel && priceLevel.betterPrice
-          ? derivePriceLevelPda(
-              order.market,
-              side,
-              priceLevel.betterPrice,
-            )
+          ? derivePriceLevelPda(order.market, side, priceLevel.betterPrice)
           : null;
       const worseLevel =
         removesPriceLevel && priceLevel.worsePrice
-          ? derivePriceLevelPda(
-              order.market,
-              side,
-              priceLevel.worsePrice,
-            )
+          ? derivePriceLevelPda(order.market, side, priceLevel.worsePrice)
           : null;
       const levelRentRecipient = removesPriceLevel
         ? priceLevel.rentPayer
@@ -192,6 +243,10 @@ export function Orders() {
                 const status = decodeOrderStatus(order.status);
                 const side = decodeOrderSide(order.side);
                 const address = order.address.toBase58();
+                const view = orderMarkets.get(order.market.toBase58());
+                const labels = view
+                  ? marketLabels(view.market, view.metadata)
+                  : null;
 
                 return (
                   <article className="order-row" key={address}>
@@ -205,47 +260,59 @@ export function Orders() {
                         <span>Market</span>
                         <strong>
                           <Link href={`/markets/${order.market.toBase58()}`}>
-                            {shortAddress(order.market.toBase58())}
+                            {labels?.name ??
+                              shortAddress(order.market.toBase58())}
                           </Link>
                         </strong>
                       </div>
 
                       <div>
                         <span>Side</span>
-                        <strong>{side}</strong>
+                        <strong>{side === "bid" ? "Buy" : "Sell"}</strong>
                       </div>
 
                       <div>
                         <span>Price</span>
-                        <strong>{order.price.toString()}</strong>
+                        <strong>
+                          {view
+                            ? `${readableAmount(order.price, view.market.quoteDecimals)} ${labels?.quote}`
+                            : "Units unavailable"}
+                        </strong>
                       </div>
 
                       <div>
                         <span>Quantity</span>
-                        <strong>{order.quantity.toString()}</strong>
+                        <strong>
+                          {view
+                            ? `${readableAmount(order.quantity, view.market.baseDecimals)} ${labels?.base}`
+                            : "Units unavailable"}
+                        </strong>
                       </div>
 
                       <div>
                         <span>Remaining</span>
                         <strong>
-                          {order.remainingQuantity.toString()}
+                          {view
+                            ? `${readableAmount(order.remainingQuantity, view.market.baseDecimals)} ${labels?.base}`
+                            : "Units unavailable"}
                         </strong>
                       </div>
 
                       <div>
                         <span>Filled</span>
                         <strong>
-                          {order.quantity
-                            .sub(order.remainingQuantity)
-                            .toString()}
+                          {view
+                            ? `${readableAmount(order.quantity.sub(order.remainingQuantity), view.market.baseDecimals)} ${labels?.base}`
+                            : "Units unavailable"}
                         </strong>
                       </div>
 
                       <div>
                         <span>Locked collateral</span>
                         <strong>
-                          {order.lockedCollateral.toString()} raw{" "}
-                          {side === "bid" ? "quote" : "base"}
+                          {view
+                            ? `${readableAmount(order.lockedCollateral, side === "bid" ? view.market.quoteDecimals : view.market.baseDecimals)} ${side === "bid" ? labels?.quote : labels?.base}`
+                            : "Units unavailable"}
                         </strong>
                       </div>
                     </div>
@@ -262,9 +329,7 @@ export function Orders() {
                           disabled={pendingOrder !== null}
                           onClick={() => void cancelOrder(order)}
                         >
-                          {pendingOrder === address
-                            ? "Canceling…"
-                            : "Cancel"}
+                          {pendingOrder === address ? "Canceling…" : "Cancel"}
                         </button>
                       )}
                     </div>
@@ -276,9 +341,7 @@ export function Orders() {
         )}
 
         {error && (
-          <div className="transaction-message transaction-error">
-            {error}
-          </div>
+          <div className="transaction-message transaction-error">{error}</div>
         )}
 
         {signature && (

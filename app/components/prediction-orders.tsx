@@ -133,7 +133,9 @@ export function PredictionOrders({
         to your wallet.
       </p>
       {!PREDICTION_CANCELLATION_ENABLED && (
-        <p>Cancellation is awaiting deployment of this program version.</p>
+        <p>
+          Prediction order cancellation is disabled in this app configuration.
+        </p>
       )}
       {loading && <p role="status">Loading orders…</p>}
       {error && (

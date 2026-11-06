@@ -1,30 +1,313 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PROGRAM_EXPLORER_URL, PROGRAM_ID } from "../lib/solana";
 import { AppHeader } from "./app-header";
 
 type ProgramStatus = "checking" | "deployed" | "not-deployed" | "unavailable";
 
-const shortAddress = (address: string) =>
-  `${address.slice(0, 5)}…${address.slice(-5)}`;
+/** Decorative order flow, not live prices or a simulated trading result. */
+function OrderFlow() {
+  return (
+    <div
+      className="landing-flow"
+      role="img"
+      aria-label="Illustration of buy and sell orders for a YES contract meeting"
+    >
+      <div className="flow-orbit flow-orbit-outer" aria-hidden="true" />
+      <div className="flow-orbit flow-orbit-inner" aria-hidden="true" />
+      <svg
+        className="flow-paths"
+        viewBox="0 0 560 440"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient
+            id="flow-sell"
+            x1="110"
+            y1="80"
+            x2="280"
+            y2="220"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#ff9b86" />
+            <stop offset="1" stopColor="#b5a2ff" />
+          </linearGradient>
+          <linearGradient
+            id="flow-buy"
+            x1="450"
+            y1="360"
+            x2="280"
+            y2="220"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop stopColor="#6de6d1" />
+            <stop offset="1" stopColor="#b5a2ff" />
+          </linearGradient>
+        </defs>
+        <path
+          className="flow-track"
+          d="M110 110H180Q220 110 220 150V170Q220 220 280 220"
+          stroke="url(#flow-sell)"
+        />
+        <path
+          className="flow-track"
+          d="M450 330H380Q340 330 340 290V270Q340 220 280 220"
+          stroke="url(#flow-buy)"
+        />
+        <path
+          className="flow-trail"
+          d="M110 110H180Q220 110 220 150V170Q220 220 280 220"
+          stroke="url(#flow-sell)"
+        />
+        <path
+          className="flow-trail flow-trail-buy"
+          d="M450 330H380Q340 330 340 290V270Q340 220 280 220"
+          stroke="url(#flow-buy)"
+        />
+      </svg>
+      <div className="flow-order flow-order-sell" aria-hidden="true">
+        <span>
+          Sell YES <i>↘</i>
+        </span>
+        <div>
+          <b />
+          <b />
+          <b />
+        </div>
+      </div>
+      <div className="flow-center" aria-hidden="true">
+        <span>⇄</span>
+      </div>
+      <div className="flow-order flow-order-buy" aria-hidden="true">
+        <span>
+          Buy YES <i>↗</i>
+        </span>
+        <div>
+          <b />
+          <b />
+          <b />
+        </div>
+      </div>
+      <span className="flow-caption" aria-hidden="true">
+        One outcome. Two sides of the book.
+      </span>
+    </div>
+  );
+}
 
-const executionSteps = [
-  { number: "01", label: "Fund", detail: "Deposit into a market balance" },
-  { number: "02", label: "Place", detail: "Submit a collateralized limit order" },
-  { number: "03", label: "Settle", detail: "Match FIFO and settle atomically" },
-];
+// Fictional market drafts for the landing demo, not listed markets or forecasts.
+const PREDICTION_EXAMPLES = [
+  {
+    category: "Space",
+    icon: "↗",
+    question: "Will the same rocket booster launch twice in 24 hours?",
+    criteria: "Two orbital launches · same booster · by 31 Dec 2027",
+    evidence: "Operator flight records & launch timestamps",
+    yes: "0.60",
+    no: "0.40",
+    cost: "6",
+  },
+  {
+    category: "Energy",
+    icon: "☀",
+    question: "Will solar supply half of Spain’s electricity for a full day?",
+    criteria: "24-hour generation share ≥ 50% · by 31 Dec 2027",
+    evidence: "National grid operator’s generation data",
+    yes: "0.35",
+    no: "0.65",
+    cost: "3.50",
+  },
+  {
+    category: "Gaming",
+    icon: "⚑",
+    question: "Will a Super Mario Bros. speedrun break 4 minutes 54 seconds?",
+    criteria: "Original game · human any% run · by 31 Dec 2027",
+    evidence: "Verified leaderboard entry & run recording",
+    yes: "0.55",
+    no: "0.45",
+    cost: "5.50",
+  },
+] as const;
+
+/** Scroll changes only this illustration. Prices are examples, never fetched quotes. */
+function PredictionJourney() {
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const example = PREDICTION_EXAMPLES[exampleIndex];
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const node = section.current;
+    if (!node) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    function update() {
+      frame = 0;
+      if (!node) return;
+      const bounds = node.getBoundingClientRect();
+      const progress = Math.min(
+        1,
+        Math.max(
+          0,
+          (innerHeight * 0.6 - bounds.top) /
+            Math.max(1, bounds.height - innerHeight * 0.4),
+        ),
+      );
+      node.style.setProperty(
+        "--journey-progress",
+        String(motion.matches ? 1 : progress),
+      );
+      node.dataset.step = motion.matches
+        ? "2"
+        : String(Math.min(2, Math.floor(progress * 3)));
+    }
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    motion.addEventListener("change", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      motion.removeEventListener("change", schedule);
+    };
+  }, []);
+  return (
+    <section
+      className="prediction-journey"
+      id="how-predictions-work"
+      ref={section}
+      aria-labelledby="journey-title"
+    >
+      <div className="journey-intro">
+        <span className="eyebrow">A question. An order book. Your call.</span>
+        <h2 id="journey-title">
+          From “what if”
+          <br />
+          to your next move.
+        </h2>
+        <p>Scroll through a prediction.</p>
+      </div>
+      <div className="journey-layout">
+        <div className="journey-steps">
+          <article className="journey-step">
+            <span>01 / Choose</span>
+            <h3>
+              Have a view?
+              <br />
+              Take a side.
+            </h3>
+            <p>Find a question. Read its rules. Choose YES or NO.</p>
+          </article>
+          <article className="journey-step">
+            <span>02 / Trade</span>
+            <h3>
+              Your conviction.
+              <br />
+              Your limit price.
+            </h3>
+            <p>
+              Buy or sell outcome contracts with other traders. Your limit sets
+              the price you’ll accept.
+            </p>
+          </article>
+          <article className="journey-step">
+            <span>03 / Understand</span>
+            <h3>
+              Clear rules.
+              <br />
+              Before your trade.
+            </h3>
+            <p>
+              Check the evidence, resolver and cutoff. A winning contract is
+              designed to pay 1 collateral token after final resolution.
+            </p>
+            <small>
+              Resolution and reward claims are still in development.
+            </small>
+          </article>
+        </div>
+        <div className="journey-sticky">
+          <div
+            className="journey-market"
+            aria-label="Illustrative prediction market"
+          >
+            <div className="journey-market-top">
+              <span>EXAMPLE MARKET</span>
+              <span className="journey-demo">Illustration only</span>
+            </div>
+            <div
+              className="journey-example-tabs"
+              role="group"
+              aria-label="Choose an example market"
+            >
+              {PREDICTION_EXAMPLES.map((item, index) => (
+                <button
+                  key={item.category}
+                  type="button"
+                  aria-pressed={index === exampleIndex}
+                  onClick={() => setExampleIndex(index)}
+                >
+                  {item.category}
+                </button>
+              ))}
+            </div>
+            <div className="journey-question-icon" aria-hidden="true">
+              {example.icon}
+            </div>
+            <h3>{example.question}</h3>
+            <p className="journey-question-note">{example.criteria}</p>
+            <div className="journey-outcomes">
+              <div>
+                <span>YES</span>
+                <strong>
+                  {example.yes} <small>tUSDC</small>
+                </strong>
+              </div>
+              <div>
+                <span>NO</span>
+                <strong>
+                  {example.no} <small>tUSDC</small>
+                </strong>
+              </div>
+            </div>
+            <div className="journey-order">
+              <span>Example limit buy</span>
+              <strong>
+                10 YES × {example.yes} = {example.cost} tUSDC
+              </strong>
+              <small>Before fees · only if the order fills</small>
+            </div>
+            <div className="journey-terms">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Know what decides the outcome</strong>
+                <small>{example.evidence}</small>
+              </div>
+            </div>
+            <div className="journey-progress" aria-hidden="true">
+              <span />
+            </div>
+            <p className="journey-card-caption">
+              Example prices, not live quotes or guaranteed probabilities.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function Dashboard() {
   const { connection } = useConnection();
-  const [programStatus, setProgramStatus] =
-    useState<ProgramStatus>("checking");
-
+  const [programStatus, setProgramStatus] = useState<ProgramStatus>("checking");
   const refreshProgramStatus = useCallback(async () => {
     setProgramStatus("checking");
-
     try {
       const account = await connection.getAccountInfo(PROGRAM_ID, "confirmed");
       setProgramStatus(account?.executable ? "deployed" : "not-deployed");
@@ -36,203 +319,132 @@ export function Dashboard() {
   useEffect(() => {
     void refreshProgramStatus();
   }, [refreshProgramStatus]);
-
   const statusLabel = {
-    checking: "Checking program",
-    deployed: "Live on devnet",
-    "not-deployed": "Deployment not found",
+    checking: "Checking program…",
+    deployed: "Program live on devnet",
+    "not-deployed": "Program not found",
     unavailable: "RPC unavailable",
   }[programStatus];
 
   return (
-    <div className="app-shell home-shell">
+    <div className="app-shell landing-shell">
       <AppHeader />
-
       <main id="top">
-        <section className="home-hero">
-          <div className="home-hero-copy">
-            <div className="eyebrow">
-              <span className="eyebrow-dot" />
-              Solana central limit order book
-            </div>
-            <h1>
-              Price-time priority,
-              <span> settled on-chain.</span>
+        <section className="landing-hero" aria-labelledby="landing-title">
+          <div className="landing-copy">
+            <span className="landing-kicker">
+              <i aria-hidden="true" /> Prediction markets on Solana.
+            </span>
+            <h1 id="landing-title">
+              Predict what
+              <br />
+              <span>comes next.</span>
             </h1>
             <p>
-              Tidebook is a working limit-order exchange on Solana devnet. Fund
-              a market, place bids and asks, and watch every fill settle
-              atomically into trader balances.
+              Trade your view on what comes next. YES or NO. Your price, your
+              call.
             </p>
-
-            <div className="home-actions">
-              <Link className="home-primary-action" href="/markets">
-                Explore markets
-                <span aria-hidden="true">↗</span>
+            <div className="landing-actions">
+              <Link className="landing-action-primary" href="/predictions">
+                Explore predictions <span aria-hidden="true">↗</span>
               </Link>
-              <Link className="home-secondary-action" href="/orders">
-                View my orders
+              <Link
+                className="landing-action-secondary"
+                href="#how-predictions-work"
+              >
+                How it works <span aria-hidden="true">→</span>
               </Link>
             </div>
-
-            <div className="home-trust-row" aria-label="Protocol properties">
-              <span>Non-custodial withdrawal</span>
-              <span>FIFO matching</span>
-              <span>Atomic settlement</span>
+            <div className="landing-tags">
+              <span>YES / NO order books</span>
+              <i aria-hidden="true" />
+              <span>One collateral asset</span>
             </div>
           </div>
-
-          <div className="execution-panel" aria-label="Tidebook execution model">
-            <div className="execution-panel-head">
-              <div>
-                <span className="panel-kicker">Execution model</span>
-                <strong>One transaction path</strong>
-              </div>
-              <div className={`program-chip program-chip-${programStatus}`}>
-                <span />
-                {statusLabel}
-              </div>
-            </div>
-
-            <div className="book-visual" aria-hidden="true">
-              <div className="book-side book-sells">
-                <span>SELL</span>
-                <i style={{ width: "47%" }} />
-                <i style={{ width: "68%" }} />
-                <i style={{ width: "84%" }} />
-              </div>
-              <div className="book-midline">
-                <span>maker price</span>
-                <strong>atomic fill</strong>
-              </div>
-              <div className="book-side book-buys">
-                <i style={{ width: "76%" }} />
-                <i style={{ width: "57%" }} />
-                <i style={{ width: "38%" }} />
-                <span>BUY</span>
-              </div>
-            </div>
-
-            <div className="execution-steps">
-              {executionSteps.map((step) => (
-                <div className="execution-step" key={step.number}>
-                  <span>{step.number}</span>
-                  <div>
-                    <strong>{step.label}</strong>
-                    <p>{step.detail}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="prediction-hero-art">
+            <span className="hero-art-label">
+              A market for every point of view.
+            </span>
+            <OrderFlow />
           </div>
         </section>
-
-        <section className="protocol-strip" aria-label="Protocol status">
-          <article>
-            <div className="protocol-strip-top">
-              <span className={`status-indicator status-${programStatus}`} />
-              <span>Program</span>
-            </div>
-            <strong>{statusLabel}</strong>
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => void refreshProgramStatus()}
-              disabled={programStatus === "checking"}
+        <p className="landing-rollout-note">
+          Devnet preview · Prediction trading is in development. Resolution and
+          reward claims are not available yet.
+        </p>
+        <PredictionJourney />
+        <section
+          className="landing-secondary"
+          aria-labelledby="secondary-title"
+        >
+          <div className="secondary-heading">
+            <span className="eyebrow">More on Tidebook</span>
+            <h2 id="secondary-title">Beyond predictions.</h2>
+          </div>
+          <nav className="landing-destinations" aria-label="More on Tidebook">
+            <Link
+              className="landing-destination destination-spot"
+              href="/markets"
             >
-              Refresh status
-            </button>
-          </article>
-          <article>
-            <div className="protocol-strip-top">
-              <span className="strip-index">01</span>
-              <span>Matching</span>
-            </div>
-            <strong>Price, then time</strong>
-            <p>Orders at each price level execute in FIFO order.</p>
-          </article>
-          <article>
-            <div className="protocol-strip-top">
-              <span className="strip-index">02</span>
-              <span>Risk model</span>
-            </div>
-            <strong>Fully collateralized</strong>
-            <p>Balances are locked before an order enters the book.</p>
-          </article>
-          <article>
-            <div className="protocol-strip-top">
-              <span className="strip-index">03</span>
-              <span>Data</span>
-            </div>
-            <strong>Indexer-ready events</strong>
-            <p>Finalized protocol events flow into PostgreSQL.</p>
-          </article>
+              <span className="destination-icon" aria-hidden="true">
+                ↗
+              </span>
+              <div>
+                <h2>Spot markets</h2>
+                <p>Find your next trade.</p>
+              </div>
+              <span className="destination-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </Link>
+            <Link
+              className="landing-destination destination-orders"
+              href="/orders"
+            >
+              <span className="destination-icon" aria-hidden="true">
+                ≋
+              </span>
+              <div>
+                <h2>Your orders</h2>
+                <p>Track fills. Cancel open orders.</p>
+              </div>
+              <span className="destination-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </Link>
+          </nav>
         </section>
-
-        <section className="home-capabilities">
-          <div className="home-section-heading">
-            <div>
-              <div className="eyebrow">The complete trading loop</div>
-              <h2>More than an order form.</h2>
-            </div>
-            <p>
-              The interface exposes the same lifecycle enforced by the
-              program—from collateral to cancellation, matching, fees, and
-              withdrawal.
-            </p>
+        <div className="landing-status">
+          <div role="status">
+            <span
+              className={`landing-status-dot landing-status-${programStatus}`}
+              aria-hidden="true"
+            />
+            {statusLabel}
           </div>
-
-          <div className="capability-grid">
-            <article>
-              <span className="capability-number">01 / MARKETS</span>
-              <h3>Discover the live book</h3>
-              <p>
-                Inspect active markets, price levels, vaults, balances, and the
-                latest traded price.
-              </p>
-              <Link href="/markets">Open markets →</Link>
-            </article>
-            <article>
-              <span className="capability-number">02 / ORDERS</span>
-              <h3>Control every order</h3>
-              <p>
-                Track open, filled, and cancelled orders. Release locked funds
-                by cancelling directly from your wallet.
-              </p>
-              <Link href="/orders">Review orders →</Link>
-            </article>
-            <article>
-              <span className="capability-number">03 / SETTLEMENT</span>
-              <h3>Keep assets accounted for</h3>
-              <p>
-                Maker and taker balances update atomically while protocol fees
-                remain separately accounted for.
-              </p>
-              <a href={PROGRAM_EXPLORER_URL} target="_blank" rel="noreferrer">
-                Inspect program ↗
-              </a>
-            </article>
-          </div>
-        </section>
-
-        <section className="home-program-callout">
-          <div>
-            <span className="panel-kicker">Verifiable by default</span>
-            <h2>The program is the source of truth.</h2>
-          </div>
-          <div className="program-address-block">
-            <span>Devnet program</span>
-            <code>{shortAddress(PROGRAM_ID.toBase58())}</code>
-            <a href={PROGRAM_EXPLORER_URL} target="_blank" rel="noreferrer">
-              View on Explorer ↗
-            </a>
-          </div>
-        </section>
+          <button
+            type="button"
+            disabled={programStatus === "checking"}
+            onClick={() => void refreshProgramStatus()}
+            aria-label="Refresh program status"
+          >
+            Refresh <span aria-hidden="true">↻</span>
+          </button>
+          <a href={PROGRAM_EXPLORER_URL} target="_blank" rel="noreferrer">
+            View program <span aria-hidden="true">↗</span>
+          </a>
+          <span className="landing-devnet-note">Devnet · test tokens only</span>
+        </div>
       </main>
-
-      <footer>
-        <span>Tidebook · on-chain order book</span>
-        <span>Anchor · Solana · PostgreSQL</span>
+      <footer className="landing-footer">
+        <span>Tidebook. Built on Solana.</span>
+        <a
+          href="https://github.com/kunal171/tidebook"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open source ↗
+        </a>
       </footer>
     </div>
   );

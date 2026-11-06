@@ -1,0 +1,316 @@
+.wallet-page-heading,
+.wallet-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.wallet-page-heading {
+  margin-bottom: 24px;
+}
+.wallet-page-heading .route-heading {
+  margin-bottom: 0;
+}
+.wallet-page-heading h1 {
+  margin-bottom: 8px;
+}
+.wallet-address-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.wallet-address-bar code {
+  color: var(--ink);
+}
+.wallet-address-bar a {
+  text-decoration: none;
+}
+.wallet-network-tag {
+  padding: 6px 9px;
+  border: 1px solid #79e8d430;
+  background: #79e8d40a;
+  color: var(--buy);
+  border-radius: 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wallet-updated {
+  margin-left: auto;
+  font-size: 11px;
+}
+.wallet-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.wallet-summary article {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--panel);
+  min-width: 0;
+}
+.wallet-summary strong {
+  display: block;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(25px, 3vw, 38px);
+  margin: 16px 0 12px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-summary article:first-child strong {
+  color: var(--buy);
+}
+.wallet-summary strong small {
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.wallet-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.wallet-section-heading h2 {
+  margin: 8px 0 0;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+.wallet-muted,
+.wallet-table-note,
+.wallet-footnote {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.wallet-assets {
+  min-width: 0;
+  /* Tall, horizontally scrollable cards exceed some mobile blur layers. */
+  backdrop-filter: none;
+}
+.wallet-asset-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 24px 0;
+}
+.wallet-search-label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  width: min(340px, 100%);
+}
+.wallet-search-label input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--surface-inset);
+  outline-offset: 3px;
+  font-size: 14px;
+}
+.wallet-hide-empty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.wallet-hide-empty input {
+  accent-color: var(--accent);
+}
+.wallet-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.wallet-assets-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  text-align: right;
+  font-size: 14px;
+}
+.wallet-assets-table thead {
+  color: var(--muted);
+  background: #11101b70;
+}
+.wallet-assets-table th {
+  padding: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.wallet-assets-table td {
+  padding: 20px 16px;
+  border-top: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.wallet-assets-table tbody th {
+  border-top: 1px solid var(--line);
+}
+.wallet-assets-table th:first-child {
+  text-align: left;
+}
+.wallet-assets-table tbody strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.wallet-assets-table a {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.wallet-assets-table small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.wallet-assets-table td:nth-child(3) {
+  color: var(--buy);
+}
+.wallet-assets-table .wallet-locked {
+  color: var(--coral);
+}
+.wallet-table-note {
+  margin-bottom: 0;
+  font-size: 11px;
+}
+.wallet-market-section {
+  margin-top: 44px;
+}
+.wallet-market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 22px;
+}
+.wallet-market-card {
+  min-width: 0;
+}
+.wallet-market-card h3 {
+  font-size: 21px;
+  line-height: 1.4;
+  margin: 12px 0 7px;
+  overflow-wrap: anywhere;
+  letter-spacing: -0.03em;
+}
+.wallet-market-address {
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.wallet-market-numbers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 16px;
+  margin: 28px 0;
+}
+.wallet-market-numbers dt {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.wallet-market-numbers dd {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-market-numbers dd small {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.wallet-yes dd {
+  color: var(--buy);
+}
+.wallet-no dd {
+  color: var(--sell);
+}
+.wallet-empty {
+  padding: 24px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.wallet-incomplete {
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.wallet-errors {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.wallet-errors:empty {
+  display: none;
+}
+.wallet-read-error {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #ffb19c30;
+  background: #ffb19c06;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--sell);
+  overflow-wrap: anywhere;
+}
+.wallet-read-error strong {
+  font-weight: 600;
+}
+.wallet-footnote {
+  margin: 36px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+@media (max-width: 800px) {
+  .wallet-summary {
+    grid-template-columns: 1fr;
+  }
+  .wallet-summary article {
+    padding: 20px;
+  }
+  .wallet-summary strong {
+    margin-block: 10px;
+  }
+  .wallet-market-grid {
+    grid-template-columns: 1fr;
+  }
+  .wallet-page-heading,
+  .wallet-section-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .wallet-updated {
+    width: 100%;
+    margin: 0;
+  }
+}

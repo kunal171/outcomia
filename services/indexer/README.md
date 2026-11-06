@@ -1,77 +1,98 @@
-# Tidebook Indexer
+# Tidebook indexer
 
-Rust service that reads finalized Tidebook transactions, decodes all 21 Anchor
-event types, and stores replayable source records in PostgreSQL. It is a
-separate Cargo workspace so its RPC and database dependencies can evolve
-independently from the on-chain program.
+Rust service that stores finalized Tidebook transactions and decoded Anchor
+events in PostgreSQL. It backfills history, resumes from durable checkpoints
+and recovers missed transactions when the live subscription reconnects.
 
-## Current scope
+This is a separate Cargo workspace. Its RPC/database dependencies can change
+without forcing the Anchor program and LiteSVM onto the same versions.
 
-- Paginates finalized program history in bounded batches and resumes from a
-  durable PostgreSQL cursor.
-- Processes successful records oldest-first within each RPC page while using
-  the raw page boundary, including failed entries, as the next cursor.
-- Accepts `Program data:` only while Tidebook is the active invocation.
-- Preserves raw logs, Base64 payloads, log indexes, decoded JSON, and schema
-  versions.
-- Writes each transaction and its events atomically.
-- Treats exact replay as success and rejects conflicting source data.
-- Advances the checkpoint only after every successful record in a page commits.
-- Subscribes to finalized program logs, then closes the startup gap over HTTP.
-- Recovers over HTTP after every wake-up and reconnect with capped backoff.
+## Coverage
 
-Historical backfill and recoverable live source ingestion are complete.
-Read-optimized projections, reconciliation, and APIs remain separate phases.
+The decoder supports the 21 event types in `src/decoder.rs`: governance, market
+metadata, spot orders/fills, balances, fees and the test faucet. It accepts
+`Program data:` only while Tidebook is the active invocation.
 
-## Runtime structure
+Prediction instructions currently emit no prediction-specific events. Shared
+metadata events can be decoded, and source transactions are retained, but this
+service does not reconstruct prediction positions, orders or fills. Adding
+prediction events requires updating the decoder catalog and its Borsh types.
+Unknown or malformed events stop processing rather than being silently skipped.
 
-```text
-main
- |-- backfill -> HTTP RPC -> processor -> decoder -> source storage
- `-- subscription -> wake-up -> HTTP gap recovery -> processor
-                                      `-> durable live checkpoint
-```
-
-`main` owns bootstrap, reconnect timing, and Ctrl+C shutdown. `backfill` owns
-bounded historical pagination. `subscription` establishes finalized log
-wake-ups but never persists their payloads. `live` reloads the durable boundary
-and recovers complete transactions through HTTP. `processor` fetches, decodes,
-and persists one transaction; `reporter` keeps diagnostics outside control flow.
+Read-optimized projections, reconciliation and a public query API are still
+planned. The health endpoints are operational checks, not a trading API.
 
 ## Run locally
 
-From the repository root:
+Run these commands from the repository root. Copy the example only on first
+setup; preserve an existing `.env`.
 
 ```bash
 cp services/indexer/.env.example services/indexer/.env
-docker compose -f services/indexer/compose.yaml up -d
+```
 
+Choose one runtime:
+
+**Docker Compose** runs both the database and the indexer:
+
+```bash
+docker compose -f services/indexer/compose.yaml up -d --build
+docker compose -f services/indexer/compose.yaml logs --tail=50 indexer
+curl --fail http://127.0.0.1:8080/health/live
+curl --fail http://127.0.0.1:8080/health/ready
+```
+
+Compose supplies the container's database URL. RPC/program settings can be
+supplied through the shell or Compose's explicit `--env-file` option. Do not
+expect the running containers to read the Rust process's environment file.
+
+**Host Rust process** uses only the Compose database:
+
+```bash
+docker compose -f services/indexer/compose.yaml up -d postgres
 set -a
 source services/indexer/.env
 set +a
-
 cargo run --manifest-path services/indexer/Cargo.toml
 ```
 
-The local database uses `127.0.0.1:5434` because ports `5432` and `5433` are
-already used by other local PostgreSQL services. `DATABASE_URL` is required.
-`SOLANA_RPC_URL`, `SOLANA_WS_URL`, and `TIDEBOOK_PROGRAM_ID` have devnet
-defaults. Pending migrations run automatically before ingestion.
+Stop an existing Compose indexer before using the host process; both would
+otherwise compete for port `8080` and write the same checkpoints. Run one
+indexer per program/database configuration.
 
-Useful database commands:
+The database is exposed on loopback port `5434`; containers use `postgres:5432`.
+`DATABASE_URL` is required. RPC, WebSocket and program settings default to devnet
+and `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`. SQLx migrations run at startup.
+The host process needs Rust `1.97.1`; Docker uses the pinned builder image.
 
-```bash
-cd services/indexer
-sqlx migrate info
-sqlx migrate run
+For [Kind/Kubernetes](infra/kubernetes/README.md), use the separate manifest
+setup. These local runtimes do not establish a cloud deployment.
 
-docker compose -f compose.yaml stop
+## Processing flow
+
+```text
+historical pages -> processor -> decoder -> PostgreSQL transaction + events
+live subscription -> wake-up -> HTTP gap recovery -> same processor
+                                      -> durable checkpoint
 ```
 
-For the local Kind deployment, resource relationships, health checks, and
-recovery procedure, see [`infra/kubernetes/README.md`](infra/kubernetes/README.md).
+- Historical pages are processed oldest-first within each page. The raw page
+  boundary, including failed entries, provides the pagination cursor.
+- Transactions and events commit together. Exact replay succeeds; conflicting
+  records roll back. A failed page does not advance its checkpoint.
+- Live subscription starts before HTTP catch-up. WebSocket messages only wake
+  recovery; finalized HTTP transactions are the persisted source.
+- Reconnects use capped backoff. An incomplete gap beyond the page limit stops
+  before partial processing; increase the bound or investigate the lag.
+- Processing is serial. Ctrl+C/SIGTERM uses the graceful shutdown path.
 
-## Verify
+Raw logs, payloads, log indexes, decoded JSON and schema versions are retained
+for replay. Failed or non-finalized transactions are not persisted.
+
+## Health and checks
+
+`/health/live` reports process liveness. `/health/ready` also requires successful
+catch-up and a reachable database. Readiness is not a time-based lag metric.
 
 ```bash
 cargo fmt --manifest-path services/indexer/Cargo.toml --all --check
@@ -79,36 +100,12 @@ cargo test --manifest-path services/indexer/Cargo.toml
 cargo clippy --manifest-path services/indexer/Cargo.toml --all-targets -- -D warnings
 ```
 
-Run the isolated PostgreSQL integration tests with:
+Run the isolated PostgreSQL integration tests against a local test database:
 
 ```bash
 DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5434/postgres \
   cargo test --manifest-path services/indexer/Cargo.toml -- --ignored
 ```
 
-## Safety guarantees
-
-- Failed or non-finalized transactions are never persisted.
-- Unknown, malformed, truncated, and trailing event data fails closed.
-- Nested CPI data cannot be misclassified as a Tidebook event.
-- Integer conversions are checked before opening a database transaction.
-- Conflicts roll back the complete transaction and event batch.
-- A transaction, decoder, or storage error leaves the page checkpoint unchanged.
-- A terminal empty page retains the last historical cursor for auditing.
-- Live subscription starts before HTTP catch-up, so startup notifications are
-  buffered instead of falling into a subscribe-after-catch-up race.
-- WebSocket logs are wake-ups only; HTTP finalized transactions remain the
-  authoritative persisted source.
-- Disconnects trigger capped exponential backoff, resubscription, and another
-  checkpoint-based HTTP recovery.
-- An incomplete live gap is not partially processed when it exceeds the page
-  cap; operators must increase the bound or investigate the lag.
-- Callbacks run serially, favoring deterministic checkpoint order over maximum
-  notification throughput. Yellowstone remains a later scaling option.
-- Ctrl+C stops both an active subscription and a reconnect delay cleanly.
-
-## Next
-
-1. Read-optimized projections and an API.
-2. Account reconciliation and operational monitoring.
-3. Yellowstone evaluation only if standard RPC becomes the measured bottleneck.
+Future work: query projections/API, account reconciliation and monitoring.
+Yellowstone is a later option if measured RPC limits justify it.

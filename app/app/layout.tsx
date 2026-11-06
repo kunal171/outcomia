@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
+import "./landing.css";
+import "./navigation.css";
 import { SolanaProvider } from "@/components/solana-provider";
 
 export const metadata: Metadata = {
-  title: "Tidebook | On-chain limit order book",
+  title: "Tidebook | Prediction markets on Solana",
   description:
-    "A working central limit order book on Solana with FIFO matching and atomic settlement.",
+    "Explore YES/NO prediction markets on Solana, with limit orders and transparent market rules. Spot trading also available.",
 };
 
 export default function RootLayout({
