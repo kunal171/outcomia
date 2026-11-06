@@ -31,7 +31,7 @@ export function rpcErrorMessage(
  * never replayed after a network error. Genesis checks reject mainnet/testnet.
  * Account reads are only coalesced while in flight; live balance and planning
  * reads are not served from a TTL cache. Discovery/history use short caches.
- * WebSocket subscriptions still use ConnectionProvider's primary endpoint.
+ * WebSocket subscriptions use the provider's separate public devnet WS endpoint.
  */
 export function createRpcFetch(
   endpoints: string[],

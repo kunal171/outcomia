@@ -19,6 +19,7 @@ Open `http://localhost:3000`. For checks:
 npm run typecheck
 npm run test:prediction
 npm run test:wallet
+npm run test:rpc-proxy
 npm run test:shared
 npm run build
 ```
@@ -33,22 +34,30 @@ Use the current devnet program and your own Helius endpoint:
 
 ```dotenv
 NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
-NEXT_PUBLIC_HELIUS_RPC_URL=https://devnet.helius-rpc.com
-NEXT_PUBLIC_HELIUS_API_KEY=<your-key>
+HELIUS_RPC_URL=https://devnet.helius-rpc.com
+HELIUS_API_KEY=<your-server-key>
+NEXT_PUBLIC_RPC_PROXY_ENABLED=true
+NEXT_PUBLIC_SOLANA_WS_URL=wss://api.devnet.solana.com/
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 NEXT_PUBLIC_SOLANA_RPC_FALLBACK_URLS=https://solana-devnet.api.onfinality.io/public,https://api.devnet.solana.com
 ```
 
-A full Helius URL containing `?api-key=...` also works; leave the separate key
-blank in that case. If Helius is unconfigured, the generic RPC is primary.
-`NEXT_PUBLIC_*` values are visible in the browser. Restrict the Helius key to
-your app domains; never put private signing keys in these variables.
+A full Helius URL containing `?api-key=...` also works; keep it in the server-only
+`HELIUS_RPC_URL`, never a `NEXT_PUBLIC_` variable. Store both Helius settings as
+Vercel Secrets. The browser uses its own deployment's `/api/solana` endpoint.
+Public Config contains only the proxy flag, program ID and key-free fallbacks.
 
 HTTP reads verify devnet, pace requests, coalesce duplicates and fail over when
 a provider is busy. Discovery/history reads have short caches; balance and
-transaction-planning account reads are not TTL-cached. Broadcasts are not
-replayed automatically after a network failure. WebSockets use the primary
-endpoint. `FAUCET_SOLANA_RPC_URL` overrides the server faucet's RPC.
+planning reads are not TTL-cached. Signed broadcasts are forwarded once and
+are never automatically replayed after a network failure. WebSockets use the
+separate public devnet WS URL; Vercel's HTTP route does not host WebSockets.
+`FAUCET_SOLANA_RPC_URL` still overrides the server faucet's RPC.
+
+The RPC route allows the app's methods, restricts program scans to Tidebook,
+limits request/response sizes and batches, and redacts upstream error URLs.
+Its per-instance rate limit is a soft bound, not a distributed quota. It does
+not replace the durable Redis requirement for public token-faucet claims.
 
 `.env.local` overrides `.env`. Restart the dev server after changing public
 settings. On Vercel, set the same variables in the project and rebuild: Next.js
@@ -75,7 +84,7 @@ flags when targeting an older binary, even if it uses the same program ID.
 Cancellation has its own gate so stopping new orders need not block exits.
 The program independently checks roles, signatures, balances and trading times.
 
-Resolution and redemption are implemented locally behind upgrade flags. Legacy
+Resolution and redemption are deployed on devnet and use explicit rollout flags. Legacy
 prediction fee withdrawal remains separate. Trading fills settle internal balances; final outcome settlement
 is a different step. The UI's help dialogs explain this distinction.
 
@@ -197,15 +206,16 @@ with incompatible versions.
 
 ## Shared custody and settlement rollout
 
-Leave these false while the previous devnet program is running:
+The current devnet program passed its live smoke test. Enable these when using
+that program:
 
 ```env
-NEXT_PUBLIC_SHARED_BALANCES_ENABLED=false
-NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED=false
+NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true
+NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED=true
 ```
 
-After the program upgrade and a successful devnet smoke test, enable both and
-rebuild/redeploy the app. No new instructions are submitted by default. A market's
+Production and Preview enable both flags. Defaults and `.env.example` remain off
+for safe rollout to other program binaries; keep them off for an older deployment. A market's
 active-admin creator enables its shared book from the market detail page.
 The new panel displays shared orders separately from legacy liquidity.
 

@@ -394,6 +394,12 @@ export function WalletWorkspace() {
                 </div>
               )}
               <p className="wallet-table-note">
+                {SHARED_BALANCES_ENABLED && (
+                  <>
+                    Totals include legacy market cash. Move it to the shared
+                    wallet before using it across markets.{" "}
+                  </>
+                )}
                 Amounts are token units, not a combined dollar value. Tidebook
                 total = available + in orders; it excludes outcome contracts and
                 collateral backing them. Wallet balances include any frozen

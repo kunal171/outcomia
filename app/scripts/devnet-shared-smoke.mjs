@@ -38,28 +38,35 @@ const publicEvidence = path.join(
 );
 const completion = path.join(root, "docs/devnet/shared-smoke-result.json");
 const stage = process.argv[2];
-if (!["prepare", "resolve", "snapshot"].includes(stage))
-  throw new Error("Use prepare, resolve or snapshot");
-// Load only public RPC settings. Never import the faucet's server secret.
+if (!["prepare", "resolve", "snapshot", "activate"].includes(stage))
+  throw new Error("Use prepare, resolve, snapshot or activate");
+// Load only RPC settings. Never import the faucet signing secret.
 const env = {};
 for (const file of [".env", ".env.local"]) {
   const p = path.join(root, "app", file);
   if (fs.existsSync(p))
     for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
       const m = line.match(
-        /^(NEXT_PUBLIC_(?:HELIUS_RPC_URL|HELIUS_API_KEY|SOLANA_RPC_URL))=(.*)$/,
+        /^((?:NEXT_PUBLIC_)?(?:HELIUS_RPC_URL|HELIUS_API_KEY|SOLANA_RPC_URL))=(.*)$/,
       );
       if (m) env[m[1]] = m[2].trim().replace(/^(["'])(.*)\1$/, "$2");
     }
 }
 const rpc = new URL(
   process.env.SOLANA_RPC_URL ||
+    env.HELIUS_RPC_URL ||
     env.NEXT_PUBLIC_HELIUS_RPC_URL ||
     env.NEXT_PUBLIC_SOLANA_RPC_URL ||
     "https://api.devnet.solana.com",
 );
-if (rpc.hostname === "devnet.helius-rpc.com" && env.NEXT_PUBLIC_HELIUS_API_KEY)
-  rpc.searchParams.set("api-key", env.NEXT_PUBLIC_HELIUS_API_KEY);
+if (
+  rpc.hostname === "devnet.helius-rpc.com" &&
+  (env.HELIUS_API_KEY || env.NEXT_PUBLIC_HELIUS_API_KEY)
+)
+  rpc.searchParams.set(
+    "api-key",
+    env.HELIUS_API_KEY || env.NEXT_PUBLIC_HELIUS_API_KEY,
+  );
 const connection = new Connection(rpc.toString(), "confirmed");
 const idl = JSON.parse(
   fs.readFileSync(path.join(root, "app/idl/tidebook.json"), "utf8"),
@@ -174,6 +181,12 @@ async function chainTime() {
 }
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function main() {
+  if (["prepare", "resolve"].includes(stage) && state.completed) {
+    console.log(
+      "This checkpoint already completed successfully. See docs/devnet/shared-smoke-result.json.",
+    );
+    return;
+  }
   assert.equal(
     await connection.getGenesisHash(),
     "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
@@ -207,6 +220,73 @@ async function main() {
     "active" in (await a.account.adminRecord.fetch(admin)).status,
     "Active creator admin required",
   );
+  if (stage === "activate") {
+    assert(
+      state.completed,
+      "Complete the isolated smoke test before activating existing markets",
+    );
+    const baseline = JSON.parse(
+      fs.readFileSync(path.join(directory, "before-accounts.json"), "utf8"),
+    );
+    const original = new Set(baseline.map((r) => r.address)),
+      markets = await a.account.market.all(),
+      enabled = [];
+    for (const row of markets) {
+      if (
+        !original.has(row.publicKey.toBase58()) ||
+        !row.account.authority.equals(payer.publicKey)
+      )
+        continue;
+      const book = sdk.sharedBookPda(row.publicKey),
+        existing = await a.account.sharedBook.fetchNullable(book);
+      const label = `activate_existing_${row.publicKey}`;
+      if (!existing)
+        await send(label, a, [
+          await a.methods
+            .initializeSharedBook({ spot: {} })
+            .accountsPartial({
+              authority: payer.publicKey,
+              adminRecord: admin,
+              market: row.publicKey,
+              book,
+              systemProgram: SystemProgram.programId,
+            })
+            .instruction(),
+        ]);
+      enabled.push({
+        market: row.publicKey.toBase58(),
+        sharedBook: book.toBase58(),
+        signature: state.steps[label] ?? null,
+      });
+    }
+    const current = await connection.getMultipleAccountsInfo(
+      baseline.map((r) => new PublicKey(r.address)),
+      "confirmed",
+    );
+    for (let n = 0; n < baseline.length; n++)
+      assert(
+        current[n] &&
+          hash(current[n].data).toString("hex") === baseline[n].sha256,
+        "Original market and user data remain unchanged",
+      );
+    fs.writeFileSync(
+      path.join(root, "docs/devnet/shared-live-markets.json"),
+      JSON.stringify(
+        {
+          program: id.toBase58(),
+          network: "devnet",
+          originalAccountsPreserved: baseline.length,
+          enabled,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+    console.log(
+      `Enabled ${enabled.length} original market books without moving any user funds.`,
+    );
+    return;
+  }
   if (!fs.existsSync(keysFile)) {
     const keys = {};
     for (const label of ["base", "quote", "taker"])
@@ -803,6 +883,7 @@ async function main() {
       ["base", base],
       ["quote", quote],
     ]) {
+      if (state.steps[`close_${label}_${symbol}_ata`]) continue;
       const token = await getOrCreateAssociatedTokenAccount(
         connection,
         payer,
@@ -860,7 +941,13 @@ async function main() {
     globalQuoteVault: "0",
     spotClosed: true,
     expiredUnfundedDrafts: state.expiredUnfundedDrafts ?? [],
-    transactions: state.steps,
+    transactions: Object.fromEntries(
+      Object.entries(state.steps).filter(
+        ([, v]) => typeof v === "string" && v.length >= 80,
+      ),
+    ),
+    result:
+      "PASS: shared custody, trading, resolution, redemption and cleanup verified on devnet.",
   };
   fs.writeFileSync(completion, JSON.stringify(report, null, 2) + "\n");
   state.completed = true;
@@ -878,6 +965,7 @@ main()
     text = text.split(rpc.toString()).join(rpc.origin + "/<redacted>");
     for (const value of [
       rpc.searchParams.get("api-key"),
+      env.HELIUS_API_KEY,
       env.NEXT_PUBLIC_HELIUS_API_KEY,
     ])
       if (value) text = text.split(value).join("<redacted>");
