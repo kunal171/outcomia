@@ -1,0 +1,12 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "network": "devnet",
+  "originalAccountsPreserved": 17,
+  "enabled": [
+    {
+      "market": "3D9Nkyi5Bc3Hrsb5VUfm9jAAg8SUiGNRk1XN1ajPMyg5",
+      "sharedBook": "CUo2nEFgctJutwSZvMwgPurs1jUHms5TL43BqHMxuah2",
+      "signature": "4U5XLKHZTYXyAce4sFMT4XbwbcTnqpADK7bRfnJ2q89LD3wpvRnBU2P4JyTwVU9V8mg5XX12YkWyCjiGsDtQPx7h"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 Design notes for the prediction and spot order books, the web app and the
 indexer. Each feature document includes its account model and limitations;
-new shared custody and payout instructions require a program upgrade before use.
+shared custody and payout instructions are deployed and verified on devnet.
 
 ## Start here
 
@@ -17,9 +17,9 @@ new shared custody and payout instructions require a program upgrade before use.
 - [Devnet deployment](deployment.md): upgrade procedure and program identity.
 - [Devnet addresses](devnet-addresses.md): test mints, wallets and markets.
 
-Prediction trading is deployed on devnet. Shared balances and resolution/claims
-are implemented locally behind rollout flags. Legacy prediction fee withdrawal
-is separate from the new shared-book fee path.
+Shared custody, prediction trading and resolution/claims are deployed on devnet.
+The live smoke report is in [deployment notes](deployment.md). Legacy prediction
+fee withdrawal remains separate from the new shared-book fee path.
 Some design notes describe the earlier implementation sequence; they are not
 live deployment records.
 

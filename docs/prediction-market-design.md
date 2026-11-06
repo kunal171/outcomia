@@ -2,7 +2,8 @@
 
 Status: prediction trading and bounded remainder posting are deployed. Shared
 asset custody, evidence-backed delayed resolution, fallback/timeout handling
-and redemption are implemented locally behind explicit UI rollout flags.
+and redemption are deployed and smoke-tested on devnet. The UI keeps explicit
+rollout flags for other deployments.
 See [shared balances and settlement](shared-balances-resolution.md) for the
 current path and deployment checklist. The implementation sequence below also
 records earlier design decisions; it is not a deployment log.

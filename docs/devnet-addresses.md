@@ -129,3 +129,11 @@ the current application IDL.
 - State the network explicitly when adding an account.
 - Record token program, decimals, and intended role for every new test mint.
 - Update this file whenever shared devnet accounts are created or replaced.
+
+## Shared-wallet deployment smoke test (6 November 2026)
+
+The isolated test mints, wallet, resolved question and all transaction signatures
+are recorded in [the smoke result](devnet/shared-smoke-result.json). Both token
+supplies were burned after withdrawal. They are not the public faucet assets.
+[Existing market activation](devnet/shared-live-markets.json) records the new
+shared book without moving legacy funds.

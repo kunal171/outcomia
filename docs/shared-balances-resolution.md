@@ -1,5 +1,9 @@
 # Shared balances and prediction settlement
 
+Deployed and smoke-tested on devnet on 6 November 2026. See
+[deployment evidence](deployment.md) for byte verification, transactions and
+existing-market activation. Flags remain explicit for other deployments.
+
 ## Shared wallet
 
 One `AssetBalance` belongs to `(owner, mint)`. It holds available and locked
@@ -156,7 +160,7 @@ real account decoding and mocked RPC. Both rollout configurations build.
 
 Local browser fixtures check desktop/mobile layout, zero-free withdrawal,
 closed-market entry, proposal maturity, redemption controls and retained history.
-Their wallet cannot sign. These checks do not replace the devnet smoke test.
+Their wallet cannot sign. The subsequent devnet smoke test also passed; its report is linked above.
 Market discovery reads shared-book heads/counts when enabled; old prices and
 recovery controls are explicitly labeled legacy. A shared-book midpoint is an
 indicative quote, not a last trade. Closed-book history stays visible without

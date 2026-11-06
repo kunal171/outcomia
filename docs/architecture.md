@@ -1,5 +1,14 @@
 # Tidebook Architecture
 
+## Browser RPC
+
+Browsers call `/api/solana` on the same deployment. The server forwards allowed
+RPC methods to Helius using private environment variables. Keys stay out of the
+client bundle and error responses. HTTP reads retain bounded public-devnet
+failover; signed broadcasts are not replayed. Public devnet WebSockets are
+configured separately. The proxy has request/response limits and a soft
+per-instance request allowance, not a distributed rate-limit store.
+
 ## Shared custody update
 
 The new execution path uses `AssetBalance(owner, mint)` and one SPL vault per

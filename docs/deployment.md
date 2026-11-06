@@ -8,9 +8,44 @@
 | Program ID                    | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` |
 | ProgramData address           | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` |
 | Upgrade authority             | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` |
-| Last verified deployment slot | `505480906`                                    |
+| Last verified deployment slot | `519350600`                                    |
 
 [Open the program in Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+
+## Shared-wallet release: 6 November 2026
+
+The deployed executable exactly matches the local build:
+
+- SHA-256: `484c86e0a4901bb59dfcb8577a30ce9188e2c7a9144cd5ec7b3d6a3170c6ede7`
+- Length: 1,399,440 bytes.
+- [Upgrade transaction](https://explorer.solana.com/tx/2WWikPwvAubAoSwcWPLwQeW6AVGoxSa649Snk8c3TgWwmWNMYdZpANm2DYp29zpmaxJJkhDjGPY9LQMYk6cjBjQZ?cluster=devnet).
+- All 17 existing program account data hashes were preserved.
+- [Live smoke evidence](devnet/shared-smoke-evidence.json),
+  [completed test](devnet/shared-smoke-result.json), and
+  [existing-market activation](devnet/shared-live-markets.json).
+
+The two-wallet test used fresh mints. It checked shared spot and YES trades,
+reuse of the same quote balance, paused cancellation, reserve conservation,
+creator proposal, delayed finalization by the second wallet, redemption, fee
+withdrawal, asset withdrawal and safe spot shutdown. Both test-token supplies
+were burned and spare test-wallet SOL returned. One earlier unfunded test Draft
+expired; it remains listed in the completion report with no claims or reserve.
+
+The original spot market now has a separate shared book. No old cash, locks or
+orders were moved. Owners can cancel legacy orders and move free cash through
+`/wallet`. Production/Preview rollout flags enable shared balances and resolution.
+
+Helius browser requests now use `/api/solana`. The Helius URL and API key are
+server-only Vercel Secrets. Public Config holds the proxy flag and key-free
+fallback/WS URLs. The route bounds methods, scans, batches and payload sizes;
+errors cannot return the upstream credential. Redis remains required for public
+faucet claims; this release does not enable the deferred faucet counter fallback.
+
+During this upgrade, Helius returned null for the funded loader buffer while
+the official RPC returned its confirmed/finalized account. Both reported the
+devnet genesis. Resuming the same buffer through the official RPC succeeded;
+no extra buffer was allocated. Keep a failed deployment's checkpoint and check
+the buffer's authority/state before trying to create another one.
 
 ## Deploying updates
 
