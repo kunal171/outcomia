@@ -1,341 +1,164 @@
-# Tidebook App
+# Tidebook app
 
-The Tidebook web application is a Next.js App Router, React, and TypeScript
-client for the Anchor program.
+Next.js App Router UI for Tidebook's prediction and spot markets. The landing
+page leads with predictions; spot markets and order management remain available.
 
-## Run locally
+## Local setup
+
+From this directory:
 
 ```bash
-npm install
+npm ci
+cp .env.example .env.local  # First setup only; do not replace existing values.
 npm run dev
 ```
 
-Create a production build with:
+Open `http://localhost:3000`. For checks:
 
 ```bash
+npm run typecheck
+npm run test:prediction
 npm run build
 ```
 
-## Current UI milestone
+`test:prediction` covers rule parsing, hashes, addresses and matching plans.
+It does not submit devnet transactions.
 
-- Connect a browser wallet through Solana Wallet Adapter.
-- Connect to Solana devnet.
-- Discover active and paused markets without connecting a wallet.
-- Display the connected wallet's aggregate base and quote SPL balances beside
-  its market-specific internal free and locked balances.
-- Enter deposits, withdrawals, prices, and quantities in human token units;
-  the client performs exact decimal-to-atomic conversion before signing.
-- Create markets as an active protocol administrator.
-- Create named spot or experimental markets atomically, attach labels to older
-  markets, and update symbols or display names without changing market type.
-- Open a dedicated administrator settings page from each market detail route to
-  initialize or update its human-readable metadata.
-- Submit bids and asks that either cross up to three best-price FIFO makers in
-  one atomic transaction or rest as collateralized limit orders, including
-  empty, best, middle, worst, and same-price FIFO insertion paths.
-- Atomically post a valid taker remainder when the bounded path exhausts the
-  crossing book or reaches a non-crossing price; keep it free only when more
-  crossing liquidity remains beyond the cap or its bid notional rounds to zero.
-- List wallet-owned open, filled, and canceled orders; only open orders expose
-  cancellation, including while a market is paused.
-- Pause, unpause, and safely close markets as their authority.
-- Manage protocol administrators as the super-admin.
-- Provide a server-backed, rate-limited faucet that mints fixed amounts of both
-  valueless assets directly into any connected wallet's associated token
-  accounts.
+## RPC and program settings
 
-The checked-in client IDL mirrors the generated Anchor IDL. After any account
-layout or instruction change, rebuild and redeploy the program before using the
-updated client against devnet.
+Use the current devnet program and your own Helius endpoint:
 
-## Prediction draft foundation
-
-`/markets/new` asks whether to create a Spot or Prediction market. Spot opens
-`/markets/new/spot`; Prediction opens `/predictions/new`. Both forms link back
-to the chooser and retain administrator checks. The spot form always creates
-Spot metadata; prediction creation retains its deployment gate.
-
-- `/predictions`: public prediction-market discovery, including open markets.
-- `/predictions/new`: active-admin form creating the draft, vault, metadata,
-  fees and empty book root in one instruction.
-- `/predictions/[address]`: public inspection of collateral, resolution windows,
-  resolver keys, rules URI and content hashes; connected-wallet position
-  initialization and display of all six free/locked balance fields.
-  The position panel also displays wallet collateral and includes a separately
-  gated deposit/withdrawal form and whole YES/NO pair split/merge actions.
-
-Draft and position creation remain disabled by default. After deploying the
-matching program containing both initializers,
-set `NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true` and rebuild. This switch only
-controls rollout; the program enforces the admin role for drafts and owner
-signatures for positions independently.
-
-Position creation is available to any signing wallet and only pays SOL rent.
-It creates no collateral or outcome claims, and duplicate initialization cannot
-reset existing balances. Confirmation reloads the account; RPC failures do not
-display fabricated zero balances or offer initialization based on a failed read.
-Wallet changes reset the position panel, and the first wallet render is delayed
-until hydration to match the server HTML.
-
-The prediction form includes an editable rules template, optional fallback
-terms, custom text/JSON key-value fields, a JSON preview and download. It uses
-schema version 1 from [`prediction-market-design.md`](../docs/prediction-market-design.md).
-Local date inputs become Unix seconds; the connected creator is the primary resolver.
-Custom fields are nested under `additionalRules` and cannot replace core terms.
-
-After review, the form validates the rules, admin record, mint and price grid,
-then signs an Arweave data item through the connected wallet using Turbo. It
-uploads the generated UTF-8 JSON, fetches the same item from the gateway and
-compares every byte before constructing the Solana market transaction. The
-on-chain URI and SHA-256 hash refer to those exact bytes. Rules are limited to
-64 KiB. The app checks the provider's free allowance, but final eligibility is
-decided at upload; existing storage credits may be used. It never tops up or
-signs Solana storage payments. No storage private key or API route is needed.
-
-Upload and market creation are separate operations. A failed transaction cannot
-undo a public upload. The accepted receipt stays in page state for same-document,
-same-wallet retries and can be downloaded; editing rules requires a new upload.
-Gateway byte verification is not proof of final Arweave block inclusion.
-Refresh/navigation resets the in-memory receipt; download it before leaving.
-
-Turbo 2.2.0 dynamically imports its optional `x402-fetch` peer even in credit
-upload code. Next.js resolves that import during builds, so the peer is installed
-explicitly. No x402 funding mode is enabled. SDK dependencies retain upstream
-audit advisories; do not interpret a passing build as a clean dependency audit.
-
-Contracts use whole quantities and pay one collateral token per winning
-contract. Prices use the mint's precision. Trading is implemented locally;
-resolution and redemption remain later milestones. A new account starts Draft.
-
-Prediction deposits, withdrawals and complete sets are implemented locally. Keep
-`NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=false` against older deployments. After
-deploying all three operations, enable it alongside the draft flag and
-rebuild against the matching program. A deposit credits only free collateral;
-it creates no YES/NO positions. Resolved markets reject deposits.
-
-The form converts human amounts to exact mint atoms, checks wallet balance and
-ledger overflow, then chooses one wallet token account able to fund the amount.
-The displayed wallet balance is aggregated: fragmented funds may require a
-smaller deposit. Failed balance reads disable submission. Confirmed deposits
-refresh wallet and position balances. The program enforces ownership, mint and
-vault checks independently of this UI.
-
-Withdrawals spend available collateral only and work after trading closes or
-resolution. The client creates a missing collateral ATA atomically; wallet SOL
-pays rent. Wallet-balance read errors block deposits but do not block recovering
-a known available position balance. Zero amounts and overspending disable submission.
-
-Splitting one whole pair reserves one collateral token and creates one YES
-plus one NO internal contract. Merging burns a free pair and returns that token
-to available collateral; it does not transfer tokens out of the vault. Locked
-outcomes cannot be merged. Splitting requires Open status before close; merging
-works in Open, Frozen and Proposed. Drafts must be opened first. Confirmation
-refreshes the position and backing reserve.
-
-The market detail page shows an **Open market** control only to the stored
-market authority. It requires Draft status, a time before close and the creator's
-current active admin record. Disabled or removed admins cannot open markets;
-another active admin cannot open someone else's market.
-Opening preserves all committed terms and balances. After deploying the opening
-instruction, set `NEXT_PUBLIC_PREDICTION_OPENING_ENABLED=true` alongside the draft
-flag and rebuild; this new flag defaults false against older binaries. The
-client reloads the market after confirmation and enables position splitting.
-Opening permits funded trading before close, subject to the client rollout gates. The rules document's
-`primaryResolver` must match the creator wallet. The creator will propose the
-outcome once settlement is implemented; traders will claim payouts themselves.
-
-`lib/prediction.ts` also defines the upcoming book, price-level and order account
-interfaces and their PDA helpers. Outcome and side use textual seeds; prices
-and IDs use exact eight-byte little-endian BN encoding. Shared Rust/browser
-test vectors protect that contract. The IDL-backed reader now exposes the root,
-which is initialized with the draft at next ID 1 and four absent best-price heads.
-The detail page shows these fields and its Explorer link. Older drafts missing
-the root are identified explicitly; create a fresh draft for the new order flow.
-The reader also exposes prediction levels and orders. The position panel has one
-Buy/Sell form for any connected trader: YES/NO, human-unit price and whole
-quantity. Its limit mode selects empty-side placement, same-price FIFO append or
-sorted new-price insertion from actual accounts. New-price discovery follows
-at most 128 linked levels and validates ordering and reciprocal links. The
-program rechecks adjacent hints and rejects stale ones atomically.
-RPC errors never trigger a fallback path. Resting placement rejects crossing
-prices and checks post-fill free funds and exact integer bounds. Buys lock collateral;
-sells lock outcome contracts. Confirmations refresh the ledger and public book.
-Appending preserves older orders' priority; the prior tail's owner does not sign
-and its balances do not change. Queue/totals, ownership and packet-size checks
-are covered in Rust/client tests. The wallet's order list shows price, quantity,
-remaining quantity and status. Only Open orders show Cancel; cancellation also
-works after trading closes. The program refunds the remaining lock, repairs the
-queue and closes an empty price level, returning its rent to the original payer.
-Confirmation refreshes the position, order list and public book.
-
-The form first trades with up to three best opposing FIFO
-orders in one atomic transaction. Each fill uses its resting price. The planner
-in `lib/prediction-matching-plan.ts` simulates promoted heads and cumulative
-balances without changing fetched accounts. The preview sums separately rounded
-fees and shows unposted quantity plus its stop reason. Buys pay notional plus
-fees; sells receive notional minus fees. A cap-blocked remainder stays free for
-retry. In limit mode, exhausted/non-crossing remainders rest at the requested
-price using the simulated final balance. Immediate-only mode never posts.
-The builder sets a 600,000-CU ceiling and checks the 1,232-byte legacy packet
-before wallet signing, including any placement instruction. If placement fails,
-the preceding fills also roll back. Oversized transactions require a smaller
-request or immediate-only mode; the client never drops instructions silently.
-Confirmations refresh positions, orders and public heads; previews are not
-claimed as confirmed fills.
-
-Keep `NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=false` publicly until this program
-version is deployed. Explicit local tests may enable it alongside the
-draft/funding/cancellation flags after deploying this version.
-`NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED` defaults false until deployment;
-it requires the draft flag but does not depend on new-order or funding flags.
-Disabling new orders therefore leaves cancellation available. No admin role is required for
-trading. Rebuild/redeploy the program before using the updated client on devnet.
-`NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED` separately controls immediate trades
-and requires draft, funding and cancellation flags. It defaults false until
-`match_prediction_order` is deployed. Limit posting also requires the new-order
-flag. Public depth needs no wallet: it shows up to 20 canonical price levels per
-side, aggregated contract quantities and order counts, with YES/NO switching and
-explicit refresh/error states. Trading refreshes depth and wallet orders after
-confirmation. Resolution, reward claims and prediction fee withdrawal remain
-unimplemented; the UI says so explicitly.
-
-Verify the JSON parser, exact-byte hashing and PDA derivation with:
-
-```bash
-npm run test:prediction
-```
-
-Configure the public program identity and your primary Helius devnet endpoint:
-
-```bash
+```dotenv
 NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
 NEXT_PUBLIC_HELIUS_RPC_URL=https://devnet.helius-rpc.com
-NEXT_PUBLIC_HELIUS_API_KEY=your-browser-restricted-key
+NEXT_PUBLIC_HELIUS_API_KEY=<your-key>
 NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
 NEXT_PUBLIC_SOLANA_RPC_FALLBACK_URLS=https://solana-devnet.api.onfinality.io/public,https://api.devnet.solana.com
 ```
 
-Copy `.env.example` to `app/.env.local` or add the variables to the existing
-ignored `app/.env`. Configure the same public program-ID variable in Vercel.
-Next.js inlines `NEXT_PUBLIC_*` values during its build, so changing the program
-identity or RPC configuration requires restarting the local server or rebuilding
-the deployment. `.env.local` takes precedence over `.env`. `NEXT_PUBLIC_*` keys
-are browser-visible; apply app-domain restrictions to the Helius key. You may
-instead paste the full Helius URL containing `?api-key=...` and leave the separate
-key blank. Until configured, the generic Solana RPC remains primary.
+A full Helius URL containing `?api-key=...` also works; leave the separate key
+blank in that case. If Helius is unconfigured, the generic RPC is primary.
+`NEXT_PUBLIC_*` values are visible in the browser. Restrict the Helius key to
+your app domains; never put private signing keys in these variables.
 
-HTTP reads use Helius first and fail over on rate limits/outages. The transport
-verifies each provider's devnet genesis, coalesces duplicate in-flight reads,
-paces requests, honors cooldowns and briefly caches discovery/history. Balance
-and planning account reads are not TTL-cached. A primary provider is retried
-after its cooldown. Transaction broadcasts are not replayed automatically after
-a failed network request. Standard WebSockets stay on the primary endpoint.
-An explicit `FAUCET_SOLANA_RPC_URL` still overrides the server faucet's default.
+HTTP reads verify devnet, pace requests, coalesce duplicates and fail over when
+a provider is busy. Discovery/history reads have short caches; balance and
+transaction-planning account reads are not TTL-cached. Broadcasts are not
+replayed automatically after a network failure. WebSockets use the primary
+endpoint. `FAUCET_SOLANA_RPC_URL` overrides the server faucet's RPC.
 
-Market cards and orders show human units using the stored mint decimals. Token
-labels come from market metadata, with the documented tBTC/tUSDT test mints as
-fallbacks. Unknown mints are never guessed from addresses. Market detail shows
-forward and inverse quotes: a recent fill when available, otherwise an explicitly
-indicative book price. It does not claim to track an external BTC/USD price.
-Recent-fill discovery reads at most six transactions sequentially and stops on
-the newest matching fill, instead of requesting 25 transactions at once.
+`.env.local` overrides `.env`. Restart the dev server after changing public
+settings. On Vercel, set the same variables in the project and rebuild: Next.js
+embeds them at build time. A program upgrade does not update a deployed UI.
 
-## Test faucet safety
+## Prediction rollout
 
-The active web faucet is server-backed. Its authority key is loaded only by the
-Next.js server route; it is never sent to the browser or stored in Git. A claim
-creates missing associated token accounts and mints fixed amounts directly to
-the requesting wallet, so the server does not maintain a transferable token
-inventory.
+The updated prediction trading program is deployed on devnet. The example
+configuration still defaults to disabled gates for use against older binaries.
+For the updated program, enable the supported features together:
 
-Claims are limited by both wallet and hashed IP address. Vercel fails closed
-unless `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` provide shared
-durable counters. The process-local limiter is an explicit local-development
-fallback and must never be enabled on Vercel. These limits are abuse friction,
-not Sybil resistance: a determined caller can rotate wallets and networks.
-
-The current devnet pair claims `10 tBTC` and `1,000 tUSDT` once per wallet per
-hour, with at most five claims per IP in the same window. These assets have no
-value and must never be bridged, sold, or treated as production tokens.
-
-The program-controlled PDA faucet remains an alternative research design, but
-a mint must use exactly one authority model at a time. Do not initialize the
-on-chain faucet after transferring authority to the server account.
-
-Full bootstrap steps and address placeholders live in `docs/deployment.md` and
-`docs/devnet-addresses.md`.
-
-## Multi-maker devnet smoke test
-
-`npm run devnet:multi-maker` executes a one-shot current-layout smoke test. It
-creates the market and internal balances, deposits test assets, places two asks
-at one FIFO level, submits two matching instructions in one transaction, and
-asserts the final orders, market pointers, level closure, and exact balances.
-
-The runner intentionally does not create or mint SPL assets. Supply fresh
-no-value devnet mints, temporary signer files, and their funded token accounts:
-
-```bash
-SOLANA_WALLET=/path/to/deployer.json \
-MAKER_TWO_WALLET=/path/to/second-maker.json \
-TAKER_WALLET=/path/to/taker.json \
-BASE_MINT=<base-mint> \
-QUOTE_MINT=<quote-mint> \
-MAKER_ONE_BASE_TOKEN=<token-account> \
-MAKER_TWO_BASE_TOKEN=<token-account> \
-TAKER_QUOTE_TOKEN=<token-account> \
-npm run devnet:multi-maker
+```dotenv
+NEXT_PUBLIC_PREDICTION_DRAFTS_ENABLED=true
+NEXT_PUBLIC_PREDICTION_OPENING_ENABLED=true
+NEXT_PUBLIC_PREDICTION_FUNDING_ENABLED=true
+NEXT_PUBLIC_PREDICTION_CANCELLATION_ENABLED=true
+NEXT_PUBLIC_PREDICTION_ORDERS_ENABLED=true
+NEXT_PUBLIC_PREDICTION_MATCHING_ENABLED=true
 ```
 
-Use a fresh mint pair for each run because the market PDA is deterministic and
-the script deliberately tests initialization as part of the complete flow.
+Rebuild after changing them. The “awaiting deployment” message means that the
+corresponding UI gate is disabled; it is not an on-chain version check.
+Cancellation has its own gate so stopping new orders need not block exits.
+The program independently checks roles, signatures, balances and trading times.
 
-## Application boundaries
+Outcome resolution, reward claims and prediction fee withdrawal are not
+implemented. Trading fills settle internal balances; final outcome settlement
+is a different step. The UI's help dialogs explain this distinction.
 
-- `app/layout.tsx` and route pages are Server Components by default.
-- `components/solana-provider.tsx` owns the client-only wallet and RPC context.
-- `components/` contains the client-side route workspaces and transaction flows.
-- `lib/tidebook.ts` owns account types, PDA derivation, token-account discovery,
-  price-level traversal, formatting, and Anchor program construction.
-- `lib/solana.ts` owns shared network and program-identity configuration.
+## Pages
 
-Price-level traversal begins at the market best price and follows
-`worse_price` links, so transaction construction is currently O(number of price
-levels). Those RPC reads are advisory: the on-chain instruction revalidates all
-neighbor accounts atomically, and a stale transaction must refresh and retry.
-An indexer can later accelerate discovery without changing the program API.
+| Route                         | Purpose                                                          |
+| ----------------------------- | ---------------------------------------------------------------- |
+| `/`                           | Prediction-first landing with an illustrative scroll walkthrough |
+| `/predictions`                | Public discovery and a pricing/settlement guide                  |
+| `/predictions/[address]`      | Terms, YES/NO depth, positions, funding and trading              |
+| `/markets`                    | Public spot-market discovery                                     |
+| `/markets/[address]`          | Spot order book, balances, orders and authority controls         |
+| `/markets/[address]/settings` | Admin metadata creation and updates                              |
+| `/markets/new`                | Choose Spot or Prediction                                        |
+| `/markets/new/spot`           | Admin spot-market creation                                       |
+| `/predictions/new`            | Admin prediction draft creation and rules upload                 |
+| `/orders`                     | Connected wallet's spot orders                                   |
+| `/admin`                      | Super-admin governance and administrator management              |
 
-Crossing-order construction is isolated in `lib/matching-plan.ts`. It starts at
-the opposing best price, validates the linked price levels and FIFO queues, and
-collects at most three makers. Every step records the taker quantity before its
-fill, the resting maker price, canonical maker ledger, and only the successor,
-worse-level, or rent-recipient accounts needed by that transition. The market
-page converts the plan into one `match_limit_order` instruction per maker and
-sends every instruction in one Solana transaction.
+Prediction orders are managed inside the relevant market's position panel.
+Creation requires an active admin. Opening a prediction draft requires both
+its stored creator and an active admin record. Trading needs a wallet, not an
+admin role.
 
-The planner's RPC reads are advisory. Each instruction revalidates best-price,
-FIFO, PDA, owner, crossing-price, and reciprocal-link invariants against the
-state produced by the preceding instruction. A stale later step therefore
-rolls back the entire transaction. The three-maker cap bounds transaction size,
-account metadata, compute, and stale-state exposure. When the planned path
-proves that no crossing maker remains, the page appends an insert-or-append
-instruction for the valid remainder to the same transaction. A remainder stays
-free and visible only when crossing liquidity remains beyond the cap or its bid
-notional rounds to zero.
+## Trading and display
 
-New routes should keep read-only structure server-rendered and move only wallet,
-transaction, state, and browser-dependent behavior behind `"use client"`.
+Spot amounts use the stored base/quote mint decimals. Prediction quantities
+are whole contracts; prices use the collateral mint's precision. The client
+converts decimal strings to exact integer amounts before signing.
 
-## Dependency note
+Buys lock collateral; sells lock base tokens or outcome contracts. The client
+matches up to three best-price FIFO makers in one transaction. A safe limit
+remainder can rest at the chosen price; a cap-blocked remainder stays free for
+retry. Immediate-only prediction orders never post. On-chain checks reject
+stale hints atomically. Cancellation releases the unfilled lock; withdrawal
+moves free tokens back to the wallet.
 
-Anchor `1.2.0` requires legacy `@solana/web3.js` v1, while the faucet uses the
-latest compatible `@solana/spl-token` package for associated token accounts.
-`npm audit --omit=dev` currently reports nine transitive advisories through
-`bigint-buffer`, `jayson`, `stream-json`, `toml`, and `uuid`.
+Symbols come from metadata, with known devnet test-mint labels as fallbacks.
+Spot detail shows the most recent fill found in bounded history, or an
+explicitly labeled indicative book quote, plus its inverse. It does not track
+an external market price. Landing examples are illustrations, not live markets.
 
-npm's proposed forced remediations replace the direct packages with incompatible
-historical or invalid versions (`@solana/spl-token@0.1.8`,
-`@solana/web3.js@0.0.3`, or `@anchor-lang/core@0.0.0`), so they are not applied.
-This boundary should be rechecked when the Solana/Anchor client stack publishes
-compatible patched releases. Do not run `npm audit fix --force` without first
-validating all generated transactions and wallet flows.
+## Prediction rules upload
+
+The creator edits a rules template, optional fallback terms and extra text/JSON
+fields. Custom fields live under `additionalRules`; they cannot overwrite core
+terms. The connected creator is the primary resolver.
+
+After review, the app validates the rules, admin, mint and price grid. It uses
+wallet message signing and Turbo to upload the JSON, fetches it back and checks
+the exact bytes. The market commits the URI and SHA-256 hash of those bytes.
+The file limit is 64 KiB. See the [rules schema](../docs/prediction-market-design.md).
+
+Uploading and creating the market are separate operations. A failed market
+transaction cannot undo an upload. Same-document, same-wallet retries reuse
+the receipt while the page remains open; download it before leaving. Gateway
+verification checks bytes, not final Arweave block inclusion. The app checks
+free allowance, may use existing storage credits, and never tops up or signs
+Solana storage payments.
+
+## Test faucet
+
+The server route mints fixed amounts into the requesting wallet's token
+accounts. Keep its authority secret server-only and out of Git. Configure
+mints, claim amounts and limits through the server variables in `.env.example`.
+The documented test pair uses 8-decimal tBTC and 6-decimal tUSDT.
+
+Vercel claims require Upstash's shared counters and fail closed without them.
+`FAUCET_ALLOW_IN_MEMORY_RATE_LIMIT` is for local testing only. Claims are limited
+by wallet and hashed IP; these limits do not prevent someone using multiple
+wallets and networks. Server-controlled and program-PDA mint authorities are
+alternative models; do not enable both for the same mint.
+
+The [address registry](../docs/devnet-addresses.md) records test assets.
+`npm run devnet:multi-maker` is a separate, transaction-sending spot smoke test;
+it needs fresh devnet mints and funded signer/token accounts. Read
+`scripts/devnet-multi-maker-smoke.mjs` before running it.
+
+## Code and dependencies
+
+Route pages/layouts are Server Components by default. Wallets and transactions
+live in client components. `lib/tidebook.ts` and `lib/prediction.ts` define
+accounts and addresses; the matching planners build bounded transaction plans.
+The checked-in IDL must match the deployed program.
+
+Anchor uses legacy web3.js v1. Turbo's optional `x402-fetch` peer is installed
+because Next.js resolves its dynamic import during builds; no x402 funding is
+enabled. Dependencies have upstream audit advisories. Recheck the current audit
+rather than relying on a saved count; forced fixes can replace the Solana stack
+with incompatible versions.
