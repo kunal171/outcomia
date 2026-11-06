@@ -3,6 +3,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 import "./landing.css";
 import "./navigation.css";
+import "./prediction-detail.css";
 import { SolanaProvider } from "@/components/solana-provider";
 
 export const metadata: Metadata = {

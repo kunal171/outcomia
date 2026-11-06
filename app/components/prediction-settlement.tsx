@@ -26,17 +26,22 @@ import {
 import {
   derivePredictionPositionPda,
   predictionStatus,
-  predictionTime,
   type PredictionMarketAccount,
   type PredictionPositionAccount,
 } from "../lib/prediction";
-import { readableAmount } from "../lib/market-display";
+import {
+  PredictionPositionActions,
+  type PositionAmounts,
+} from "./prediction/position-actions";
+import { PredictionResolutionSummary } from "./prediction/resolution-summary";
+import { predictionCloseLabel } from "../lib/prediction-display";
 import { useProtocolRole } from "./protocol-role-provider";
 interface Props {
   address: PublicKey;
   market: PredictionMarketAccount;
   symbol: string;
   onChanged: () => void;
+  view?: "all" | "position" | "resolution" | "manage";
 }
 export function PredictionSettlement(props: Props) {
   const wallet = useAnchorWallet(),
@@ -51,7 +56,13 @@ export function PredictionSettlement(props: Props) {
     />
   );
 }
-function Settlement({ address, market, symbol, onChanged }: Props) {
+function Settlement({
+  address,
+  market,
+  symbol,
+  onChanged,
+  view = "all",
+}: Props) {
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     role = useProtocolRole();
@@ -62,30 +73,33 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
     [pending, setPending] = useState(false),
     [issue, setIssue] = useState<string | null>(null),
     [signature, setSignature] = useState<string | null>(null),
-    [quantity, setQuantity] = useState(""),
-    [yes, setYes] = useState(""),
-    [no, setNo] = useState(""),
     [outcome, setOutcome] = useState("yes"),
     [uri, setUri] = useState(""),
     [hash, setHash] = useState<number[] | null>(null),
-    [revision, setRevision] = useState(0);
+    [revision, setRevision] = useState(0),
+    [positionLoaded, setPositionLoaded] = useState(false);
   useEffect(() => {
     let dead = false;
-    if (wallet)
+    if (wallet && (view === "position" || view === "all")) {
+      setPositionLoaded(false);
       void getTidebookAccounts(p)
         .predictionPosition.fetchNullable(
           derivePredictionPositionPda(address, wallet.publicKey),
         )
         .then((v) => {
-          if (!dead) setPosition(v);
+          if (!dead) {
+            setPosition(v);
+            setPositionLoaded(true);
+          }
         })
         .catch((e) => {
           if (!dead) setIssue(String(e));
         });
+    }
     return () => {
       dead = true;
     };
-  }, [p, wallet, address, revision]);
+  }, [p, wallet, address, revision, market, view]);
   const evidenceRead = useRef(0);
   const [now, setNow] = useState(() => new BN(Math.floor(Date.now() / 1000)));
   useEffect(() => {
@@ -95,8 +109,7 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
     );
     return () => clearInterval(timer);
   }, []);
-  const status = predictionStatus(market),
-    decimals = market.payoutPerContract.toString().length - 1;
+  const status = predictionStatus(market);
   const resolver =
     "fallback" in market.resolutionPhase
       ? market.fallback?.resolver
@@ -116,35 +129,11 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
         now.gte(market.fallback.availableTs) &&
         (!market.fallback.deadlineTs || now.lt(market.fallback.deadlineTs))
       : !market.fallback || now.lt(market.fallback.availableTs));
-  const whole = (s: string) => {
-    if (!/^\d+$/.test(s)) throw new Error("Use whole contract quantities");
-    const n = new BN(s);
-    if (n.bitLength() > 64) throw new Error("Quantity exceeds u64");
-    return n;
-  };
-  let canRedeem = false,
-    positivePairs = false,
-    canMerge = false;
-  try {
-    const y = whole(yes || "0"),
-      n = whole(no || "0");
-    canRedeem =
-      !!position &&
-      (y.gtn(0) || n.gtn(0)) &&
-      y.lte(position.yesFree) &&
-      n.lte(position.noFree);
-    const pairs = whole(quantity || "0");
-    positivePairs = pairs.gtn(0);
-    canMerge =
-      positivePairs &&
-      !!position &&
-      pairs.lte(position.yesFree) &&
-      pairs.lte(position.noFree);
-  } catch {
-    /* Invalid or overflowing input is never actionable. */
-  }
-  async function act(action: string) {
-    if (!wallet) return;
+  async function act(
+    action: string,
+    amounts?: PositionAmounts,
+  ): Promise<boolean> {
+    if (!wallet) return false;
     setPending(true);
     setIssue(null);
     setSignature(null);
@@ -244,11 +233,11 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
           await (
             action === "redeem"
               ? signed.methods.redeemPrediction(
-                  whole(yes || "0"),
-                  whole(no || "0"),
+                  amounts?.yes ?? new BN(0),
+                  amounts?.no ?? new BN(0),
                 )
               : signed.methods.sharedCompleteSet(
-                  whole(quantity),
+                  amounts?.quantity ?? new BN(0),
                   action === "split",
                 )
           )
@@ -260,12 +249,11 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
         await (signed.provider as AnchorProvider).sendAndConfirm(tx),
       );
       setRevision((v) => v + 1);
-      setYes("");
-      setNo("");
-      setQuantity("");
       onChanged();
+      return true;
     } catch (e) {
       setIssue(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setPending(false);
     }
@@ -275,226 +263,183 @@ function Settlement({ address, market, symbol, onChanged }: Props) {
     : null;
   return (
     <section className="admin-card prediction-settlement">
-      <span className="eyebrow">Resolution & payouts</span>
       <h2>
-        {status === "resolved"
-          ? `Final outcome: ${Object.keys(market.finalOutcome ?? {})[0]?.toUpperCase()}`
-          : "Published resolution process"}
+        {view === "position" && status !== "resolved"
+          ? "Your position"
+          : view === "manage"
+            ? "Resolve this market"
+            : status === "resolved"
+              ? `Final outcome: ${Object.keys(market.finalOutcome ?? {})[0]?.toUpperCase()}`
+              : "Resolution"}
       </h2>
-      <p>
-        One winning contract pays{" "}
-        {readableAmount(market.payoutPerContract, decimals)} {symbol}. Invalid
-        pays half to each outcome. Final payouts go to your shared wallet.
-      </p>
-      <p>
-        Trading cutoff: {predictionTime(market.closeTs)} · Earliest proposal:{" "}
-        {predictionTime(market.earliestResolutionTs ?? market.closeTs)}
-      </p>
-      {market.proposal && (
-        <p>
-          Proposed:{" "}
-          <strong>
-            {Object.keys(market.proposal.outcome)[0].toUpperCase()}
-          </strong>{" "}
-          · Finalizable after {predictionTime(maturity!)} · Evidence:{" "}
-          <span className="shared-address">{market.proposal.evidenceUri}</span>{" "}
-          · SHA-256:{" "}
-          <code className="shared-address">
-            {Buffer.from(market.proposal.evidenceHash).toString("hex")}
-          </code>
-        </p>
+      {view === "manage" && status !== "resolved" && (
+        <p>Proposal opens {predictionCloseLabel(earliest)}.</p>
       )}
+      {view !== "position" && <PredictionResolutionSummary market={market} />}
       {wallet && (
         <>
-          <div className="shared-actions">
-            {status === "open" && (
-              <>
-                <button
-                  disabled={pending || now.lt(market.closeTs)}
-                  onClick={() => void act("freeze")}
-                >
-                  Freeze at cutoff
-                </button>
-                {wallet.publicKey.equals(market.authority) &&
-                  (role.role === "admin" || role.role === "super-admin") && (
-                    <button
-                      disabled={pending}
-                      onClick={() => void act("close")}
-                    >
-                      Close trading early
-                    </button>
-                  )}
-              </>
-            )}
-            {market.fallback && status !== "resolved" && (
-              <>
-                <button
-                  disabled={
-                    pending ||
-                    !!market.proposal ||
-                    "fallback" in market.resolutionPhase ||
-                    !market.fallback ||
-                    now.lt(market.fallback.availableTs) ||
-                    (!!market.fallback.deadlineTs &&
-                      now.gte(market.fallback.deadlineTs))
-                  }
-                  onClick={() => void act("fallback")}
-                >
-                  Activate published fallback
-                </button>
-                {market.fallback.deadlineTs && (
-                  <button
-                    disabled={
-                      pending ||
-                      !!market.proposal ||
-                      !market.fallback?.deadlineTs ||
-                      now.lt(market.fallback.deadlineTs)
-                    }
-                    onClick={() => void act("timeout")}
-                  >
-                    Finalize expired fallback as Invalid
-                  </button>
+          {view !== "position" && (
+            <div className="shared-actions">
+              {status === "open" &&
+                (now.gte(market.closeTs) ||
+                  view === "manage" ||
+                  view === "all") && (
+                  <>
+                    {now.gte(market.closeTs) && (
+                      <button
+                        disabled={pending || now.lt(market.closeTs)}
+                        onClick={() => void act("freeze")}
+                      >
+                        Close trading at cutoff
+                      </button>
+                    )}
+                    {(view === "manage" || view === "all") &&
+                      wallet.publicKey.equals(market.authority) &&
+                      (role.role === "admin" ||
+                        role.role === "super-admin") && (
+                        <button
+                          disabled={pending}
+                          onClick={() => void act("close")}
+                        >
+                          Close trading early
+                        </button>
+                      )}
+                  </>
                 )}
-              </>
-            )}
-            {status === "proposed" && (
-              <button
-                disabled={pending || !maturity || now.lt(maturity)}
-                onClick={() => void act("finalize")}
-              >
-                Finalize after review delay
-              </button>
-            )}
-          </div>
-          {canPropose && status !== "resolved" && (
-            <details>
-              <summary>Resolver: propose or correct outcome</summary>
-              <p>
-                Requires your active admin record. Upload evidence
-                independently, then enter its permanent reference. A correction
-                restarts the full delay.
-              </p>
-              <label>
-                Outcome
-                <select
-                  value={outcome}
-                  onChange={(e) => setOutcome(e.target.value)}
+              {market.fallback &&
+                status !== "resolved" &&
+                status !== "draft" && (
+                  <>
+                    <button
+                      disabled={
+                        pending ||
+                        !!market.proposal ||
+                        "fallback" in market.resolutionPhase ||
+                        !market.fallback ||
+                        now.lt(market.fallback.availableTs) ||
+                        (!!market.fallback.deadlineTs &&
+                          now.gte(market.fallback.deadlineTs))
+                      }
+                      onClick={() => void act("fallback")}
+                    >
+                      Activate published fallback
+                    </button>
+                    {market.fallback.deadlineTs && (
+                      <button
+                        disabled={
+                          pending ||
+                          !!market.proposal ||
+                          !market.fallback?.deadlineTs ||
+                          now.lt(market.fallback.deadlineTs)
+                        }
+                        onClick={() => void act("timeout")}
+                      >
+                        Finalize expired fallback as Invalid
+                      </button>
+                    )}
+                  </>
+                )}
+              {status === "proposed" && (
+                <button
+                  disabled={pending || !maturity || now.lt(maturity)}
+                  onClick={() => void act("finalize")}
                 >
-                  <option value="yes">YES</option>
-                  <option value="no">NO</option>
-                  <option value="invalid">Invalid</option>
-                </select>
-              </label>
-              <label>
-                Evidence reference
-                <input
-                  value={uri}
-                  onChange={(e) => setUri(e.target.value)}
-                  placeholder="ar://…"
-                />
-              </label>
-              <label>
-                Exact evidence file
-                <input
-                  type="file"
-                  disabled={pending}
-                  onChange={(e) => {
-                    setHash(null);
-                    const file = e.target.files?.[0];
-                    const readVersion = ++evidenceRead.current;
-                    if (file)
-                      void file
-                        .arrayBuffer()
-                        .then((bytes) => crypto.subtle.digest("SHA-256", bytes))
-                        .then((d) => {
-                          if (readVersion === evidenceRead.current)
-                            setHash(Array.from(new Uint8Array(d)));
-                        })
-                        .catch((e) => setIssue(String(e)));
-                  }}
-                />
-              </label>
-              <button
-                disabled={
-                  pending ||
-                  !hash ||
-                  !uri ||
-                  !proposalWindow ||
-                  (status === "proposed" && !!maturity && now.gte(maturity))
-                }
-                onClick={() => void act("propose")}
-              >
-                {status === "proposed" ? "Correct proposal" : "Propose outcome"}
-              </button>
-            </details>
+                  Finalize after review delay
+                </button>
+              )}
+            </div>
           )}
-          {position && (
-            <p>
-              Your free contracts: {position.yesFree.toString()} YES ·{" "}
-              {position.noFree.toString()} NO. Locked contracts must be canceled
-              before redemption.
-            </p>
-          )}
-          {SHARED_BALANCES_ENABLED && status !== "resolved" && (
-            <>
-              <label>
-                Complete pairs
-                <input
-                  inputMode="numeric"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                />
-              </label>
-              <div className="shared-actions">
+          {(view === "manage" || view === "all") &&
+            canPropose &&
+            status !== "resolved" &&
+            status !== "draft" && (
+              <details>
+                <summary>Resolver: propose or correct outcome</summary>
+                <p>
+                  Requires your active admin record. Upload evidence
+                  independently, then enter its permanent reference. A
+                  correction restarts the full delay.
+                </p>
+                <label>
+                  Outcome
+                  <select
+                    value={outcome}
+                    onChange={(e) => setOutcome(e.target.value)}
+                  >
+                    <option value="yes">YES</option>
+                    <option value="no">NO</option>
+                    <option value="invalid">Invalid</option>
+                  </select>
+                </label>
+                <label>
+                  Evidence reference
+                  <input
+                    value={uri}
+                    onChange={(e) => setUri(e.target.value)}
+                    placeholder="ar://…"
+                  />
+                </label>
+                <label>
+                  Exact evidence file
+                  <input
+                    type="file"
+                    disabled={pending}
+                    onChange={(e) => {
+                      setHash(null);
+                      const file = e.target.files?.[0];
+                      const readVersion = ++evidenceRead.current;
+                      if (file)
+                        void file
+                          .arrayBuffer()
+                          .then((bytes) =>
+                            crypto.subtle.digest("SHA-256", bytes),
+                          )
+                          .then((d) => {
+                            if (readVersion === evidenceRead.current)
+                              setHash(Array.from(new Uint8Array(d)));
+                          })
+                          .catch((e) => setIssue(String(e)));
+                    }}
+                  />
+                </label>
                 <button
                   disabled={
                     pending ||
-                    status !== "open" ||
-                    now.gte(market.closeTs) ||
-                    !positivePairs
+                    !hash ||
+                    !uri ||
+                    !proposalWindow ||
+                    (status === "proposed" && !!maturity && now.gte(maturity))
                   }
-                  onClick={() => void act("split")}
+                  onClick={() => void act("propose")}
                 >
-                  Create YES + NO pairs
+                  {status === "proposed"
+                    ? "Correct proposal"
+                    : "Propose outcome"}
                 </button>
-                <button
-                  disabled={pending || !canMerge}
-                  onClick={() => void act("merge")}
-                >
-                  Merge free pairs
-                </button>
-              </div>
-            </>
-          )}
-          {SHARED_BALANCES_ENABLED && status === "resolved" && (
-            <>
-              <label>
-                YES contracts to redeem
-                <input
-                  inputMode="numeric"
-                  value={yes}
-                  onChange={(e) => setYes(e.target.value)}
-                />
-              </label>
-              <label>
-                NO contracts to redeem
-                <input
-                  inputMode="numeric"
-                  value={no}
-                  onChange={(e) => setNo(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={pending || !canRedeem}
-                onClick={() => void act("redeem")}
-              >
-                Redeem selected free contracts
-              </button>
-            </>
+              </details>
+            )}
+          {(view === "position" || view === "all") && (
+            <PredictionPositionActions
+              market={market}
+              status={status}
+              position={position}
+              loaded={positionLoaded}
+              failed={!!issue}
+              pending={pending}
+              now={now}
+              symbol={symbol}
+              onAction={act}
+            />
           )}
         </>
       )}
-      {!wallet && <p>Connect your wallet to finalize or claim.</p>}
+      {!wallet && (
+        <p>
+          {view === "position"
+            ? "Connect your wallet to see your contracts and claims."
+            : "Connect your wallet to use available resolution actions."}
+        </p>
+      )}
       {issue && <p role="alert">{issue}</p>}
       {signature && (
         <a
