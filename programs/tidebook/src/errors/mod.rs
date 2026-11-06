@@ -13,6 +13,7 @@ pub mod matching;
 pub mod metadata;
 pub mod order;
 pub mod prediction;
+pub mod shared;
 
 mod catalog;
 

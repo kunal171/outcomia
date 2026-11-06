@@ -3,6 +3,7 @@
 pub mod add_admin;
 pub mod append_limit_order;
 pub mod append_prediction_order;
+pub mod asset_wallet;
 pub mod cancel_limit_order;
 pub mod cancel_prediction_order;
 pub mod close;
@@ -34,6 +35,7 @@ pub mod withdraw_protocol_fees;
 pub use add_admin::*;
 pub use append_limit_order::*;
 pub use append_prediction_order::*;
+pub use asset_wallet::*;
 pub use cancel_limit_order::*;
 pub use cancel_prediction_order::*;
 pub use close::*;

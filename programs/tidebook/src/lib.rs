@@ -40,6 +40,35 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod tidebook {
     use super::*;
 
+    /// Creates the owner's reusable mint ledger. Inputs: owner/mint/vault. Errors: duplicate or
+    /// invalid custody/rent. Returns: zero shared balance; no deposit.
+    pub fn initialize_asset_balance(ctx: Context<InitializeAssetBalance>) -> Result<()> {
+        instructions::asset_wallet::handle_initialize_asset_balance(ctx)
+    }
+    /// Deposits mint atoms. Inputs: owner/ledger/source/vault, amount. Errors: bad funds/binding or
+    /// overflow/CPI. Returns: equal shared-custody and free-claim credit.
+    pub fn deposit_asset(ctx: Context<TransferAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_deposit_asset(ctx, amount)
+    }
+    /// Withdraws only free atoms. Inputs: owner/ledger/destination/vault, amount. Errors: bad
+    /// binding, insufficient free/vault funds or CPI. Returns: equal custody/free debit.
+    pub fn withdraw_asset(ctx: Context<TransferAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_withdraw_asset(ctx, amount)
+    }
+    /// Migrates legacy spot free atoms. Inputs: owner, market and shared custody, amount. Errors:
+    /// wrong binding, insufficient free cash or overflow/CPI. Returns: atomic transfer and credit.
+    pub fn migrate_spot_asset(ctx: Context<MigrateSpotAsset>, amount: u64) -> Result<()> {
+        instructions::asset_wallet::handle_migrate_spot_asset(ctx, amount)
+    }
+    /// Migrates legacy prediction free cash. Inputs: owner/position/two vaults, amount. Errors:
+    /// binding/funds/overflow/CPI. Returns: shared credit, leaving reserves and orders intact.
+    pub fn migrate_prediction_asset(
+        ctx: Context<MigratePredictionAsset>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::asset_wallet::handle_migrate_prediction_asset(ctx, amount)
+    }
+
     /// Settles up to one best FIFO maker; excess taker quantity is not posted.
     ///
     /// # Inputs
