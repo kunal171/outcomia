@@ -7,8 +7,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Token, TokenAccount};
 
 use crate::{
-    constants::{MARKET_FEES_SEED, TEST_FAUCET_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
-    errors::{faucet, fee, market},
+    constants::{
+        MARKET_FEES_SEED, SHARED_BOOK_SEED, TEST_FAUCET_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
+    },
+    errors::{faucet, fee, market, shared},
     events::MarketClosedEvent,
     state::{Market, MarketFees, MarketStatus},
 };
@@ -96,6 +98,9 @@ pub struct CloseMarket<'info> {
     pub quote_vault: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+    /// CHECK: Canonical new book must be closed before deleting its source market.
+    #[account(seeds = [SHARED_BOOK_SEED, market.key().as_ref()], bump)]
+    pub shared_book: UncheckedAccount<'info>,
 }
 
 /// Closes a paused, fully drained spot market and returns vault/config rent.
@@ -141,6 +146,10 @@ pub fn handle_close_market(ctx: Context<CloseMarket>) -> Result<()> {
     require!(
         ctx.accounts.test_faucet.data_is_empty(),
         faucet::FaucetMustBeClosed
+    );
+    require!(
+        ctx.accounts.shared_book.data_is_empty(),
+        shared::SharedBookMustBeClosed
     );
     msg!("Closing market {}", ctx.accounts.market.key());
 

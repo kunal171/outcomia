@@ -1,5 +1,21 @@
 # Tidebook Architecture
 
+## Shared custody update
+
+The new execution path uses `AssetBalance(owner, mint)` and one SPL vault per
+mint. `SharedBook` owns price heads and fees; `SharedOrder` and
+`SharedPriceLevel` keep price/FIFO priority. Spot balances are shared for both
+mints. Prediction buys use shared collateral; prediction sells lock per-question
+YES/NO positions. Existing market layouts, queues and cash recovery stay intact.
+See [shared balances and settlement](shared-balances-resolution.md) for exact
+invariants, instructions, limitations and deployment steps. The sections below
+describe the original per-market path where marked by `TraderBalance`.
+
+Resolution checks the published resolver, active admin record and time window.
+Finalization is permissionless after the review delay. Redemption burns only
+free contracts and transfers their reserve into shared custody. No administrative
+instruction can pick a different outcome during finalization.
+
 ## 1. Purpose and current scope
 
 `tidebook` is an Anchor program being developed as a research study of an

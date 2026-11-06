@@ -87,3 +87,78 @@ rounding/fees, stale FIFO hints, deadlines, fallback/corrections, repeated claim
 and transaction-wide rollback. New clients remain gated until the matching
 program is deployed. Prediction-specific typed indexing is a separate task;
 source ingestion must be extended before new event types are emitted publicly.
+
+## Instruction map
+
+| Operation | Instruction | Who signs |
+| --- | --- | --- |
+| Create mint ledger / deposit / withdraw | `initialize_asset_balance`, `deposit_asset`, `withdraw_asset` | Asset owner |
+| Move old free cash | `migrate_spot_asset`, `migrate_prediction_asset` | Asset owner |
+| Enable a shared book | `initialize_shared_book` | Stored market creator, active admin |
+| Place / fill / cancel | `place_shared_order`, `match_shared_order`, `cancel_shared_order` | Trader / taker / order owner |
+| Withdraw book fees | `withdraw_shared_fees` | Protocol super-admin |
+| Drain book before shutdown | `close_shared_book` | Stored creator, active admin |
+| Move backing into/out of complete sets | `shared_complete_set` | Position owner |
+| Stop trading early | `close_prediction_trading` | Stored creator, active admin |
+| Propose / correct outcome | `propose_prediction` | Current configured resolver, active admin |
+| Advance a clock | `advance_prediction` | No authority signature required |
+| Burn claims and receive payout | `redeem_prediction` | Position owner |
+
+`advance_prediction` actions: 0 freezes at the published cutoff; 1 activates
+fallback; 2 finalizes a mature proposal; 3 applies Invalid after a configured
+fallback deadline with no proposal. A correction is allowed strictly before
+maturity and restarts the full delay. Earliest proposal time and fallback
+windows use inclusive starts and exclusive proposal/correction deadlines.
+Finalization never depends on the resolver still being an admin.
+
+A source spot market cannot close while its shared root exists. Drain orders
+and fees, pause the source, close the root, then close the source. A prediction
+root requires Resolved state, no orders and no fees. Global user cash is never
+closed with a market. Historical orders remain. Recreating a used root under
+the same source resets its ID counter and collides with retained order accounts;
+do not reuse a closed source market. No historical order can be overwritten.
+
+## Examples
+
+- Deposit 100 USDC once. A 30-USDC bid in SOL/USDC leaves 70 available for
+  BTC/USDC. Canceling that bid releases exactly 30, preserving other locks.
+- Split 4 pairs at a 1-USDC payout: shared cash falls by 4 USDC and the question
+  reserve gains 4; the owner receives 4 YES and 4 NO.
+- If YES resolves, 2 free YES redeem for 2 USDC; free NO can be burned for zero.
+  If Invalid resolves, 3 YES plus 2 NO pay 2.5 USDC. Each burned claim pays once.
+
+## Rollout
+
+1. Run `anchor build`, `anchor test --skip-deploy` and strict Clippy.
+2. Run the app type check, shared-planner, wallet and prediction tests, and build.
+3. Upgrade the program explicitly. This branch does not deploy it automatically.
+4. On devnet, initialize a shared asset balance and book, deposit a small amount,
+   trade from a second wallet, cancel, withdraw, and complete a short prediction
+   through proposal, finalization and redemption. Check both vault equations.
+5. Set `NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true` and
+   `NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED=true`, then rebuild the app.
+
+The flags default false. Existing legacy trading and recovery remain available.
+The new path emits ordinary fill log messages, not new typed Anchor events;
+the existing indexer must not be described as indexing these account changes.
+A remainder whose value rounds down to zero quote atoms stays free; it is not
+posted and does not roll back successful fills.
+Typed shared/prediction event coverage and read projections remain follow-up work.
+The shared book is a separate liquidity pool during transition, and global
+cash introduces same-mint write contention. No migrations run automatically.
+
+## Verification (6 November 2026)
+
+The full Rust suite passes 335 tests, including 16 shared custody, trading and
+settlement tests. Anchor build and strict Clippy pass. The app has nine shared
+planner/encoding tests, 63 existing prediction tests, and portfolio tests using
+real account decoding and mocked RPC. Both rollout configurations build.
+
+Local browser fixtures check desktop/mobile layout, zero-free withdrawal,
+closed-market entry, proposal maturity, redemption controls and retained history.
+Their wallet cannot sign. These checks do not replace the devnet smoke test.
+Market discovery reads shared-book heads/counts when enabled; old prices and
+recovery controls are explicitly labeled legacy. A shared-book midpoint is an
+indicative quote, not a last trade. Closed-book history stays visible without
+guessing lost token precision. Direct account scans can grow with history;
+read projections and typed event coverage remain separate indexer work.
