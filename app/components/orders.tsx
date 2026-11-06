@@ -1,4 +1,5 @@
 "use client";
+import { SharedOrders } from "./shared-orders";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -204,6 +205,7 @@ export function Orders() {
       <AppHeader />
 
       <main className="route-shell">
+        <SharedOrders />
         <div className="route-heading">
           <div className="eyebrow">Trader workspace</div>
           <h1>My orders</h1>

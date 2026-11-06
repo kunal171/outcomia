@@ -1,4 +1,5 @@
 "use client";
+import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 
 import { useEffect, useState } from "react";
 import { type Program } from "@anchor-lang/core";
@@ -86,7 +87,9 @@ export function PredictionBook({
       <div className="market-list-heading">
         <div>
           <span className="eyebrow">Live account snapshot</span>
-          <h2>Order book</h2>
+          <h2>
+            {SHARED_BALANCES_ENABLED ? "Legacy order book" : "Order book"}
+          </h2>
         </div>
         <button
           className="text-button"

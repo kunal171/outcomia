@@ -1,4 +1,10 @@
 "use client";
+import { SharedMarket } from "./shared-market";
+import {
+  sharedBookPda,
+  sharedAccounts,
+  SHARED_BALANCES_ENABLED,
+} from "../lib/shared";
 
 import {
   useCallback,
@@ -26,6 +32,7 @@ import {
   deriveTestFaucetPda,
   deriveProtocolConfigPda,
   deriveTraderBalancePda,
+  deriveAdminRecordPda,
   deriveVaultAuthorityPda,
   formatAtomicAmount,
   getOwnedTokenBalance,
@@ -846,6 +853,28 @@ export function MarketDetail({ address }: { address: string }) {
         }
 
         const transaction = new Transaction();
+        if (SHARED_BALANCES_ENABLED) {
+          const shared = await sharedAccounts(
+            signedProgram,
+          ).sharedBook.fetchNullable(sharedBookPda(marketAddress));
+          if (shared) {
+            if (shared.openOrderCount.gtn(0) || shared.accruedQuoteFees.gtn(0))
+              throw new Error(
+                "Cancel shared orders and withdraw shared fees before closing",
+              );
+            transaction.add(
+              await signedProgram.methods
+                .closeSharedBook()
+                .accountsPartial({
+                  authority: wallet.publicKey,
+                  adminRecord: deriveAdminRecordPda(wallet.publicKey),
+                  market: marketAddress,
+                  book: sharedBookPda(marketAddress),
+                })
+                .instruction(),
+            );
+          }
+        }
         const testFaucetAddress = deriveTestFaucetPda(marketAddress);
         if (testFaucet) {
           transaction.add(
@@ -879,6 +908,7 @@ export function MarketDetail({ address }: { address: string }) {
               market: marketAddress,
               marketFees: deriveMarketFeesPda(marketAddress),
               testFaucet: testFaucetAddress,
+              sharedBook: sharedBookPda(marketAddress),
               vaultAuthority: deriveVaultAuthorityPda(marketAddress),
               baseVault: deriveVaultPda(marketAddress, market.baseMint),
               quoteVault: deriveVaultPda(marketAddress, market.quoteMint),
@@ -1028,55 +1058,74 @@ export function MarketDetail({ address }: { address: string }) {
               </div>
             </div>
 
-            <section
-              className="market-rate-card"
-              aria-label="Pair exchange rate"
-            >
-              <div>
-                <span className="card-label">
-                  {labels.base} / {labels.quote}
-                </span>
-                {reference ? (
-                  <>
-                    <h2>
-                      1 {labels.base} {reference.indicative ? "≈" : "="}{" "}
-                      {readableAmount(reference.price, market.quoteDecimals)}{" "}
-                      {labels.quote}
-                    </h2>
-                    <p>
-                      1 {labels.quote} ≈{" "}
-                      {inversePrice(reference.price, market.quoteDecimals)}{" "}
-                      {labels.base}
-                    </p>
-                    <span className="price-source">
-                      <span aria-hidden="true">●</span> {reference.label}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <h2>No price yet</h2>
-                    <p>A price appears when an order or trade is available.</p>
-                  </>
+            <SharedMarket
+              market={marketAddress}
+              kind="spot"
+              tradingOpen={"active" in market.status}
+              authority={market.authority}
+              quoteMint={market.quoteMint}
+              quoteDecimals={market.quoteDecimals}
+              quoteSymbol={labels.quote}
+              baseMint={market.baseMint}
+              baseDecimals={market.baseDecimals}
+              baseSymbol={labels.base}
+            />
+            {!SHARED_BALANCES_ENABLED && (
+              <section
+                className="market-rate-card"
+                aria-label="Pair exchange rate"
+              >
+                <div>
+                  <span className="card-label">
+                    {labels.base} / {labels.quote}
+                  </span>
+                  {reference ? (
+                    <>
+                      <h2>
+                        1 {labels.base} {reference.indicative ? "≈" : "="}{" "}
+                        {readableAmount(reference.price, market.quoteDecimals)}{" "}
+                        {labels.quote}
+                      </h2>
+                      <p>
+                        1 {labels.quote} ≈{" "}
+                        {inversePrice(reference.price, market.quoteDecimals)}{" "}
+                        {labels.base}
+                      </p>
+                      <span className="price-source">
+                        <span aria-hidden="true">●</span> {reference.label}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <h2>No price yet</h2>
+                      <p>
+                        A price appears when an order or trade is available.
+                      </p>
+                    </>
+                  )}
+                </div>
+                {tradeError && (
+                  <p className="market-rate-note">
+                    Recent trade history is unavailable. Any displayed quote is
+                    labeled by its book source.
+                  </p>
                 )}
-              </div>
-              {tradeError && (
-                <p className="market-rate-note">
-                  Recent trade history is unavailable. Any displayed quote is
-                  labeled by its book source.
-                </p>
-              )}
-              <details className="inline-explainer rate-explainer">
-                <summary>How is this price calculated?</summary>
-                <p>
-                  The last traded price is the most recent fill found in recent
-                  history. If none is available, we show an indicative quote
-                  from the order book, labeled by its source. The reverse rate
-                  is 1 divided by that price. Your order fills at available
-                  resting prices, so the final execution price can differ.
-                </p>
-              </details>
-            </section>
-            <div className="market-detail-layout">
+                <details className="inline-explainer rate-explainer">
+                  <summary>How is this price calculated?</summary>
+                  <p>
+                    The last traded price is the most recent fill found in
+                    recent history. If none is available, we show an indicative
+                    quote from the order book, labeled by its source. The
+                    reverse rate is 1 divided by that price. Your order fills at
+                    available resting prices, so the final execution price can
+                    differ.
+                  </p>
+                </details>
+              </section>
+            )}
+            <div
+              className={`market-detail-layout ${SHARED_BALANCES_ENABLED ? "shared-layout" : ""}`}
+            >
               <section className="admin-card market-information">
                 <div className="card-label">Pair</div>
                 <div className="market-symbol-pair">
@@ -1122,7 +1171,11 @@ export function MarketDetail({ address }: { address: string }) {
                     </div>
                   )}
                   <div>
-                    <dt>Last traded price</dt>
+                    <dt>
+                      {SHARED_BALANCES_ENABLED
+                        ? "Legacy last traded price"
+                        : "Last traded price"}
+                    </dt>
                     <dd>
                       {lastTrade ? (
                         <a
@@ -1152,11 +1205,19 @@ export function MarketDetail({ address }: { address: string }) {
                     <dd>#{market.nextOrderId.toString()}</dd>
                   </div>
                   <div>
-                    <dt>Open orders</dt>
+                    <dt>
+                      {SHARED_BALANCES_ENABLED
+                        ? "Legacy open orders"
+                        : "Open orders"}
+                    </dt>
                     <dd>{market.openOrderCount.toString()}</dd>
                   </div>
                   <div>
-                    <dt>Highest buy price</dt>
+                    <dt>
+                      {SHARED_BALANCES_ENABLED
+                        ? "Legacy highest buy price"
+                        : "Highest buy price"}
+                    </dt>
                     <dd>
                       {market.bestBid
                         ? `${readableAmount(
@@ -1167,7 +1228,11 @@ export function MarketDetail({ address }: { address: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Lowest sell price</dt>
+                    <dt>
+                      {SHARED_BALANCES_ENABLED
+                        ? "Legacy lowest sell price"
+                        : "Lowest sell price"}
+                    </dt>
                     <dd>
                       {market.bestAsk
                         ? `${readableAmount(
@@ -1306,113 +1371,115 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
               </section>
 
-              <section className="admin-card">
-                <div className="card-label">Limit order</div>
-                <h2>Place an order</h2>
+              {!SHARED_BALANCES_ENABLED && (
+                <section className="admin-card">
+                  <div className="card-label">Limit order</div>
+                  <h2>Place an order</h2>
 
-                {status === "paused" && (
-                  <div className="market-order-notice">
-                    This market is paused. Existing orders may still be
-                    canceled, but new orders are disabled.
-                  </div>
-                )}
+                  {status === "paused" && (
+                    <div className="market-order-notice">
+                      This market is paused. Existing orders may still be
+                      canceled, but new orders are disabled.
+                    </div>
+                  )}
 
-                {status === "active" && !wallet && (
-                  <div className="market-order-notice">
-                    Connect your wallet to place an order.
-                  </div>
-                )}
+                  {status === "active" && !wallet && (
+                    <div className="market-order-notice">
+                      Connect your wallet to place an order.
+                    </div>
+                  )}
 
-                {status === "active" && wallet && (
-                  <form className="market-create-form" onSubmit={placeOrder}>
-                    {!traderBalance && !balanceLoading && (
-                      <div className="market-order-notice">
-                        Initialize your market balance below before placing an
-                        order.
-                      </div>
-                    )}
-                    <label>
-                      Side
-                      <select
-                        value={side}
-                        onChange={(event) =>
-                          setSide(event.target.value as OrderSide)
+                  {status === "active" && wallet && (
+                    <form className="market-create-form" onSubmit={placeOrder}>
+                      {!traderBalance && !balanceLoading && (
+                        <div className="market-order-notice">
+                          Initialize your market balance below before placing an
+                          order.
+                        </div>
+                      )}
+                      <label>
+                        Side
+                        <select
+                          value={side}
+                          onChange={(event) =>
+                            setSide(event.target.value as OrderSide)
+                          }
+                        >
+                          <option value="bid">Buy {labels.base}</option>
+                          <option value="ask">Sell {labels.base}</option>
+                        </select>
+                      </label>
+
+                      <label>
+                        Price per {labels.base} ({labels.quote})
+                        <input
+                          inputMode="decimal"
+                          value={price}
+                          onChange={(event) => setPrice(event.target.value)}
+                          placeholder="150.00"
+                          autoComplete="off"
+                        />
+                        <small>
+                          Minimum price increment:{" "}
+                          {formatAtomicAmount(
+                            market.priceTickSize,
+                            market.quoteDecimals,
+                          )}{" "}
+                          {labels.quote}
+                        </small>
+                      </label>
+
+                      <label>
+                        Quantity ({labels.base})
+                        <input
+                          inputMode="decimal"
+                          value={quantity}
+                          onChange={(event) => setQuantity(event.target.value)}
+                          placeholder="0.01"
+                          autoComplete="off"
+                        />
+                        <small>
+                          Minimum quantity increment:{" "}
+                          {formatAtomicAmount(
+                            market.quantityLotSize,
+                            market.baseDecimals,
+                          )}{" "}
+                          {labels.base}
+                        </small>
+                      </label>
+
+                      <button
+                        className="primary-button"
+                        type="submit"
+                        disabled={
+                          !traderBalance ||
+                          !rawPricePreview ||
+                          !rawQuantityPreview ||
+                          !rawPricePreview.mod(market.priceTickSize).isZero() ||
+                          !rawQuantityPreview
+                            .mod(market.quantityLotSize)
+                            .isZero() ||
+                          pending
                         }
                       >
-                        <option value="bid">Buy {labels.base}</option>
-                        <option value="ask">Sell {labels.base}</option>
-                      </select>
-                    </label>
-
-                    <label>
-                      Price per {labels.base} ({labels.quote})
-                      <input
-                        inputMode="decimal"
-                        value={price}
-                        onChange={(event) => setPrice(event.target.value)}
-                        placeholder="150.00"
-                        autoComplete="off"
-                      />
-                      <small>
-                        Minimum price increment:{" "}
-                        {formatAtomicAmount(
-                          market.priceTickSize,
-                          market.quoteDecimals,
-                        )}{" "}
-                        {labels.quote}
-                      </small>
-                    </label>
-
-                    <label>
-                      Quantity ({labels.base})
-                      <input
-                        inputMode="decimal"
-                        value={quantity}
-                        onChange={(event) => setQuantity(event.target.value)}
-                        placeholder="0.01"
-                        autoComplete="off"
-                      />
-                      <small>
-                        Minimum quantity increment:{" "}
-                        {formatAtomicAmount(
-                          market.quantityLotSize,
-                          market.baseDecimals,
-                        )}{" "}
-                        {labels.base}
-                      </small>
-                    </label>
-
-                    <button
-                      className="primary-button"
-                      type="submit"
-                      disabled={
-                        !traderBalance ||
-                        !rawPricePreview ||
-                        !rawQuantityPreview ||
-                        !rawPricePreview.mod(market.priceTickSize).isZero() ||
-                        !rawQuantityPreview
-                          .mod(market.quantityLotSize)
-                          .isZero() ||
-                        pending
-                      }
-                    >
-                      {submitLabel}
-                    </button>
-                    {crossesBest ? (
-                      <small>
-                        Your limit price crosses an existing{" "}
-                        {side === "bid" ? "sell" : "buy"} order, so it will
-                        trade automatically. This transaction processes up to{" "}
-                        {MAX_MATCHES_PER_TRANSACTION} FIFO makers atomically. A
-                        safe remainder rests at your limit price; a cap-blocked
-                        remainder stays free for retry.
-                      </small>
-                    ) : collateralPreview ? (
-                      <small>This order will lock {collateralPreview}.</small>
-                    ) : null}
-                  </form>
-                )}
-              </section>
+                        {submitLabel}
+                      </button>
+                      {crossesBest ? (
+                        <small>
+                          Your limit price crosses an existing{" "}
+                          {side === "bid" ? "sell" : "buy"} order, so it will
+                          trade automatically. This transaction processes up to{" "}
+                          {MAX_MATCHES_PER_TRANSACTION} FIFO makers atomically.
+                          A safe remainder rests at your limit price; a
+                          cap-blocked remainder stays free for retry.
+                        </small>
+                      ) : collateralPreview ? (
+                        <small>This order will lock {collateralPreview}.</small>
+                      ) : null}
+                    </form>
+                  )}
+                </section>
+              )}
             </div>
 
             <section className="admin-card order-book-card">

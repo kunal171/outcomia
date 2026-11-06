@@ -1,4 +1,10 @@
 "use client";
+import { LegacyBalanceTransfer } from "./legacy-balance-transfer";
+import {
+  PREDICTION_RESOLUTION_ENABLED,
+  SHARED_BALANCES_ENABLED,
+} from "../lib/shared";
+import { SharedAssetFunds } from "./shared-wallet";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -216,12 +222,29 @@ export function WalletWorkspace() {
             </section>
             {data && (
               <div className="wallet-errors">
+                {data.shared && (
+                  <details className="admin-card">
+                    <summary>Deposit or withdraw shared assets</summary>
+                    {assets.map((a) => (
+                      <SharedAssetFunds
+                        key={a.mint.toBase58()}
+                        mint={a.mint}
+                        decimals={a.decimals}
+                        symbol={a.symbol}
+                        onChanged={() => setRevision((v) => v + 1)}
+                      />
+                    ))}
+                  </details>
+                )}
                 <ReadError label="SOL balance" result={data.sol} />
                 <ReadError label="SPL token balances" result={data.tokens} />
                 <ReadError
                   label="Tidebook asset listings"
                   result={data.catalog}
                 />
+                {data.shared && (
+                  <ReadError label="Shared assets" result={data.shared} />
+                )}
                 <ReadError label="Spot deposits" result={data.spot} />
                 <ReadError
                   label="Prediction positions"
@@ -384,7 +407,11 @@ export function WalletWorkspace() {
               <div className="wallet-section-heading">
                 <div>
                   <span className="eyebrow">Deposited assets</span>
-                  <h2 id="spot-balances-title">Spot market balances</h2>
+                  <h2 id="spot-balances-title">
+                    {SHARED_BALANCES_ENABLED
+                      ? "Legacy spot deposits"
+                      : "Spot market balances"}
+                  </h2>
                 </div>
                 <Link className="text-button" href="/markets">
                   Explore spot →
@@ -455,6 +482,26 @@ export function WalletWorkspace() {
                         ) : (
                           <p className="wallet-incomplete">{item.issue}</p>
                         )}
+                        {market && labels && (
+                          <>
+                            <LegacyBalanceTransfer
+                              market={balance.market}
+                              mint={market.baseMint}
+                              amount={balance.baseFree}
+                              symbol={labels.base}
+                              kind="spot"
+                              onChanged={() => setRevision((v) => v + 1)}
+                            />
+                            <LegacyBalanceTransfer
+                              market={balance.market}
+                              mint={market.quoteMint}
+                              amount={balance.quoteFree}
+                              symbol={labels.quote}
+                              kind="spot"
+                              onChanged={() => setRevision((v) => v + 1)}
+                            />
+                          </>
+                        )}
                         <Link
                           className="market-open-link"
                           href={`/markets/${balance.market.toBase58()}#balances`}
@@ -482,8 +529,10 @@ export function WalletWorkspace() {
               </div>
               <p className="wallet-muted">
                 Contract counts are not cash balances. Merge an available YES/NO
-                pair to recover its collateral. Outcome resolution and reward
-                claims are not available yet.
+                pair to recover its collateral.{" "}
+                {PREDICTION_RESOLUTION_ENABLED
+                  ? "After final resolution, redeem free contracts on the market page."
+                  : "Resolution and claims require the next program upgrade."}
               </p>
               {!data || data.predictions.error ? (
                 <p className="wallet-empty">
@@ -555,6 +604,16 @@ export function WalletWorkspace() {
                         ) : (
                           <p className="wallet-incomplete">{item.issue}</p>
                         )}
+                        {market && (
+                          <LegacyBalanceTransfer
+                            market={balance.market}
+                            mint={market.collateralMint}
+                            amount={balance.collateralFree}
+                            symbol={symbol}
+                            kind="prediction"
+                            onChanged={() => setRevision((v) => v + 1)}
+                          />
+                        )}
                         <Link
                           className="market-open-link"
                           href={`/predictions/${balance.market.toBase58()}#position`}
@@ -569,8 +628,8 @@ export function WalletWorkspace() {
             </section>
             <p className="wallet-footnote">
               Confirmed RPC reads may span different slots. Refresh after a
-              deposit, withdrawal or trade. This page does not move funds or ask
-              you to sign.
+              deposit, withdrawal or trade. Transfers require your wallet
+              signature; reading balances does not.
             </p>
           </>
         )}

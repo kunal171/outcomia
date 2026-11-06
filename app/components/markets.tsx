@@ -1,4 +1,10 @@
 "use client";
+import {
+  SHARED_BALANCES_ENABLED,
+  sharedAccounts,
+  sharedBookPda,
+  type SharedBook,
+} from "../lib/shared";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,6 +32,9 @@ function getErrorMessage(cause: unknown) {
 
 export function Markets() {
   const { connection } = useConnection();
+  const [sharedBooks, setSharedBooks] = useState<Map<string, SharedBook>>(
+    () => new Map(),
+  );
   const [markets, setMarkets] = useState<MarketView[]>([]);
   const [metadataByMarket, setMetadataByMarket] = useState<
     Map<string, MarketMetadataAccount>
@@ -46,11 +55,22 @@ export function Markets() {
 
     try {
       const accounts = getTidebookAccounts(program);
-      const [marketRead, metadataRead] = await Promise.allSettled([
+      const [marketRead, metadataRead, sharedRead] = await Promise.allSettled([
         accounts.market.all(),
         accounts.marketMetadata.all(),
+        SHARED_BALANCES_ENABLED
+          ? sharedAccounts(program).sharedBook.all()
+          : Promise.resolve([]),
       ]);
       if (marketRead.status === "rejected") throw marketRead.reason;
+      if (sharedRead.status === "rejected") throw sharedRead.reason;
+      const books = new Map<string, SharedBook>();
+      for (const r of sharedRead.value) {
+        if (!sharedBookPda(r.account.market).equals(r.publicKey))
+          throw new Error("Invalid shared book identity");
+        books.set(r.account.market.toBase58(), r.account);
+      }
+      setSharedBooks(books);
       const records = marketRead.value;
       const metadataRecords =
         metadataRead.status === "fulfilled" ? metadataRead.value : [];
@@ -158,6 +178,14 @@ export function Markets() {
         <section className="markets-grid" aria-live="polite">
           {markets.map((market) => {
             const status = decodeMarketStatus(market.status);
+            const shared = sharedBooks.get(market.address.toBase58());
+            const bid = SHARED_BALANCES_ENABLED
+              ? shared?.bestPrices[0]
+              : market.bestBid;
+            const ask = SHARED_BALANCES_ENABLED
+              ? shared?.bestPrices[1]
+              : market.bestAsk;
+
             const metadata = metadataByMarket.get(market.address.toBase58());
             const kind = metadata ? decodeMarketKind(metadata.kind) : null;
             const labels = marketLabels(market, metadata);
@@ -200,11 +228,19 @@ export function Markets() {
                   </div>
                   <div>
                     <dt>Next order</dt>
-                    <dd>#{market.nextOrderId.toString()}</dd>
+                    <dd>
+                      {SHARED_BALANCES_ENABLED
+                        ? (shared?.nextOrderId.toString() ?? "—")
+                        : `#${market.nextOrderId.toString()}`}
+                    </dd>
                   </div>
                   <div>
                     <dt>Open orders</dt>
-                    <dd>{market.openOrderCount.toString()}</dd>
+                    <dd>
+                      {SHARED_BALANCES_ENABLED
+                        ? (shared?.openOrderCount.toString() ?? "Not enabled")
+                        : market.openOrderCount.toString()}
+                    </dd>
                   </div>
                   <div>
                     <dt>Price step</dt>
@@ -229,16 +265,16 @@ export function Markets() {
                   <div>
                     <dt>Highest buy price</dt>
                     <dd>
-                      {market.bestBid
-                        ? `${readableAmount(market.bestBid, market.quoteDecimals)} ${labels.quote}`
+                      {bid
+                        ? `${readableAmount(bid, market.quoteDecimals)} ${labels.quote}`
                         : "No buy orders"}
                     </dd>
                   </div>
                   <div>
                     <dt>Lowest sell price</dt>
                     <dd>
-                      {market.bestAsk
-                        ? `${readableAmount(market.bestAsk, market.quoteDecimals)} ${labels.quote}`
+                      {ask
+                        ? `${readableAmount(ask, market.quoteDecimals)} ${labels.quote}`
                         : "No sell orders"}
                     </dd>
                   </div>

@@ -1,3 +1,10 @@
+import { unpackMint } from "@solana/spl-token";
+import {
+  sharedAccounts,
+  assetBalancePda,
+  SHARED_BALANCES_ENABLED,
+  type AssetBalance,
+} from "./shared";
 /** Read-only portfolio discovery. Amounts stay in integer atoms; markets remain separate. */
 import { BN, type Program } from "@anchor-lang/core";
 import { Connection, PublicKey, type ParsedAccountData } from "@solana/web3.js";
@@ -59,6 +66,7 @@ export interface WalletOverview {
   catalog: ReadResult<ListedAsset[]>;
   spot: ReadResult<SpotHolding[]>;
   predictions: ReadResult<PredictionHolding[]>;
+  shared?: ReadResult<Array<{ balance: AssetBalance; decimals: number }>>;
 }
 
 async function read<T>(action: () => Promise<T>): Promise<ReadResult<T>> {
@@ -276,6 +284,38 @@ async function readPredictions(
   }));
 }
 
+/** Owner scan uses offset 8: the shared ledger stores owner before mint.
+ * Verify each address and read actual mint precision, including delisted assets for recovery. */
+async function readShared(
+  connection: Connection,
+  program: Program,
+  owner: PublicKey,
+) {
+  const records = await sharedAccounts(program).assetBalance.all([
+    { memcmp: { offset: 8, bytes: owner.toBase58() } },
+  ]);
+  const result: Array<{ balance: AssetBalance; decimals: number }> = [];
+  for (let start = 0; start < records.length; start += 100) {
+    const batch = records.slice(start, start + 100),
+      infos = await connection.getMultipleAccountsInfo(
+        batch.map((r) => r.account.mint),
+        "confirmed",
+      );
+    for (let n = 0; n < batch.length; n++) {
+      const { publicKey, account } = batch[n];
+      if (
+        !account.owner.equals(owner) ||
+        !assetBalancePda(owner, account.mint).equals(publicKey)
+      )
+        throw new Error("Invalid shared balance identity");
+      validateAmounts([account.free, account.locked]);
+      const mint = unpackMint(account.mint, infos[n], TOKEN_PROGRAM_ID);
+      result.push({ balance: account, decimals: mint.decimals });
+    }
+  }
+  return result;
+}
+
 /** Listing checks use actual market accounts, never arbitrary wallet-token symbols.
  * Labels are optional; failed metadata reads do not invent or remove listings.
  */
@@ -350,7 +390,11 @@ export async function loadWalletOverview(
     read(() => readSpot(connection, program, owner)),
     read(() => readPredictions(connection, program, owner)),
   ]);
+  const shared = SHARED_BALANCES_ENABLED
+    ? await read(() => readShared(connection, program, owner))
+    : undefined;
   return {
+    shared,
     owner,
     readAt: Date.now(),
     sol,
@@ -386,7 +430,10 @@ export function walletAssetRows(snapshot: WalletOverview): AssetRow[] {
   const predictionComplete =
     snapshot.predictions.data !== null &&
     snapshot.predictions.data.every((row) => row.market !== null);
-  const complete = spotComplete && predictionComplete;
+  const complete =
+    spotComplete &&
+    predictionComplete &&
+    (snapshot.shared === undefined || snapshot.shared.data !== null);
   const rows = new Map<string, AssetRow & { labels: Set<string> }>();
   function get(
     mint: PublicKey,
@@ -431,6 +478,8 @@ export function walletAssetRows(snapshot: WalletOverview): AssetRow[] {
   for (const item of snapshot.predictions.data ?? []) {
     if (item.market) listed.add(item.market.collateralMint.toBase58());
   }
+  for (const item of snapshot.shared?.data ?? [])
+    listed.add(item.balance.mint.toBase58());
   for (const token of snapshot.tokens.data ?? []) {
     if (!listed.has(token.mint.toBase58())) continue;
     const row = get(token.mint, token.decimals, token.tokenProgram);
@@ -475,6 +524,13 @@ export function walletAssetRows(snapshot: WalletOverview): AssetRow[] {
     if (complete) {
       row.available = row.available!.add(item.balance.collateralFree);
       row.inOrders = row.inOrders!.add(item.balance.collateralLocked);
+    }
+  }
+  for (const { balance, decimals } of snapshot.shared?.data ?? []) {
+    const row = get(balance.mint, decimals);
+    if (complete) {
+      row.available = row.available!.add(balance.free);
+      row.inOrders = row.inOrders!.add(balance.locked);
     }
   }
   for (const listing of snapshot.catalog.data ?? []) {

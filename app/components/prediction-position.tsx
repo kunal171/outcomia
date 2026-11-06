@@ -1,4 +1,8 @@
 "use client";
+import {
+  SHARED_BALANCES_ENABLED,
+  PREDICTION_RESOLUTION_ENABLED,
+} from "../lib/shared";
 
 import { useEffect, useMemo, useState } from "react";
 import { PredictionOrders } from "./prediction-orders";
@@ -57,7 +61,11 @@ export function PredictionPositionPanel(props: PositionProps) {
   if (!mounted) {
     return (
       <section className="access-card">
-        <h2>Your position</h2>
+        <h2>
+          {SHARED_BALANCES_ENABLED
+            ? "Legacy cash & outcome recovery"
+            : "Your position"}
+        </h2>
         <p>Loading wallet…</p>
       </section>
     );
@@ -65,7 +73,11 @@ export function PredictionPositionPanel(props: PositionProps) {
   if (!wallet) {
     return (
       <section className="access-card">
-        <h2>Your position</h2>
+        <h2>
+          {SHARED_BALANCES_ENABLED
+            ? "Legacy cash & outcome recovery"
+            : "Your position"}
+        </h2>
         <p>Connect a wallet to view or initialize your prediction position.</p>
       </section>
     );
@@ -451,7 +463,11 @@ function ConnectedPosition({
       aria-busy={loading || walletLoading || pending}
     >
       <div className="market-list-heading">
-        <h2>Your position</h2>
+        <h2>
+          {SHARED_BALANCES_ENABLED
+            ? "Legacy cash & outcome recovery"
+            : "Your position"}
+        </h2>
         <button
           className="text-button"
           type="button"
@@ -482,22 +498,24 @@ function ConnectedPosition({
               </div>
             ))}
           </dl>
-          <PredictionMatchForm
-            program={program}
-            owner={wallet.publicKey}
-            market={market}
-            decimals={decimals}
-            symbol={collateralSymbol}
-            pending={pending}
-            setPending={setPending}
-            onMatched={(confirmed, order) => {
-              setSignature(confirmed);
-              setLastOrder(order);
-              setResultKind("match");
-              setRefresh((value) => value + 1);
-              onOrderPlaced();
-            }}
-          />
+          {!SHARED_BALANCES_ENABLED && (
+            <PredictionMatchForm
+              program={program}
+              owner={wallet.publicKey}
+              market={market}
+              decimals={decimals}
+              symbol={collateralSymbol}
+              pending={pending}
+              setPending={setPending}
+              onMatched={(confirmed, order) => {
+                setSignature(confirmed);
+                setLastOrder(order);
+                setResultKind("match");
+                setRefresh((value) => value + 1);
+                onOrderPlaced();
+              }}
+            />
+          )}
           <PredictionOrders
             program={program}
             owner={wallet.publicKey}
@@ -724,9 +742,11 @@ function ConnectedPosition({
         </p>
       )}
       <p>
-        Cancel open orders to release their remaining funds. Resolution and
-        reward claims are not available in this version. The creator must open a
-        draft before trading begins.
+        Cancel open orders to release their remaining funds.{" "}
+        {PREDICTION_RESOLUTION_ENABLED
+          ? "Use the resolution panel above to redeem finalized free contracts into your shared wallet."
+          : "Resolution and claims require the next program upgrade."}{" "}
+        The creator must open a draft before trading begins.
       </p>
     </section>
   );

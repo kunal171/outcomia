@@ -19,6 +19,7 @@ Open `http://localhost:3000`. For checks:
 npm run typecheck
 npm run test:prediction
 npm run test:wallet
+npm run test:shared
 npm run build
 ```
 
@@ -74,8 +75,8 @@ flags when targeting an older binary, even if it uses the same program ID.
 Cancellation has its own gate so stopping new orders need not block exits.
 The program independently checks roles, signatures, balances and trading times.
 
-Outcome resolution, reward claims and prediction fee withdrawal are not
-implemented. Trading fills settle internal balances; final outcome settlement
+Resolution and redemption are implemented locally behind upgrade flags. Legacy
+prediction fee withdrawal remains separate. Trading fills settle internal balances; final outcome settlement
 is a different step. The UI's help dialogs explain this distinction.
 
 ## Pages
@@ -132,8 +133,11 @@ available collateral and order locks without valuing YES/NO contracts as cash.
 The prediction section lists free and locked contracts separately. Missing
 market units or failed reads produce unavailable totals, not fabricated zeros.
 Market links lead to the existing deposit, withdrawal and position controls.
-Each balance account is initialized once per wallet/market pair. A shared quote
-mint does not create a shared spending balance across markets.
+Legacy balances remain per wallet/market. The new shared path initializes one
+`AssetBalance` per wallet/mint; the same USDC is spendable across shared books.
+The wallet page identifies legacy deposits and offers signed transfers of free
+cash. Cancel old orders before moving their released funds. YES/NO contracts
+and their backing remain question-specific.
 
 The page only reads accounts and never requests a signature. Refresh manually
 after transactions; the confirmed reads may span different slots. Changing or
@@ -190,3 +194,29 @@ because Next.js resolves its dynamic import during builds; no x402 funding is
 enabled. Dependencies have upstream audit advisories. Recheck the current audit
 rather than relying on a saved count; forced fixes can replace the Solana stack
 with incompatible versions.
+
+## Shared custody and settlement rollout
+
+Leave these false while the previous devnet program is running:
+
+```env
+NEXT_PUBLIC_SHARED_BALANCES_ENABLED=false
+NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED=false
+```
+
+After the program upgrade and a successful devnet smoke test, enable both and
+rebuild/redeploy the app. No new instructions are submitted by default. A market's
+active-admin creator enables its shared book from the market detail page.
+The new panel displays shared orders separately from legacy liquidity.
+
+`/wallet` supports shared deposits/withdrawals and legacy free-cash transfers.
+Trading matches up to three FIFO makers and posts only a noncrossing remainder.
+Oversized packets are rejected before signing. Initialize missing mint balances
+separately if a first trade is too large. Failed reads are shown as unavailable.
+
+Prediction detail pages add creator closure, evidence-backed proposals/corrections,
+fallback activation, delayed finalization and free-contract redemption. Proposal
+files are hashed locally; the resolver uploads evidence independently and supplies
+its permanent reference. The app does not verify the remote bytes. Anyone can
+finalize a mature proposal; only the configured active-admin resolver can propose.
+Legacy cash stays withdrawable; redemption credits the shared mint balance.

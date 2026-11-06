@@ -1,0 +1,15 @@
+{
+  "environment": "Solana devnet only",
+  "question": "Did the shared-wallet and prediction settlement smoke test pass?",
+  "purpose": "A technical deployment check using newly created test assets, not a public wagering market.",
+  "resolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "yes": "Confirmed shared spot and YES trades conserve custody, a paused order cancels, and the same quote balance funds the prediction reserve.",
+  "no": "The above checks execute but their documented conservation assertions fail.",
+  "invalid": "Evidence is incomplete or the test is interrupted before the assertions can be evaluated.",
+  "evidence": "The pinned smoke-evidence JSON records transaction signatures, account addresses, balances and the program ID.",
+  "close": "Use the immutable close_ts stored in the prediction market account.",
+  "review_delay_seconds": 5,
+  "fallback": null,
+  "earliest_resolution": "The stored trading cutoff; administrative closure cannot accelerate it.",
+  "payout": "One test collateral token per winning contract; Invalid pays one half per outcome. Free contracts are burned on redemption."
+}

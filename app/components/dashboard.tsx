@@ -1,4 +1,5 @@
 "use client";
+import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -228,7 +229,9 @@ function PredictionJourney() {
               designed to pay 1 collateral token after final resolution.
             </p>
             <small>
-              Resolution and reward claims are still in development.
+              {PREDICTION_RESOLUTION_ENABLED
+                ? "Finalized winning contracts can be redeemed into your shared wallet."
+                : "Resolution and claims require the next program upgrade."}
             </small>
           </article>
         </div>
@@ -369,8 +372,9 @@ export function Dashboard() {
           </div>
         </section>
         <p className="landing-rollout-note">
-          Devnet preview · Prediction trading is in development. Resolution and
-          reward claims are not available yet.
+          {PREDICTION_RESOLUTION_ENABLED
+            ? "Devnet test markets · Trade, resolve and redeem under published market rules."
+            : "Devnet preview · Prediction trading is deployed. Resolution and claims require the next program upgrade."}
         </p>
         <PredictionJourney />
         <section

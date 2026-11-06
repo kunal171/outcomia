@@ -41,7 +41,7 @@ function load(file) {
       AbortController,
       setTimeout,
       clearTimeout,
-      process: { env: {} },
+      process: { env: { NEXT_PUBLIC_SHARED_BALANCES_ENABLED: "true" } },
       require: (name) => {
         if (name === "./solana") return { PROGRAM_ID: programId };
         if (name.startsWith(".")) {
@@ -336,6 +336,99 @@ const connection = {
     readableAmount(rows.find((r) => r.mint.equals(base)).wallet, 8),
     "90,071,992.54740993",
   );
+  // Shared cash is counted once, separately from legacy cash and outcome backing.
+  const sharedSnapshot = {
+    ...result,
+    shared: {
+      error: null,
+      data: [
+        {
+          balance: {
+            owner,
+            mint: quote,
+            free: bn(7000000),
+            locked: bn(2000000),
+          },
+          decimals: 6,
+        },
+        {
+          balance: { owner, mint: unrelated, free: bn(123), locked: bn(0) },
+          decimals: 9,
+        },
+      ],
+    },
+  };
+  const sharedRows = walletAssetRows(sharedSnapshot);
+  assert.equal(
+    sharedRows.find((r) => r.mint.equals(quote)).available.toString(),
+    "16000000",
+  );
+  assert.equal(
+    sharedRows.find((r) => r.mint.equals(quote)).inOrders.toString(),
+    "3500000",
+  );
+  assert.ok(
+    sharedRows.some((r) => r.mint.equals(unrelated)),
+    "Delisted shared deposits stay recoverable",
+  );
+  assert.equal(
+    walletAssetRows({
+      ...result,
+      shared: { data: null, error: "RPC unavailable" },
+    }).find((r) => r.mint.equals(quote)).available,
+    null,
+  );
+  // The real shared loader validates owner-at-offset-8 and actual SPL mint precision.
+  const sharedAddress = derive(
+    "asset_balance",
+    owner.toBuffer(),
+    quote.toBuffer(),
+  );
+  const { MintLayout, TOKEN_PROGRAM_ID } = req("@solana/spl-token");
+  const mintBytes = Buffer.alloc(MintLayout.span);
+  MintLayout.encode(
+    {
+      mintAuthorityOption: 0,
+      mintAuthority: PublicKey.default,
+      supply: 100000000n,
+      decimals: 6,
+      isInitialized: true,
+      freezeAuthorityOption: 0,
+      freezeAuthority: PublicKey.default,
+    },
+    mintBytes,
+  );
+  records.set(quote.toBase58(), {
+    data: mintBytes,
+    owner: TOKEN_PROGRAM_ID,
+    lamports: 10000,
+    executable: false,
+    rentEpoch: 0,
+  });
+  await put(sharedAddress, "assetBalance", {
+    owner,
+    mint: quote,
+    free: bn(7000000),
+    locked: bn(2000000),
+    bump: 255,
+  });
+  const loadedShared = await loadWalletOverview(connection, owner);
+  assert.equal(loadedShared.shared.data[0].decimals, 6);
+  assert.equal(
+    walletAssetRows(loadedShared)
+      .find((r) => r.mint.equals(quote))
+      .available.toString(),
+    "16000000",
+  );
+  assert.ok(
+    filtersSeen.some((filters) =>
+      filters.some(
+        (f) => f.memcmp?.offset === 8 && f.memcmp.bytes === owner.toBase58(),
+      ),
+    ),
+  );
+  records.delete(sharedAddress.toBase58());
+  records.delete(quote.toBase58());
   // Existing deposits remain discoverable with zero wallet token accounts.
   const saved = connection.getParsedTokenAccountsByOwner;
   connection.getParsedTokenAccountsByOwner = async () => ({
