@@ -4,24 +4,8 @@
   font-family: "DM Sans", sans-serif;
   color: var(--ink);
   background: var(--background);
-  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --background: #101019;
-  --ink: #f3f1ff;
-  --muted: #aaa9bf;
-  --panel: rgba(27, 25, 39, 0.86);
-  --surface-inset: #141320;
-  --line: rgba(190, 182, 230, 0.14);
-  --accent: #b5a2ff;
-  --accent-rgb: 181 162 255;
-  --coral: #ffb19c;
-  --buy: #79e8d4;
-  --sell: #ffb19c;
-  /* Compatibility aliases keep existing component selectors on one palette. */
-  --mint: var(--accent);
-  --mint-dark: #252039;
-  --amber: #ffc66d;
 }
 
 * {
@@ -37,8 +21,16 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse at 82% 30%, #29204480, transparent 48%),
-    radial-gradient(ellipse at 8% 80%, #173b3b40, transparent 44%),
+    radial-gradient(
+      ellipse at 82% 30%,
+      rgb(var(--accent-rgb) / 0.502),
+      transparent 48%
+    ),
+    radial-gradient(
+      ellipse at 8% 80%,
+      rgb(var(--buy-rgb) / 0.251),
+      transparent 44%
+    ),
     var(--background);
 }
 
@@ -145,7 +137,7 @@ a {
   height: 7px;
   border-radius: 50%;
   background: var(--buy);
-  box-shadow: 0 0 10px rgb(121 232 212 / 0.38);
+  box-shadow: 0 0 10px rgb(var(--buy-rgb) / 0.38);
 }
 
 .wallet-adapter-button-trigger {
@@ -163,9 +155,9 @@ a {
 .wallet-adapter-modal-wrapper,
 .wallet-adapter-dropdown-list {
   border: 1px solid var(--line);
-  background: #1d1a2b;
+  background: var(--accent-ink);
   color: var(--ink);
-  box-shadow: 0 24px 80px rgb(0 0 0 / 0.35);
+  box-shadow: 0 24px 80px rgb(var(--shadow-rgb) / 0.35);
 }
 .wallet-adapter-modal-title,
 .wallet-adapter-modal-list .wallet-adapter-button {
@@ -178,7 +170,7 @@ a {
   background: rgb(var(--accent-rgb) / 0.12);
 }
 .wallet-adapter-modal-overlay {
-  background: rgb(10 9 18 / 0.78);
+  background: rgb(var(--background-rgb) / 0.78);
 }
 
 .hero {
@@ -279,12 +271,12 @@ a {
 
 .status-deployed {
   background: var(--buy);
-  box-shadow: 0 0 12px rgb(121 232 212 / 0.4);
+  box-shadow: 0 0 12px rgb(var(--buy-rgb) / 0.4);
 }
 
 .status-not-deployed,
 .status-unavailable {
-  background: #ff8c79;
+  background: var(--sell);
 }
 
 .status-checking {
@@ -314,7 +306,7 @@ a {
   border: 0;
   border-radius: 10px;
   background: var(--mint);
-  color: #1b1530;
+  color: var(--accent-ink);
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -323,7 +315,7 @@ a {
 }
 
 .primary-button:not(:disabled):hover {
-  background: #c8b8ff;
+  background: var(--accent);
   box-shadow: 0 6px 24px rgb(var(--accent-rgb) / 0.14);
 }
 
@@ -360,15 +352,15 @@ footer {
 .role-disabled,
 .role-disabled-admin,
 .role-uninitialized {
-  border-color: rgba(255, 198, 109, 0.35);
-  background: rgba(255, 198, 109, 0.09);
+  border-color: rgb(var(--amber-rgb) / 0.35);
+  background: rgb(var(--amber-rgb) / 0.09);
   color: var(--amber);
 }
 
 .role-super-admin {
   color: var(--coral);
-  background: rgb(255 177 156 / 0.08);
-  border-color: rgb(255 177 156 / 0.28);
+  background: rgb(var(--sell-rgb) / 0.08);
+  border-color: rgb(var(--sell-rgb) / 0.28);
 }
 
 .route-shell {
@@ -493,8 +485,8 @@ footer {
 
 .access-denied,
 .transaction-error {
-  border-color: rgba(255, 122, 122, 0.28);
-  color: #ffaaaa;
+  border-color: rgb(var(--sell-rgb) / 0.28);
+  color: var(--sell);
 }
 
 .admin-layout {
@@ -728,9 +720,9 @@ footer {
 }
 
 .danger-button {
-  border: 1px solid rgba(255, 122, 122, 0.3);
-  background: rgba(255, 122, 122, 0.08);
-  color: #ffaaaa;
+  border: 1px solid rgb(var(--sell-rgb) / 0.3);
+  background: rgb(var(--sell-rgb) / 0.08);
+  color: var(--sell);
 }
 
 .admin-action-button:disabled,
@@ -940,7 +932,7 @@ footer {
   background: var(--sell);
 }
 .prediction-trade-ask .primary-button:not(:disabled):hover {
-  background: #ffc4b4;
+  background: var(--sell);
 }
 .prediction-order-row {
   margin-block: 14px;
@@ -1053,7 +1045,7 @@ select:focus-visible {
 }
 
 .order-canceled {
-  color: #ffaaaa;
+  color: var(--sell);
 }
 
 .markets-heading,
@@ -1152,8 +1144,8 @@ select:focus-visible {
 }
 
 .market-paused {
-  border-color: rgba(255, 198, 109, 0.35);
-  background: rgba(255, 198, 109, 0.09);
+  border-color: rgb(var(--amber-rgb) / 0.35);
+  background: rgb(var(--amber-rgb) / 0.09);
   color: var(--amber);
 }
 
@@ -1317,7 +1309,7 @@ select:focus-visible {
     linear-gradient(
       110deg,
       rgb(var(--accent-rgb) / 0.1),
-      rgb(121 232 212 / 0.025)
+      rgb(var(--buy-rgb) / 0.025)
     ),
     var(--panel);
 }
@@ -1714,7 +1706,7 @@ textarea {
   gap: 8px;
   padding: 7px 11px;
   border-radius: 8px;
-  background: rgb(121 232 212 / 0.09);
+  background: rgb(var(--buy-rgb) / 0.09);
   color: var(--buy);
   font-size: 12px;
   font-weight: 600;
@@ -1777,7 +1769,7 @@ textarea {
   text-transform: none;
   letter-spacing: 0;
   font-size: 13px;
-  color: #d7d1e8;
+  color: var(--ink);
 }
 .market-create-form input,
 .market-create-form select,
@@ -1847,11 +1839,11 @@ textarea {
   border: 1px solid rgb(var(--accent-rgb) / 0.3);
   border-radius: 20px;
   color: var(--ink);
-  background: #191725;
-  box-shadow: 0 30px 120px #0009;
+  background: var(--panel);
+  box-shadow: 0 30px 120px rgb(var(--shadow-rgb) / 0.6);
 }
 .prediction-guide::backdrop {
-  background: #080811c9;
+  background: rgb(var(--background-rgb) / 0.788);
   backdrop-filter: blur(6px);
 }
 .guide-heading {
@@ -1884,9 +1876,9 @@ textarea {
 .guide-example {
   margin: 24px 0;
   padding: 20px;
-  border: 1px solid rgb(121 232 212 / 0.25);
+  border: 1px solid rgb(var(--buy-rgb) / 0.25);
   border-radius: 14px;
-  background: rgb(121 232 212 / 0.04);
+  background: rgb(var(--buy-rgb) / 0.04);
 }
 .guide-example > strong {
   display: block;
@@ -1977,7 +1969,7 @@ body:has(.prediction-guide[open]) {
   flex: 1;
   min-width: 180px;
   padding: 1rem;
-  border: 1px solid var(--border, #353043);
+  border: 1px solid var(--border, var(--line));
   border-radius: 12px;
 }
 .shared-funds {

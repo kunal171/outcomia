@@ -10,7 +10,13 @@ body {
   flex-direction: column;
   gap: 0;
   padding: 30px 16px 22px;
-  background: linear-gradient(160deg, #211b3255, transparent 60%), #11101b;
+  background:
+    linear-gradient(
+      160deg,
+      rgb(var(--background-rgb) / 0.333),
+      transparent 60%
+    ),
+    var(--background);
   color: var(--ink);
   border: 0;
   border-right: 1px solid var(--line);
@@ -31,7 +37,7 @@ body {
 .sidebar-section-label {
   display: block;
   margin: 42px 14px 14px;
-  color: #817a96;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -62,7 +68,7 @@ body {
 }
 .sidebar-nav a > svg {
   flex-shrink: 0;
-  color: #8a819e;
+  color: var(--muted);
   transition: color 180ms ease;
 }
 .sidebar-link-arrow {
@@ -171,13 +177,13 @@ body {
   max-width: none;
   padding: 24px 18px;
   overflow-y: auto;
-  box-shadow: 20px 0 100px #0005;
+  box-shadow: 20px 0 100px rgb(var(--shadow-rgb) / 0.333);
 }
 .sidebar-drawer[open] {
   display: flex;
 }
 .sidebar-drawer::backdrop {
-  background: #070611b8;
+  background: rgb(var(--background-rgb) / 0.722);
   backdrop-filter: blur(5px);
 }
 .sidebar-drawer-heading {

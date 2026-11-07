@@ -31,8 +31,8 @@
 }
 .wallet-network-tag {
   padding: 6px 9px;
-  border: 1px solid #79e8d430;
-  background: #79e8d40a;
+  border: 1px solid rgb(var(--buy-rgb) / 0.188);
+  background: rgb(var(--buy-rgb) / 0.039);
   color: var(--buy);
   border-radius: 7px;
   font-size: 10px;
@@ -149,7 +149,7 @@
 }
 .wallet-assets-table thead {
   color: var(--muted);
-  background: #11101b70;
+  background: rgb(var(--background-rgb) / 0.439);
 }
 .wallet-assets-table th {
   padding: 16px;
@@ -275,8 +275,8 @@
   display: grid;
   gap: 7px;
   padding: 16px;
-  border: 1px solid #ffb19c30;
-  background: #ffb19c06;
+  border: 1px solid rgb(var(--sell-rgb) / 0.188);
+  background: rgb(var(--sell-rgb) / 0.024);
   border-radius: 10px;
   font-size: 12px;
   color: var(--sell);

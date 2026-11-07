@@ -1,0 +1,197 @@
+/* Petrol, sand and copper. These tokens are shared by every route and dialog. */
+:root {
+  color-scheme: dark;
+  --background: #101f27;
+  --ink: #edf3f2;
+  --muted: #afbec2;
+  --panel: #182a33;
+  --surface-inset: #13242d;
+  --line: rgb(205 229 231 / 0.17);
+  --accent: #efbd78;
+  --accent-rgb: 239 189 120;
+  --accent-ink: #19262c;
+  --coral: #e4a98d;
+  --buy: #79dbc0;
+  --buy-rgb: 121 219 192;
+  --sell: #f0a3a8;
+  --sell-rgb: 240 163 168;
+  --outcome-ink: #13242c;
+  --amber: #e7c76c;
+  --amber-rgb: 231 199 108;
+  --background-rgb: 16 31 39;
+  --surface-rgb: 24 42 51;
+  --ink-rgb: 237 243 242;
+  --shadow-rgb: 0 0 0;
+  --mint-dark: #263a3b;
+  --mint: var(--accent);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f6f3ec;
+  --ink: #17343e;
+  --muted: #536970;
+  --panel: #fffefa;
+  --surface-inset: #efede6;
+  --line: rgb(23 52 62 / 0.19);
+  --accent: #925018;
+  --accent-rgb: 146 80 24;
+  --accent-ink: #ffffff;
+  --coral: #934c35;
+  --buy: #116958;
+  --buy-rgb: 17 105 88;
+  --sell: #a63d50;
+  --sell-rgb: 166 61 80;
+  --outcome-ink: #ffffff;
+  --amber: #785c0b;
+  --amber-rgb: 120 92 11;
+  --background-rgb: 246 243 236;
+  --surface-rgb: 255 254 250;
+  --ink-rgb: 23 52 62;
+  --shadow-rgb: 23 52 62;
+  --mint-dark: #e7efdf;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --background: #f6f3ec;
+    --ink: #17343e;
+    --muted: #536970;
+    --panel: #fffefa;
+    --surface-inset: #efede6;
+    --line: rgb(23 52 62 / 0.19);
+    --accent: #925018;
+    --accent-rgb: 146 80 24;
+    --accent-ink: #ffffff;
+    --coral: #934c35;
+    --buy: #116958;
+    --buy-rgb: 17 105 88;
+    --sell: #a63d50;
+    --sell-rgb: 166 61 80;
+    --outcome-ink: #ffffff;
+    --amber: #785c0b;
+    --amber-rgb: 120 92 11;
+    --background-rgb: 246 243 236;
+    --surface-rgb: 255 254 250;
+    --ink-rgb: 23 52 62;
+    --shadow-rgb: 23 52 62;
+    --mint-dark: #e7efdf;
+  }
+}
+body {
+  background: var(--background);
+}
+/* Preferences share the same surface and focus treatment as trading controls. */
+.preferences-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+.preferences-trigger:hover {
+  background: rgb(var(--accent-rgb) / 0.09);
+}
+.preferences-dialog {
+  width: min(380px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 90px rgb(var(--shadow-rgb) / 0.2);
+}
+.preferences-dialog::backdrop {
+  background: rgb(7 20 27 / 0.5);
+}
+.preferences-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.preferences-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.preferences-heading button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 26px;
+  cursor: pointer;
+}
+.preferences-dialog label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.preferences-dialog select {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--surface-inset);
+  color: var(--ink);
+  font: inherit;
+}
+.preferences-trigger:focus-visible,
+.preferences-dialog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.topbar-actions {
+  min-width: 0;
+}
+.wallet-adapter-modal-wrapper,
+.wallet-adapter-dropdown-list {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.wallet-adapter-modal-title,
+.wallet-adapter-modal-list .wallet-adapter-button,
+.wallet-adapter-dropdown-list-item,
+.wallet-adapter-modal-list-more {
+  color: var(--ink);
+}
+.wallet-adapter-modal-button-close,
+.wallet-adapter-modal-list-more {
+  background: var(--surface-inset);
+}
+.wallet-adapter-modal-button-close svg {
+  fill: var(--muted);
+}
+.wallet-adapter-dropdown-list-item:hover,
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: rgb(var(--accent-rgb) / 0.1);
+}
+.wallet-adapter-button-trigger {
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--ink);
+}
+@media (max-width: 380px) {
+  .mobile-brand-row .brand > span:last-child {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 6px;
+  }
+  .topbar-actions .wallet-adapter-button-trigger {
+    max-width: 104px;
+    padding-inline: 10px;
+  }
+}
