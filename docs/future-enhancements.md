@@ -1,5 +1,11 @@
 # Future Enhancements
 
+The broader prediction-platform scope—public and private markets, clubs,
+multi-outcome trading and governance—is recorded in
+[future platform scope](future-scope.md). This document covers the separate
+indexing, pricing and liquidity research track. Its phases describe a roadmap;
+current implementation status is recorded in the feature and deployment docs.
+
 ## Purpose
 
 This document records Tidebook's planned evolution beyond the current

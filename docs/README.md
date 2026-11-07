@@ -6,6 +6,8 @@ shared custody and payout instructions are deployed and verified on devnet.
 
 ## Start here
 
+- [Future platform scope](future-scope.md): user-created predictions, private
+  markets, clubs, multi-outcome trading and governance. Planned features only.
 - [Architecture](architecture.md): accounts, instructions, authorization,
   balances and application routes.
 - [Prediction market design](prediction-market-design.md): single-collateral
