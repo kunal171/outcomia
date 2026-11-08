@@ -274,9 +274,10 @@ function Settlement({
             ? t("Resolve this market")
             : status === "resolved"
               ? t("Final outcome: {value0}", {
-                  value0: Object.keys(
-                    market.finalOutcome ?? {},
-                  )[0]?.toUpperCase(),
+                  value0: t(
+                    Object.keys(market.finalOutcome ?? {})[0]?.toUpperCase() ??
+                      "Unknown",
+                  ),
                 })
               : t("Resolution")}
       </h2>

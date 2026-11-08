@@ -95,6 +95,8 @@ const { message, interpolate } = load("catalog");
 const { isLocale, isTheme } = load("config");
 test("external diagnostics and unknown source text remain verbatim", () => {
   for (const locale of Object.keys(catalogs)) {
+    for (const source of ["__proto__", "constructor", "toString"])
+      assert.equal(message(locale, source), source);
     assert.equal(
       message(locale, "RPC 429: provider diagnostic"),
       "RPC 429: provider diagnostic",

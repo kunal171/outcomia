@@ -17,7 +17,9 @@ export const catalogs: Record<Locale, Record<string, string>> = {
  * questions, rule documents, symbols, addresses, enum arguments or signed data.
  */
 export function message(locale: Locale, source: string): string {
-  return catalogs[locale][source] ?? source;
+  return Object.hasOwn(catalogs[locale], source)
+    ? catalogs[locale][source]
+    : source;
 }
 export function interpolate(
   template: string,

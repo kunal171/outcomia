@@ -339,7 +339,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                         />
                         <details className="admin-card prediction-rules">
                           <summary>
-                            Technical details &amp; on-chain references
+                            {t("Technical details & on-chain references")}
                           </summary>
                           <dl className="market-metadata prediction-terms">
                             {fields.map(([label, value]) => (
@@ -354,7 +354,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            View market on Explorer ↗
+                            {t("View market on Explorer ↗")}
                           </a>
                         </details>
                       </>
@@ -390,7 +390,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                   <div className="market-card-heading">
                     <div>
                       <span className="card-label">
-                        {t("Prediction · {value0}", { value0: status })}
+                        {t("Prediction · {value0}", { value0: t(status) })}
                       </span>
                       <strong>{metadata?.displayName ?? key.toBase58()}</strong>
                     </div>

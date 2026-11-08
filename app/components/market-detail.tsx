@@ -2038,15 +2038,19 @@ export function MarketDetail({ address }: { address: string }) {
 
         {result?.kind === "matched" && market && (
           <div className="transaction-message transaction-success">
-            {t("Filled {value0} {value1} across {value2} maker{value3}.", {
-              value0: readableAmount(
-                result.filledQuantity,
-                market.baseDecimals,
-              ),
-              value1: labels.base,
-              value2: result.makerCount,
-              value3: result.makerCount === 1 ? "" : "s",
-            })}
+            {t(
+              result.makerCount === 1
+                ? "Filled {value0} {value1} across {value2} maker."
+                : "Filled {value0} {value1} across {value2} makers.",
+              {
+                value0: readableAmount(
+                  result.filledQuantity,
+                  market.baseDecimals,
+                ),
+                value1: labels.base,
+                value2: result.makerCount,
+              },
+            )}
             {result.postedOrder ? (
               <>
                 {" "}

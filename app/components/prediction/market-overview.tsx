@@ -34,7 +34,7 @@ export function PredictionMarketOverview({
           >
             {status.startsWith("Resolved · ")
               ? t("Resolved · {value0}", {
-                  value0: status.slice("Resolved · ".length),
+                  value0: t(status.slice("Resolved · ".length)),
                 })
               : t(status)}
           </span>

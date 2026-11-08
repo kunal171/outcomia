@@ -196,7 +196,7 @@ export function Markets() {
                   <div>
                     <span className="card-label">
                       {kind
-                        ? t("{value0} market", { value0: kind })
+                        ? t("{value0} market", { value0: t(kind) })
                         : t("Spot market")}
                     </span>
                     <strong>{labels.name}</strong>

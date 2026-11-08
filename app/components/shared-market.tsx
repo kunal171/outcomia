@@ -374,7 +374,9 @@ function Market(props: Props) {
               event.currentTarget.open && setFundingOpen(true)
             }
           >
-            <summary>Funds · {props.quoteSymbol}</summary>
+            <summary>
+              {t("Funds · {value0}", { value0: props.quoteSymbol })}
+            </summary>
             {fundingOpen && (
               <SharedAssetFunds
                 key={`quote:${revision}`}

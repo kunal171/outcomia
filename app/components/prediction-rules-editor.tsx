@@ -91,7 +91,7 @@ export function PredictionRulesEditor({
           {t(label ?? "")}
           <textarea
             required
-            aria-label={label}
+            aria-label={t(label)}
             value={value[key]}
             onChange={(e) => set(key, e.target.value)}
             rows={3}

@@ -42,7 +42,9 @@ export function predictionReviewLabel(
     unit,
     unitDisplay: "long",
     useGrouping: false,
-  }).format(BigInt(count)).replace(/\s+/g, " ");
+  })
+    .format(BigInt(count))
+    .replace(/\s+/g, " ");
 }
 
 /** A rules reference may be shown as a link, never as executable URL content. */

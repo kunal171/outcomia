@@ -373,10 +373,12 @@ export function WalletWorkspace() {
                                   </small>
                                 )}
                                 <small>
-                                  {t("{value0} token account{value1}", {
-                                    value0: row.accountCount,
-                                    value1: row.accountCount === 1 ? "" : "s",
-                                  })}
+                                  {t(
+                                    row.accountCount === 1
+                                      ? "{value0} token account"
+                                      : "{value0} token accounts",
+                                    { value0: row.accountCount },
+                                  )}
                                 </small>
                               </td>
                               <td>{value(row.available, row.decimals)}</td>
