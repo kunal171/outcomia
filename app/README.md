@@ -116,10 +116,11 @@ is a different step. The UI's help dialogs explain this distinction.
 | `/markets/new/spot`           | Admin spot-market creation                                                                     |
 | `/predictions/new`            | Admin prediction draft creation and rules upload                                               |
 | `/wallet`                     | Connected wallet SOL, held/deposited Tidebook assets, market balances and prediction positions |
-| `/orders`                     | Connected wallet's spot orders                                                                 |
+| `/orders`                     | Shared spot/prediction orders, Open/History filters and optional legacy orders                                                                 |
 | `/admin`                      | Super-admin governance and administrator management                                            |
 
-Prediction orders are managed inside the relevant market's position panel.
+Shared prediction orders appear on `/orders` and in the relevant market’s position panel.
+Legacy order readers stay unmounted until their disclosure is opened.
 Creation requires an active admin. Opening a prediction draft requires both
 its stored creator and an active admin record. Trading needs a wallet, not an
 admin role.
