@@ -21,12 +21,26 @@ npm run test:prediction
 npm run test:wallet
 npm run test:rpc-proxy
 npm run test:shared
+npm run test:theme
+npm run test:i18n
 npm run build
 ```
 
 `test:prediction` covers rule parsing, hashes, addresses and matching plans.
 `test:wallet` checks portfolio accounting, listing filters, account ownership and
 partial RPC failures. Neither test command submits devnet transactions.
+
+## Display settings
+
+The header provides System, Light and Dark modes and English, Hindi, Spanish,
+French and Portuguese. Preferences persist in cookies and are applied during
+server rendering. All pages use the same petrol, ivory and copper palette.
+
+Translation files are in `i18n/messages/`. Add interface text to all five files;
+`test:i18n` checks coverage and interpolation arguments. Creator-written rules,
+market names, token symbols and provider diagnostics remain unchanged. Amounts
+keep exact decimal strings and displayed deadlines remain in UTC. See the
+[UI guide](../docs/ui-design.md) for layout and content rules.
 
 ## RPC and program settings
 
