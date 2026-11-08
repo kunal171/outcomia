@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -29,6 +30,8 @@ function getErrorMessage(cause: unknown) {
 }
 
 export function AdminManagement() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
   const {
@@ -138,14 +141,26 @@ export function AdminManagement() {
       if (action === "add") {
         tx = await program.methods
           .addAdmin(target)
-          .accounts({ ...commonAccounts, systemProgram: SystemProgram.programId })
+          .accounts({
+            ...commonAccounts,
+            systemProgram: SystemProgram.programId,
+          })
           .rpc();
       } else if (action === "disable") {
-        tx = await program.methods.disableAdmin(target).accounts(commonAccounts).rpc();
+        tx = await program.methods
+          .disableAdmin(target)
+          .accounts(commonAccounts)
+          .rpc();
       } else if (action === "enable") {
-        tx = await program.methods.enableAdmin(target).accounts(commonAccounts).rpc();
+        tx = await program.methods
+          .enableAdmin(target)
+          .accounts(commonAccounts)
+          .rpc();
       } else {
-        tx = await program.methods.removeAdmin(target).accounts(commonAccounts).rpc();
+        tx = await program.methods
+          .removeAdmin(target)
+          .accounts(commonAccounts)
+          .rpc();
       }
 
       setSignature(tx);
@@ -210,21 +225,26 @@ export function AdminManagement() {
       <AppHeader />
       <main className="route-shell">
         <div className="route-heading">
-          <div className="eyebrow">Protocol governance</div>
-          <h1>Administrator control</h1>
-          <p>Only the on-chain super-admin can add or change administrator records.</p>
+          <h1>{t("Administrator control")}</h1>
         </div>
 
-        {!wallet && <div className="access-card">Connect your wallet to continue.</div>}
+        {!wallet && (
+          <div className="access-card">
+            {t("Connect your wallet to continue.")}
+          </div>
+        )}
 
-        {wallet && roleLoading && <div className="access-card">Checking protocol role…</div>}
+        {wallet && roleLoading && (
+          <div className="access-card">{t("Checking protocol role…")}</div>
+        )}
 
         {wallet && !roleLoading && role === "uninitialized" && (
           <section className="access-card">
-            <h2>Initialize protocol governance</h2>
+            <h2>{t("Initialize protocol governance")}</h2>
             <p>
-              This transaction succeeds only when the connected wallet is the program
-              upgrade authority. It creates the config and deployer admin PDAs atomically.
+              {t(
+                "Only the program upgrade authority can initialize governance.",
+              )}
             </p>
             <button
               className="primary-button"
@@ -232,7 +252,9 @@ export function AdminManagement() {
               disabled={pending !== null}
               onClick={() => void initializeProtocol()}
             >
-              {pending === "initialize" ? "Initializing…" : "Initialize protocol"}
+              {pending === "initialize"
+                ? t("Initializing…")
+                : t("Initialize protocol")}
             </button>
           </section>
         )}
@@ -243,24 +265,27 @@ export function AdminManagement() {
           role !== "super-admin" &&
           role !== "uninitialized" && (
             <div className="access-card access-denied">
-              This route requires the active super-admin wallet.
+              {t("This route requires the active super-admin wallet.")}
             </div>
           )}
 
         {wallet && !roleLoading && role === "super-admin" && (
           <div className="admin-layout">
             <section className="admin-card">
-              <div className="card-label">Trading fees</div>
-              <h2>Global taker fee</h2>
+              <div className="card-label">{t("Trading fees")}</div>
+              <h2>{t("Global taker fee")}</h2>
               <p>
-                Current rate: {takerFeeBps ?? "—"} bps
-                {takerFeeBps === null
-                  ? ""
-                  : ` (${(takerFeeBps / 100).toFixed(2)}%)`}
+                {t("Current rate: {value0} bps{value1}", {
+                  value0: takerFeeBps ?? "—",
+                  value1:
+                    takerFeeBps === null
+                      ? ""
+                      : ` (${(takerFeeBps / 100).toFixed(2)}%)`,
+                })}
               </p>
               <form className="admin-form" onSubmit={updateTakerFee}>
                 <label>
-                  Basis points (0–1,000)
+                  {t("Basis points (0–1,000)")}
                   <input
                     inputMode="numeric"
                     value={feeRateInput}
@@ -273,20 +298,23 @@ export function AdminManagement() {
                   type="submit"
                   disabled={pending !== null}
                 >
-                  {pending === "set-fee" ? "Updating…" : "Update fee"}
+                  {pending === "set-fee" ? t("Updating…") : t("Update fee")}
                 </button>
               </form>
             </section>
 
             <section className="admin-card">
-              <div className="card-label">Add administrator</div>
-              <form className="admin-form" onSubmit={(event) => void submitNewAdmin(event)}>
+              <div className="card-label">{t("Add administrator")}</div>
+              <form
+                className="admin-form"
+                onSubmit={(event) => void submitNewAdmin(event)}
+              >
                 <label>
-                  Wallet address
+                  {t("Wallet address")}
                   <input
                     value={newAdmin}
                     onChange={(event) => setNewAdmin(event.target.value)}
-                    placeholder="Administrator public key"
+                    placeholder={t("Administrator public key")}
                     autoComplete="off"
                   />
                 </label>
@@ -295,7 +323,7 @@ export function AdminManagement() {
                   type="submit"
                   disabled={!newAdmin.trim() || pending !== null}
                 >
-                  {pending?.startsWith("add:") ? "Adding…" : "Add admin"}
+                  {pending?.startsWith("add:") ? t("Adding…") : t("Add admin")}
                 </button>
               </form>
             </section>
@@ -303,8 +331,8 @@ export function AdminManagement() {
             <section className="admin-card admin-list-card">
               <div className="admin-list-heading">
                 <div>
-                  <div className="card-label">On-chain records</div>
-                  <h2>Administrators</h2>
+                  <div className="card-label">{t("On-chain records")}</div>
+                  <h2>{t("Administrators")}</h2>
                 </div>
                 <button
                   className="text-button"
@@ -312,24 +340,33 @@ export function AdminManagement() {
                   disabled={loadingAdmins}
                   onClick={() => void loadAdmins()}
                 >
-                  {loadingAdmins ? "Refreshing…" : "Refresh"}
+                  {loadingAdmins ? t("Refreshing…") : t("Refresh")}
                 </button>
               </div>
 
               <div className="admin-list">
-                {!loadingAdmins && admins.length === 0 && <p>No admin records found.</p>}
+                {!loadingAdmins && admins.length === 0 && (
+                  <p>{t("No admin records found.")}</p>
+                )}
                 {admins.map((admin) => {
                   const isSuperAdmin = admin.authority.equals(wallet.publicKey);
                   const actionKey = `${admin.status === "active" ? "disable" : "enable"}:${admin.authority.toBase58()}`;
 
                   return (
-                    <article className="admin-row" key={admin.address.toBase58()}>
+                    <article
+                      className="admin-row"
+                      key={admin.address.toBase58()}
+                    >
                       <div>
                         <strong>{shortAddress(admin.authority)}</strong>
                         <span className={`role-badge role-${admin.status}`}>
-                          {isSuperAdmin ? "Super admin" : admin.status}
+                          {isSuperAdmin ? t("Super admin") : admin.status}
                         </span>
-                        <p>Added by {shortAddress(admin.addedBy)}</p>
+                        <p>
+                          {t("Added by {value0}", {
+                            value0: shortAddress(admin.addedBy),
+                          })}
+                        </p>
                       </div>
                       {!isSuperAdmin && (
                         <div className="admin-actions">
@@ -339,26 +376,32 @@ export function AdminManagement() {
                             disabled={pending !== null}
                             onClick={() =>
                               void runAdminAction(
-                                admin.status === "active" ? "disable" : "enable",
+                                admin.status === "active"
+                                  ? "disable"
+                                  : "enable",
                                 admin.authority,
                               )
                             }
                           >
                             {pending === actionKey
-                              ? "Submitting…"
+                              ? t("Submitting…")
                               : admin.status === "active"
-                                ? "Disable"
-                                : "Enable"}
+                                ? t("Disable")
+                                : t("Enable")}
                           </button>
                           <button
                             className="danger-button"
                             type="button"
-                            disabled={admin.status !== "disabled" || pending !== null}
-                            onClick={() => void runAdminAction("remove", admin.authority)}
+                            disabled={
+                              admin.status !== "disabled" || pending !== null
+                            }
+                            onClick={() =>
+                              void runAdminAction("remove", admin.authority)
+                            }
                           >
                             {pending === `remove:${admin.authority.toBase58()}`
-                              ? "Removing…"
-                              : "Remove"}
+                              ? t("Removing…")
+                              : t("Remove")}
                           </button>
                         </div>
                       )}
@@ -377,9 +420,13 @@ export function AdminManagement() {
         )}
         {signature && (
           <div className="transaction-message transaction-success">
-            Transaction confirmed.{" "}
-            <a href={transactionExplorerUrl(signature)} target="_blank" rel="noreferrer">
-              View on Explorer ↗
+            {t("Transaction confirmed.")}{" "}
+            <a
+              href={transactionExplorerUrl(signature)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("View on Explorer ↗")}
             </a>
           </div>
         )}
