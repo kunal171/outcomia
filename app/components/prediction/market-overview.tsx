@@ -22,7 +22,7 @@ export function PredictionMarketOverview({
   loading: boolean;
   onRefresh: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <header className="prediction-overview">
@@ -70,7 +70,7 @@ export function PredictionMarketOverview({
         <div>
           <dt>{t("Closes")}</dt>
           <dd title={predictionTime(market.closeTs)}>
-            {predictionCloseLabel(market.closeTs)}
+            {predictionCloseLabel(market.closeTs, locale)}
           </dd>
         </div>
       </dl>

@@ -235,7 +235,18 @@ function Market(props: Props) {
           tx.add(...plan.instructions);
           if (plan.remaining.gtn(0))
             setNotice(
-              `${readableAmount(plan.remaining, props.kind === "prediction" ? 0 : props.baseDecimals!)} was not posted: ${plan.stopReason === "zero-notional" ? "its value is below one quote atom" : "the three-maker limit was reached; refresh before retrying"}.`,
+              t("{value0} was not posted: {value1}.", {
+                value0: readableAmount(
+                  plan.remaining,
+                  props.kind === "prediction" ? 0 : props.baseDecimals!,
+                ),
+                value1:
+                  plan.stopReason === "zero-notional"
+                    ? t("its value is below one quote atom")
+                    : t(
+                        "the three-maker limit was reached; refresh before retrying",
+                      ),
+              }),
             );
         }
       }

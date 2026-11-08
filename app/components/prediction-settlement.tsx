@@ -65,7 +65,7 @@ function Settlement({
   onChanged,
   view = "all",
 }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
@@ -283,7 +283,7 @@ function Settlement({
       {view === "manage" && status !== "resolved" && (
         <p>
           {t("Proposal opens {value0}.", {
-            value0: predictionCloseLabel(earliest),
+            value0: predictionCloseLabel(earliest, locale),
           })}
         </p>
       )}

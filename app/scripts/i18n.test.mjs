@@ -133,3 +133,35 @@ test("cookie preferences accept only supported values", () => {
   for (const value of ["auto", "Light", null, undefined])
     assert.equal(isTheme(value), false);
 });
+
+const BN = require("@anchor-lang/core").BN;
+const display = {};
+runInNewContext(
+  ts.transpileModule(
+    readFileSync(new URL("lib/prediction-display.ts", root), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+  ).outputText,
+  {
+    exports: display,
+    require: () => ({
+      predictionTime: (value) => `${value.toString()} Unix seconds`,
+    }),
+  },
+);
+test("deadlines retain UTC and review periods localize without rounding integers", () => {
+  const deadline = new BN("1794130200");
+  for (const locale of Object.keys(catalogs)) {
+    assert.match(display.predictionCloseLabel(deadline, locale), /UTC$/);
+    assert.match(display.predictionCloseLabel(deadline, locale), /2026/);
+  }
+  assert.equal(display.predictionReviewLabel(new BN(3600), "fr"), "1 heure");
+  assert.equal(display.predictionReviewLabel(new BN(7200), "es"), "2 horas");
+  assert.equal(
+    display.predictionReviewLabel(new BN("18446744073709551615"), "en"),
+    "18446744073709551615 seconds",
+  );
+  assert.equal(
+    display.predictionCloseLabel(new BN("18446744073709551615"), "hi"),
+    "18446744073709551615 Unix seconds",
+  );
+});

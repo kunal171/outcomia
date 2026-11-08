@@ -141,7 +141,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
         )}
         {!address && (
           <div className="route-heading">
-            <h1>{t("Trade your view.")}</h1>
+            <h1>{t("Prediction markets")}</h1>
 
             <p className="prediction-release-note">
               {PREDICTION_RESOLUTION_ENABLED

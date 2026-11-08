@@ -13,7 +13,7 @@ export function PredictionResolutionSummary({
 }: {
   market: PredictionMarketAccount;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   if (!market.proposal)
     return <p className="prediction-empty-copy">{t("No outcome proposed.")}</p>;
@@ -31,6 +31,7 @@ export function PredictionResolutionSummary({
           <dd>
             {predictionCloseLabel(
               proposal.proposedAt.add(market.resolutionDelaySeconds),
+              locale,
             )}
           </dd>
         </div>

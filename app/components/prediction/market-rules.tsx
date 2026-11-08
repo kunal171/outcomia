@@ -20,7 +20,7 @@ export function PredictionMarketRules({
   symbol: string;
   children: ReactNode;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const documentUrl = rulesDocumentUrl(market.rulesUri);
   return (
@@ -80,23 +80,30 @@ export function PredictionMarketRules({
                   market.closeTs,
                   market.earliestResolutionTs ?? market.closeTs,
                 ),
+                locale,
               )}
             </dd>
           </div>
           <div>
             <dt>{t("Review period")}</dt>
-            <dd>{predictionReviewLabel(market.resolutionDelaySeconds)}</dd>
+            <dd>
+              {predictionReviewLabel(market.resolutionDelaySeconds, locale)}
+            </dd>
           </div>
           {market.fallback && (
             <div>
               <dt>{t("Fallback available")}</dt>
-              <dd>{predictionCloseLabel(market.fallback.availableTs)}</dd>
+              <dd>
+                {predictionCloseLabel(market.fallback.availableTs, locale)}
+              </dd>
             </div>
           )}
           {market.fallback?.deadlineTs && (
             <div>
               <dt>{t("Fallback deadline")}</dt>
-              <dd>{predictionCloseLabel(market.fallback.deadlineTs)}</dd>
+              <dd>
+                {predictionCloseLabel(market.fallback.deadlineTs, locale)}
+              </dd>
             </div>
           )}
           <div>
