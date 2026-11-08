@@ -226,3 +226,21 @@ body {
   font-size: 14px;
   line-height: 1.6;
 }
+
+/* Translated loading labels must fit alongside the market heading on small screens. */
+.markets-heading {
+  flex-wrap: wrap;
+}
+.market-summary {
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .market-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 14px;
+    text-align: left;
+  }
+}

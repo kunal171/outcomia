@@ -30,12 +30,18 @@ function WalletPicker({
   onClose: () => void;
 }) {
   const { wallets, select } = useWallet();
+  // Injected wallets exist only in the browser. Keep the first client render
+  // identical to SSR, then discover them after hydration (even while closed).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
-  const available = wallets.filter(
-    (wallet) =>
-      wallet.readyState === "Installed" || wallet.readyState === "Loadable",
-  );
+  const available = mounted
+    ? wallets.filter(
+        (wallet) =>
+          wallet.readyState === "Installed" || wallet.readyState === "Loadable",
+      )
+    : [];
   useEffect(() => {
     if (visible) dialog.current?.showModal();
     else dialog.current?.close();
