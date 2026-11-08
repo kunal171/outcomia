@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Owner-signed transfer of free legacy cash; order locks and prediction reserves never move. */
 import { useState } from "react";
 import { AnchorProvider, type BN } from "@anchor-lang/core";
@@ -33,6 +35,8 @@ export function LegacyBalanceTransfer({
   kind: "spot" | "prediction";
   onChanged: () => void;
 }) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     [pending, setPending] = useState(false),
@@ -97,9 +101,11 @@ export function LegacyBalanceTransfer({
         disabled={pending}
         onClick={() => void move()}
       >
-        {pending ? "Confirm transfer…" : `Move free ${symbol} to shared wallet`}
+        {pending
+          ? t("Confirm transfer…")
+          : t("Move free {value0} to shared wallet", { value0: symbol })}
       </button>
-      {issue && <p role="alert">{issue}</p>}
+      {issue && <p role="alert">{t(issue ?? "")}</p>}
     </div>
   );
 }

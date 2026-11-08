@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { SharedOrders } from "./shared-orders";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -31,6 +33,8 @@ function getErrorMessage(cause: unknown) {
 }
 
 export function Orders() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
 
@@ -207,24 +211,19 @@ export function Orders() {
       <main className="route-shell">
         <SharedOrders />
         <div className="route-heading">
-          <div className="eyebrow">Trader workspace</div>
-          <h1>My orders</h1>
-          <p>
-            Orders owned by the connected wallet. Filled and canceled records
-            remain visible as history; only open orders can be canceled.
-          </p>
+          <h1>{t("My orders")}</h1>
         </div>
 
         {!wallet && (
           <div className="access-card">
-            Connect your wallet to view your orders.
+            {t("Connect your wallet to view your orders.")}
           </div>
         )}
 
         {wallet && (
           <section className="admin-card">
             <div className="admin-list-heading">
-              <h2>Orders</h2>
+              <h2>{t("Orders")}</h2>
 
               <button
                 className="text-button"
@@ -232,12 +231,12 @@ export function Orders() {
                 disabled={loading}
                 onClick={() => void loadOrders()}
               >
-                {loading ? "Refreshing…" : "Refresh"}
+                {loading ? t("Refreshing…") : t("Refresh")}
               </button>
             </div>
 
             {!loading && orders.length === 0 && (
-              <p>No orders found for this wallet.</p>
+              <p>{t("No orders found for this wallet.")}</p>
             )}
 
             <div className="orders-list">
@@ -254,12 +253,15 @@ export function Orders() {
                   <article className="order-row" key={address}>
                     <div className="order-details">
                       <div>
-                        <span>Order</span>
-                        <strong>#{order.orderId.toString()}</strong>
+                        <span>{t("Order")}</span>
+                        <strong>
+                          {"#"}
+                          {order.orderId.toString()}
+                        </strong>
                       </div>
 
                       <div>
-                        <span>Market</span>
+                        <span>{t("Market")}</span>
                         <strong>
                           <Link href={`/markets/${order.market.toBase58()}`}>
                             {labels?.name ??
@@ -269,59 +271,59 @@ export function Orders() {
                       </div>
 
                       <div>
-                        <span>Side</span>
-                        <strong>{side === "bid" ? "Buy" : "Sell"}</strong>
+                        <span>{t("Side")}</span>
+                        <strong>{side === "bid" ? t("Buy") : t("Sell")}</strong>
                       </div>
 
                       <div>
-                        <span>Price</span>
+                        <span>{t("Price")}</span>
                         <strong>
                           {view
                             ? `${readableAmount(order.price, view.market.quoteDecimals)} ${labels?.quote}`
-                            : "Units unavailable"}
+                            : t("Units unavailable")}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Quantity</span>
+                        <span>{t("Quantity")}</span>
                         <strong>
                           {view
                             ? `${readableAmount(order.quantity, view.market.baseDecimals)} ${labels?.base}`
-                            : "Units unavailable"}
+                            : t("Units unavailable")}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Remaining</span>
+                        <span>{t("Remaining")}</span>
                         <strong>
                           {view
                             ? `${readableAmount(order.remainingQuantity, view.market.baseDecimals)} ${labels?.base}`
-                            : "Units unavailable"}
+                            : t("Units unavailable")}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Filled</span>
+                        <span>{t("Filled")}</span>
                         <strong>
                           {view
                             ? `${readableAmount(order.quantity.sub(order.remainingQuantity), view.market.baseDecimals)} ${labels?.base}`
-                            : "Units unavailable"}
+                            : t("Units unavailable")}
                         </strong>
                       </div>
 
                       <div>
-                        <span>Locked collateral</span>
+                        <span>{t("Locked collateral")}</span>
                         <strong>
                           {view
                             ? `${readableAmount(order.lockedCollateral, side === "bid" ? view.market.quoteDecimals : view.market.baseDecimals)} ${side === "bid" ? labels?.quote : labels?.base}`
-                            : "Units unavailable"}
+                            : t("Units unavailable")}
                         </strong>
                       </div>
                     </div>
 
                     <div className="order-actions">
                       <span className={`role-badge order-${status}`}>
-                        {status}
+                        {t(status ?? "")}
                       </span>
 
                       {status === "open" && (
@@ -331,7 +333,9 @@ export function Orders() {
                           disabled={pendingOrder !== null}
                           onClick={() => void cancelOrder(order)}
                         >
-                          {pendingOrder === address ? "Canceling…" : "Cancel"}
+                          {pendingOrder === address
+                            ? t("Canceling…")
+                            : t("Cancel")}
                         </button>
                       )}
                     </div>
@@ -343,18 +347,20 @@ export function Orders() {
         )}
 
         {error && (
-          <div className="transaction-message transaction-error">{error}</div>
+          <div className="transaction-message transaction-error">
+            {t(error ?? "")}
+          </div>
         )}
 
         {signature && (
           <div className="transaction-message transaction-success">
-            Order canceled and collateral released to your free balance.{" "}
+            {t("Order canceled and collateral released to your free balance.")}{" "}
             <a
               href={transactionExplorerUrl(signature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}

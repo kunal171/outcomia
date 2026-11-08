@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import type { PublicKey } from "@solana/web3.js";
 import type { SharedSnapshot } from "../lib/shared";
@@ -26,6 +27,8 @@ export function SharedOpenOrders({
   symbol,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
+
   const orders =
     snapshot?.orders.filter(
       ({ account }) => owner?.equals(account.owner) && "open" in account.status,
@@ -35,32 +38,36 @@ export function SharedOpenOrders({
       className="shared-open-orders"
       aria-labelledby="shared-open-orders-heading"
     >
-      <h2 id="shared-open-orders-heading">Your open orders</h2>
+      <h2 id="shared-open-orders-heading">{t("Your open orders")}</h2>
       {!owner ? (
-        <p>Connect your wallet to see your orders.</p>
+        <p>{t("Connect your wallet to see your orders.")}</p>
       ) : !loaded ? (
-        <p>Loading orders…</p>
+        <p>{t("Loading orders…")}</p>
       ) : orders.length === 0 ? (
-        <p className="prediction-empty-copy">No open orders in this market.</p>
+        <p className="prediction-empty-copy">
+          {t("No open orders in this market.")}
+        </p>
       ) : (
         <div className="prediction-table-scroll">
           <table>
             <thead>
               <tr>
-                <th>Contract</th>
-                <th>Side</th>
-                <th>Price ({symbol})</th>
-                <th>Remaining</th>
+                <th>{t("Contract")}</th>
+                <th>{t("Side")}</th>
+                <th>{t("Price ({value0})", { value0: symbol })}</th>
+                <th>{t("Remaining")}</th>
                 <th>
-                  <span className="sr-only">Action</span>
+                  <span className="sr-only">{t("Action")}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               {orders.map(({ publicKey, account }) => (
                 <tr key={publicKey.toBase58()}>
-                  <td>{Object.keys(account.outcome)[0].toUpperCase()}</td>
-                  <td>{"bid" in account.side ? "Buy" : "Sell"}</td>
+                  <td>
+                    {t(Object.keys(account.outcome)[0].toUpperCase() ?? "")}
+                  </td>
+                  <td>{"bid" in account.side ? t("Buy") : t("Sell")}</td>
                   <td>{readableAmount(account.price, decimals)}</td>
                   <td>
                     {readableAmount(
@@ -74,7 +81,7 @@ export function SharedOpenOrders({
                       disabled={pending}
                       onClick={() => onCancel(publicKey)}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </button>
                   </td>
                 </tr>

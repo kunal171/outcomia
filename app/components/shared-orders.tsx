@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Owner history includes all shared books; cancellation refreshes its exact queue first. */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -31,6 +33,8 @@ export function SharedOrders() {
   return <OwnerOrders key={`${connection.rpcEndpoint}:${wallet.publicKey}`} />;
 }
 function OwnerOrders() {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet()!,
     { connection } = useConnection(),
     p = useMemo(() => getTidebookReadProgram(connection), [connection]);
@@ -125,20 +129,20 @@ function OwnerOrders() {
   return (
     <section className="admin-card shared-market">
       <div className="section-heading">
-        <h2>Shared-wallet orders</h2>
+        <h2>{t("Shared-wallet orders")}</h2>
         <button
           disabled={busy || pending}
           onClick={() => setRevision((v) => v + 1)}
         >
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
       {issue ? (
-        <p role="alert">{issue}</p>
+        <p role="alert">{t(issue ?? "")}</p>
       ) : pending ? (
-        <p>Loading shared orders…</p>
+        <p>{t("Loading shared orders…")}</p>
       ) : rows.length === 0 ? (
-        <p>No shared orders yet.</p>
+        <p>{t("No shared orders yet.")}</p>
       ) : (
         rows.map((r) => {
           const prediction = r.book
@@ -154,31 +158,34 @@ function OwnerOrders() {
                   `${r.order.market.toBase58().slice(0, 8)}…`}
               </Link>
               <p>
-                {Object.keys(r.order.outcome)[0].toUpperCase()} ·{" "}
-                {"bid" in r.order.side ? "Buy" : "Sell"} ·{" "}
-                {Object.keys(r.order.status)[0]}
+                {`${Object.keys(r.order.outcome)[0].toUpperCase()} · ${"bid" in r.order.side ? t("Buy") : t("Sell")} · ${Object.keys(r.order.status)[0]}`}
               </p>
               <p>
-                Price:{" "}
-                {units
-                  ? readableAmount(r.order.price, units.quoteDecimals)
-                  : "—"}{" "}
-                {r.metadata?.quoteSymbol ?? "quote"} · Quantity:{" "}
-                {units
-                  ? readableAmount(r.order.quantity, units.baseDecimals)
-                  : "—"}{" "}
-                · Remaining:{" "}
-                {units
-                  ? readableAmount(
-                      r.order.remainingQuantity,
-                      units.baseDecimals,
-                    )
-                  : "—"}
+                {t(
+                  "Price: {value0} {value1} · Quantity: {value2} · Remaining: {value3}",
+                  {
+                    value0: units
+                      ? readableAmount(r.order.price, units.quoteDecimals)
+                      : "—",
+                    value1: r.metadata?.quoteSymbol ?? t("quote"),
+                    value2: units
+                      ? readableAmount(r.order.quantity, units.baseDecimals)
+                      : "—",
+                    value3: units
+                      ? readableAmount(
+                          r.order.remainingQuantity,
+                          units.baseDecimals,
+                        )
+                      : "—",
+                  },
+                )}
               </p>
               {!units && (
                 <p>
-                  Closed book. Token precision is unavailable; order #
-                  {r.order.orderId.toString()} remains on chain.
+                  {t(
+                    "Closed book. Token precision is unavailable; order #{value0} remains on chain.",
+                    { value0: r.order.orderId.toString() },
+                  )}
                 </p>
               )}
               {"open" in r.order.status && (
@@ -186,7 +193,7 @@ function OwnerOrders() {
                   disabled={busy}
                   onClick={() => void cancel(r.order.market, r.address)}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </button>
               )}
             </article>
@@ -194,8 +201,9 @@ function OwnerOrders() {
         })
       )}
       <p>
-        Cancellation works after pause, cutoff or resolution. Legacy orders are
-        listed separately below.
+        {t(
+          "Cancellation works after pause, cutoff or resolution. Legacy orders are listed separately below.",
+        )}
       </p>
     </section>
   );
