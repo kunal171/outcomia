@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 import { PredictionDetailLayout } from "./prediction-detail-layout";
 import { LegacyRecovery } from "./legacy-recovery";
@@ -35,6 +37,8 @@ type Record = {
 
 /** Public discovery and account inspection; RPC failure never becomes an empty book. */
 export function PredictionMarkets({ address }: { address?: string }) {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const { role, loading: roleLoading } = useProtocolRole();
   const program = useMemo(
@@ -132,30 +136,30 @@ export function PredictionMarkets({ address }: { address?: string }) {
       >
         {address && (
           <Link className="text-button" href="/predictions">
-            ← Prediction markets
+            {t("← Prediction markets")}
           </Link>
         )}
         {!address && (
           <div className="route-heading">
-            <div className="eyebrow">Binary outcomes</div>
-            <h1>Trade your view.</h1>
-            <p>
-              Explore questions with on-chain order books. Choose an outcome,
-              set your price, and trade with other participants.
-            </p>
+            <h1>{t("Trade your view.")}</h1>
+
             <p className="prediction-release-note">
               {PREDICTION_RESOLUTION_ENABLED
-                ? "Devnet test markets · Outcome payouts follow each market’s published rules and final resolution."
-                : "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade."}
+                ? t(
+                    "Devnet test markets · Outcome payouts follow each market’s published rules and final resolution.",
+                  )
+                : t(
+                    "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.",
+                  )}
             </p>
           </div>
         )}
         {!address && (
           <label className="prediction-search">
-            Find a market
+            {t("Find a market")}
             <input
               type="search"
-              placeholder="Search questions or market addresses"
+              placeholder={t("Search questions or market addresses")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -168,11 +172,11 @@ export function PredictionMarkets({ address }: { address?: string }) {
         )}
         {!address && (
           <div className="market-list-heading">
-            <h2>On-chain markets</h2>
+            <h2>{t("On-chain markets")}</h2>
             <div className="admin-actions">
               {isAdmin && (
                 <Link className="admin-action-button" href="/markets/new">
-                  Create market
+                  {t("Create market")}
                 </Link>
               )}
               <button
@@ -181,29 +185,31 @@ export function PredictionMarkets({ address }: { address?: string }) {
                 disabled={loading}
                 onClick={() => setRefresh((value) => value + 1)}
               >
-                Refresh
+                {t("Refresh")}
               </button>
             </div>
           </div>
         )}
         {loading && records.length === 0 && (
-          <div className="access-card">Loading prediction markets…</div>
+          <div className="access-card">{t("Loading prediction markets…")}</div>
         )}
         {error && (
           <div className="access-card access-denied" role="alert">
-            {error}
+            {t(error ?? "")}
           </div>
         )}
         {!loading && !error && records.length === 0 && (
           <div className="access-card">
-            No prediction markets exist on this network yet.
+            {t("No prediction markets exist on this network yet.")}
           </div>
         )}
         {!loading &&
           !error &&
           records.length > 0 &&
           visibleRecords.length === 0 && (
-            <div className="access-card">No markets match your search.</div>
+            <div className="access-card">
+              {t("No markets match your search.")}
+            </div>
           )}
         <section
           className={address ? "prediction-detail-grid" : "markets-grid"}
@@ -338,7 +344,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                           <dl className="market-metadata prediction-terms">
                             {fields.map(([label, value]) => (
                               <div key={label}>
-                                <dt>{label}</dt>
+                                <dt>{t(label ?? "")}</dt>
                                 <dd>{value}</dd>
                               </div>
                             ))}
@@ -383,15 +389,21 @@ export function PredictionMarkets({ address }: { address?: string }) {
                 <article className="market-card" key={key.toBase58()}>
                   <div className="market-card-heading">
                     <div>
-                      <span className="card-label">Prediction · {status}</span>
+                      <span className="card-label">
+                        {t("Prediction · {value0}", { value0: status })}
+                      </span>
                       <strong>{metadata?.displayName ?? key.toBase58()}</strong>
                     </div>
-                    <span className="role-badge">{status}</span>
+                    <span className="role-badge">{t(status ?? "")}</span>
                   </div>
                   <p className="market-address-caption">{key.toBase58()}</p>
                   <p>
-                    Trading closes {predictionTime(market.closeTs)}. Collateral:{" "}
-                    {metadata?.quoteSymbol ?? market.collateralMint.toBase58()}.
+                    {t("Trading closes {value0}. Collateral: {value1}.", {
+                      value0: predictionTime(market.closeTs),
+                      value1:
+                        metadata?.quoteSymbol ??
+                        market.collateralMint.toBase58(),
+                    })}
                   </p>
                   <div className="market-card-actions">
                     {!address && (
@@ -399,7 +411,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                         className="market-open-link"
                         href={`/predictions/${key.toBase58()}`}
                       >
-                        View market →
+                        {t("View market →")}
                       </Link>
                     )}
                     <a
@@ -408,7 +420,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      View account ↗
+                      {t("View account ↗")}
                     </a>
                   </div>
                 </article>

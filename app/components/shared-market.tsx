@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Public shared order book and signed owner actions. Old queues are separate recovery paths. */
 import { useEffect, useMemo, useState } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -72,6 +74,8 @@ export function SharedMarket(props: Props) {
   );
 }
 function Market(props: Props) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     role = useProtocolRole();
@@ -257,15 +261,15 @@ function Market(props: Props) {
     (role.role === "admin" || role.role === "super-admin");
   const feedback = (
     <div className="prediction-feedback">
-      {issue && <p role="alert">{issue}</p>}
-      {notice && signature && <p role="status">{notice}</p>}
+      {issue && <p role="alert">{t(issue ?? "")}</p>}
+      {notice && signature && <p role="status">{t(notice ?? "")}</p>}
       {signature && (
         <a
           href={transactionExplorerUrl(signature)}
           target="_blank"
           rel="noreferrer"
         >
-          View transaction ↗
+          {t("View transaction ↗")}
         </a>
       )}
     </div>
@@ -285,17 +289,16 @@ function Market(props: Props) {
   const fees =
     snapshot && role.role === "super-admin" ? (
       <details className="prediction-fees">
-        <summary>Protocol fees</summary>
+        <summary>{t("Protocol fees")}</summary>
         <p>
-          {readableAmount(snapshot.book.accruedQuoteFees, props.quoteDecimals)}{" "}
-          {props.quoteSymbol}
+          {`${readableAmount(snapshot.book.accruedQuoteFees, props.quoteDecimals)} ${props.quoteSymbol}`}
         </p>
         <button
           type="button"
           disabled={pending || snapshot.book.accruedQuoteFees.isZero()}
           onClick={() => void transact("fees")}
         >
-          Withdraw earned fees
+          {t("Withdraw earned fees")}
         </button>
       </details>
     ) : null;
@@ -310,7 +313,7 @@ function Market(props: Props) {
             disabled={pending}
             onClick={() => setRevision((v) => v + 1)}
           >
-            Refresh orders
+            {t("Refresh orders")}
           </button>
         </div>
         {openOrders}
@@ -321,7 +324,9 @@ function Market(props: Props) {
   if (props.kind === "prediction" && !props.tradingOpen)
     return (
       <div className="prediction-closed-feedback">
-        {pending && <p role="status">Waiting for transaction confirmation…</p>}
+        {pending && (
+          <p role="status">{t("Waiting for transaction confirmation…")}</p>
+        )}
         {feedback}
       </div>
     );
@@ -382,22 +387,23 @@ function Market(props: Props) {
   return (
     <section className="admin-card shared-market">
       <div className="section-heading">
-        <h2>Trade this pair</h2>
+        <h2>{t("Trade this pair")}</h2>
         <button
           type="button"
           disabled={pending}
           onClick={() => setRevision((v) => v + 1)}
         >
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
       {!props.tradingOpen && (
         <p role="status">
-          Trading is closed. You can still cancel orders and withdraw free
-          funds.
+          {t(
+            "Trading is closed. You can still cancel orders and withdraw free funds.",
+          )}
         </p>
       )}
-      {!loaded && !issue && <p>Loading shared book…</p>}
+      {!loaded && !issue && <p>{t("Loading shared book…")}</p>}
       {loaded && !snapshot && (
         <p>
           {canSetup && props.tradingOpen ? (
@@ -406,7 +412,7 @@ function Market(props: Props) {
               disabled={pending}
               onClick={() => void transact("initialize")}
             >
-              Enable shared-wallet book
+              {t("Enable shared-wallet book")}
             </button>
           ) : (
             "The market creator has not enabled the shared book."
@@ -417,17 +423,16 @@ function Market(props: Props) {
         <div className="market-rate-card">
           <div>
             <h3>
-              1 {props.baseSymbol} ≈{" "}
-              {readableAmount(quote, props.quoteDecimals)} {props.quoteSymbol}
+              {`1 ${props.baseSymbol} ≈ ${readableAmount(quote, props.quoteDecimals)}  ${props.quoteSymbol}`}
             </h3>
             <p>
-              1 {props.quoteSymbol} ≈ {inversePrice(quote, props.quoteDecimals)}{" "}
-              {props.baseSymbol}
+              {`1 ${props.quoteSymbol} ≈ ${inversePrice(quote, props.quoteDecimals)} ${props.baseSymbol}`}
             </p>
             <p>
-              Indicative shared-book quote{" "}
-              {bid && ask ? "(midpoint)" : "(one side only)"}; execution prices
-              and fees can differ.
+              {t(
+                "Indicative shared-book quote {value0}; execution prices and fees can differ.",
+                { value0: bid && ask ? t("(midpoint)") : t("(one side only)") },
+              )}
             </p>
           </div>
         </div>
@@ -437,7 +442,7 @@ function Market(props: Props) {
           <div className="shared-depth">
             {(["bid", "ask"] as const).map((value) => (
               <div key={value}>
-                <h3>{value === "bid" ? "Buy orders" : "Sell orders"}</h3>
+                <h3>{value === "bid" ? t("Buy orders") : t("Sell orders")}</h3>
                 {orders
                   .filter(({ account }) => value in account.side)
                   .sort((a, b) =>
@@ -447,12 +452,10 @@ function Market(props: Props) {
                   )
                   .map(({ publicKey, account }) => (
                     <p key={publicKey.toBase58()}>
-                      {readableAmount(account.price, props.quoteDecimals)}{" "}
-                      {props.quoteSymbol} ×{" "}
-                      {readableAmount(
+                      {`${readableAmount(account.price, props.quoteDecimals)} ${props.quoteSymbol} × ${readableAmount(
                         account.remainingQuantity,
                         props.baseDecimals!,
-                      )}
+                      )}`}
                     </p>
                   ))}
               </div>
@@ -461,18 +464,25 @@ function Market(props: Props) {
           {wallet ? (
             <>
               <label>
-                Buy or sell
+                {t("Buy or sell")}
                 <select
                   value={side}
                   disabled={pending}
                   onChange={(event) => setSide(event.target.value as Side)}
                 >
-                  <option value="bid">Buy {props.baseSymbol}</option>
-                  <option value="ask">Sell {props.baseSymbol}</option>
+                  <option value="bid">
+                    {t("Buy {value0}", { value0: props.baseSymbol })}
+                  </option>
+                  <option value="ask">
+                    {t("Sell {value0}", { value0: props.baseSymbol })}
+                  </option>
                 </select>
               </label>
               <label>
-                Price ({props.quoteSymbol} per {props.baseSymbol})
+                {t("Price ({value0} per {value1})", {
+                  value0: props.quoteSymbol,
+                  value1: props.baseSymbol,
+                })}
                 <input
                   inputMode="decimal"
                   value={price}
@@ -481,7 +491,7 @@ function Market(props: Props) {
                 />
               </label>
               <label>
-                Quantity ({props.baseSymbol})
+                {t("Quantity ({value0})", { value0: props.baseSymbol })}
                 <input
                   inputMode="decimal"
                   value={quantity}
@@ -502,12 +512,12 @@ function Market(props: Props) {
                 onClick={() => void transact("trade")}
               >
                 {pending
-                  ? "Confirm in wallet…"
-                  : `${side === "bid" ? "Buy" : "Sell"} ${props.baseSymbol}`}
+                  ? t("Confirm in wallet…")
+                  : `${side === "bid" ? t("Buy") : t("Sell")} ${props.baseSymbol}`}
               </button>
             </>
           ) : (
-            <p>Connect a wallet to trade.</p>
+            <p>{t("Connect a wallet to trade.")}</p>
           )}
           {openOrders}
         </>

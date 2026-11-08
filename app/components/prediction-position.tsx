@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import {
   SHARED_BALANCES_ENABLED,
   PREDICTION_RESOLUTION_ENABLED,
@@ -52,6 +54,8 @@ interface PositionProps {
  * on wallet, market or RPC changes so an old response cannot show another
  * wallet's ledger or initialization result. Account balances themselves are public. */
 export function PredictionPositionPanel(props: PositionProps) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
   const [mounted, setMounted] = useState(false);
@@ -63,10 +67,10 @@ export function PredictionPositionPanel(props: PositionProps) {
       <section className="access-card">
         <h2>
           {SHARED_BALANCES_ENABLED
-            ? "Legacy cash & outcome recovery"
-            : "Your position"}
+            ? t("Legacy cash & outcome recovery")
+            : t("Your position")}
         </h2>
-        <p>Loading wallet…</p>
+        <p>{t("Loading wallet…")}</p>
       </section>
     );
   }
@@ -75,10 +79,14 @@ export function PredictionPositionPanel(props: PositionProps) {
       <section className="access-card">
         <h2>
           {SHARED_BALANCES_ENABLED
-            ? "Legacy cash & outcome recovery"
-            : "Your position"}
+            ? t("Legacy cash & outcome recovery")
+            : t("Your position")}
         </h2>
-        <p>Connect a wallet to view or initialize your prediction position.</p>
+        <p>
+          {t(
+            "Connect a wallet to view or initialize your prediction position.",
+          )}
+        </p>
       </section>
     );
   }
@@ -103,6 +111,8 @@ function ConnectedPosition({
 }: PositionProps & {
   wallet: NonNullable<ReturnType<typeof useAnchorWallet>>;
 }) {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const program = useMemo(
     () => getTidebookProgram(connection, wallet),
@@ -465,8 +475,8 @@ function ConnectedPosition({
       <div className="market-list-heading">
         <h2>
           {SHARED_BALANCES_ENABLED
-            ? "Legacy cash & outcome recovery"
-            : "Your position"}
+            ? t("Legacy cash & outcome recovery")
+            : t("Your position")}
         </h2>
         <button
           className="text-button"
@@ -474,18 +484,18 @@ function ConnectedPosition({
           disabled={loading || walletLoading || pending}
           onClick={() => setRefresh((value) => value + 1)}
         >
-          Refresh position
+          {t("Refresh position")}
         </button>
       </div>
-      {loading && <p role="status">Loading your position…</p>}
+      {loading && <p role="status">{t("Loading your position…")}</p>}
       {error && (
         <p className="access-denied" role="alert">
-          {error}
+          {t(error ?? "")}
         </p>
       )}
       {actionError && (
         <p className="access-denied" role="alert">
-          {actionError}
+          {t(actionError ?? "")}
         </p>
       )}
       {!loading && !error && position && (
@@ -493,7 +503,7 @@ function ConnectedPosition({
           <dl className="market-metadata prediction-balances">
             {balances.map(([label, amount]) => (
               <div key={label}>
-                <dt>{label}</dt>
+                <dt>{t(label ?? "")}</dt>
                 <dd>{amount}</dd>
               </div>
             ))}
@@ -538,7 +548,7 @@ function ConnectedPosition({
             target="_blank"
             rel="noreferrer"
           >
-            View position account ↗
+            {t("View position account ↗")}
           </a>
           <form
             className="market-create-form prediction-deposit"
@@ -547,22 +557,24 @@ function ConnectedPosition({
               void fund();
             }}
           >
-            <h3>Deposit &amp; withdraw</h3>
+            <h3>{t("Deposit & withdraw")}</h3>
             <p>
-              {collateralSymbol} in wallet:{" "}
-              {walletLoading
-                ? "Loading…"
-                : walletBalance !== null
-                  ? formatAtomicAmount(walletBalance, decimals)
-                  : "Unavailable"}
+              {t("{value0} in wallet: {value1}", {
+                value0: collateralSymbol,
+                value1: walletLoading
+                  ? t("Loading…")
+                  : walletBalance !== null
+                    ? formatAtomicAmount(walletBalance, decimals)
+                    : t("Unavailable"),
+              })}
             </p>
             {walletError && (
               <p className="access-denied" role="alert">
-                {walletError}
+                {t(walletError ?? "")}
               </p>
             )}
             <label>
-              Collateral action
+              {t("Collateral action")}
               <select
                 value={cashAction}
                 onChange={(event) =>
@@ -570,12 +582,12 @@ function ConnectedPosition({
                 }
                 disabled={pending}
               >
-                <option value="deposit">Deposit to market</option>
-                <option value="withdraw">Withdraw to wallet</option>
+                <option value="deposit">{t("Deposit to market")}</option>
+                <option value="withdraw">{t("Withdraw to wallet")}</option>
               </select>
             </label>
             <label>
-              Amount ({collateralSymbol})
+              {t("Amount ({value0})", { value0: collateralSymbol })}
               <input
                 inputMode="decimal"
                 value={amount}
@@ -588,17 +600,24 @@ function ConnectedPosition({
             <small id="prediction-cash-issue">
               {cashIssue ??
                 (cashAction === "deposit"
-                  ? "Depositing credits available collateral; it does not create YES/NO positions."
-                  : "Withdraw available collateral only. Funds in orders and outcome backing cannot be withdrawn.")}
+                  ? t(
+                      "Depositing credits available collateral; it does not create YES/NO positions.",
+                    )
+                  : t(
+                      "Withdraw available collateral only. Funds in orders and outcome backing cannot be withdrawn.",
+                    ))}
             </small>
             {!PREDICTION_FUNDING_ENABLED && (
               <p>
-                Funding and pair conversion are disabled in this app
-                configuration.
+                {t(
+                  "Funding and pair conversion are disabled in this app configuration.",
+                )}
               </p>
             )}
             {!acceptsDeposits && cashAction === "deposit" && (
-              <p>This market no longer accepts new collateral deposits.</p>
+              <p>
+                {t("This market no longer accepts new collateral deposits.")}
+              </p>
             )}
             <button
               className="primary-button"
@@ -606,10 +625,10 @@ function ConnectedPosition({
               disabled={!canFund}
             >
               {pending
-                ? "Confirming…"
+                ? t("Confirming…")
                 : cashAction === "deposit"
-                  ? "Deposit collateral"
-                  : "Withdraw collateral"}
+                  ? t("Deposit collateral")
+                  : t("Withdraw collateral")}
             </button>
           </form>
           <form
@@ -619,14 +638,15 @@ function ConnectedPosition({
               void convert();
             }}
           >
-            <h3>YES / NO pairs</h3>
+            <h3>{t("YES / NO pairs")}</h3>
             <p>
-              One {collateralSymbol} backs one YES plus one NO contract.
-              Splitting reserves collateral; merging an available pair returns
-              it to your available balance.
+              {t(
+                "One {value0} backs one YES plus one NO contract. Splitting reserves collateral; merging an available pair returns it to your available balance.",
+                { value0: collateralSymbol },
+              )}
             </p>
             <label>
-              Pair action
+              {t("Pair action")}
               <select
                 value={setAction}
                 onChange={(event) =>
@@ -634,12 +654,16 @@ function ConnectedPosition({
                 }
                 disabled={pending}
               >
-                <option value="split">Split collateral into YES + NO</option>
-                <option value="merge">Merge YES + NO into collateral</option>
+                <option value="split">
+                  {t("Split collateral into YES + NO")}
+                </option>
+                <option value="merge">
+                  {t("Merge YES + NO into collateral")}
+                </option>
               </select>
             </label>
             <label>
-              Whole pairs
+              {t("Whole pairs")}
               <input
                 inputMode="numeric"
                 value={quantity}
@@ -651,15 +675,28 @@ function ConnectedPosition({
             </label>
             <small id="prediction-set-issue">
               {setIssue ??
-                (setCollateral
-                  ? `${setAction === "split" ? "Reserves" : "Releases"} ${formatAtomicAmount(setCollateral, decimals)} ${collateralSymbol}.`
-                  : "Splitting requires an open market before close. Merge available pairs while open, frozen or awaiting resolution.")}
+                (setCollateral ? (
+                  <>
+                    {setAction === "split" ? t("Reserves") : t("Releases")}{" "}
+                    {formatAtomicAmount(setCollateral, decimals)}{" "}
+                    {collateralSymbol}
+                    {"."}
+                  </>
+                ) : (
+                  t(
+                    "Splitting requires an open market before close. Merge available pairs while open, frozen or awaiting resolution.",
+                  )
+                ))}
             </small>
             {marketState && (
               <p>
-                Reserved backing:{" "}
-                {formatAtomicAmount(marketState.backingReserve, decimals)}{" "}
-                {collateralSymbol}
+                {t("Reserved backing: {value0} {value1}", {
+                  value0: formatAtomicAmount(
+                    marketState.backingReserve,
+                    decimals,
+                  ),
+                  value1: collateralSymbol,
+                })}
               </p>
             )}
             <button
@@ -668,10 +705,10 @@ function ConnectedPosition({
               disabled={!canConvert}
             >
               {pending
-                ? "Confirming…"
+                ? t("Confirming…")
                 : setAction === "split"
-                  ? "Create YES + NO pairs"
-                  : "Merge available pairs"}
+                  ? t("Create YES + NO pairs")
+                  : t("Merge available pairs")}
             </button>
           </form>
         </>
@@ -679,13 +716,15 @@ function ConnectedPosition({
       {!loading && !error && !position && (
         <>
           <p>
-            Initialize your position to create your market ledger. You pay SOL
-            account rent; no collateral is deposited.
+            {t(
+              "Initialize your position to create your market ledger. You pay SOL account rent; no collateral is deposited.",
+            )}
           </p>
           {!PREDICTION_DRAFTS_ENABLED && (
             <p>
-              Prediction position initialization is disabled in this app
-              configuration.
+              {t(
+                "Prediction position initialization is disabled in this app configuration.",
+              )}
             </p>
           )}
           <button
@@ -695,36 +734,38 @@ function ConnectedPosition({
             onClick={() => void initialize()}
           >
             {pending
-              ? "Initializing…"
+              ? t("Initializing…")
               : signature
-                ? "Confirmed; refresh to load"
-                : "Initialize position"}
+                ? t("Confirmed; refresh to load")
+                : t("Initialize position")}
           </button>
         </>
       )}
       {signature && (
         <p className="transaction-message transaction-success">
           {resultKind === "deposit"
-            ? "Collateral deposited."
+            ? t("Collateral deposited.")
             : resultKind === "withdraw"
-              ? "Collateral withdrawn."
+              ? t("Collateral withdrawn.")
               : resultKind === "split"
-                ? "YES + NO pairs created."
+                ? t("YES + NO pairs created.")
                 : resultKind === "merge"
-                  ? "Pairs merged into available collateral."
+                  ? t("Pairs merged into available collateral.")
                   : resultKind === "order"
-                    ? "Prediction order placed."
+                    ? t("Prediction order placed.")
                     : resultKind === "cancel"
-                      ? "Prediction order canceled; unfilled funds released."
+                      ? t("Prediction order canceled; unfilled funds released.")
                       : resultKind === "match"
-                        ? "Order transaction confirmed. Check your refreshed balances and orders for its result."
-                        : "Position initialized."}{" "}
+                        ? t(
+                            "Order transaction confirmed. Check your refreshed balances and orders for its result.",
+                          )
+                        : t("Position initialized.")}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"
             rel="noreferrer"
           >
-            View transaction ↗
+            {t("View transaction ↗")}
           </a>
           {lastOrder && (
             <>
@@ -735,18 +776,23 @@ function ConnectedPosition({
                 target="_blank"
                 rel="noreferrer"
               >
-                View order ↗
+                {t("View order ↗")}
               </a>
             </>
           )}
         </p>
       )}
       <p>
-        Cancel open orders to release their remaining funds.{" "}
-        {PREDICTION_RESOLUTION_ENABLED
-          ? "Use the resolution panel above to redeem finalized free contracts into your shared wallet."
-          : "Resolution and claims require the next program upgrade."}{" "}
-        The creator must open a draft before trading begins.
+        {t(
+          "Cancel open orders to release their remaining funds. {value0} The creator must open a draft before trading begins.",
+          {
+            value0: PREDICTION_RESOLUTION_ENABLED
+              ? t(
+                  "Use the resolution panel above to redeem finalized free contracts into your shared wallet.",
+                )
+              : t("Resolution and claims require the next program upgrade."),
+          },
+        )}
       </p>
     </section>
   );

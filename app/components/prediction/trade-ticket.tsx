@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
 import type { ReactNode } from "react";
@@ -35,6 +36,8 @@ export interface PredictionTradeTicketProps {
  * Example: 10 contracts at 0.60 cost at most 6 collateral tokens before fees.
  */
 export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
+  const { t } = useI18n();
+
   const {
     snapshot,
     loaded,
@@ -54,14 +57,20 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
       const atoms = parseTokenAmount(price, decimals, "Limit price");
       if (atoms.lten(0) || atoms.gte(snapshot.book.payoutPerContract))
         throw new Error(
-          `Price must be between 0 and ${readableAmount(snapshot.book.payoutPerContract, decimals)} ${symbol}.`,
+          t("Price must be between 0 and {value0} {value1}.", {
+            value0: readableAmount(snapshot.book.payoutPerContract, decimals),
+            value1: symbol,
+          }),
         );
       if (
         snapshot.book.priceTick.lten(0) ||
         !atoms.mod(snapshot.book.priceTick).isZero()
       )
         throw new Error(
-          `Use price increments of ${readableAmount(snapshot.book.priceTick, decimals)} ${symbol}.`,
+          t("Use price increments of {value0} {value1}.", {
+            value0: readableAmount(snapshot.book.priceTick, decimals),
+            value1: symbol,
+          }),
         );
       errorField = "quantity";
       if (!/^\d+$/.test(quantity))
@@ -95,11 +104,11 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
       aria-labelledby="prediction-ticket-heading"
       data-outcome={outcome}
     >
-      <h2 id="prediction-ticket-heading">Place an order</h2>
+      <h2 id="prediction-ticket-heading">{t("Place an order")}</h2>
       <div
         className="prediction-choice"
         role="group"
-        aria-label="Choose outcome"
+        aria-label={t("Choose outcome")}
       >
         {(["yes", "no"] as const).map((value) => {
           const offer = snapshot?.book.bestPrices[value === "yes" ? 1 : 3];
@@ -116,11 +125,11 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
               <small>
                 {!loaded
                   ? props.failed
-                    ? "Unavailable"
-                    : "Loading…"
+                    ? t("Unavailable")
+                    : t("Loading…")
                   : offer
                     ? `${readableAmount(offer, decimals)} ${symbol}`
-                    : "No sell offers"}
+                    : t("No sell offers")}
               </small>
             </button>
           );
@@ -134,10 +143,10 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
               disabled={pending || props.disabled}
               onClick={props.onInitialize}
             >
-              Enable trading
+              {t("Enable trading")}
             </button>
           ) : (
-            <p>The creator has not enabled trading.</p>
+            <p>{t("The creator has not enabled trading.")}</p>
           )}
         </div>
       )}
@@ -151,7 +160,7 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
           <div
             className="prediction-action-choice"
             role="group"
-            aria-label="Buy or sell"
+            aria-label={t("Buy or sell")}
           >
             {(["bid", "ask"] as const).map((value) => (
               <button
@@ -161,13 +170,13 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
                 disabled={pending}
                 onClick={() => props.onSide(value)}
               >
-                {value === "bid" ? "Buy" : "Sell"}
+                {value === "bid" ? t("Buy") : t("Sell")}
               </button>
             ))}
           </div>
           <div className="prediction-entry-fields">
             <label>
-              Limit price ({symbol})
+              {t("Limit price ({value0})", { value0: symbol })}
               <input
                 inputMode="decimal"
                 placeholder="0.60"
@@ -181,7 +190,7 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
               />
             </label>
             <label>
-              Contracts
+              {t("Contracts")}
               <input
                 inputMode="numeric"
                 placeholder="10"
@@ -201,13 +210,13 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
               id="prediction-ticket-error"
               role="status"
             >
-              {inputError}
+              {t(inputError ?? "")}
             </p>
           )}
           <dl className="prediction-order-estimate" aria-live="polite">
             <div>
               <dt>
-                Limit value <small>before fees</small>
+                {t("Limit value")} <small>{t("before fees")}</small>
               </dt>
               <dd>
                 {estimate
@@ -217,7 +226,11 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
             </div>
             {side === "bid" && (
               <div>
-                <dt>Payout if filled &amp; {outcome.toUpperCase()} wins</dt>
+                <dt>
+                  {t("Payout if filled & {value0} wins", {
+                    value0: outcome.toUpperCase(),
+                  })}
+                </dt>
                 <dd>
                   {estimate
                     ? `${readableAmount(estimate.payout, decimals)} ${symbol}`
@@ -232,12 +245,14 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
             disabled={blocked}
           >
             {pending
-              ? "Confirm in wallet…"
-              : `${side === "bid" ? "Buy" : "Sell"} ${outcome.toUpperCase()}`}
+              ? t("Confirm in wallet…")
+              : `${side === "bid" ? t("Buy") : t("Sell")} ${outcome.toUpperCase()}`}
           </button>
         </form>
       ) : (
-        <p className="prediction-empty-copy">Connect your wallet to trade.</p>
+        <p className="prediction-empty-copy">
+          {t("Connect your wallet to trade.")}
+        </p>
       )}
       {props.feedback}
       {props.connected && props.funding}

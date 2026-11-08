@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useEffect, useState } from "react";
 import { AnchorProvider, BN, type Program } from "@anchor-lang/core";
@@ -50,6 +51,8 @@ export function PredictionMatchForm({
   setPending,
   onMatched,
 }: Props) {
+  const { t } = useI18n();
+
   const [outcome, setOutcome] = useState<PredictionOutcome>("yes");
   const [side, setSide] = useState<OrderSide>("bid");
   const [price, setPrice] = useState("");
@@ -228,19 +231,19 @@ export function PredictionMatchForm({
       }}
     >
       <div>
-        <span className="eyebrow">Trade contracts</span>
-        <h3>Take a position</h3>
+        <h3>{t("Take a position")}</h3>
       </div>
       <p>
-        Choose YES or NO, then set your price. Orders match up to{" "}
-        {MAX_PREDICTION_MATCHES_PER_TRANSACTION} resting orders at their prices.
-        A winning contract pays 1 {symbol} after resolution.
+        {t(
+          "Choose YES or NO, then set your price. Orders match up to {value0} resting orders at their prices. A winning contract pays 1 {value1} after resolution.",
+          { value0: MAX_PREDICTION_MATCHES_PER_TRANSACTION, value1: symbol },
+        )}
       </p>
       {!PREDICTION_MATCHING_ENABLED && (
-        <p>Prediction trading is disabled in this app configuration.</p>
+        <p>{t("Prediction trading is disabled in this app configuration.")}</p>
       )}
       <label>
-        Execution
+        {t("Execution")}
         <select
           value={execution}
           disabled={pending}
@@ -249,14 +252,16 @@ export function PredictionMatchForm({
             setExecution(event.target.value as "limit" | "immediate");
           }}
         >
-          <option value="limit">Limit — match, then rest the remainder</option>
+          <option value="limit">
+            {t("Limit — match, then rest the remainder")}
+          </option>
           <option value="immediate">
-            Immediate only — leave remainder unposted
+            {t("Immediate only — leave remainder unposted")}
           </option>
         </select>
       </label>
       <label>
-        Outcome
+        {t("Outcome")}
         <select
           value={outcome}
           disabled={pending}
@@ -265,12 +270,12 @@ export function PredictionMatchForm({
             setOutcome(event.target.value as PredictionOutcome);
           }}
         >
-          <option value="yes">YES</option>
-          <option value="no">NO</option>
+          <option value="yes">{t("YES")}</option>
+          <option value="no">{t("NO")}</option>
         </select>
       </label>
       <label>
-        Action
+        {t("Action")}
         <select
           value={side}
           disabled={pending}
@@ -279,12 +284,15 @@ export function PredictionMatchForm({
             setSide(event.target.value as OrderSide);
           }}
         >
-          <option value="bid">Buy contracts</option>
-          <option value="ask">Sell contracts</option>
+          <option value="bid">{t("Buy contracts")}</option>
+          <option value="ask">{t("Sell contracts")}</option>
         </select>
       </label>
       <label>
-        {side === "bid" ? "Maximum" : "Minimum"} price per contract ({symbol})
+        {t("{value0} price per contract ({value1})", {
+          value0: side === "bid" ? t("Maximum") : t("Minimum"),
+          value1: symbol,
+        })}
         <input
           inputMode="decimal"
           value={price}
@@ -297,7 +305,7 @@ export function PredictionMatchForm({
         />
       </label>
       <label>
-        Whole contracts
+        {t("Whole contracts")}
         <input
           inputMode="numeric"
           value={quantity}
@@ -309,16 +317,21 @@ export function PredictionMatchForm({
           placeholder="1"
         />
       </label>
-      {loading && <p role="status">Reading the best order and fees…</p>}
+      {loading && <p role="status">{t("Reading the best order and fees…")}</p>}
       {preview && (
         <p className="prediction-preview" role="status">
-          Preview: {preview} Refreshes before signing; execution can change.
+          {t(
+            "Preview: {value0} Refreshes before signing; execution can change.",
+            { value0: preview },
+          )}
         </p>
       )}
-      {closed && <p>Trading has closed. You can still cancel open orders.</p>}
+      {closed && (
+        <p>{t("Trading has closed. You can still cancel open orders.")}</p>
+      )}
       {error && (
         <p className="access-denied" role="alert">
-          {error}
+          {t(error ?? "")}
         </p>
       )}
       <button
@@ -327,7 +340,7 @@ export function PredictionMatchForm({
         disabled={pending || loading}
         onClick={() => setRefresh((value) => value + 1)}
       >
-        Refresh quote
+        {t("Refresh quote")}
       </button>
       <button
         className="primary-button"
@@ -342,8 +355,8 @@ export function PredictionMatchForm({
         }
       >
         {pending
-          ? "Confirming…"
-          : `${side === "bid" ? "Buy" : "Sell"} ${outcome.toUpperCase()}`}
+          ? t("Confirming…")
+          : `${side === "bid" ? t("Buy") : t("Sell")} ${outcome.toUpperCase()}`}
       </button>
     </form>
   );

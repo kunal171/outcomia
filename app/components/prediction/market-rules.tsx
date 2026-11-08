@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
 import type { ReactNode } from "react";
@@ -19,6 +20,8 @@ export function PredictionMarketRules({
   symbol: string;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
+
   const documentUrl = rulesDocumentUrl(market.rulesUri);
   return (
     <div className="prediction-rules-layout">
@@ -27,40 +30,42 @@ export function PredictionMarketRules({
         aria-labelledby="prediction-rules-heading"
       >
         <div className="prediction-section-title">
-          <h2 id="prediction-rules-heading">Rules</h2>
+          <h2 id="prediction-rules-heading">{t("Rules")}</h2>
           {documentUrl && (
             <a href={documentUrl} target="_blank" rel="noreferrer">
-              Published document ↗
+              {t("Published document ↗")}
             </a>
           )}
         </div>
         {!documentUrl && (
           <p className="shared-address">
-            {market.rulesUri || "No rules reference available"}
+            {market.rulesUri || t("No rules reference available")}
           </p>
         )}
         <table className="prediction-payout-table">
-          <caption>Payout per contract ({symbol})</caption>
+          <caption>
+            {t("Payout per contract ({value0})", { value0: symbol })}
+          </caption>
           <thead>
             <tr>
-              <th scope="col">Final outcome</th>
-              <th scope="col">YES</th>
-              <th scope="col">NO</th>
+              <th scope="col">{t("Final outcome")}</th>
+              <th scope="col">{t("YES")}</th>
+              <th scope="col">{t("NO")}</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <th scope="row">YES wins</th>
+              <th scope="row">{t("YES wins")}</th>
               <td>1</td>
               <td>0</td>
             </tr>
             <tr>
-              <th scope="row">NO wins</th>
+              <th scope="row">{t("NO wins")}</th>
               <td>0</td>
               <td>1</td>
             </tr>
             <tr>
-              <th scope="row">Invalid</th>
+              <th scope="row">{t("Invalid")}</th>
               <td>0.5</td>
               <td>0.5</td>
             </tr>
@@ -68,7 +73,7 @@ export function PredictionMarketRules({
         </table>
         <dl className="prediction-rule-facts">
           <div>
-            <dt>Earliest proposal</dt>
+            <dt>{t("Earliest proposal")}</dt>
             <dd>
               {predictionCloseLabel(
                 BN.max(
@@ -79,29 +84,31 @@ export function PredictionMarketRules({
             </dd>
           </div>
           <div>
-            <dt>Review period</dt>
+            <dt>{t("Review period")}</dt>
             <dd>{predictionReviewLabel(market.resolutionDelaySeconds)}</dd>
           </div>
           {market.fallback && (
             <div>
-              <dt>Fallback available</dt>
+              <dt>{t("Fallback available")}</dt>
               <dd>{predictionCloseLabel(market.fallback.availableTs)}</dd>
             </div>
           )}
           {market.fallback?.deadlineTs && (
             <div>
-              <dt>Fallback deadline</dt>
+              <dt>{t("Fallback deadline")}</dt>
               <dd>{predictionCloseLabel(market.fallback.deadlineTs)}</dd>
             </div>
           )}
           <div>
-            <dt>Payout destination</dt>
-            <dd>Tidebook wallet</dd>
+            <dt>{t("Payout destination")}</dt>
+            <dd>{t("Tidebook wallet")}</dd>
           </div>
         </dl>
         {(!market.fallback || !market.fallback.deadlineTs) && (
           <p className="prediction-risk-note">
-            Without a timeout deadline, unpaired contracts may stay unresolved.
+            {t(
+              "Without a timeout deadline, unpaired contracts may stay unresolved.",
+            )}
           </p>
         )}
       </section>

@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Resolution and owner redemption use different authorization paths on chain. */
 import { useEffect, useMemo, useState, useRef } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -63,6 +65,8 @@ function Settlement({
   onChanged,
   view = "all",
 }: Props) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     role = useProtocolRole();
@@ -265,15 +269,23 @@ function Settlement({
     <section className="admin-card prediction-settlement">
       <h2>
         {view === "position" && status !== "resolved"
-          ? "Your position"
+          ? t("Your position")
           : view === "manage"
-            ? "Resolve this market"
+            ? t("Resolve this market")
             : status === "resolved"
-              ? `Final outcome: ${Object.keys(market.finalOutcome ?? {})[0]?.toUpperCase()}`
-              : "Resolution"}
+              ? t("Final outcome: {value0}", {
+                  value0: Object.keys(
+                    market.finalOutcome ?? {},
+                  )[0]?.toUpperCase(),
+                })
+              : t("Resolution")}
       </h2>
       {view === "manage" && status !== "resolved" && (
-        <p>Proposal opens {predictionCloseLabel(earliest)}.</p>
+        <p>
+          {t("Proposal opens {value0}.", {
+            value0: predictionCloseLabel(earliest),
+          })}
+        </p>
       )}
       {view !== "position" && <PredictionResolutionSummary market={market} />}
       {wallet && (
@@ -290,7 +302,7 @@ function Settlement({
                         disabled={pending || now.lt(market.closeTs)}
                         onClick={() => void act("freeze")}
                       >
-                        Close trading at cutoff
+                        {t("Close trading at cutoff")}
                       </button>
                     )}
                     {(view === "manage" || view === "all") &&
@@ -301,7 +313,7 @@ function Settlement({
                           disabled={pending}
                           onClick={() => void act("close")}
                         >
-                          Close trading early
+                          {t("Close trading early")}
                         </button>
                       )}
                   </>
@@ -322,7 +334,7 @@ function Settlement({
                       }
                       onClick={() => void act("fallback")}
                     >
-                      Activate published fallback
+                      {t("Activate published fallback")}
                     </button>
                     {market.fallback.deadlineTs && (
                       <button
@@ -334,7 +346,7 @@ function Settlement({
                         }
                         onClick={() => void act("timeout")}
                       >
-                        Finalize expired fallback as Invalid
+                        {t("Finalize expired fallback as Invalid")}
                       </button>
                     )}
                   </>
@@ -344,7 +356,7 @@ function Settlement({
                   disabled={pending || !maturity || now.lt(maturity)}
                   onClick={() => void act("finalize")}
                 >
-                  Finalize after review delay
+                  {t("Finalize after review delay")}
                 </button>
               )}
             </div>
@@ -354,25 +366,25 @@ function Settlement({
             status !== "resolved" &&
             status !== "draft" && (
               <details>
-                <summary>Resolver: propose or correct outcome</summary>
+                <summary>{t("Resolver: propose or correct outcome")}</summary>
                 <p>
-                  Requires your active admin record. Upload evidence
-                  independently, then enter its permanent reference. A
-                  correction restarts the full delay.
+                  {t(
+                    "Requires your active admin record. Upload evidence independently, then enter its permanent reference. A correction restarts the full delay.",
+                  )}
                 </p>
                 <label>
-                  Outcome
+                  {t("Outcome")}
                   <select
                     value={outcome}
                     onChange={(e) => setOutcome(e.target.value)}
                   >
-                    <option value="yes">YES</option>
-                    <option value="no">NO</option>
-                    <option value="invalid">Invalid</option>
+                    <option value="yes">{t("YES")}</option>
+                    <option value="no">{t("NO")}</option>
+                    <option value="invalid">{t("Invalid")}</option>
                   </select>
                 </label>
                 <label>
-                  Evidence reference
+                  {t("Evidence reference")}
                   <input
                     value={uri}
                     onChange={(e) => setUri(e.target.value)}
@@ -380,7 +392,7 @@ function Settlement({
                   />
                 </label>
                 <label>
-                  Exact evidence file
+                  {t("Exact evidence file")}
                   <input
                     type="file"
                     disabled={pending}
@@ -413,8 +425,8 @@ function Settlement({
                   onClick={() => void act("propose")}
                 >
                   {status === "proposed"
-                    ? "Correct proposal"
-                    : "Propose outcome"}
+                    ? t("Correct proposal")
+                    : t("Propose outcome")}
                 </button>
               </details>
             )}
@@ -436,18 +448,18 @@ function Settlement({
       {!wallet && (
         <p>
           {view === "position"
-            ? "Connect your wallet to see your contracts and claims."
-            : "Connect your wallet to use available resolution actions."}
+            ? t("Connect your wallet to see your contracts and claims.")
+            : t("Connect your wallet to use available resolution actions.")}
         </p>
       )}
-      {issue && <p role="alert">{issue}</p>}
+      {issue && <p role="alert">{t(issue ?? "")}</p>}
       {signature && (
         <a
           href={transactionExplorerUrl(signature)}
           target="_blank"
           rel="noreferrer"
         >
-          View transaction ↗
+          {t("View transaction ↗")}
         </a>
       )}
     </section>
