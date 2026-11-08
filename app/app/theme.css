@@ -244,3 +244,110 @@ body {
     text-align: left;
   }
 }
+
+/* Orders use one ledger table instead of nested cards per record. */
+.orders-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.orders-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orders-filters button {
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.orders-filters button[aria-pressed="true"] {
+  color: var(--ink);
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+.orders-table-scroll {
+  overflow-x: auto;
+}
+.orders-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  text-align: left;
+}
+.orders-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+}
+.orders-table th,
+.orders-table td {
+  padding: 18px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.orders-table th:first-child,
+.orders-table td:first-child {
+  padding-left: 0;
+}
+.orders-table td:first-child {
+  min-width: 190px;
+  max-width: 340px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.orders-market-link {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.5;
+}
+.orders-market-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.orders-table small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.orders-buy {
+  color: var(--buy);
+}
+.orders-sell,
+.orders-cancel {
+  color: var(--sell);
+}
+.orders-empty {
+  padding: 36px 0;
+  border-block: 1px solid var(--line);
+  color: var(--muted);
+}
+.orders-legacy {
+  margin-top: 40px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.orders-legacy > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+.orders-legacy-content {
+  padding-top: 20px;
+}
+.orders-filters button:focus-visible,
+.orders-market-link:focus-visible,
+.orders-legacy > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

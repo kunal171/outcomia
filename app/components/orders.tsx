@@ -2,6 +2,7 @@
 import { useI18n } from "./preferences-provider";
 
 import { SharedOrders } from "./shared-orders";
+import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -32,7 +33,44 @@ function getErrorMessage(cause: unknown) {
   return rpcErrorMessage(cause, "Transaction failed");
 }
 
+/** The page owns navigation; each ledger keeps its existing cancellation path. */
 export function Orders() {
+  const { t } = useI18n();
+  const wallet = useAnchorWallet();
+  const { connection } = useConnection();
+  const [legacyOpen, setLegacyOpen] = useState(false);
+  const identity = `${connection.rpcEndpoint}:${wallet?.publicKey.toBase58() ?? ""}`;
+  return (
+    <div className="app-shell">
+      <AppHeader />
+      <main className="route-shell orders-workspace">
+        <div className="route-heading">
+          <h1>{t("Orders")}</h1>
+        </div>
+        {!wallet ? (
+          <div className="access-card">
+            {t("Connect your wallet to view your orders.")}
+          </div>
+        ) : SHARED_BALANCES_ENABLED ? (
+          <>
+            <SharedOrders />
+            <details
+              className="orders-legacy"
+              onToggle={(event) => setLegacyOpen(event.currentTarget.open)}
+            >
+              <summary>{t("Legacy orders")}</summary>
+              {legacyOpen && <LegacyOrders key={identity} />}
+            </details>
+          </>
+        ) : (
+          <LegacyOrders key={identity} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function LegacyOrders() {
   const { t } = useI18n();
 
   const { connection } = useConnection();
@@ -45,7 +83,7 @@ export function Orders() {
       { market: MarketAccount; metadata: MarketMetadataAccount | null }
     >
   >(() => new Map());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [pendingOrder, setPendingOrder] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -205,166 +243,152 @@ export function Orders() {
   };
 
   return (
-    <div className="app-shell">
-      <AppHeader />
+    <div className="orders-legacy-content">
+      {wallet && (
+        <section aria-label={t("Legacy orders")}>
+          <div className="admin-list-heading">
+            <h2>{t("Legacy orders")}</h2>
 
-      <main className="route-shell">
-        <SharedOrders />
-        <div className="route-heading">
-          <h1>{t("My orders")}</h1>
-        </div>
-
-        {!wallet && (
-          <div className="access-card">
-            {t("Connect your wallet to view your orders.")}
-          </div>
-        )}
-
-        {wallet && (
-          <section className="admin-card">
-            <div className="admin-list-heading">
-              <h2>{t("Orders")}</h2>
-
-              <button
-                className="text-button"
-                type="button"
-                disabled={loading}
-                onClick={() => void loadOrders()}
-              >
-                {loading ? t("Refreshing…") : t("Refresh")}
-              </button>
-            </div>
-
-            {!loading && orders.length === 0 && (
-              <p>{t("No orders found for this wallet.")}</p>
-            )}
-
-            <div className="orders-list">
-              {orders.map((order) => {
-                const status = decodeOrderStatus(order.status);
-                const side = decodeOrderSide(order.side);
-                const address = order.address.toBase58();
-                const view = orderMarkets.get(order.market.toBase58());
-                const labels = view
-                  ? marketLabels(view.market, view.metadata)
-                  : null;
-
-                return (
-                  <article className="order-row" key={address}>
-                    <div className="order-details">
-                      <div>
-                        <span>{t("Order")}</span>
-                        <strong>
-                          {"#"}
-                          {order.orderId.toString()}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Market")}</span>
-                        <strong>
-                          <Link href={`/markets/${order.market.toBase58()}`}>
-                            {labels?.name ??
-                              shortAddress(order.market.toBase58())}
-                          </Link>
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Side")}</span>
-                        <strong>{side === "bid" ? t("Buy") : t("Sell")}</strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Price")}</span>
-                        <strong>
-                          {view
-                            ? `${readableAmount(order.price, view.market.quoteDecimals)} ${labels?.quote}`
-                            : t("Units unavailable")}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Quantity")}</span>
-                        <strong>
-                          {view
-                            ? `${readableAmount(order.quantity, view.market.baseDecimals)} ${labels?.base}`
-                            : t("Units unavailable")}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Remaining")}</span>
-                        <strong>
-                          {view
-                            ? `${readableAmount(order.remainingQuantity, view.market.baseDecimals)} ${labels?.base}`
-                            : t("Units unavailable")}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Filled")}</span>
-                        <strong>
-                          {view
-                            ? `${readableAmount(order.quantity.sub(order.remainingQuantity), view.market.baseDecimals)} ${labels?.base}`
-                            : t("Units unavailable")}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>{t("Locked collateral")}</span>
-                        <strong>
-                          {view
-                            ? `${readableAmount(order.lockedCollateral, side === "bid" ? view.market.quoteDecimals : view.market.baseDecimals)} ${side === "bid" ? labels?.quote : labels?.base}`
-                            : t("Units unavailable")}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div className="order-actions">
-                      <span className={`role-badge order-${status}`}>
-                        {t(status ?? "")}
-                      </span>
-
-                      {status === "open" && (
-                        <button
-                          className="danger-button"
-                          type="button"
-                          disabled={pendingOrder !== null}
-                          onClick={() => void cancelOrder(order)}
-                        >
-                          {pendingOrder === address
-                            ? t("Canceling…")
-                            : t("Cancel")}
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {error && (
-          <div className="transaction-message transaction-error">
-            {t(error ?? "")}
-          </div>
-        )}
-
-        {signature && (
-          <div className="transaction-message transaction-success">
-            {t("Order canceled and collateral released to your free balance.")}{" "}
-            <a
-              href={transactionExplorerUrl(signature)}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              className="text-button"
+              type="button"
+              disabled={loading}
+              onClick={() => void loadOrders()}
             >
-              {t("View transaction ↗")}
-            </a>
+              {loading ? t("Refreshing…") : t("Refresh")}
+            </button>
           </div>
-        )}
-      </main>
+
+          {loading && <p role="status">{t("Loading orders…")}</p>}
+          {!loading && !error && orders.length === 0 && (
+            <p>{t("No orders found for this wallet.")}</p>
+          )}
+
+          <div className="orders-list">
+            {orders.map((order) => {
+              const status = decodeOrderStatus(order.status);
+              const side = decodeOrderSide(order.side);
+              const address = order.address.toBase58();
+              const view = orderMarkets.get(order.market.toBase58());
+              const labels = view
+                ? marketLabels(view.market, view.metadata)
+                : null;
+
+              return (
+                <article className="order-row" key={address}>
+                  <div className="order-details">
+                    <div>
+                      <span>{t("Order")}</span>
+                      <strong>
+                        {"#"}
+                        {order.orderId.toString()}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Market")}</span>
+                      <strong>
+                        <Link href={`/markets/${order.market.toBase58()}`}>
+                          {labels?.name ??
+                            shortAddress(order.market.toBase58())}
+                        </Link>
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Side")}</span>
+                      <strong>{side === "bid" ? t("Buy") : t("Sell")}</strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Price")}</span>
+                      <strong>
+                        {view
+                          ? `${readableAmount(order.price, view.market.quoteDecimals)} ${labels?.quote}`
+                          : t("Units unavailable")}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Quantity")}</span>
+                      <strong>
+                        {view
+                          ? `${readableAmount(order.quantity, view.market.baseDecimals)} ${labels?.base}`
+                          : t("Units unavailable")}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Remaining")}</span>
+                      <strong>
+                        {view
+                          ? `${readableAmount(order.remainingQuantity, view.market.baseDecimals)} ${labels?.base}`
+                          : t("Units unavailable")}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Filled")}</span>
+                      <strong>
+                        {view
+                          ? `${readableAmount(order.quantity.sub(order.remainingQuantity), view.market.baseDecimals)} ${labels?.base}`
+                          : t("Units unavailable")}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>{t("Locked collateral")}</span>
+                      <strong>
+                        {view
+                          ? `${readableAmount(order.lockedCollateral, side === "bid" ? view.market.quoteDecimals : view.market.baseDecimals)} ${side === "bid" ? labels?.quote : labels?.base}`
+                          : t("Units unavailable")}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="order-actions">
+                    <span className={`role-badge order-${status}`}>
+                      {t(status ?? "")}
+                    </span>
+
+                    {status === "open" && (
+                      <button
+                        className="danger-button"
+                        type="button"
+                        disabled={pendingOrder !== null}
+                        onClick={() => void cancelOrder(order)}
+                      >
+                        {pendingOrder === address
+                          ? t("Canceling…")
+                          : t("Cancel")}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {error && (
+        <div className="transaction-message transaction-error">
+          {t(error ?? "")}
+        </div>
+      )}
+
+      {signature && (
+        <div className="transaction-message transaction-success">
+          {t("Order canceled and collateral released to your free balance.")}{" "}
+          <a
+            href={transactionExplorerUrl(signature)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t("View transaction ↗")}
+          </a>
+        </div>
+      )}
     </div>
   );
 }
