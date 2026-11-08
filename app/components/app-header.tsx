@@ -1,9 +1,11 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { BaseWalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { DisplayPreferences } from "./display-preferences";
 import { NETWORK } from "../lib/solana";
 import { useProtocolRole } from "./protocol-role-provider";
 
@@ -17,6 +19,8 @@ const roleLabels = {
 };
 
 function HydrationSafeWalletButton() {
+  const { t } = useI18n();
+
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -29,14 +33,26 @@ function HydrationSafeWalletButton() {
         className="wallet-adapter-button wallet-adapter-button-trigger"
         type="button"
         disabled
-        aria-label="Loading wallet"
+        aria-label={t("Loading wallet")}
       >
-        Select Wallet
+        {t("Select Wallet")}
       </button>
     );
   }
 
-  return <WalletMultiButton />;
+  return (
+    <BaseWalletMultiButton
+      labels={{
+        "change-wallet": t("Change wallet"),
+        connecting: t("Connecting…"),
+        "copy-address": t("Copy address"),
+        copied: t("Copied"),
+        disconnect: t("Disconnect"),
+        "has-wallet": t("Connect"),
+        "no-wallet": t("Select Wallet"),
+      }}
+    />
+  );
 }
 
 type NavigationItem = {
@@ -57,8 +73,10 @@ function BrandMark() {
 }
 
 function TidebookBrand() {
+  const { t } = useI18n();
+
   return (
-    <Link className="brand" href="/" aria-label="Tidebook home">
+    <Link className="brand" href="/" aria-label={t("Tidebook home")}>
       <BrandMark />
       <span>Tidebook</span>
     </Link>
@@ -94,6 +112,8 @@ function NavigationIcon({ name }: { name: NavigationItem["icon"] }) {
 
 /** Shared navigation keeps desktop and modal mobile links under the same role checks. */
 export function AppHeader() {
+  const { t } = useI18n();
+
   const pathname = usePathname();
   const { role, loading } = useProtocolRole();
   const roleLabel = loading ? "Checking role" : roleLabels[role];
@@ -197,18 +217,18 @@ export function AppHeader() {
   ];
   function navigation(id?: string) {
     return (
-      <nav id={id} className="sidebar-nav" aria-label="Primary navigation">
+      <nav id={id} className="sidebar-nav" aria-label={t("Primary navigation")}>
         {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            aria-label={item.label}
-            title={item.label}
+            aria-label={t(item.label)}
+            title={t(item.label)}
             aria-current={item.active ? "page" : undefined}
             onClick={() => drawer.current?.close()}
           >
             <NavigationIcon name={item.icon} />
-            <span>{item.label}</span>
+            <span>{t(item.label)}</span>
             <span className="sidebar-link-arrow" aria-hidden="true">
               ↗
             </span>
@@ -221,24 +241,24 @@ export function AppHeader() {
     return (
       <div className="sidebar-footer">
         <span>
-          <span className="network-dot" aria-hidden="true" /> Solana {NETWORK}
+          <span className="network-dot" aria-hidden="true" />{" "}
+          {t("Solana {value0}", { value0: NETWORK })}
         </span>
-        <small>Test tokens. Real order books.</small>
       </div>
     );
   }
   return (
     <>
-      <aside className="app-sidebar" aria-label="Tidebook sidebar">
+      <aside className="app-sidebar" aria-label={t("Tidebook sidebar")}>
         <div className="sidebar-brand-heading">
           <button
             type="button"
             className="sidebar-brand-toggle"
             onClick={toggleSidebar}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
             aria-expanded={!collapsed}
             aria-controls="tidebook-desktop-navigation"
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
           >
             <BrandMark />
           </button>
@@ -246,7 +266,7 @@ export function AppHeader() {
             Tidebook
           </Link>
         </div>
-        <span className="sidebar-section-label">Workspace</span>
+
         {navigation("tidebook-desktop-navigation")}
         {footer()}
       </aside>
@@ -255,7 +275,7 @@ export function AppHeader() {
           <button
             type="button"
             className="sidebar-menu-toggle"
-            aria-label="Open navigation"
+            aria-label={t("Open navigation")}
             aria-haspopup="dialog"
             aria-controls="tidebook-navigation-drawer"
             aria-expanded={menuOpen}
@@ -281,12 +301,13 @@ export function AppHeader() {
         </div>
         <div className="topbar-actions">
           {roleLabel && (
-            <span className={`role-badge role-${role}`}>{roleLabel}</span>
+            <span className={`role-badge role-${role}`}>{t(roleLabel)}</span>
           )}
           <span className="network-pill">
             <span className="network-dot" />
             {NETWORK}
           </span>
+          <DisplayPreferences />
           <HydrationSafeWalletButton />
         </div>
       </header>
@@ -294,7 +315,7 @@ export function AppHeader() {
         className="sidebar-drawer"
         id="tidebook-navigation-drawer"
         ref={drawer}
-        aria-label="Navigation menu"
+        aria-label={t("Navigation menu")}
         onClose={() => setMenuOpen(false)}
         onClick={(event) => {
           if (event.target !== event.currentTarget) return;
@@ -313,7 +334,7 @@ export function AppHeader() {
             <button
               type="button"
               className="sidebar-brand-toggle"
-              aria-label="Hide navigation"
+              aria-label={t("Hide navigation")}
               onClick={() => drawer.current?.close()}
             >
               <BrandMark />
@@ -329,13 +350,13 @@ export function AppHeader() {
           <button
             type="button"
             className="sidebar-close"
-            aria-label="Close navigation"
+            aria-label={t("Close navigation")}
             onClick={() => drawer.current?.close()}
           >
             ×
           </button>
         </div>
-        <span className="sidebar-section-label">Workspace</span>
+
         {navigation()}
         {footer()}
       </dialog>

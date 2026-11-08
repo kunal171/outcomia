@@ -5,7 +5,7 @@ import {
   ConnectionProvider,
   WalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { LocalizedWalletModalProvider } from "./localized-wallet-modal";
 import { RPC_ENDPOINT, RPC_ENDPOINTS, RPC_WS_ENDPOINT } from "../lib/solana";
 import { createRpcFetch } from "../lib/rpc-transport";
 import { ProtocolRoleProvider } from "./protocol-role-provider";
@@ -25,9 +25,9 @@ export function SolanaProvider({ children }: { children: React.ReactNode }) {
   return (
     <ConnectionProvider endpoint={RPC_ENDPOINT} config={config}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
+        <LocalizedWalletModalProvider>
           <ProtocolRoleProvider>{children}</ProtocolRoleProvider>
-        </WalletModalProvider>
+        </LocalizedWalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );
