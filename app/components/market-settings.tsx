@@ -196,13 +196,7 @@ export function MarketSettings({ address }: { address: string }) {
 
         <div className="route-heading">
           <h1>{t("Manage market")}</h1>
-          <p>
-            {t("Update the human-readable identity for")}{" "}
-            <strong>{title}</strong>
-            {t(
-              ". The market address, mint pair, and trading state do not change.",
-            )}
-          </p>
+          <p>{title}</p>
         </div>
 
         {!wallet && (
@@ -230,7 +224,7 @@ export function MarketSettings({ address }: { address: string }) {
               </div>
               {metadata && (
                 <span className="role-badge">
-                  {decodeMarketKind(metadata.kind)}
+                  {t(decodeMarketKind(metadata.kind))}
                 </span>
               )}
             </div>
@@ -284,9 +278,6 @@ export function MarketSettings({ address }: { address: string }) {
                 >
                   <option value="spot">{t("Spot")}</option>
                   <option value="other">{t("Other (experimental)")}</option>
-                  <option value="prediction" disabled>
-                    {t("Prediction (coming later)")}
-                  </option>
                 </select>
                 {metadata && (
                   <small>
@@ -316,7 +307,7 @@ export function MarketSettings({ address }: { address: string }) {
 
         {(roleError || error) && (
           <div className="transaction-message transaction-error">
-            {roleError || error}
+            {t(roleError || error || "")}
           </div>
         )}
         {signature && (

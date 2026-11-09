@@ -333,6 +333,11 @@ export function CreatePredictionMarket() {
             </label>
             <details className="inline-explainer">
               <summary>{t("How does the price increment work?")}</summary>
+              <p>
+                {t(
+                  "For example, a 0.01 increment allows prices of 0.50 or 0.51, but not 0.505.",
+                )}
+              </p>
             </details>
             <PredictionRulesEditor
               value={draft}

@@ -345,7 +345,7 @@ export function AdminManagement() {
               </div>
 
               <div className="admin-list">
-                {!loadingAdmins && admins.length === 0 && (
+                {!loadingAdmins && !error && admins.length === 0 && (
                   <p>{t("No admin records found.")}</p>
                 )}
                 {admins.map((admin) => {
@@ -360,7 +360,7 @@ export function AdminManagement() {
                       <div>
                         <strong>{shortAddress(admin.authority)}</strong>
                         <span className={`role-badge role-${admin.status}`}>
-                          {isSuperAdmin ? t("Super admin") : admin.status}
+                          {isSuperAdmin ? t("Super admin") : t(admin.status)}
                         </span>
                         <p>
                           {t("Added by {value0}", {
@@ -415,7 +415,7 @@ export function AdminManagement() {
 
         {(roleError || error) && (
           <div className="transaction-message transaction-error">
-            {roleError || error}
+            {t(roleError || error || "")}
           </div>
         )}
         {signature && (

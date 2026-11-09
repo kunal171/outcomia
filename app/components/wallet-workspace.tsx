@@ -44,7 +44,7 @@ function ReadError({
 
   return result.error ? (
     <div className="wallet-read-error" role="alert">
-      <strong>{t("{value0} unavailable", { value0: label })}</strong>
+      <strong>{t("{value0} unavailable", { value0: t(label) })}</strong>
       <span>{t(result.error ?? "")}</span>
     </div>
   ) : null;
@@ -52,7 +52,7 @@ function ReadError({
 
 /** A read-only view. Identity changes invalidate old responses before any balances render. */
 export function WalletWorkspace() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   const { connection } = useConnection();
   const { publicKey } = useWallet();
@@ -180,7 +180,7 @@ export function WalletWorkspace() {
               {data && (
                 <span className="wallet-updated">
                   {t("Updated {value0}", {
-                    value0: new Date(data.readAt).toLocaleTimeString(),
+                    value0: new Date(data.readAt).toLocaleTimeString(locale),
                   })}
                 </span>
               )}

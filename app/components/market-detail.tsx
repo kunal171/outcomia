@@ -1109,6 +1109,11 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
                 <details className="inline-explainer rate-explainer">
                   <summary>{t("How is this price calculated?")}</summary>
+                  <p>
+                    {t(
+                      "A recent trade is used when available. Otherwise the quote uses the midpoint of the best buy and sell prices, or the available side. An indicative quote is not an execution price.",
+                    )}
+                  </p>
                 </details>
               </section>
             )}
