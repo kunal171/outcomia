@@ -17,13 +17,14 @@ Order storage is defined in `src/state/prediction_book.rs`: `PredictionOrderBook
 `PredictionPriceLevel` and `PredictionOrder`. Rust and browser PDA helpers agree
 on fixed test vectors. Draft creation now initializes `PredictionOrderBook`
 atomically. Empty-side placement, same-price FIFO append and new-price insertion
-and cancellation are implemented locally, along with one-maker matching.
+and cancellation are implemented, along with one-maker matching. The sections
+below describe the legacy per-market path; shared custody is the current path.
 
 `PredictionMarket` reserves 834 payload bytes (842 including its Anchor
 discriminator), with a 200-byte limit for each URI. `PredictionPosition` uses
 113 payload bytes (121 including its discriminator). These are Borsh sizes,
 not Rust in-memory struct sizes. Creation enforces URI bounds and configuration
-rules; future handlers will enforce lifecycle transitions. `InitSpace` only
+rules; instruction handlers enforce lifecycle transitions. `InitSpace` only
 calculates allocation.
 
 `programs/outcomia/src/prediction_config.rs` validates proposed creation terms
@@ -86,7 +87,7 @@ queues, and keeping them explicit makes collateral checks easier to audit.
 
 ### Outcomia's choice
 
-Outcomia will use Polymarket-style complete-set accounting with internal
+Outcomia uses Polymarket-style complete-set accounting with internal
 positions, explicit bid and ask books, and Outcomia's existing bounded on-chain
 FIFO matching.
 
@@ -263,7 +264,7 @@ replace data in the new panel. The same rollout flag gates position creation;
 it must be enabled only after deploying a program containing both initializers.
 Deposits, withdrawals and split/merge use the separate funding rollout gate.
 
-### Prediction order-book accounts (layouts implemented locally)
+### Prediction order-book accounts (legacy per-market layouts)
 
 The current spot accounts assume a base mint, quote mint, and `TraderBalance`.
 Reusing them directly would require a fake base mint and still would not model
@@ -412,7 +413,7 @@ constraints always apply to draft creation, while position creation requires
 the owner's signature. Reads remain public and distinguish RPC errors from
 an empty result. UI trading actions are not exposed yet.
 
-### Opening (implemented locally)
+### Opening (legacy per-market path)
 
 `open_prediction_market()` takes the stored authority's signature, the canonical
 prediction-market PDA and the authority's canonical active `AdminRecord`. It
@@ -433,15 +434,18 @@ with matching rules rather than rewriting its committed terms.
 
 The detail page shows lifecycle controls only to the connected market authority,
 and disables opening if its admin role is inactive, missing, loading or unreadable.
-`NEXT_PUBLIC_PREDICTION_OPENING_ENABLED` defaults false and also requires the
-draft rollout flag. Enable it only after deploying the opening instruction.
+`NEXT_PUBLIC_PREDICTION_OPENING_ENABLED` also requires the draft rollout flag.
+These trading gates default on for the documented devnet program and require
+explicit opt-in for other program IDs. Shared custody and resolution have their
+own explicit rollout flags; disable unsupported features for an older binary.
 The client checks the displayed close time and reads fresh terms and the canonical
 admin record before signing;
 on-chain checks remain authoritative. Confirmation reloads the market and its
 position controls. If that read fails, the receipt remains visible and asks for
 a refresh instead of inventing a status or reporting the confirmed opening as
-failed. Opening currently enables splitting; order placement and settlement
-remain unimplemented and the UI says so.
+failed. Opening enables complete-set conversion and trading before the cutoff.
+Resolution and redemption are separate lifecycle transitions and are implemented
+through the current shared-custody path.
 
 Tests use actual initialized drafts, check unchanged vault/metadata/fee data,
 status-only mutation, disabled/removed/substituted/corrupt admin records,
@@ -449,7 +453,7 @@ creator versus admin/resolver roles, unsigned accounts,
 canonical addresses, account type, close boundaries and whole-transaction
 rollback. Collateral round-trip tests now open through this instruction.
 
-### Collateral deposits (implemented locally)
+### Collateral deposits (legacy per-market path)
 
 `deposit_prediction_collateral(amount)` requires the position owner's signature,
 the canonical prediction-market PDA, the canonical market/wallet position with
@@ -489,7 +493,7 @@ mint/vault/position binding, overflow, insufficient funds, SPL frozen-account
 failure and whole-transaction rollback. Client tests cover amount limits and
 IDL encoding of the exact atomic amount and account roles.
 
-### Free-collateral withdrawals (implemented locally)
+### Free-collateral withdrawals (legacy per-market path)
 
 `withdraw_prediction_collateral(amount)` requires the wallet signature, its
 canonical position and the market's canonical mint, vault and authority. The
@@ -505,7 +509,7 @@ remain unchanged. Withdrawals work in every lifecycle status, including after
 close and resolution. They do not redeem outcomes. Failed wallet-balance reads
 do not block withdrawing a known free balance, but position read errors do.
 
-### Complete sets (implemented locally)
+### Complete sets (legacy per-market path)
 
 `split_prediction_complete_set(quantity)` takes a positive whole number of
 pairs. It requires Open status and `Clock.unix_timestamp < close_ts`. Each pair
@@ -542,7 +546,7 @@ all lifecycle gates, the exact close boundary, locked funds, zero amounts,
 overflow/underflow, unsigned or substituted accounts, SPL CPI failure and batch
 rollback. Typed events/indexer decoding remain a later milestone.
 
-### First resting order (implemented locally)
+### First resting order (legacy per-market path)
 
 `place_prediction_order(order_id, outcome, side, price, quantity)` is callable
 by any signing trader with an initialized position. No admin record is needed.
@@ -594,7 +598,7 @@ shortfalls, occupied/crossing rejection, checked arithmetic, account binding,
 ID reuse and full rollback of multi-instruction placements. Client tests check
 preflight bounds, exact units, account metadata, enum encoding and packet size.
 
-### Same-price FIFO append (implemented locally)
+### Same-price FIFO append (legacy per-market path)
 
 `append_prediction_order(order_id, outcome, side, price, quantity)` uses the
 same signer, canonical market/position/book, lifecycle, price, quantity, ID and
@@ -641,7 +645,7 @@ and stale tails, corrupt endpoints/identity, timing/funding/counter failures,
 real cross-outcome orders, signatures and multi-append rollback. Client tests
 cover routing, failed RPC reads, queue preflight, account roles and packet size.
 
-### New-price insertion (implemented locally)
+### New-price insertion (legacy per-market path)
 
 `insert_prediction_order(order_id, outcome, side, price, quantity)` creates a
 new level and its first order on an occupied side. It uses the shared price,
@@ -683,7 +687,7 @@ crossing rejection, forged identities, stale/nonadjacent hints, counter bounds
 and transaction rollback. Client tests cover routing, bad links, the search cap,
 RPC failures, optional-account encoding and transaction size.
 
-### Cancellation (implemented locally)
+### Cancellation (legacy per-market path)
 
 `cancel_prediction_order(order_id)` requires the signing order owner and the
 canonical market, position, book, order and price level. Only Open orders can
@@ -735,7 +739,7 @@ expired/closed market states and whole-transaction rollback. A synthetic partial
 snapshot verifies remainder-only refunds; it does not execute matching. Client tests
 cover neighbor selection, failure handling, rollout flags and IDL packet size.
 
-### One-maker matching (implemented locally)
+### One-maker matching (legacy per-market path)
 
 `match_prediction_order(outcome, taker_side, limit_price, quantity)` fills at most
 one resting order. Any connected trader with an initialized position can call
@@ -812,7 +816,7 @@ priority rejection, lifecycle boundaries, account substitutions, malformed hints
 funding/overflow failures, real partial-fill cancellation and transaction rollback.
 Conservation tests sum both actual traders, reserve and fees against the vault.
 
-### Bounded multi-maker planning (implemented locally)
+### Bounded multi-maker planning (legacy per-market path)
 
 `app/lib/prediction-matching-plan.ts` plans up to three `match_prediction_order`
 instructions in one legacy transaction. The Rust matching primitive and account
@@ -856,7 +860,7 @@ boundary. It does not plan a fourth fill, although the fourth order may be read
 as the third maker's required FIFO successor. Cap-blocked quantity stays unposted.
 The UI shows the reason and quantity so the wallet can submit again deliberately.
 
-### Limit execution and public depth (implemented locally)
+### Limit execution and public depth (legacy per-market path)
 
 One Buy/Sell form offers two execution choices. Limit mode matches first, then
 posts a positive remainder only for `book-exhausted` or `non-crossing`. Immediate
@@ -904,32 +908,32 @@ immutable inputs, account encoding and packet size. LiteSVM tests execute
 three-fill batches with partial/full final makers, price promotion, custody
 conservation, rent refunds and rollback on a third-step failure.
 
-### Trading still to implement
+### Remaining trading work
 
-Typed prediction events/indexer decoding remain.
-Fee accrual is implemented, but the existing spot fee-withdrawal instruction
-accepts spot market accounts only; prediction fee withdrawal needs a separate
-collateral-vault adapter. Prediction fills do not emit events yet.
+Typed shared/prediction events and indexer decoding remain. The current shared
+book supports super-admin fee withdrawal through `withdraw_shared_fees`. The
+older spot-only `withdraw_protocol_fees` cannot withdraw legacy prediction-vault
+fees; that legacy adapter remains separate work. Shared fills currently emit
+ordinary log messages rather than typed Anchor events.
 
 Cancellation remains available after the market freezes or resolves and releases
-only the unfilled collateral or positions. Planned redemption initially
-requires positions to be free, so users cancel resting orders before redeeming.
+only the unfilled collateral or positions. Redemption requires positions to be free, so users cancel resting orders before redeeming.
 
 ### Resolution and redemption
 
 The creator is the trusted primary outcome decision-maker. The initializer
-already binds `resolver == authority`; proposal, finalization and redemption
-instructions are still planned. The permissions for those instructions are:
+binds `resolver == authority`; proposal, finalization and redemption instructions
+are implemented. The permissions for those instructions are:
 
 | Action | Required permission |
 | --- | --- |
 | Create draft | Active admin |
 | Open | Stored creator and active admin; enforced now |
-| Administrative trading closure | Stored creator and active admin; planned |
-| Primary outcome proposal/correction | Stored creator and active admin; planned |
-| Fallback proposal/correction | Predeclared fallback resolver and active admin; planned |
-| Finalize after review delay | Anyone may execute the fixed result; cannot choose or replace it; planned |
-| Claim payout | Owner of the winning positions; no admin role; planned |
+| Administrative trading closure | Stored creator and active admin; enforced |
+| Primary outcome proposal/correction | Stored creator and active admin; enforced |
+| Fallback proposal/correction | Predeclared fallback resolver and active admin; enforced |
+| Finalize after review delay | Anyone may execute the fixed result; cannot choose or replace it; enforced |
+| Claim payout | Owner of the winning positions; no admin role; enforced |
 | Withdraw free collateral | Position owner; no admin role; enforced now |
 
 Administrative trading closure stops new orders; it does not destroy collateral
@@ -938,10 +942,10 @@ matching automatically, without waiting for an admin transaction. A later
 account-deletion instruction must require the creator and active admin status
 and reject outstanding orders, cash claims, outcome claims, reserves or fees.
 Neither trading closure nor admin revocation may block trader cancellation,
-withdrawal or redemption. These prediction-closure instructions are not yet
-implemented; the spot `close_market` instruction cannot close a prediction account.
+withdrawal or redemption. Early trading closure is implemented. Deleting prediction market/vault accounts
+is not implemented; the spot `close_market` instruction cannot close a prediction account.
 
-The planned settlement flow is:
+The settlement flow is:
 
 1. All placement and matching instructions reject `now >= close_ts`, even if
    nobody has called the permissionless freeze instruction yet.
@@ -1083,25 +1087,25 @@ these equations with checked `u128` intermediate arithmetic.
 - reuse spot accounts by pretending collateral is a base asset;
 - add AMM liquidity before the CLOB lifecycle is tested end to end.
 
-## Implementation sequence
+## Implementation status
 
-The remaining implementation is grouped into four milestones. Each includes
-its tests, frontend and documentation; grouping does not remove the safety checks.
+Implemented and covered by the recorded devnet lifecycle test:
 
-1. **Collateral recovery — implemented locally.** Position ledgers, deposits and
-   withdrawals, with owner checks and atomic SPL custody.
-2. **Complete sets — implemented locally.** Split/merge with exact backing,
-   free/locked separation and conservation tests.
-3. **Trading — started locally.** Opening, atomic book initialization, empty-side
-   placement, same-price FIFO append, new-price insertion and cancellation are implemented.
-   One-maker matching, taker fees and an immediate-trade UI are also implemented.
-   Bounded three-maker planning and atomic batch execution are implemented.
-   Safe remainder posting, public book depth and the unified trading UI are implemented.
-   Next: prediction fee withdrawal, typed events and indexer decoding.
-4. **Resolution and integration.** Freeze, propose, finalize, fallback/Invalid
-   handling, redemption and its UI. Add atomic position switching with execution
-   limits and rollback tests, then run a full devnet lifecycle. Oracle adapters
-   remain outside the first version.
+- Position creation, owner deposits/withdrawals and complete-set split/merge.
+- Opening, price/FIFO queues, cancellation, bounded matching and safe remainders.
+- Shared per-asset cash, book fees and super-admin shared-fee withdrawal.
+- Creator closure, evidence-backed proposals/corrections, fallback activation,
+  delayed finalization, timeout Invalid and owner redemption.
+- Public discovery, trading, positions, rules and resolver controls in the UI.
+
+See [deployment evidence](deployment.md) for the dated release record. The
+legacy per-market handlers above remain available for recovery. They do not
+make cash fungible across markets; that is the shared `AssetBalance` path.
+
+Remaining work includes typed shared/prediction events and indexer decoding,
+read projections, legacy prediction-fee withdrawal, account cleanup, and the
+separate atomic position-switching design. Multi-outcome markets, clubs and
+governance are tracked in [future scope](future-scope.md).
 
 ## Sources
 

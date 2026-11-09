@@ -57,6 +57,11 @@ anchor build
 anchor test --skip-deploy
 npm --prefix app run typecheck
 npm --prefix app run test:prediction
+npm --prefix app run test:shared
+npm --prefix app run test:wallet
+npm --prefix app run test:rpc-proxy
+npm --prefix app run test:i18n
+npm --prefix app run test:theme
 npm --prefix app run build
 ```
 

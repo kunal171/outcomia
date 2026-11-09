@@ -161,8 +161,10 @@ atomically. A stale client transaction fails safely and can be retried after a
 refresh. The browser walk is O(number of price levels); a production indexer
 can replace it later without changing the program's neighbor-account contract.
 
-The orders page filters program accounts by owner, displays locked collateral,
-and refreshes after confirmation. Cancellation releases locked collateral to
+The Orders page filters shared orders by owner, provides Open/History/All
+views, and refreshes after confirmed cancellation. Legacy order readers mount
+only when their disclosure is opened. Closed-book history stays visible, with
+unavailable spot precision shown as a dash instead of guessed units. Cancellation releases locked collateral to
 the owner's free balance without a token transfer. It fetches the live level,
 supplies the order FIFO neighbors, and, only for a final-order removal, derives
 the better/worse level PDAs and supplies the recorded rent payer. These accounts
@@ -173,8 +175,8 @@ Every privileged action must also be constrained by the Anchor program because
 any client can submit an instruction directly.
 
 The root layout and route pages are Server Components. Wallet Adapter, RPC
-context, browser state, and future transaction signing are isolated behind
-client-component boundaries. Planned routes can therefore share layouts and
+context, browser state, and transaction signing are isolated behind
+client-component boundaries. Routes can therefore share layouts and
 loading/error boundaries without forcing the entire application into the client
 bundle.
 

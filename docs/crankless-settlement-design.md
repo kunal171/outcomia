@@ -2,7 +2,7 @@
 
 ## Status
 
-Status: **In progress.** One instruction atomically settles one partial or full
+Status: **Implemented.** One instruction atomically settles one partial or full
 maker, and the web client plans and batches up to three such instructions in one
 transaction. The planner supports same-level FIFO continuation, multi-level
 traversal, complete rollback if a later step fails, and atomic insertion or
@@ -13,6 +13,11 @@ how that differs from Phoenix and older OpenBook designs, and which accounts a
 matching instruction must read and write. The first implementation slice proves
 maker-price settlement, price-time priority, and safe queue removal.
 
+The account names in this document describe the legacy per-market path.
+The deployed shared path reuses these matching rules with per-asset cash;
+see [shared custody](shared-balances-resolution.md). Typed shared/prediction
+event coverage remains separate from the legacy fill events.
+
 ## The problem in plain language
 
 Suppose Alice has an ask to sell 2 BTC at 100 USDT and Bob submits a bid to buy
@@ -20,10 +25,10 @@ Suppose Alice has an ask to sell 2 BTC at 100 USDT and Bob submits a bid to buy
 
 1. remove 1 BTC from Alice's locked amount;
 2. give Alice a claim to 100 USDT;
-3. remove 100 USDT from Bob's locked amount;
+3. remove 100 USDT from Bob's available amount;
 4. give Bob a claim to 1 BTC;
 5. reduce Alice's resting order from 2 BTC to 1 BTC;
-6. record that Bob's incoming order is filled;
+6. record the fill without creating a resting order for Bob;
 7. update the price level's aggregate quantity.
 
 If only some changes commit, tokens or accounting can be lost. Outcomia must
