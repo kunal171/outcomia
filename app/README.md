@@ -34,7 +34,8 @@ partial RPC failures. Neither test command submits devnet transactions.
 
 The header provides System, Light and Dark modes and English, Hindi, Spanish,
 French and Portuguese. Preferences persist in cookies and are applied during
-server rendering. All pages use the same petrol, ivory and copper palette.
+server rendering. All pages use the same cobalt, soft-white and ink palette. New visitors start
+in Light mode; saved appearance choices are retained.
 
 Translation files are in `i18n/messages/`. Add interface text to all five files;
 `test:i18n` checks coverage and interpolation arguments. Creator-written rules,

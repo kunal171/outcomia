@@ -42,11 +42,12 @@ contracts; contracts in sell orders must be canceled first.
 ## Themes and languages
 
 Display settings in the header contain appearance and language controls.
-Dark mode uses petrol surfaces, sand text and amber accents. Light mode uses
-warm ivory surfaces, petrol text and copper accents. Every page, wallet menu
+Light mode uses soft-white surfaces, ink text and cobalt accents. Dark mode
+uses navy surfaces and pale-blue accents. The landing feature area uses cobalt
+with white headings and a dark primary action, following the supplied reference. Every page, wallet menu
 and help dialog uses the tokens in `app/app/theme.css`.
 
-System mode follows the device color preference. Validated cookies seed the
+New visitors start in Light mode. System mode follows the device color preference. Validated cookies seed the
 server render, so a saved language or theme does not change during hydration.
 Changing either preference keeps the wallet provider and entered amounts mounted.
 Cookies last one year and apply to all routes.

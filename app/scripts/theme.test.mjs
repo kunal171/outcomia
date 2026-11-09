@@ -35,6 +35,8 @@ for (const [name, selector] of [
           surface,
         ]),
       ),
+      ["hero-ink", "hero-background"],
+      ["hero-muted", "hero-background"],
       ["accent-ink", "accent"],
       ["outcome-ink", "buy"],
       ["outcome-ink", "sell"],

@@ -1,4 +1,4 @@
-/* Landing layout and illustration. Shared palette lives in globals.css. */
+/* Landing layout and illustration. Shared palette lives in theme.css. */
 .landing-shell {
   position: relative;
   isolation: isolate;

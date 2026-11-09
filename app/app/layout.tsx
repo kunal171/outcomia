@@ -29,7 +29,7 @@ export default async function RootLayout({
     preferences.get("outcomia_theme")?.value ??
     preferences.get("tidebook_theme")?.value;
   const locale = isLocale(savedLocale) ? savedLocale : "en";
-  const theme = isTheme(savedTheme) ? savedTheme : "system";
+  const theme = isTheme(savedTheme) ? savedTheme : "light";
   return (
     <html lang={locale} data-theme={theme}>
       <body>
