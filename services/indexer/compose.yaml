@@ -7,10 +7,10 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://tidebook:tidebook_dev@postgres:5432/tidebook_indexer
+      DATABASE_URL: postgres://outcomia:outcomia_dev@postgres:5432/outcomia_indexer
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
       SOLANA_WS_URL: ${SOLANA_WS_URL:-wss://api.devnet.solana.com}
-      OUTCOMIA_PROGRAM_ID: ${OUTCOMIA_PROGRAM_ID:-${TIDEBOOK_PROGRAM_ID:-AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL}}
+      OUTCOMIA_PROGRAM_ID: ${OUTCOMIA_PROGRAM_ID:-AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL}
       HEALTH_ADDRESS: 0.0.0.0:8080
     ports:
       - "127.0.0.1:8080:8080"
@@ -22,9 +22,9 @@ services:
   postgres:
     image: postgres:18.6
     environment:
-      POSTGRES_DB: tidebook_indexer
-      POSTGRES_USER: tidebook
-      POSTGRES_PASSWORD: tidebook_dev
+      POSTGRES_DB: outcomia_indexer
+      POSTGRES_USER: outcomia
+      POSTGRES_PASSWORD: outcomia_dev
     ports:
       # Ports 5432 and 5433 are already used by other local PostgreSQL
       # services. Keep Outcomia isolated on loopback port 5434.
@@ -32,7 +32,7 @@ services:
     volumes:
       - outcomia_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tidebook -d tidebook_indexer"]
+      test: ["CMD-SHELL", "pg_isready -U outcomia -d outcomia_indexer"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -40,5 +40,4 @@ services:
 
 volumes:
   outcomia_postgres_data:
-    # Existing Compose volume: preserve stored source history across the rename.
-    name: tidebook-indexer_tidebook_postgres_data
+    name: outcomia-indexer_outcomia_postgres_data
