@@ -1,8 +1,8 @@
 /** Display names supplement addresses; prices always use the market's mint decimals. */
 import type { PublicKey } from "@solana/web3.js";
 import { BN } from "@anchor-lang/core";
-import type { MarketAccount, MarketMetadataAccount } from "./tidebook";
-import { formatAtomicAmount } from "./tidebook";
+import type { MarketAccount, MarketMetadataAccount } from "./outcomia";
+import { formatAtomicAmount } from "./outcomia";
 
 // Valueless test assets recorded in docs/devnet-addresses.md. Do not label an
 // unknown mint BTC/USDT just because somebody chose similar market symbols.

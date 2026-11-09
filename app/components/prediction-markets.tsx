@@ -24,10 +24,10 @@ import {
 } from "../lib/prediction";
 import {
   accountExplorerUrl,
-  getTidebookAccounts,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaReadProgram,
   type MarketMetadataAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 type Record = {
   address: PublicKey;
@@ -42,7 +42,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const { connection } = useConnection();
   const { role, loading: roleLoading } = useProtocolRole();
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const [records, setRecords] = useState<Record[]>([]);
@@ -66,7 +66,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
     );
     async function load() {
       try {
-        const accounts = getTidebookAccounts(program);
+        const accounts = getOutcomiaAccounts(program);
         let markets: Array<{
           publicKey: PublicKey;
           account: PredictionMarketAccount;

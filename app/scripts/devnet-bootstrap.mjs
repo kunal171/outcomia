@@ -31,7 +31,7 @@ if (!walletPath) {
 }
 
 const idl = JSON.parse(
-  await readFile(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  await readFile(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
 );
 const secret = JSON.parse(await readFile(walletPath, "utf8"));
 const payer = Keypair.fromSecretKey(Uint8Array.from(secret));

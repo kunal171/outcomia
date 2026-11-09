@@ -3,14 +3,14 @@ kind: Service
 metadata:
   name: indexer-health
   labels:
-    app.kubernetes.io/name: tidebook-indexer
+    app.kubernetes.io/name: outcomia-indexer
     app.kubernetes.io/component: indexer
-    app.kubernetes.io/part-of: tidebook
+    app.kubernetes.io/part-of: outcomia
 spec:
   type: ClusterIP
 
   selector:
-    app.kubernetes.io/name: tidebook-indexer
+    app.kubernetes.io/name: outcomia-indexer
     app.kubernetes.io/component: indexer
 
   ports:

@@ -1,6 +1,6 @@
-# Tidebook app
+# Outcomia app
 
-Next.js App Router UI for Tidebook's prediction and spot markets. The landing
+Next.js App Router UI for Outcomia's prediction and spot markets. The landing
 page leads with predictions; spot markets and order management remain available.
 
 ## Local setup
@@ -47,7 +47,7 @@ keep exact decimal strings and displayed deadlines remain in UTC. See the
 Use the current devnet program and your own Helius endpoint:
 
 ```dotenv
-NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
+NEXT_PUBLIC_OUTCOMIA_PROGRAM_ID=AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
 HELIUS_RPC_URL=https://devnet.helius-rpc.com
 HELIUS_API_KEY=<your-server-key>
 NEXT_PUBLIC_RPC_PROXY_ENABLED=true
@@ -68,7 +68,7 @@ are never automatically replayed after a network failure. WebSockets use the
 separate public devnet WS URL; Vercel's HTTP route does not host WebSockets.
 `FAUCET_SOLANA_RPC_URL` still overrides the server faucet's RPC.
 
-The RPC route allows the app's methods, restricts program scans to Tidebook,
+The RPC route allows the app's methods, restricts program scans to Outcomia,
 limits request/response sizes and batches, and redacts upstream error URLs.
 Its per-instance rate limit is a soft bound, not a distributed quota. It does
 not replace the durable Redis requirement for public token-faucet claims.
@@ -115,7 +115,7 @@ is a different step. The UI's help dialogs explain this distinction.
 | `/markets/new`                | Choose Spot or Prediction                                                                      |
 | `/markets/new/spot`           | Admin spot-market creation                                                                     |
 | `/predictions/new`            | Admin prediction draft creation and rules upload                                               |
-| `/wallet`                     | Connected wallet SOL, held/deposited Tidebook assets, market balances and prediction positions |
+| `/wallet`                     | Connected wallet SOL, held/deposited Outcomia assets, market balances and prediction positions |
 | `/orders`                     | Shared spot/prediction orders, Open/History filters and optional legacy orders                                                                 |
 | `/admin`                      | Super-admin governance and administrator management                                            |
 
@@ -145,7 +145,7 @@ an external market price. Landing examples are illustrations, not live markets.
 
 ## Wallet overview
 
-`/wallet` shows native SOL and token balances for assets listed in Tidebook
+`/wallet` shows native SOL and token balances for assets listed in Outcomia
 markets. Unrelated wallet tokens are excluded; listed tokens appear before a
 first deposit, and existing deposits stay visible when wallet holdings are zero.
 Amounts are grouped by mint, not symbol, across all owned SPL token accounts.
@@ -209,7 +209,7 @@ it needs fresh devnet mints and funded signer/token accounts. Read
 ## Code and dependencies
 
 Route pages/layouts are Server Components by default. Wallets and transactions
-live in client components. `lib/tidebook.ts` and `lib/prediction.ts` define
+live in client components. `lib/outcomia.ts` and `lib/prediction.ts` define
 accounts and addresses; the matching planners build bounded transaction plans.
 The checked-in IDL must match the deployed program.
 

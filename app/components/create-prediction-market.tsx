@@ -37,12 +37,12 @@ import {
   deriveMarketMetadataPda,
   deriveVaultAuthorityPda,
   deriveVaultPda,
-  getTidebookProgram,
-  getTidebookAccounts,
+  getOutcomiaProgram,
+  getOutcomiaAccounts,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 export function CreatePredictionMarket() {
   const { t } = useI18n();
@@ -56,7 +56,7 @@ export function CreatePredictionMarket() {
   const { role, loading, error: roleError } = useProtocolRole();
   const isAdmin = !loading && (role === "admin" || role === "super-admin");
   const program = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
   const [name, setName] = useState("");
@@ -125,7 +125,7 @@ export function CreatePredictionMarket() {
       validatePredictionCreatorResolver(rules.resolver, wallet.publicKey);
       if (rules.closeTs.lte(new BN(String(Math.floor(Date.now() / 1000)))))
         throw new Error("Trading close time must be in the future");
-      const admin = await getTidebookAccounts(
+      const admin = await getOutcomiaAccounts(
         program,
       ).adminRecord.fetchNullable(deriveAdminRecordPda(wallet.publicKey));
       if (
@@ -424,7 +424,7 @@ export function CreatePredictionMarket() {
                 );
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = "tidebook-rules-upload-receipt.json";
+                link.download = "outcomia-rules-upload-receipt.json";
                 link.click();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}

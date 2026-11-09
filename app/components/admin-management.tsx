@@ -9,11 +9,11 @@ import {
   deriveAdminRecordPda,
   deriveProgramDataAddress,
   deriveProtocolConfigPda,
-  getTidebookAccounts,
-  getTidebookProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
   transactionExplorerUrl,
   type AdminRecordView,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { PROGRAM_ID } from "../lib/solana";
 import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -50,7 +50,7 @@ export function AdminManagement() {
   const [signature, setSignature] = useState<string | null>(null);
 
   const program = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
 
@@ -61,7 +61,7 @@ export function AdminManagement() {
     setError(null);
 
     try {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const [records, protocolConfig] = await Promise.all([
         accounts.adminRecord.all(),
         accounts.protocolConfig.fetchNullable(deriveProtocolConfigPda()),

@@ -23,15 +23,15 @@ import {
   type SharedSnapshot,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
-  getTidebookReadProgram,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   deriveAdminRecordPda,
   deriveProtocolConfigPda,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-  getTidebookAccounts,
-} from "../lib/tidebook";
+  getOutcomiaAccounts,
+} from "../lib/outcomia";
 import { derivePredictionPositionPda } from "../lib/prediction";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -80,7 +80,7 @@ function Market(props: Props) {
     { connection } = useConnection(),
     role = useProtocolRole();
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const [snapshot, setSnapshot] = useState<SharedSnapshot | null>(null),
@@ -125,7 +125,7 @@ function Market(props: Props) {
     setSignature(null);
     setNotice("");
     try {
-      const p = getTidebookProgram(connection, wallet),
+      const p = getOutcomiaProgram(connection, wallet),
         tx = new Transaction();
       if (action === "initialize")
         tx.add(
@@ -203,7 +203,7 @@ function Market(props: Props) {
               wallet.publicKey,
             );
             if (
-              !(await getTidebookAccounts(p).predictionPosition.fetchNullable(
+              !(await getOutcomiaAccounts(p).predictionPosition.fetchNullable(
                 position,
               ))
             )

@@ -11,7 +11,7 @@ import "./theme.css";
 import { SolanaProvider } from "@/components/solana-provider";
 
 export const metadata: Metadata = {
-  title: "Tidebook | Prediction markets on Solana",
+  title: "Outcomia | Prediction markets on Solana",
   description:
     "Explore YES/NO prediction markets on Solana, with limit orders and transparent market rules. Spot trading also available.",
 };
@@ -22,8 +22,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const preferences = await cookies();
-  const savedLocale = preferences.get("tidebook_locale")?.value;
-  const savedTheme = preferences.get("tidebook_theme")?.value;
+  const savedLocale =
+    preferences.get("outcomia_locale")?.value ??
+    preferences.get("tidebook_locale")?.value;
+  const savedTheme =
+    preferences.get("outcomia_theme")?.value ??
+    preferences.get("tidebook_theme")?.value;
   const locale = isLocale(savedLocale) ? savedLocale : "en";
   const theme = isTheme(savedTheme) ? savedTheme : "system";
   return (

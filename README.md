@@ -1,7 +1,7 @@
-# Tidebook
+# Outcomia
 
 Prediction markets on Solana, with YES/NO order books and one collateral asset
-per market. Tidebook also supports spot trading and includes a Rust indexer
+per market. Outcomia also supports spot trading and includes a Rust indexer
 that stores finalized transactions in PostgreSQL.
 
 This is a devnet research project. Shared asset balances, prediction trading,
@@ -28,7 +28,10 @@ new custody model, legacy recovery and rollout checks.
   durable checkpoints and PostgreSQL storage.
 
 Prediction trades settle internal balances immediately. Determining the final
-YES/NO outcome and paying winning positions are separate, unfinished steps.
+YES/NO outcome and paying winning positions are separate, implemented lifecycle steps.
+See the [rename compatibility notes](docs/rebranding.md) for existing environment
+variables, database identities and deployment keys.
+
 The indexer retains source transactions; it does not yet provide prediction
 trade projections or a public query API.
 
@@ -78,7 +81,7 @@ workaround are in the [deployment guide](docs/deployment.md).
 
 | Directory                                        | Contents                                                    |
 | ------------------------------------------------ | ----------------------------------------------------------- |
-| [`programs/tidebook`](programs/tidebook)         | Anchor program and LiteSVM tests                            |
+| [`programs/outcomia`](programs/outcomia)         | Anchor program and LiteSVM tests                            |
 | [`app`](app/README.md)                           | Next.js UI, wallet flows and transaction builders           |
 | [`services/indexer`](services/indexer/README.md) | Separate Rust workspace for ingestion and storage           |
 | [`docs`](docs/README.md)                         | Architecture, design decisions, diagrams and test addresses |

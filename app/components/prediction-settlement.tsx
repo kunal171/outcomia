@@ -17,14 +17,14 @@ import {
   variant,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
-  getTidebookReadProgram,
-  getTidebookAccounts,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
+  getOutcomiaAccounts,
   deriveAdminRecordPda,
   deriveVaultAuthorityPda,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import {
   derivePredictionPositionPda,
   predictionStatus,
@@ -70,7 +70,7 @@ function Settlement({
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     role = useProtocolRole();
-  const p = useMemo(() => getTidebookReadProgram(connection), [connection]);
+  const p = useMemo(() => getOutcomiaReadProgram(connection), [connection]);
   const [position, setPosition] = useState<PredictionPositionAccount | null>(
       null,
     ),
@@ -86,7 +86,7 @@ function Settlement({
     let dead = false;
     if (wallet && (view === "position" || view === "all")) {
       setPositionLoaded(false);
-      void getTidebookAccounts(p)
+      void getOutcomiaAccounts(p)
         .predictionPosition.fetchNullable(
           derivePredictionPositionPda(address, wallet.publicKey),
         )
@@ -142,7 +142,7 @@ function Settlement({
     setIssue(null);
     setSignature(null);
     try {
-      const signed = getTidebookProgram(connection, wallet),
+      const signed = getOutcomiaProgram(connection, wallet),
         tx = new Transaction();
       if (action === "propose") {
         if (!hash) throw new Error("Choose the exact evidence file to hash");

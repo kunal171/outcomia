@@ -8,7 +8,7 @@ transaction. The planner supports same-level FIFO continuation, multi-level
 traversal, complete rollback if a later step fails, and atomic insertion or
 append of a valid non-crossing remainder.
 
-This document explains why Tidebook is targeting bounded crankless settlement,
+This document explains why Outcomia is targeting bounded crankless settlement,
 how that differs from Phoenix and older OpenBook designs, and which accounts a
 matching instruction must read and write. The first implementation slice proves
 maker-price settlement, price-time priority, and safe queue removal.
@@ -26,7 +26,7 @@ Suppose Alice has an ask to sell 2 BTC at 100 USDT and Bob submits a bid to buy
 6. record that Bob's incoming order is filled;
 7. update the price level's aggregate quantity.
 
-If only some changes commit, tokens or accounting can be lost. Tidebook must
+If only some changes commit, tokens or accounting can be lost. Outcomia must
 therefore make the book mutation and balance mutation in one Solana transaction.
 On failure, the entire transaction rolls back.
 
@@ -37,7 +37,7 @@ account.
 
 ## What "settlement" means
 
-Tidebook distinguishes two operations:
+Outcomia distinguishes two operations:
 
 - **ledger settlement** changes who owns the claim to tokens already held in
   the market vaults;
@@ -96,15 +96,15 @@ accounts, but correct and timely maker accounting depends on event consumption.
 It also introduces queue capacity, crank incentives, monitoring, and recovery
 as protocol concerns.
 
-## Tidebook decision: bounded crankless PDA matching
+## Outcomia decision: bounded crankless PDA matching
 
-Tidebook will keep its educational PDA-based order book instead of immediately
+Outcomia will keep its educational PDA-based order book instead of immediately
 adopting Phoenix's fixed slab. It will add canonical per-trader balance PDAs and
 require the client to supply a bounded matching path.
 
 This is Phoenix-like in settlement semantics but not in storage layout:
 
-| Concern | Phoenix | Tidebook target |
+| Concern | Phoenix | Outcomia target |
 | --- | --- | --- |
 | Book storage | Trees inside one market account | Price-level and order PDAs |
 | Trader balances | Entries inside the market account | One PDA per market and trader |
@@ -334,7 +334,7 @@ a balance claim.
 
 ## Events and indexers
 
-Tidebook emits typed events for governance, market lifecycle, trader-ledger,
+Outcomia emits typed events for governance, market lifecycle, trader-ledger,
 order-lifecycle, and fill transitions. These events support history and UI
 indexing but do not authorize or complete a balance transition. If an indexer
 is offline, the on-chain order book and trader balances remain correct and
@@ -368,7 +368,7 @@ settlement work.
 15. Only the super-admin can withdraw accrued fees, and only to a token account
     for the market quote mint. Withdrawal is allowed while active or paused.
 
-## Tradeoffs accepted by Tidebook
+## Tradeoffs accepted by Outcomia
 
 ### Benefits
 

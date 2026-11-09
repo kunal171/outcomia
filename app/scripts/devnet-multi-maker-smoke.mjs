@@ -64,7 +64,7 @@ const secondMakerBaseToken = new PublicKey(required("MAKER_TWO_BASE_TOKEN"));
 const takerQuoteToken = new PublicKey(required("TAKER_QUOTE_TOKEN"));
 
 const idl = JSON.parse(
-  await readFile(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  await readFile(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
 );
 const connection = new Connection(RPC_URL, "confirmed");
 const deployerProgram = programFor(idl, connection, deployer);

@@ -46,11 +46,11 @@ export function PreferencesProvider({
   }, []);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.cookie = `tidebook_locale=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.cookie = `outcomia_locale=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [locale]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.cookie = `tidebook_theme=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.cookie = `outcomia_theme=${theme}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [theme]);
   const t = useCallback(
     (

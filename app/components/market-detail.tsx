@@ -41,9 +41,9 @@ import {
   findOwnedTokenAccount,
   fetchLatestTrade,
   fetchPriceLevelSide,
-  getTidebookAccounts,
-  getTidebookProgram,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   parseTokenAmount,
   transactionExplorerUrl,
   deriveVaultPda,
@@ -56,7 +56,7 @@ import {
   type TestFaucetAccount,
   type OrderSide,
   type TraderBalanceAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import {
   MAX_MATCHES_PER_TRANSACTION,
   planBoundedMatches,
@@ -162,11 +162,11 @@ export function MarketDetail({ address }: { address: string }) {
   }, [address]);
 
   const readProgram = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const signedProgram = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
   const traderBalanceAddress = useMemo(
@@ -200,7 +200,7 @@ export function MarketDetail({ address }: { address: string }) {
     setError(null);
 
     try {
-      const accounts = getTidebookAccounts(readProgram);
+      const accounts = getOutcomiaAccounts(readProgram);
       const [account, fees, faucet, metadata] = await Promise.all([
         accounts.market.fetchNullable(marketAddress),
         accounts.marketFees.fetchNullable(deriveMarketFeesPda(marketAddress)),
@@ -283,7 +283,7 @@ export function MarketDetail({ address }: { address: string }) {
     setBalanceError(null);
     try {
       const [account, baseBalance, quoteBalance] = await Promise.all([
-        getTidebookAccounts(readProgram).traderBalance.fetchNullable(
+        getOutcomiaAccounts(readProgram).traderBalance.fetchNullable(
           traderBalanceAddress,
         ),
         getOwnedTokenBalance(connection, wallet.publicKey, market.baseMint),
@@ -589,7 +589,7 @@ export function MarketDetail({ address }: { address: string }) {
       );
 
       if (crossesBest && opposingBest) {
-        const protocolConfig = await getTidebookAccounts(
+        const protocolConfig = await getOutcomiaAccounts(
           readProgram,
         ).protocolConfig.fetchNullable(deriveProtocolConfigPda());
         if (!protocolConfig) {
@@ -701,7 +701,7 @@ export function MarketDetail({ address }: { address: string }) {
           postedOrder = placement.order;
         }
 
-        // getTidebookProgram always constructs an AnchorProvider. The explicit
+        // getOutcomiaProgram always constructs an AnchorProvider. The explicit
         // type communicates that this write path requires wallet signing, while
         // the read-only program elsewhere only exposes a generic Provider.
         const provider = signedProgram.provider as AnchorProvider;
@@ -1669,7 +1669,7 @@ export function MarketDetail({ address }: { address: string }) {
                   <h2>{t("Enable public test minting")}</h2>
                   <p>
                     {t(
-                      "This permanently transfers both mint authorities to Tidebook. Enable it only for fresh, zero-supply tokens with no economic value.",
+                      "This permanently transfers both mint authorities to Outcomia. Enable it only for fresh, zero-supply tokens with no economic value.",
                     )}
                   </p>
                   <form

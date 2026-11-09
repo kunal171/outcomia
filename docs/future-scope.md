@@ -1,6 +1,6 @@
 # Prediction platform: future scope
 
-This document records the agreed direction for Tidebook. These are planned
+This document records the agreed direction for Outcomia. These are planned
 features, not a list of what is available today. Each milestone needs its own
 design, implementation, tests and UI before it is considered complete.
 
@@ -9,7 +9,7 @@ order book, public and invite-only markets, permanent clubs and governance.
 
 ## Current foundation
 
-Tidebook already has binary YES/NO markets, on-chain limit orders, price-time
+Outcomia already has binary YES/NO markets, on-chain limit orders, price-time
 priority, partial fills, cancellation and atomic settlement. Outcome positions
 are backed by one collateral asset per market. Complete pairs can be created
 and merged; final resolution permits redemption into the shared asset wallet.

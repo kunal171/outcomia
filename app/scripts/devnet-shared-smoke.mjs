@@ -69,7 +69,7 @@ if (
   );
 const connection = new Connection(rpc.toString(), "confirmed");
 const idl = JSON.parse(
-  fs.readFileSync(path.join(root, "app/idl/tidebook.json"), "utf8"),
+  fs.readFileSync(path.join(root, "app/idl/outcomia.json"), "utf8"),
 );
 const payer = Keypair.fromSecretKey(
   Uint8Array.from(
@@ -130,7 +130,7 @@ runInNewContext(
     require: (name) =>
       name === "./solana"
         ? { PROGRAM_ID: id }
-        : name === "./tidebook"
+        : name === "./outcomia"
           ? { deriveProtocolConfigPda: () => pda("protocol_config") }
           : name === "./prediction"
             ? {

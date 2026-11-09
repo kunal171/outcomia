@@ -14,7 +14,7 @@ import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { AppHeader } from "./app-header";
-import { accountExplorerUrl, TOKEN_PROGRAM_ID } from "../lib/tidebook";
+import { accountExplorerUrl, TOKEN_PROGRAM_ID } from "../lib/outcomia";
 import { marketLabels, readableAmount } from "../lib/market-display";
 import { rpcErrorMessage } from "../lib/rpc-transport";
 import {
@@ -213,7 +213,7 @@ export function WalletWorkspace() {
                 </strong>
               </article>
               <article>
-                <span className="card-label">{t("Tidebook accounts")}</span>
+                <span className="card-label">{t("Outcomia accounts")}</span>
                 <strong>
                   {marketCount ?? "—"} <small>{t("markets")}</small>
                 </strong>
@@ -241,7 +241,7 @@ export function WalletWorkspace() {
                   result={data.tokens}
                 />
                 <ReadError
-                  label={t("Tidebook asset listings")}
+                  label={t("Outcomia asset listings")}
                   result={data.catalog}
                 />
                 {data.shared && (
@@ -261,14 +261,14 @@ export function WalletWorkspace() {
             >
               <div className="wallet-section-heading">
                 <div>
-                  <h2 id="wallet-assets-title">{t("Your Tidebook assets")}</h2>
+                  <h2 id="wallet-assets-title">{t("Your Outcomia assets")}</h2>
                 </div>
                 <Link className="text-button" href="/orders">
                   {t("Manage spot orders →")}
                 </Link>
               </div>
               <p className="wallet-muted">
-                {t("Tidebook assets only. Outcome contracts appear below.")}
+                {t("Outcomia assets only. Outcome contracts appear below.")}
               </p>
               <div className="wallet-asset-controls">
                 <label className="wallet-search-label">
@@ -292,14 +292,14 @@ export function WalletWorkspace() {
               {data?.catalog.error && (
                 <p className="wallet-incomplete" role="status">
                   {t(
-                    "Market listings could not be fully checked. Only assets verified through your existing Tidebook accounts are shown.",
+                    "Market listings could not be fully checked. Only assets verified through your existing Outcomia accounts are shown.",
                   )}
                 </p>
               )}
               {data && !depositsComplete && (
                 <p className="wallet-incomplete" role="status">
                   {t(
-                    "Some market balances or token units are unavailable. Tidebook totals are hidden until all market balances can be read.",
+                    "Some market balances or token units are unavailable. Outcomia totals are hidden until all market balances can be read.",
                   )}
                 </p>
               )}
@@ -314,7 +314,7 @@ export function WalletWorkspace() {
                   {query
                     ? t("No assets match your search.")
                     : t(
-                        "No held or deposited Tidebook assets to show. Turn off “Hide empty assets” to include empty listed token accounts.",
+                        "No held or deposited Outcomia assets to show. Turn off “Hide empty assets” to include empty listed token accounts.",
                       )}
                 </p>
               ) : (
@@ -329,9 +329,9 @@ export function WalletWorkspace() {
                       <tr>
                         <th scope="col">{t("Asset / mint")}</th>
                         <th scope="col">{t("In wallet")}</th>
-                        <th scope="col">{t("Tidebook available")}</th>
+                        <th scope="col">{t("Outcomia available")}</th>
                         <th scope="col">{t("In orders")}</th>
-                        <th scope="col">{t("Tidebook total")}</th>
+                        <th scope="col">{t("Outcomia total")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -414,7 +414,7 @@ export function WalletWorkspace() {
                   </>
                 )}
                 {t(
-                  "Amounts are token units, not a combined dollar value. Tidebook total = available + in orders; it excludes outcome contracts and collateral backing them. Wallet balances include any frozen tokens.",
+                  "Amounts are token units, not a combined dollar value. Outcomia total = available + in orders; it excludes outcome contracts and collateral backing them. Wallet balances include any frozen tokens.",
                 )}
               </p>
             </section>

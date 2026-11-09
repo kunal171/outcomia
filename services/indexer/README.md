@@ -1,6 +1,6 @@
-# Tidebook indexer
+# Outcomia indexer
 
-Rust service that stores finalized Tidebook transactions and decoded Anchor
+Rust service that stores finalized Outcomia transactions and decoded Anchor
 events in PostgreSQL. It backfills history, resumes from durable checkpoints
 and recovers missed transactions when the live subscription reconnects.
 
@@ -11,7 +11,7 @@ without forcing the Anchor program and LiteSVM onto the same versions.
 
 The decoder supports the 21 event types in `src/decoder.rs`: governance, market
 metadata, spot orders/fills, balances, fees and the test faucet. It accepts
-`Program data:` only while Tidebook is the active invocation.
+`Program data:` only while Outcomia is the active invocation.
 
 Prediction instructions currently emit no prediction-specific events. Shared
 metadata events can be decoded, and source transactions are retained, but this
@@ -59,6 +59,9 @@ cargo run --manifest-path services/indexer/Cargo.toml
 Stop an existing Compose indexer before using the host process; both would
 otherwise compete for port `8080` and write the same checkpoints. Run one
 indexer per program/database configuration.
+
+Compose retains the pre-rename database/user/volume to preserve existing history.
+See [rename notes](../../docs/rebranding.md) before switching existing workloads.
 
 The database is exposed on loopback port `5434`; containers use `postgres:5432`.
 `DATABASE_URL` is required. RPC, WebSocket and program settings default to devnet

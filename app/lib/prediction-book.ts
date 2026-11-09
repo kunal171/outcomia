@@ -8,7 +8,7 @@ import {
   type PredictionOutcome,
   type PredictionPriceLevelAccount,
 } from "./prediction";
-import { type OrderSide } from "./tidebook";
+import { type OrderSide } from "./outcomia";
 
 export const PREDICTION_DEPTH_LIMIT = 20;
 export interface PredictionDepth {

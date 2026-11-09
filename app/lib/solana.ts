@@ -29,10 +29,13 @@ export const RPC_ENDPOINTS = [
   ]),
 ];
 
-const configuredProgramId = process.env.NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID;
+// Keep existing deployments configured while new installs use the Outcomia name.
+const configuredProgramId =
+  process.env.NEXT_PUBLIC_OUTCOMIA_PROGRAM_ID ??
+  process.env.NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID;
 
 if (!configuredProgramId) {
-  throw new Error("NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID is not configured");
+  throw new Error("NEXT_PUBLIC_OUTCOMIA_PROGRAM_ID is not configured");
 }
 
 export const PROGRAM_ID = new PublicKey(configuredProgramId);

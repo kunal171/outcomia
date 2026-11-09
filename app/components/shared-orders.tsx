@@ -17,12 +17,12 @@ import {
   type SharedSnapshot,
 } from "../lib/shared";
 import {
-  getTidebookReadProgram,
-  getTidebookProgram,
-  getTidebookAccounts,
+  getOutcomiaReadProgram,
+  getOutcomiaProgram,
+  getOutcomiaAccounts,
   deriveMarketMetadataPda,
   type MarketMetadataAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { readableAmount } from "../lib/market-display";
 export function SharedOrders() {
   const wallet = useAnchorWallet(),
@@ -37,7 +37,7 @@ function OwnerOrders() {
 
   const wallet = useAnchorWallet()!,
     { connection } = useConnection(),
-    p = useMemo(() => getTidebookReadProgram(connection), [connection]);
+    p = useMemo(() => getOutcomiaReadProgram(connection), [connection]);
   const [rows, setRows] = useState<
       Array<{
         address: PublicKey;
@@ -80,7 +80,7 @@ function OwnerOrders() {
           )
             throw new Error("Open order is missing its shared book");
         }
-        const metadata = await getTidebookAccounts(
+        const metadata = await getOutcomiaAccounts(
           p,
         ).marketMetadata.fetchNullable(deriveMarketMetadataPda(market));
         contexts.set(market.toBase58(), { book, metadata });
@@ -117,7 +117,7 @@ function OwnerOrders() {
     setBusy(true);
     setIssue(null);
     try {
-      const signed = getTidebookProgram(connection, wallet),
+      const signed = getOutcomiaProgram(connection, wallet),
         current = await readSharedBook(signed, market);
       if (!current) throw new Error("Book unavailable");
       await (signed.provider as AnchorProvider).sendAndConfirm(

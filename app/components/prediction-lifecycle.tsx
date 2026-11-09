@@ -12,11 +12,11 @@ import {
   type PredictionMarketAccount,
 } from "../lib/prediction";
 import {
-  getTidebookAccounts,
+  getOutcomiaAccounts,
   deriveAdminRecordPda,
-  getTidebookProgram,
+  getOutcomiaProgram,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { useProtocolRole } from "./protocol-role-provider";
 
 interface Props {
@@ -54,7 +54,7 @@ function ConnectedLifecycle({
 
   const { connection } = useConnection();
   const program = useMemo(
-    () => getTidebookProgram(connection, wallet),
+    () => getOutcomiaProgram(connection, wallet),
     [connection, wallet],
   );
   const [pending, setPending] = useState(false);
@@ -88,7 +88,7 @@ function ConnectedLifecycle({
     try {
       // A displayed draft may have expired or opened elsewhere. Re-read before
       // asking for a signature, then let the instruction check again atomically.
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const latest = await accounts.predictionMarket.fetchNullable(address);
       if (!latest) throw new Error("Prediction market was not found");
       const problem = predictionOpeningIssue(

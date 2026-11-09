@@ -14,13 +14,13 @@ import {
   derivePriceLevelPda,
   deriveTraderBalancePda,
   deriveMarketMetadataPda,
-  getTidebookAccounts,
-  getTidebookProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
   transactionExplorerUrl,
   type OrderView,
   type MarketAccount,
   type MarketMetadataAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { marketLabels, readableAmount } from "../lib/market-display";
 import { rpcErrorMessage } from "../lib/rpc-transport";
@@ -89,7 +89,7 @@ function LegacyOrders() {
   const [signature, setSignature] = useState<string | null>(null);
 
   const program = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
 
@@ -104,7 +104,7 @@ function LegacyOrders() {
     setError(null);
 
     try {
-      const records = await getTidebookAccounts(program).order.all([
+      const records = await getOutcomiaAccounts(program).order.all([
         {
           memcmp: {
             offset: 8,
@@ -191,7 +191,7 @@ function LegacyOrders() {
     setSignature(null);
 
     try {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const priceLevel = await accounts.priceLevel.fetchNullable(
         order.priceLevel,
       );

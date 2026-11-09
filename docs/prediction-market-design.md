@@ -8,7 +8,7 @@ See [shared balances and settlement](shared-balances-resolution.md) for the
 current path and deployment checklist. The implementation sequence below also
 records earlier design decisions; it is not a deployment log.
 
-The first implementation is in `programs/tidebook/src/state/prediction.rs`:
+The first implementation is in `programs/outcomia/src/state/prediction.rs`:
 outcome, resolution, lifecycle and resolver-phase enums, plus `PredictionMarket`
 and `PredictionPosition`. PDA helpers live in `src/pda.rs`. Existing spot
 account layouts are unchanged.
@@ -26,7 +26,7 @@ not Rust in-memory struct sizes. Creation enforces URI bounds and configuration
 rules; future handlers will enforce lifecycle transitions. `InitSpace` only
 calculates allocation.
 
-`programs/tidebook/src/prediction_config.rs` validates proposed creation terms
+`programs/outcomia/src/prediction_config.rs` validates proposed creation terms
 without account allocation or network access. It requires a future close time,
 ordered optional resolution windows, nonzero resolver keys, a distinct fallback
 resolver, positive representable delay, and timestamp arithmetic without overflow.
@@ -43,7 +43,7 @@ admin role, SPL mint, vault authority and canonical account addresses. Proposal
 instructions must repeat checked timestamp arithmetic at the actual proposal
 time, especially when a resolver window has no deadline.
 
-This design adds binary prediction markets to Tidebook without creating YES and
+This design adds binary prediction markets to Outcomia without creating YES and
 NO SPL tokens. A market uses one collateral mint, such as test USDC. YES and NO
 are internal positions recorded by the program.
 
@@ -80,17 +80,17 @@ YES bid at 0.60 = implied NO ask at 0.40
 NO bid at 0.35  = implied YES ask at 0.65
 ```
 
-This is useful for a compact UI. It does not mean Tidebook should immediately
-copy Kalshi's bid-only matching model. Tidebook already has explicit bid and ask
+This is useful for a compact UI. It does not mean Outcomia should immediately
+copy Kalshi's bid-only matching model. Outcomia already has explicit bid and ask
 queues, and keeping them explicit makes collateral checks easier to audit.
 
-### Tidebook's choice
+### Outcomia's choice
 
-Tidebook will use Polymarket-style complete-set accounting with internal
-positions, explicit bid and ask books, and Tidebook's existing bounded on-chain
+Outcomia will use Polymarket-style complete-set accounting with internal
+positions, explicit bid and ask books, and Outcomia's existing bounded on-chain
 FIFO matching.
 
-| Area | Tidebook decision |
+| Area | Outcomia decision |
 | --- | --- |
 | Collateral | One SPL mint and one program vault per prediction market |
 | Outcomes | Internal `Yes` and `No` balances; no outcome token mints |

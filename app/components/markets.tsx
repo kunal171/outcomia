@@ -15,11 +15,11 @@ import {
   accountExplorerUrl,
   decodeMarketKind,
   decodeMarketStatus,
-  getTidebookAccounts,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaReadProgram,
   type MarketMetadataAccount,
   type MarketView,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { marketLabels, readableAmount } from "../lib/market-display";
 import { rpcErrorMessage } from "../lib/rpc-transport";
@@ -48,7 +48,7 @@ export function Markets() {
   const [labelNotice, setLabelNotice] = useState<string | null>(null);
 
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
 
@@ -58,7 +58,7 @@ export function Markets() {
     setLabelNotice(null);
 
     try {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const [marketRead, metadataRead, sharedRead] = await Promise.allSettled([
         accounts.market.all(),
         accounts.marketMetadata.all(),

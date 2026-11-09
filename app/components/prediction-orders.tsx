@@ -12,8 +12,8 @@ import {
 import {
   accountExplorerUrl,
   formatAtomicAmount,
-  getTidebookAccounts,
-} from "../lib/tidebook";
+  getOutcomiaAccounts,
+} from "../lib/outcomia";
 
 interface Props {
   program: Program;
@@ -52,7 +52,7 @@ export function PredictionOrders({
     setError(null);
     // Borsh stores the discriminator (8 bytes), owner (32), then market (32).
     // Filter on both fixed fields so RPC returns only this wallet/market pair.
-    getTidebookAccounts(program)
+    getOutcomiaAccounts(program)
       .predictionOrder.all([
         { memcmp: { offset: 8, bytes: owner.toBase58() } },
         { memcmp: { offset: 40, bytes: market.toBase58() } },
@@ -89,7 +89,7 @@ export function PredictionOrders({
       setPending(true);
       setError(null);
       try {
-        const reader = getTidebookAccounts(program);
+        const reader = getOutcomiaAccounts(program);
         const accounts = await readPredictionCancellationAccounts(
           reader,
           market,

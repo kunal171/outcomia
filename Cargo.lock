@@ -1927,6 +1927,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
+name = "outcomia"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "base64 0.22.1",
+ "litesvm",
+ "solana-account",
+ "solana-keypair",
+ "solana-loader-v3-interface 8.0.1",
+ "solana-message",
+ "solana-signer",
+ "solana-transaction",
+ "wincode",
+]
+
+[[package]]
 name = "pairing"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4330,23 +4347,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
-]
-
-[[package]]
-name = "tidebook"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "base64 0.22.1",
- "litesvm",
- "solana-account",
- "solana-keypair",
- "solana-loader-v3-interface 8.0.1",
- "solana-message",
- "solana-signer",
- "solana-transaction",
- "wincode",
 ]
 
 [[package]]

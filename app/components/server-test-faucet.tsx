@@ -6,7 +6,7 @@ import { BN } from "@anchor-lang/core";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 
-import { formatAtomicAmount, transactionExplorerUrl } from "../lib/tidebook";
+import { formatAtomicAmount, transactionExplorerUrl } from "../lib/outcomia";
 
 type FaucetConfiguration = {
   enabled: boolean;

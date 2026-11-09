@@ -30,15 +30,15 @@ import {
 import {
   accountExplorerUrl,
   formatAtomicAmount,
-  getTidebookAccounts,
-  getTidebookProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
   getOwnedTokenBalance,
   findOwnedTokenAccount,
   deriveVaultAuthorityPda,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 interface PositionProps {
   market: PublicKey;
@@ -115,7 +115,7 @@ function ConnectedPosition({
 
   const { connection } = useConnection();
   const program = useMemo(
-    () => getTidebookProgram(connection, wallet),
+    () => getOutcomiaProgram(connection, wallet),
     [connection, wallet],
   );
   const positionAddress = useMemo(
@@ -169,7 +169,7 @@ function ConnectedPosition({
     setError(null);
     async function load() {
       try {
-        const accounts = getTidebookAccounts(program);
+        const accounts = getOutcomiaAccounts(program);
         const [ledger, terms] = await Promise.all([
           accounts.predictionPosition.fetchNullable(positionAddress),
           accounts.predictionMarket.fetchNullable(market),

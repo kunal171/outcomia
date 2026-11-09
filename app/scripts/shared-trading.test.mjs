@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url),
   { BN, Program } = require("@anchor-lang/core"),
   { PublicKey, Connection, Transaction } = require("@solana/web3.js");
 const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   ),
   programId = new PublicKey(idl.address),
   p = new Program(idl, { connection: new Connection("http://127.0.0.1:8899") });
@@ -34,7 +34,7 @@ runInNewContext(
     require: (name) =>
       name === "./solana"
         ? { PROGRAM_ID: programId }
-        : name === "./tidebook"
+        : name === "./outcomia"
           ? { deriveProtocolConfigPda: () => derive("protocol_config") }
           : name === "./prediction"
             ? {

@@ -110,7 +110,7 @@ export async function uploadArweaveRules(
     dataItemOpts: {
       tags: [
         { name: "Content-Type", value: "application/json" },
-        { name: "App-Name", value: "Tidebook" },
+        { name: "App-Name", value: "Outcomia" },
         { name: "Document-Type", value: "Prediction-Market-Rules" },
         { name: "Schema-Version", value: "1" },
       ],

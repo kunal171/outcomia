@@ -18,13 +18,13 @@ import {
   type AssetBalance,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
+  getOutcomiaProgram,
   accountExplorerUrl,
-  getTidebookReadProgram,
+  getOutcomiaReadProgram,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { readableAmount } from "../lib/market-display";
 
 export function SharedAssetFunds(props: {
@@ -68,7 +68,7 @@ function Funds({
     [signature, setSignature] = useState<string | null>(null),
     [revision, setRevision] = useState(0);
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   useEffect(() => {
@@ -95,7 +95,7 @@ function Funds({
     setIssue(null);
     setSignature(null);
     try {
-      const p = getTidebookProgram(connection, wallet),
+      const p = getOutcomiaProgram(connection, wallet),
         tx = new Transaction(),
         custody = assetCustody(wallet.publicKey, mint);
       if (!balance)

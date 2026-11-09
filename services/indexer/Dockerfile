@@ -21,12 +21,12 @@ RUN apt-get update \
         --system \
         --uid 10001 \
         --create-home \
-        --home-dir /home/tidebook \
-        tidebook
+        --home-dir /home/outcomia \
+        outcomia
 
 COPY --from=builder \
-    /build/target/release/tidebook-indexer \
-    /usr/local/bin/tidebook-indexer
+    /build/target/release/outcomia-indexer \
+    /usr/local/bin/outcomia-indexer
 
 ENV HEALTH_ADDRESS=0.0.0.0:8080
 
@@ -36,4 +36,4 @@ USER 10001
 
 STOPSIGNAL SIGTERM
 
-ENTRYPOINT ["/usr/local/bin/tidebook-indexer"]
+ENTRYPOINT ["/usr/local/bin/outcomia-indexer"]

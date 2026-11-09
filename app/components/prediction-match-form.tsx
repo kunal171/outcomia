@@ -22,10 +22,10 @@ import {
   deriveMarketFeesPda,
   deriveProtocolConfigPda,
   formatAtomicAmount,
-  getTidebookAccounts,
+  getOutcomiaAccounts,
   parseTokenAmount,
   type OrderSide,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 interface Props {
   program: Program;
@@ -76,7 +76,7 @@ export function PredictionMatchForm({
       throw new Error("Enter a positive whole contract quantity");
     const rawQuantity = new BN(quantity.trim());
     const limit = parseTokenAmount(price, decimals, "Limit price");
-    const accounts = getTidebookAccounts(program);
+    const accounts = getOutcomiaAccounts(program);
     const [book, config, terms, position, fees] = await Promise.all([
       accounts.predictionOrderBook.fetchNullable(
         derivePredictionBookPda(market),

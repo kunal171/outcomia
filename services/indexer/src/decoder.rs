@@ -1,4 +1,4 @@
-//! Deterministic decoding of Anchor event payloads emitted by Tidebook.
+//! Deterministic decoding of Anchor event payloads emitted by Outcomia.
 //!
 //! This catalog supports the event definitions listed below, not every program
 //! account or instruction type. Prediction instructions currently emit no
@@ -69,7 +69,7 @@ pub struct DecodedEventEnvelope {
     pub body: Vec<u8>,
 }
 
-/// A successfully identified and Borsh-decoded Tidebook event.
+/// A successfully identified and Borsh-decoded Outcomia event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DecodedEventLog {
     /// Position in the original transaction logs and stable event identity.
@@ -79,13 +79,13 @@ pub struct DecodedEventLog {
     pub payload_base64: String,
 
     /// Strictly decoded event from the current supported schema catalog.
-    pub event: TidebookEvent,
+    pub event: OutcomiaEvent,
 }
 
 /// Top-level event families mirror protocol domains rather than flattening all
 /// event names into one growing enum.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub enum TidebookEvent {
+pub enum OutcomiaEvent {
     Governance(GovernanceEvent),
     Market(MarketEvent),
     Order(OrderEvent),
@@ -158,7 +158,7 @@ pub enum EventDecodeError {
     )]
     MissingDiscriminator { decoded_len: usize },
 
-    #[error("unknown Tidebook event discriminator: {0:?}")]
+    #[error("unknown Outcomia event discriminator: {0:?}")]
     UnknownDiscriminator([u8; EVENT_DISCRIMINATOR_BYTES]),
 
     #[error("invalid {event_name} body: {message}")]
@@ -232,12 +232,12 @@ fn decode_body<T: BorshDeserialize>(
     })
 }
 
-/// Routes one extracted program-data log to its exact Tidebook event type.
+/// Routes one extracted program-data log to its exact Outcomia event type.
 /// Unknown discriminators are errors so a future checkpoint cannot advance
 /// past an event that was never represented in the indexed state.
 ///
 /// # Inputs
-/// A RawEventLog emitted while Tidebook is the active invocation.
+/// A RawEventLog emitted while Outcomia is the active invocation.
 ///
 /// # Errors
 /// Envelope failures, unknown discriminator or invalid known body; callers must not checkpoint past
@@ -249,105 +249,105 @@ pub fn decode_event(raw_event: &RawEventLog) -> Result<DecodedEventLog, EventDec
     let envelope = decode_envelope(raw_event)?;
 
     let event = match envelope.discriminator {
-        MARKET_INITIALIZED_DISCRIMINATOR => TidebookEvent::Market(MarketEvent::Initialized(
+        MARKET_INITIALIZED_DISCRIMINATOR => OutcomiaEvent::Market(MarketEvent::Initialized(
             decode_body(&envelope.body, "MarketInitializedEvent")?,
         )),
 
-        MARKET_STATUS_CHANGED_DISCRIMINATOR => TidebookEvent::Market(MarketEvent::StatusChanged(
+        MARKET_STATUS_CHANGED_DISCRIMINATOR => OutcomiaEvent::Market(MarketEvent::StatusChanged(
             decode_body(&envelope.body, "MarketStatusChangedEvent")?,
         )),
 
-        MARKET_CLOSED_DISCRIMINATOR => TidebookEvent::Market(MarketEvent::Closed(decode_body(
+        MARKET_CLOSED_DISCRIMINATOR => OutcomiaEvent::Market(MarketEvent::Closed(decode_body(
             &envelope.body,
             "MarketClosedEvent",
         )?)),
 
         MARKET_METADATA_INITIALIZED_DISCRIMINATOR => {
-            TidebookEvent::Market(MarketEvent::MetadataInitialized(decode_body(
+            OutcomiaEvent::Market(MarketEvent::MetadataInitialized(decode_body(
                 &envelope.body,
                 "MarketMetadataInitializedEvent",
             )?))
         }
 
         MARKET_METADATA_UPDATED_DISCRIMINATOR => {
-            TidebookEvent::Market(MarketEvent::MetadataUpdated(decode_body(
+            OutcomiaEvent::Market(MarketEvent::MetadataUpdated(decode_body(
                 &envelope.body,
                 "MarketMetadataUpdatedEvent",
             )?))
         }
 
-        MARKET_METADATA_CLOSED_DISCRIMINATOR => TidebookEvent::Market(MarketEvent::MetadataClosed(
+        MARKET_METADATA_CLOSED_DISCRIMINATOR => OutcomiaEvent::Market(MarketEvent::MetadataClosed(
             decode_body(&envelope.body, "MarketMetadataClosedEvent")?,
         )),
-        ORDER_PLACED_DISCRIMINATOR => TidebookEvent::Order(OrderEvent::Placed(decode_body(
+        ORDER_PLACED_DISCRIMINATOR => OutcomiaEvent::Order(OrderEvent::Placed(decode_body(
             &envelope.body,
             "OrderPlacedEvent",
         )?)),
 
-        ORDER_CANCELED_DISCRIMINATOR => TidebookEvent::Order(OrderEvent::Canceled(decode_body(
+        ORDER_CANCELED_DISCRIMINATOR => OutcomiaEvent::Order(OrderEvent::Canceled(decode_body(
             &envelope.body,
             "OrderCanceledEvent",
         )?)),
 
-        FILL_EVENT_DISCRIMINATOR => TidebookEvent::Fill(decode_body(&envelope.body, "FillEvent")?),
+        FILL_EVENT_DISCRIMINATOR => OutcomiaEvent::Fill(decode_body(&envelope.body, "FillEvent")?),
 
         TRADER_BALANCE_INITIALIZED_DISCRIMINATOR => {
-            TidebookEvent::Balance(BalanceEvent::Initialized(decode_body(
+            OutcomiaEvent::Balance(BalanceEvent::Initialized(decode_body(
                 &envelope.body,
                 "TraderBalanceInitializedEvent",
             )?))
         }
 
-        DEPOSIT_EVENT_DISCRIMINATOR => TidebookEvent::Balance(BalanceEvent::Deposited(
+        DEPOSIT_EVENT_DISCRIMINATOR => OutcomiaEvent::Balance(BalanceEvent::Deposited(
             decode_body(&envelope.body, "DepositEvent")?,
         )),
 
-        WITHDRAWAL_EVENT_DISCRIMINATOR => TidebookEvent::Balance(BalanceEvent::Withdrawn(
+        WITHDRAWAL_EVENT_DISCRIMINATOR => OutcomiaEvent::Balance(BalanceEvent::Withdrawn(
             decode_body(&envelope.body, "WithdrawalEvent")?,
         )),
 
         PROTOCOL_INITIALIZED_DISCRIMINATOR => {
-            TidebookEvent::Governance(GovernanceEvent::ProtocolInitialized(decode_body(
+            OutcomiaEvent::Governance(GovernanceEvent::ProtocolInitialized(decode_body(
                 &envelope.body,
                 "ProtocolInitializedEvent",
             )?))
         }
 
-        ADMIN_ADDED_DISCRIMINATOR => TidebookEvent::Governance(GovernanceEvent::AdminAdded(
+        ADMIN_ADDED_DISCRIMINATOR => OutcomiaEvent::Governance(GovernanceEvent::AdminAdded(
             decode_body(&envelope.body, "AdminAddedEvent")?,
         )),
 
         ADMIN_STATUS_CHANGED_DISCRIMINATOR => {
-            TidebookEvent::Governance(GovernanceEvent::AdminStatusChanged(decode_body(
+            OutcomiaEvent::Governance(GovernanceEvent::AdminStatusChanged(decode_body(
                 &envelope.body,
                 "AdminStatusChangedEvent",
             )?))
         }
 
-        ADMIN_REMOVED_DISCRIMINATOR => TidebookEvent::Governance(GovernanceEvent::AdminRemoved(
+        ADMIN_REMOVED_DISCRIMINATOR => OutcomiaEvent::Governance(GovernanceEvent::AdminRemoved(
             decode_body(&envelope.body, "AdminRemovedEvent")?,
         )),
 
-        TAKER_FEE_UPDATED_DISCRIMINATOR => TidebookEvent::Governance(
+        TAKER_FEE_UPDATED_DISCRIMINATOR => OutcomiaEvent::Governance(
             GovernanceEvent::TakerFeeUpdated(decode_body(&envelope.body, "TakerFeeUpdatedEvent")?),
         ),
 
         PROTOCOL_FEES_WITHDRAWN_DISCRIMINATOR => {
-            TidebookEvent::Fee(FeeEvent::ProtocolFeesWithdrawn(decode_body(
+            OutcomiaEvent::Fee(FeeEvent::ProtocolFeesWithdrawn(decode_body(
                 &envelope.body,
                 "ProtocolFeesWithdrawnEvent",
             )?))
         }
 
-        TEST_FAUCET_INITIALIZED_DISCRIMINATOR => TidebookEvent::Faucet(FaucetEvent::Initialized(
+        TEST_FAUCET_INITIALIZED_DISCRIMINATOR => OutcomiaEvent::Faucet(FaucetEvent::Initialized(
             decode_body(&envelope.body, "TestFaucetInitializedEvent")?,
         )),
 
-        TEST_FAUCET_CLAIMED_DISCRIMINATOR => TidebookEvent::Faucet(FaucetEvent::Claimed(
+        TEST_FAUCET_CLAIMED_DISCRIMINATOR => OutcomiaEvent::Faucet(FaucetEvent::Claimed(
             decode_body(&envelope.body, "TestFaucetClaimedEvent")?,
         )),
 
-        TEST_FAUCET_CLOSED_DISCRIMINATOR => TidebookEvent::Faucet(FaucetEvent::Closed(
+        TEST_FAUCET_CLOSED_DISCRIMINATOR => OutcomiaEvent::Faucet(FaucetEvent::Closed(
             decode_body(&envelope.body, "TestFaucetClosedEvent")?,
         )),
 
@@ -363,14 +363,14 @@ pub fn decode_event(raw_event: &RawEventLog) -> Result<DecodedEventLog, EventDec
     })
 }
 
-impl TidebookEvent {
+impl OutcomiaEvent {
     /// Stable on-chain event type stored beside the decoded JSON document.
     ///
     /// This explicit mapping avoids using Debug output or Serde's JSON shape as
     /// a database identifier, either of which could change during refactoring.
     ///
     /// # Inputs
-    /// Borrowed TidebookEvent, including its domain-specific variant.
+    /// Borrowed OutcomiaEvent, including its domain-specific variant.
     ///
     /// # Errors
     /// None; the exhaustive match has no fallback string.
@@ -517,7 +517,7 @@ mod tests {
         let authority = Pubkey::new_from_array([33; 32]);
         let base_symbol = "tSOL".to_owned();
         let quote_symbol = "tUSDC".to_owned();
-        let display_name = "Tidebook SOL / USDC".to_owned();
+        let display_name = "Outcomia SOL / USDC".to_owned();
 
         let mut body = Vec::new();
         body.extend_from_slice(metadata.as_ref());
@@ -1116,7 +1116,7 @@ mod tests {
         assert_eq!(decoded.payload_base64, raw.payload_base64);
         assert_eq!(
             decoded.event,
-            TidebookEvent::Market(MarketEvent::Initialized(expected))
+            OutcomiaEvent::Market(MarketEvent::Initialized(expected))
         );
     }
 
@@ -1177,7 +1177,7 @@ mod tests {
 
             assert_eq!(
                 decoded.event,
-                TidebookEvent::Market(MarketEvent::StatusChanged(MarketStatusChangedEvent {
+                OutcomiaEvent::Market(MarketEvent::StatusChanged(MarketStatusChangedEvent {
                     market,
                     authority,
                     status: expected_status,
@@ -1214,7 +1214,7 @@ mod tests {
         assert_eq!(decoded.log_index, 31);
         assert_eq!(
             decoded.event,
-            TidebookEvent::Market(MarketEvent::Closed(expected))
+            OutcomiaEvent::Market(MarketEvent::Closed(expected))
         );
     }
 
@@ -1226,7 +1226,7 @@ mod tests {
         let initialized_raw = raw_event(&initialized_payload, 32);
         assert_eq!(
             decode_event(&initialized_raw).unwrap().event,
-            TidebookEvent::Market(MarketEvent::MetadataInitialized(initialized)),
+            OutcomiaEvent::Market(MarketEvent::MetadataInitialized(initialized)),
         );
 
         let (updated_body, updated) = market_metadata_updated_fixture();
@@ -1234,7 +1234,7 @@ mod tests {
         let updated_raw = raw_event(&updated_payload, 33);
         assert_eq!(
             decode_event(&updated_raw).unwrap().event,
-            TidebookEvent::Market(MarketEvent::MetadataUpdated(updated)),
+            OutcomiaEvent::Market(MarketEvent::MetadataUpdated(updated)),
         );
 
         let (closed_body, closed) = market_metadata_closed_fixture();
@@ -1242,7 +1242,7 @@ mod tests {
         let closed_raw = raw_event(&closed_payload, 34);
         assert_eq!(
             decode_event(&closed_raw).unwrap().event,
-            TidebookEvent::Market(MarketEvent::MetadataClosed(closed)),
+            OutcomiaEvent::Market(MarketEvent::MetadataClosed(closed)),
         );
     }
 
@@ -1258,7 +1258,7 @@ mod tests {
 
             assert_eq!(
                 decoded.event,
-                TidebookEvent::Order(OrderEvent::Placed(expected))
+                OutcomiaEvent::Order(OrderEvent::Placed(expected))
             );
         }
     }
@@ -1293,7 +1293,7 @@ mod tests {
 
             assert_eq!(
                 decoded.event,
-                TidebookEvent::Order(OrderEvent::Canceled(expected))
+                OutcomiaEvent::Order(OrderEvent::Canceled(expected))
             );
         }
     }
@@ -1327,7 +1327,7 @@ mod tests {
 
             let decoded = decode_event(&raw).expect("valid FillEvent should decode");
 
-            assert_eq!(decoded.event, TidebookEvent::Fill(expected));
+            assert_eq!(decoded.event, OutcomiaEvent::Fill(expected));
         }
     }
 
@@ -1374,7 +1374,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Balance(BalanceEvent::Initialized(expected))
+            OutcomiaEvent::Balance(BalanceEvent::Initialized(expected))
         );
     }
 
@@ -1388,7 +1388,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Balance(BalanceEvent::Deposited(expected))
+            OutcomiaEvent::Balance(BalanceEvent::Deposited(expected))
         );
     }
 
@@ -1402,7 +1402,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Balance(BalanceEvent::Withdrawn(expected))
+            OutcomiaEvent::Balance(BalanceEvent::Withdrawn(expected))
         );
     }
 
@@ -1416,7 +1416,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Governance(GovernanceEvent::ProtocolInitialized(expected))
+            OutcomiaEvent::Governance(GovernanceEvent::ProtocolInitialized(expected))
         );
     }
 
@@ -1430,7 +1430,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Governance(GovernanceEvent::AdminAdded(expected))
+            OutcomiaEvent::Governance(GovernanceEvent::AdminAdded(expected))
         );
     }
 
@@ -1445,7 +1445,7 @@ mod tests {
 
             assert_eq!(
                 decoded.event,
-                TidebookEvent::Governance(GovernanceEvent::AdminStatusChanged(expected))
+                OutcomiaEvent::Governance(GovernanceEvent::AdminStatusChanged(expected))
             );
         }
     }
@@ -1475,7 +1475,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Governance(GovernanceEvent::AdminRemoved(expected))
+            OutcomiaEvent::Governance(GovernanceEvent::AdminRemoved(expected))
         );
     }
 
@@ -1489,7 +1489,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Governance(GovernanceEvent::TakerFeeUpdated(expected))
+            OutcomiaEvent::Governance(GovernanceEvent::TakerFeeUpdated(expected))
         );
     }
 
@@ -1503,7 +1503,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Fee(FeeEvent::ProtocolFeesWithdrawn(expected))
+            OutcomiaEvent::Fee(FeeEvent::ProtocolFeesWithdrawn(expected))
         );
     }
 
@@ -1517,7 +1517,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Faucet(FaucetEvent::Initialized(expected))
+            OutcomiaEvent::Faucet(FaucetEvent::Initialized(expected))
         );
     }
 
@@ -1531,7 +1531,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Faucet(FaucetEvent::Claimed(expected))
+            OutcomiaEvent::Faucet(FaucetEvent::Claimed(expected))
         );
     }
 
@@ -1545,7 +1545,7 @@ mod tests {
 
         assert_eq!(
             decoded.event,
-            TidebookEvent::Faucet(FaucetEvent::Closed(expected))
+            OutcomiaEvent::Faucet(FaucetEvent::Closed(expected))
         );
     }
 

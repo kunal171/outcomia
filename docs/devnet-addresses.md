@@ -1,14 +1,14 @@
 # Devnet Address Registry
 
 This file records the shared Solana devnet addresses used while developing and
-testing Tidebook. These accounts have no mainnet value and must not be reused as
+testing Outcomia. These accounts have no mainnet value and must not be reused as
 production configuration.
 
 ## Program and governance
 
 | Account                | Address                                        | Notes                                                                        |
 | ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| Tidebook program       | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` | Current fresh-state upgradeable devnet program; verified at slot `505480906` |
+| Outcomia program       | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` | Current fresh-state upgradeable devnet program; verified at slot `505480906` |
 | ProgramData            | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` | Upgradeable loader metadata and program data                                 |
 | Upgrade authority      | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` | Protocol deployer and super-admin                                            |
 | Protocol config PDA    | `433qRcpUj1dizPRRp5Cghr6h3sfje8S6HXq4kkAxScmG` | Initialized; seeds: `["protocol_config"]`                                    |
@@ -40,7 +40,7 @@ abuse but do not provide Sybil resistance.
 
 Both mints use the legacy SPL Token Program
 `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`, which is the mint owner expected
-by the current Tidebook program.
+by the current Outcomia program.
 
 | Test asset          | Role             | Mint address                                   | Decimals | Current supply |
 | ------------------- | ---------------- | ---------------------------------------------- | -------- | -------------- |

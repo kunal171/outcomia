@@ -13,12 +13,12 @@ import {
   sharedAccounts,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
+  getOutcomiaProgram,
   deriveVaultAuthorityPda,
   deriveVaultPda,
   deriveTraderBalancePda,
   TOKEN_PROGRAM_ID,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { derivePredictionPositionPda } from "../lib/prediction";
 export function LegacyBalanceTransfer({
   market,
@@ -47,7 +47,7 @@ export function LegacyBalanceTransfer({
     setPending(true);
     setIssue(null);
     try {
-      const p = getTidebookProgram(connection, wallet),
+      const p = getOutcomiaProgram(connection, wallet),
         tx = new Transaction(),
         c = assetCustody(wallet.publicKey, mint);
       if (!(await sharedAccounts(p).assetBalance.fetchNullable(c.assetBalance)))

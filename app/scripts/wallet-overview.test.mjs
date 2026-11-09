@@ -12,7 +12,7 @@ const ts = req("typescript");
 const { PublicKey, Connection } = req("@solana/web3.js");
 const { Program, BN } = req("@anchor-lang/core");
 const bs58 = req("bs58");
-const idl = require(path.join(root, "app/idl/tidebook.json"));
+const idl = require(path.join(root, "app/idl/outcomia.json"));
 const programId = new PublicKey(idl.address);
 const cache = new Map();
 function load(file) {
@@ -493,7 +493,7 @@ const connection = {
   assert.ok(result.spot.error);
   wrongOwner = false;
   console.log(
-    "Passed: owner offset/PDA binding, non-ATA aggregation, frozen amounts, exact large integers, mint grouping, Tidebook listing filter, wallet-only listed assets, deposited-only assets, prediction contract separation and independent failure paths.",
+    "Passed: owner offset/PDA binding, non-ATA aggregation, frozen amounts, exact large integers, mint grouping, Outcomia listing filter, wallet-only listed assets, deposited-only assets, prediction contract separation and independent failure paths.",
   );
 })().catch((e) => {
   console.error(e);

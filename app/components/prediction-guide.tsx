@@ -10,7 +10,7 @@ import {
   type PredictionMarketAccount,
   type PredictionOrderBookAccount,
 } from "../lib/prediction";
-import { formatAtomicAmount } from "../lib/tidebook";
+import { formatAtomicAmount } from "../lib/outcomia";
 
 /** Read-only help uses the loaded market terms and book; opening it sends no RPC. */
 export function PredictionGuide({

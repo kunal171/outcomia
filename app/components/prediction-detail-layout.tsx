@@ -9,7 +9,7 @@ import {
   predictionStatus,
   type PredictionMarketAccount,
 } from "../lib/prediction";
-import type { MarketMetadataAccount } from "../lib/tidebook";
+import type { MarketMetadataAccount } from "../lib/outcomia";
 import { PredictionMarketOverview } from "./prediction/market-overview";
 import { PredictionMarketRules } from "./prediction/market-rules";
 import { useProtocolRole } from "./protocol-role-provider";

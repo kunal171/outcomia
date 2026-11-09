@@ -7,10 +7,10 @@ skip-lint = false
 [hooks]
 
 [programs.devnet]
-tidebook = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL"
+outcomia = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL"
 
 [programs.localnet]
-tidebook = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL"
+outcomia = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL"
 
 [provider]
 cluster = "https://api.devnet.solana.com"

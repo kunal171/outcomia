@@ -15,13 +15,13 @@ import {
   decodeMarketKind,
   deriveAdminRecordPda,
   deriveMarketMetadataPda,
-  getTidebookAccounts,
-  getTidebookProgram,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   transactionExplorerUrl,
   type MarketAccount,
   type MarketMetadataAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
 
@@ -59,11 +59,11 @@ export function MarketSettings({ address }: { address: string }) {
   }, [address]);
 
   const readProgram = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const signedProgram = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
 
@@ -77,7 +77,7 @@ export function MarketSettings({ address }: { address: string }) {
     setLoading(true);
     setError(null);
     try {
-      const accounts = getTidebookAccounts(readProgram);
+      const accounts = getOutcomiaAccounts(readProgram);
       const [marketAccount, metadataAccount] = await Promise.all([
         accounts.market.fetchNullable(marketAddress),
         accounts.marketMetadata.fetchNullable(
@@ -267,7 +267,7 @@ export function MarketSettings({ address }: { address: string }) {
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder={t("Tidebook SOL / USDC")}
+                  placeholder={t("Outcomia SOL / USDC")}
                   maxLength={64}
                   autoComplete="off"
                   required

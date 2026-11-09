@@ -14,7 +14,7 @@ import {
   type PredictionPlacementReader,
   type PredictionOutcome,
 } from "./prediction";
-import { type OrderSide } from "./tidebook";
+import { type OrderSide } from "./outcomia";
 
 /** Inputs: fresh own-side accounts and the market/book/position after planned fills.
  * Returns the canonical place/append/insert instruction and its new order PDA.

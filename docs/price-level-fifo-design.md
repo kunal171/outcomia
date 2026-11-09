@@ -16,7 +16,7 @@ boundary and must be validated rather than treated as trusted client input.
 
 ## Required ordering
 
-Tidebook uses price-time priority:
+Outcomia uses price-time priority:
 
 1. bids with higher prices have priority over lower bids;
 2. asks with lower prices have priority over higher asks;

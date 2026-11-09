@@ -8,7 +8,7 @@ import {
   type Transaction,
 } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
-import { deriveProtocolConfigPda } from "./tidebook";
+import { deriveProtocolConfigPda } from "./outcomia";
 import { derivePredictionPositionPda } from "./prediction";
 export const SHARED_BALANCES_ENABLED =
   process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED === "true";

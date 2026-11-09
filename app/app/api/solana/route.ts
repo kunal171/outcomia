@@ -11,6 +11,7 @@ export async function POST(request: Request) {
           process.env.HELIUS_API_KEY,
         ) ?? "https://api.devnet.solana.com",
       programId:
+        process.env.NEXT_PUBLIC_OUTCOMIA_PROGRAM_ID ??
         process.env.NEXT_PUBLIC_TIDEBOOK_PROGRAM_ID ??
         "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
     });

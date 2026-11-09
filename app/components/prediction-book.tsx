@@ -14,7 +14,7 @@ import {
   readPredictionDepth,
   type PredictionDepth,
 } from "../lib/prediction-book";
-import { formatAtomicAmount, getTidebookAccounts } from "../lib/tidebook";
+import { formatAtomicAmount, getOutcomiaAccounts } from "../lib/outcomia";
 
 /** Public depth needs no wallet. A failed refresh clears stale rows visibly. */
 export function PredictionBook({
@@ -46,7 +46,7 @@ export function PredictionBook({
     setDepth(null);
     setError(null);
     async function load() {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const book = await accounts.predictionOrderBook.fetchNullable(
         derivePredictionBookPda(market),
       );

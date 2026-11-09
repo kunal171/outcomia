@@ -150,7 +150,7 @@ export function createRpcFetch(
         index,
         {
           jsonrpc: "2.0",
-          id: "tidebook-cluster-check",
+          id: "outcomia-cluster-check",
           method: "getGenesisHash",
         },
         init,

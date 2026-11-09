@@ -4,7 +4,7 @@ import { useI18n } from "../preferences-provider";
 import { BN } from "@anchor-lang/core";
 import type { ReactNode } from "react";
 import type { SharedSnapshot, Side } from "../../lib/shared";
-import { parseTokenAmount } from "../../lib/tidebook";
+import { parseTokenAmount } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 
 type Outcome = "yes" | "no";

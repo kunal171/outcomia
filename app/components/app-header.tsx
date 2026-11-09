@@ -72,13 +72,13 @@ function BrandMark() {
   );
 }
 
-function TidebookBrand() {
+function OutcomiaBrand() {
   const { t } = useI18n();
 
   return (
-    <Link className="brand" href="/" aria-label={t("Tidebook home")}>
+    <Link className="brand" href="/" aria-label={t("Outcomia home")}>
       <BrandMark />
-      <span>Tidebook</span>
+      <span>Outcomia</span>
     </Link>
   );
 }
@@ -127,7 +127,9 @@ export function AppHeader() {
   useEffect(() => {
     let saved = document.documentElement.dataset.sidebarCollapsed === "true";
     try {
-      const stored = localStorage.getItem("tidebook:sidebar-collapsed");
+      const stored =
+        localStorage.getItem("outcomia:sidebar-collapsed") ??
+        localStorage.getItem("tidebook:sidebar-collapsed");
       if (stored !== null) saved = stored === "true";
     } catch {
       /* Navigation still works when browser storage is unavailable. */
@@ -140,7 +142,7 @@ export function AppHeader() {
     setCollapsed(next);
     document.documentElement.dataset.sidebarCollapsed = String(next);
     try {
-      localStorage.setItem("tidebook:sidebar-collapsed", String(next));
+      localStorage.setItem("outcomia:sidebar-collapsed", String(next));
     } catch {
       /* The current page still keeps the selected layout. */
     }
@@ -249,7 +251,7 @@ export function AppHeader() {
   }
   return (
     <>
-      <aside className="app-sidebar" aria-label={t("Tidebook sidebar")}>
+      <aside className="app-sidebar" aria-label={t("Outcomia sidebar")}>
         <div className="sidebar-brand-heading">
           <button
             type="button"
@@ -257,17 +259,17 @@ export function AppHeader() {
             onClick={toggleSidebar}
             aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
             aria-expanded={!collapsed}
-            aria-controls="tidebook-desktop-navigation"
+            aria-controls="outcomia-desktop-navigation"
             title={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
           >
             <BrandMark />
           </button>
           <Link className="sidebar-brand-name" href="/">
-            Tidebook
+            Outcomia
           </Link>
         </div>
 
-        {navigation("tidebook-desktop-navigation")}
+        {navigation("outcomia-desktop-navigation")}
         {footer()}
       </aside>
       <header className="topbar">
@@ -277,7 +279,7 @@ export function AppHeader() {
             className="sidebar-menu-toggle"
             aria-label={t("Open navigation")}
             aria-haspopup="dialog"
-            aria-controls="tidebook-navigation-drawer"
+            aria-controls="outcomia-navigation-drawer"
             aria-expanded={menuOpen}
             onClick={() => {
               drawer.current?.showModal();
@@ -297,7 +299,7 @@ export function AppHeader() {
               <path d="M4 6h16 M4 12h16 M4 18h16" />
             </svg>
           </button>
-          <TidebookBrand />
+          <OutcomiaBrand />
         </div>
         <div className="topbar-actions">
           {roleLabel && (
@@ -313,7 +315,7 @@ export function AppHeader() {
       </header>
       <dialog
         className="sidebar-drawer"
-        id="tidebook-navigation-drawer"
+        id="outcomia-navigation-drawer"
         ref={drawer}
         aria-label={t("Navigation menu")}
         onClose={() => setMenuOpen(false)}
@@ -344,7 +346,7 @@ export function AppHeader() {
               href="/"
               onClick={() => drawer.current?.close()}
             >
-              Tidebook
+              Outcomia
             </Link>
           </div>
           <button

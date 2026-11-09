@@ -372,7 +372,7 @@ export function Dashboard() {
           </div>
           <nav
             className="landing-destinations"
-            aria-label={t("More on Tidebook")}
+            aria-label={t("More on Outcomia")}
           >
             <Link
               className="landing-destination destination-spot"
@@ -429,7 +429,7 @@ export function Dashboard() {
         </div>
       </main>
       <footer className="landing-footer">
-        <span>Tidebook</span>
+        <span>Outcomia</span>
         <a
           href="https://github.com/kunal171/tidebook"
           target="_blank"

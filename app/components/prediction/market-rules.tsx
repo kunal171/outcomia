@@ -108,7 +108,7 @@ export function PredictionMarketRules({
           )}
           <div>
             <dt>{t("Payout destination")}</dt>
-            <dd>{t("Tidebook wallet")}</dd>
+            <dd>{t("Outcomia wallet")}</dd>
           </div>
         </dl>
         {(!market.fallback || !market.fallback.deadlineTs) && (

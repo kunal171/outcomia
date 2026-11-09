@@ -1,10 +1,12 @@
-# Tidebook docs
+# Outcomia docs
 
 Design notes for the prediction and spot order books, the web app and the
 indexer. Each feature document includes its account model and limitations;
 shared custody and payout instructions are deployed and verified on devnet.
 
 ## Start here
+
+- [Outcomia rename](rebranding.md): package names, deployment identity and compatibility.
 
 - [Future platform scope](future-scope.md): user-created predictions, private
   markets, clubs, multi-outcome trading and governance. Planned features only.
@@ -30,7 +32,7 @@ live deployment records.
 - [Price levels and FIFO](price-level-fifo-design.md): linked price levels,
   queue mutations, invariants and tradeoffs.
 - [Crankless settlement](crankless-settlement-design.md): Phoenix/OpenBook
-  comparison and Tidebook's bounded matching with internal balances.
+  comparison and Outcomia's bounded matching with internal balances.
 - [Future enhancements](future-enhancements.md): indexing, reference prices,
   market making, AMM work and later research.
 
@@ -40,7 +42,7 @@ live deployment records.
   checkpoints, event coverage and recovery.
 - [Local Kubernetes](../services/indexer/infra/kubernetes/README.md): Kind,
   workload manifests, health probes and persistent storage.
-- [Tidebook architecture](diagrams/tidebook-architecture.drawio).
+- [Outcomia architecture](diagrams/outcomia-architecture.drawio).
 - [Prediction architecture](diagrams/prediction-market-architecture.drawio).
 
 Open `.drawio` files in [draw.io](https://app.diagrams.net/). Their legends

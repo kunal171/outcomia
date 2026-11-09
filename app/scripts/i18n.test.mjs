@@ -29,7 +29,7 @@ for (const [locale, catalog] of Object.entries(catalogs)) {
         `${locale}: ${key}`,
       );
     }
-    for (const identity of ["YES", "NO", "Devnet", "Tidebook SOL / USDC"])
+    for (const identity of ["YES", "NO", "Devnet", "Outcomia SOL / USDC"])
       assert.equal(catalog[identity], identity);
     if (locale !== "en")
       for (const key of [
