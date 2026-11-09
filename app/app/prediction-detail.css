@@ -12,7 +12,7 @@ body:has(.prediction-workspace) {
   color: var(--muted);
 }
 .prediction-workspace {
-  --prediction-surface: #181721;
+  --prediction-surface: var(--panel);
   width: 100%;
   max-width: 1120px;
   margin: 32px auto 0;
@@ -349,13 +349,13 @@ body:has(.prediction-workspace) {
 }
 .prediction-choice button[aria-pressed="true"][data-outcome="yes"] {
   color: var(--buy);
-  border-color: rgb(121 232 212 / 0.5);
-  background: rgb(121 232 212 / 0.05);
+  border-color: rgb(var(--buy-rgb) / 0.5);
+  background: rgb(var(--buy-rgb) / 0.05);
 }
 .prediction-choice button[aria-pressed="true"][data-outcome="no"] {
   color: var(--sell);
-  border-color: rgb(255 177 156 / 0.5);
-  background: rgb(255 177 156 / 0.05);
+  border-color: rgb(var(--sell-rgb) / 0.5);
+  background: rgb(var(--sell-rgb) / 0.05);
 }
 .prediction-action-choice {
   display: flex;
@@ -446,7 +446,7 @@ body:has(.prediction-workspace) {
   border: 0;
   border-radius: 7px;
   background: var(--buy);
-  color: #111820;
+  color: var(--outcome-ink);
   font-weight: 600 !important;
   font-size: 14px !important;
 }

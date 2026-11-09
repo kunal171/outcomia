@@ -2,7 +2,7 @@
 import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
-import type { OrderSide } from "./tidebook";
+import type { OrderSide } from "./outcomia";
 
 export type PredictionOutcome = "yes" | "no";
 

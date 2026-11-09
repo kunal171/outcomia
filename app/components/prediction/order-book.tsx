@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
 import type { SharedSnapshot } from "../../lib/shared";
@@ -29,6 +30,8 @@ export function PredictionOrderBook({
   disabled,
   onPrice,
 }: Props) {
+  const { t } = useI18n();
+
   const sides = (["bid", "ask"] as const).map((side) => {
     const levels = new Map<string, { price: BN; quantity: BN }>();
     for (const { account } of snapshot?.orders ?? []) {
@@ -60,32 +63,36 @@ export function PredictionOrderBook({
       aria-labelledby="prediction-book-heading"
     >
       <div className="prediction-section-title">
-        <h2 id="prediction-book-heading">Order book</h2>
+        <h2 id="prediction-book-heading">{t("Order book")}</h2>
         <span className={`outcome-text outcome-${outcome}`}>
           {outcome.toUpperCase()}
         </span>
       </div>
       {!loaded ? (
         <p className="prediction-empty-copy" role="status">
-          {failed ? "Order book unavailable" : "Loading order book…"}
+          {failed ? t("Order book unavailable") : t("Loading order book…")}
         </p>
       ) : !snapshot ? (
-        <p className="prediction-empty-copy">Trading has not been enabled.</p>
+        <p className="prediction-empty-copy">
+          {t("Trading has not been enabled.")}
+        </p>
       ) : (
         <div className="prediction-book-sides">
           {sides.map(({ side, rows }) => (
             <div key={side} className={`prediction-book-side book-${side}`}>
-              <h3>{side === "bid" ? "Buy orders" : "Sell orders"}</h3>
+              <h3>{side === "bid" ? t("Buy orders") : t("Sell orders")}</h3>
               <div className="prediction-ladder-scroll">
                 <table>
                   <caption className="sr-only">
-                    {outcome.toUpperCase()} {side === "bid" ? "buy" : "sell"}{" "}
-                    orders
+                    {t("{value0}  {value1} orders", {
+                      value0: outcome.toUpperCase(),
+                      value1: side === "bid" ? t("buy") : t("sell"),
+                    })}
                   </caption>
                   <thead>
                     <tr>
-                      <th>Price ({symbol})</th>
-                      <th>Contracts</th>
+                      <th>{t("Price ({value0})", { value0: symbol })}</th>
+                      <th>{t("Contracts")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -95,7 +102,10 @@ export function PredictionOrderBook({
                           <button
                             type="button"
                             disabled={disabled}
-                            aria-label={`Use limit price ${readableAmount(price, decimals)} ${symbol}`}
+                            aria-label={t("Use limit price {value0} {value1}", {
+                              value0: readableAmount(price, decimals),
+                              value1: symbol,
+                            })}
                             onClick={() =>
                               onPrice(readableAmount(price, decimals))
                             }
@@ -110,7 +120,9 @@ export function PredictionOrderBook({
                 </table>
                 {rows.length === 0 && (
                   <p className="prediction-empty-copy">
-                    No {side === "bid" ? "buy" : "sell"} offers
+                    {t("No {value0} offers", {
+                      value0: side === "bid" ? t("buy") : t("sell"),
+                    })}
                   </p>
                 )}
               </div>

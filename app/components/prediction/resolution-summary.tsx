@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import type { PredictionMarketAccount } from "../../lib/prediction";
 import {
@@ -12,31 +13,34 @@ export function PredictionResolutionSummary({
 }: {
   market: PredictionMarketAccount;
 }) {
+  const { t, locale } = useI18n();
+
   if (!market.proposal)
-    return <p className="prediction-empty-copy">No outcome proposed.</p>;
+    return <p className="prediction-empty-copy">{t("No outcome proposed.")}</p>;
   const proposal = market.proposal;
   const evidence = rulesDocumentUrl(proposal.evidenceUri);
   return (
     <div className="prediction-proposal-summary">
       <dl className="prediction-rule-facts">
         <div>
-          <dt>Proposed outcome</dt>
-          <dd>{Object.keys(proposal.outcome)[0].toUpperCase()}</dd>
+          <dt>{t("Proposed outcome")}</dt>
+          <dd>{t(Object.keys(proposal.outcome)[0].toUpperCase() ?? "")}</dd>
         </div>
         <div>
-          <dt>Review ends</dt>
+          <dt>{t("Review ends")}</dt>
           <dd>
             {predictionCloseLabel(
               proposal.proposedAt.add(market.resolutionDelaySeconds),
+              locale,
             )}
           </dd>
         </div>
         <div>
-          <dt>Evidence</dt>
+          <dt>{t("Evidence")}</dt>
           <dd className="shared-address">
             {evidence ? (
               <a href={evidence} target="_blank" rel="noreferrer">
-                Read evidence ↗
+                {t("Read evidence ↗")}
               </a>
             ) : (
               proposal.evidenceUri
@@ -45,7 +49,7 @@ export function PredictionResolutionSummary({
         </div>
       </dl>
       <details>
-        <summary>Evidence fingerprint</summary>
+        <summary>{t("Evidence fingerprint")}</summary>
         <code className="shared-address">
           {Buffer.from(proposal.evidenceHash).toString("hex")}
         </code>

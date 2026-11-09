@@ -4098,7 +4098,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tidebook-indexer"
+name = "outcomia-indexer"
 version = "0.1.0"
 dependencies = [
  "axum",

@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import type { PredictionMarketAccount } from "../../lib/prediction";
 import { predictionTime } from "../../lib/prediction";
@@ -21,6 +22,8 @@ export function PredictionMarketOverview({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const { t, locale } = useI18n();
+
   return (
     <header className="prediction-overview">
       <div className="prediction-overview-top">
@@ -29,17 +32,21 @@ export function PredictionMarketOverview({
             className="role-badge"
             data-live={status === "Open for trading"}
           >
-            {status}
+            {status.startsWith("Resolved · ")
+              ? t("Resolved · {value0}", {
+                  value0: t(status.slice("Resolved · ".length)),
+                })
+              : t(status)}
           </span>
-          <span className="prediction-network">Devnet</span>
+          <span className="prediction-network">{t("Devnet")}</span>
         </div>
         <div className="prediction-overview-actions">
           <PredictionGuide compact market={market} symbol={symbol} />
           <button
             type="button"
             className="prediction-refresh"
-            aria-label="Refresh market"
-            title="Refresh market"
+            aria-label={t("Refresh market")}
+            title={t("Refresh market")}
             disabled={loading}
             onClick={onRefresh}
           >
@@ -55,15 +62,15 @@ export function PredictionMarketOverview({
       <h1>{name}</h1>
       <dl className="prediction-facts">
         <div>
-          <dt>Winning payout</dt>
+          <dt>{t("Winning payout")}</dt>
           <dd>
-            1 {symbol} <span>/ contract</span>
+            {`1 ${symbol}`} <span>{t("/ contract")}</span>
           </dd>
         </div>
         <div>
-          <dt>Closes</dt>
+          <dt>{t("Closes")}</dt>
           <dd title={predictionTime(market.closeTs)}>
-            {predictionCloseLabel(market.closeTs)}
+            {predictionCloseLabel(market.closeTs, locale)}
           </dd>
         </div>
       </dl>

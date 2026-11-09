@@ -14,7 +14,8 @@
 
 ## Shared-wallet release: 6 November 2026
 
-The deployed executable exactly matches the local build:
+At the 6 November verification, the deployed executable matched that release build.
+These are historical release measurements, not the hash of a later local rebuild:
 
 - SHA-256: `484c86e0a4901bb59dfcb8577a30ce9188e2c7a9144cd5ec7b3d6a3170c6ede7`
 - Length: 1,399,440 bytes.
@@ -60,7 +61,7 @@ anchor program deploy --no-idl
 Bare `anchor test` deploys to the provider cluster before executing the test
 script. Use `--skip-deploy` for the LiteSVM-only local verification workflow.
 
-The deployment keypair at `target/deploy/tidebook-keypair.json` determines the
+The deployment keypair at `target/deploy/outcomia-keypair.json` determines the
 program address. It is intentionally excluded from Git and must be preserved
 securely; replacing it would create a different program ID.
 

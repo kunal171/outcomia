@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import {
   SHARED_BALANCES_ENABLED,
   sharedAccounts,
@@ -13,11 +15,11 @@ import {
   accountExplorerUrl,
   decodeMarketKind,
   decodeMarketStatus,
-  getTidebookAccounts,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaReadProgram,
   type MarketMetadataAccount,
   type MarketView,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { marketLabels, readableAmount } from "../lib/market-display";
 import { rpcErrorMessage } from "../lib/rpc-transport";
@@ -31,6 +33,8 @@ function getErrorMessage(cause: unknown) {
 }
 
 export function Markets() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const [sharedBooks, setSharedBooks] = useState<Map<string, SharedBook>>(
     () => new Map(),
@@ -44,7 +48,7 @@ export function Markets() {
   const [labelNotice, setLabelNotice] = useState<string | null>(null);
 
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
 
@@ -54,7 +58,7 @@ export function Markets() {
     setLabelNotice(null);
 
     try {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const [marketRead, metadataRead, sharedRead] = await Promise.allSettled([
         accounts.market.all(),
         accounts.marketMetadata.all(),
@@ -127,51 +131,47 @@ export function Markets() {
       <main className="route-shell">
         <div className="route-heading markets-heading">
           <div>
-            <div className="eyebrow">Market discovery</div>
-            <h1>Markets</h1>
-            <p>
-              Explore Tidebook markets without connecting a wallet. Active
-              markets can accept new orders; paused markets remain visible for
-              inspection and cancellation.
-            </p>
+            <h1>{t("Markets")}</h1>
           </div>
 
-          <div className="market-summary" aria-label="Market summary">
+          <div className="market-summary" aria-label={t("Market summary")}>
             <strong>
               {markets.length === 0 && (loading || error) ? "—" : activeCount}
             </strong>
             <span>
               {markets.length === 0 && error
-                ? "Status unavailable"
+                ? t("Status unavailable")
                 : loading && !markets.length
-                  ? "Loading markets"
-                  : `Active of ${markets.length}`}
+                  ? t("Loading markets")
+                  : t("Active of {value0}", { value0: markets.length })}
             </span>
           </div>
         </div>
 
         <div className="market-list-heading">
-          <h2>On-chain markets</h2>
+          <h2>{t("On-chain markets")}</h2>
           <button
             className="text-button"
             type="button"
             disabled={loading}
             onClick={() => void loadMarkets()}
           >
-            {loading ? "Refreshing…" : "Refresh"}
+            {loading ? t("Refreshing…") : t("Refresh")}
           </button>
         </div>
 
         {loading && markets.length === 0 && (
-          <div className="access-card">Loading markets…</div>
+          <div className="access-card">{t("Loading markets…")}</div>
         )}
 
         {!loading && !error && markets.length === 0 && (
-          <div className="access-card">No markets have been created yet.</div>
+          <div className="access-card">
+            {t("No markets have been created yet.")}
+          </div>
         )}
         {labelNotice && (
           <p className="order-book-note" role="status">
-            {labelNotice}
+            {t(labelNotice ?? "")}
           </p>
         )}
 
@@ -195,7 +195,9 @@ export function Markets() {
                 <div className="market-card-heading">
                   <div>
                     <span className="card-label">
-                      {kind ? `${kind} market` : "Spot market"}
+                      {kind
+                        ? t("{value0} market", { value0: t(kind) })
+                        : t("Spot market")}
                     </span>
                     <strong>{labels.name}</strong>
                     <small className="market-address-caption">
@@ -203,19 +205,19 @@ export function Markets() {
                     </small>
                   </div>
                   <span className={`role-badge market-${status}`}>
-                    {status}
+                    {t(status ?? "")}
                   </span>
                 </div>
 
                 <div className="market-pair">
                   <div>
-                    <span>Trading</span>
+                    <span>{t("Trading")}</span>
                     <strong>{labels.base}</strong>
                     <small>{shortAddress(market.baseMint.toBase58())}</small>
                   </div>
                   <span aria-hidden="true">/</span>
                   <div>
-                    <span>Priced in</span>
+                    <span>{t("Priced in")}</span>
                     <strong>{labels.quote}</strong>
                     <small>{shortAddress(market.quoteMint.toBase58())}</small>
                   </div>
@@ -223,59 +225,63 @@ export function Markets() {
 
                 <dl className="market-metadata">
                   <div>
-                    <dt>Authority</dt>
+                    <dt>{t("Authority")}</dt>
                     <dd>{shortAddress(market.authority.toBase58())}</dd>
                   </div>
                   <div>
-                    <dt>Next order</dt>
+                    <dt>{t("Next order")}</dt>
                     <dd>
-                      {SHARED_BALANCES_ENABLED
-                        ? (shared?.nextOrderId.toString() ?? "—")
-                        : `#${market.nextOrderId.toString()}`}
+                      {SHARED_BALANCES_ENABLED ? (
+                        (shared?.nextOrderId.toString() ?? "—")
+                      ) : (
+                        <>
+                          {"#"}
+                          {market.nextOrderId.toString()}
+                        </>
+                      )}
                     </dd>
                   </div>
                   <div>
-                    <dt>Open orders</dt>
+                    <dt>{t("Open orders")}</dt>
                     <dd>
                       {SHARED_BALANCES_ENABLED
-                        ? (shared?.openOrderCount.toString() ?? "Not enabled")
+                        ? (shared?.openOrderCount.toString() ??
+                          t("Not enabled"))
                         : market.openOrderCount.toString()}
                     </dd>
                   </div>
                   <div>
-                    <dt>Price step</dt>
+                    <dt>{t("Price step")}</dt>
                     <dd>
-                      {readableAmount(
+                      {`${readableAmount(
                         market.priceTickSize,
                         market.quoteDecimals,
-                      )}{" "}
-                      {labels.quote}
+                      )} ${labels.quote}`}
                     </dd>
                   </div>
                   <div>
-                    <dt>Order size step</dt>
+                    <dt>{t("Order size step")}</dt>
                     <dd>
-                      {readableAmount(
+                      {`${readableAmount(
                         market.quantityLotSize,
                         market.baseDecimals,
-                      )}{" "}
-                      {labels.base}
+                      )} ${labels.base}`}
                     </dd>
                   </div>
                   <div>
-                    <dt>Highest buy price</dt>
+                    <dt>{t("Highest buy price")}</dt>
                     <dd>
                       {bid
                         ? `${readableAmount(bid, market.quoteDecimals)} ${labels.quote}`
-                        : "No buy orders"}
+                        : t("No buy orders")}
                     </dd>
                   </div>
                   <div>
-                    <dt>Lowest sell price</dt>
+                    <dt>{t("Lowest sell price")}</dt>
                     <dd>
                       {ask
                         ? `${readableAmount(ask, market.quoteDecimals)} ${labels.quote}`
-                        : "No sell orders"}
+                        : t("No sell orders")}
                     </dd>
                   </div>
                 </dl>
@@ -285,7 +291,7 @@ export function Markets() {
                     className="market-open-link"
                     href={`/markets/${market.address.toBase58()}`}
                   >
-                    {status === "active" ? "Open market" : "View details"}
+                    {status === "active" ? t("Open market") : t("View details")}
                   </Link>
                   <a
                     className="market-explorer-link"
@@ -293,7 +299,7 @@ export function Markets() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Explorer ↗
+                    {t("Explorer ↗")}
                   </a>
                 </div>
               </article>
@@ -302,7 +308,9 @@ export function Markets() {
         </section>
 
         {error && (
-          <div className="transaction-message transaction-error">{error}</div>
+          <div className="transaction-message transaction-error">
+            {t(error ?? "")}
+          </div>
         )}
       </main>
     </div>

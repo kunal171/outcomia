@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { type PredictionRulesDraft } from "../lib/prediction-rules-draft";
 
@@ -20,6 +21,8 @@ export function PredictionRulesEditor({
   issue,
   onChange,
 }: Props) {
+  const { t } = useI18n();
+
   function set<K extends keyof PredictionRulesDraft>(
     key: K,
     field: PredictionRulesDraft[K],
@@ -43,39 +46,36 @@ export function PredictionRulesEditor({
         <span className="section-marker" aria-hidden="true">
           02
         </span>{" "}
-        Market rules
+        {t("Market rules")}
       </legend>
-      <p className="rules-help">
-        Start with these terms, then make the criteria specific to your
-        question. All rules are public after upload.
-      </p>
+      <p className="rules-help">{t("Rules are public after upload.")}</p>
       <label>
-        Full question
+        {t("Full question")}
         <textarea
           required
-          aria-label="Full question"
+          aria-label={t("Full question")}
           value={value.question}
           onChange={(e) => set("question", e.target.value)}
-          placeholder="Will the named event occur by the cutoff?"
+          placeholder={t("Will the named event occur by the cutoff?")}
           rows={2}
         />
       </label>
       <label>
-        Description <small>Optional</small>
+        {t("Description")} <small>{t("Optional")}</small>
         <textarea
-          aria-label="Description"
+          aria-label={t("Description")}
           value={value.description}
           onChange={(e) => set("description", e.target.value)}
           rows={2}
         />
       </label>
       <label>
-        Authoritative resolution source
+        {t("Authoritative resolution source")}
         <input
           required
           value={value.resolutionSource}
           onChange={(e) => set("resolutionSource", e.target.value)}
-          placeholder="Source name and URL"
+          placeholder={t("Source name and URL")}
         />
       </label>
       {(
@@ -88,10 +88,10 @@ export function PredictionRulesEditor({
         ] as const
       ).map(([key, label]) => (
         <label key={key}>
-          {label}
+          {t(label ?? "")}
           <textarea
             required
-            aria-label={label}
+            aria-label={t(label)}
             value={value[key]}
             onChange={(e) => set(key, e.target.value)}
             rows={3}
@@ -100,7 +100,7 @@ export function PredictionRulesEditor({
       ))}
       <div className="rules-field-grid">
         <label>
-          Trading close (local time)
+          {t("Trading close (local time)")}
           <input
             type="datetime-local"
             required
@@ -109,18 +109,18 @@ export function PredictionRulesEditor({
           />
         </label>
         <label>
-          Earliest resolution (local time)
+          {t("Earliest resolution (local time)")}
           <input
             type="datetime-local"
-            aria-label="Earliest resolution (local time)"
+            aria-label={t("Earliest resolution (local time)")}
             value={value.earliestResolutionTime}
             onChange={(e) => set("earliestResolutionTime", e.target.value)}
           />
-          <small>Optional; defaults to trading close.</small>
+          <small>{t("Optional; defaults to trading close.")}</small>
         </label>
       </div>
       <label>
-        Review delay (seconds)
+        {t("Review delay (seconds)")}
         <input
           type="number"
           min="1"
@@ -131,10 +131,10 @@ export function PredictionRulesEditor({
         />
       </label>
       <label>
-        Primary resolver
-        <input aria-label="Primary resolver" readOnly value={creator} />
+        {t("Primary resolver")}
+        <input aria-label={t("Primary resolver")} readOnly value={creator} />
         <small>
-          The connected creator wallet will be the primary resolver.
+          {t("The connected creator wallet will be the primary resolver.")}
         </small>
       </label>
       <label className="rules-checkbox">
@@ -143,12 +143,12 @@ export function PredictionRulesEditor({
           checked={value.fallbackEnabled}
           onChange={(e) => set("fallbackEnabled", e.target.checked)}
         />
-        Add a fallback resolver
+        {t("Add a fallback resolver")}
       </label>
       {value.fallbackEnabled ? (
         <div className="rules-fallback">
           <label>
-            Fallback resolver address
+            {t("Fallback resolver address")}
             <input
               required
               value={value.fallbackResolver}
@@ -156,7 +156,7 @@ export function PredictionRulesEditor({
             />
           </label>
           <label>
-            Fallback activation (local time)
+            {t("Fallback activation (local time)")}
             <input
               type="datetime-local"
               required
@@ -165,20 +165,21 @@ export function PredictionRulesEditor({
             />
           </label>
           <label>
-            Fallback proposal deadline (local time)
+            {t("Fallback proposal deadline (local time)")}
             <input
               type="datetime-local"
-              aria-label="Fallback proposal deadline (local time)"
+              aria-label={t("Fallback proposal deadline (local time)")}
               value={value.fallbackDeadlineTime}
               onChange={(e) => set("fallbackDeadlineTime", e.target.value)}
             />
             <small>
-              Optional. Without a deadline there is no automatic timeout
-              outcome.
+              {t(
+                "Optional. Without a deadline there is no automatic timeout outcome.",
+              )}
             </small>
           </label>
           <label>
-            Fallback procedure
+            {t("Fallback procedure")}
             <textarea
               required
               rows={2}
@@ -187,21 +188,29 @@ export function PredictionRulesEditor({
             />
           </label>
           <p className="rules-help">
-            Fallback activates only when no primary proposal exists at
-            activation.{" "}
-            {value.fallbackDeadlineTime
-              ? "If no proposal exists by its deadline, the configured timeout outcome is Invalid."
-              : "Otherwise positions may remain unresolved while waiting for a resolver."}
+            {t(
+              "Fallback activates only when no primary proposal exists at activation. {value0}",
+              {
+                value0: value.fallbackDeadlineTime
+                  ? t(
+                      "If no proposal exists by its deadline, the configured timeout outcome is Invalid.",
+                    )
+                  : t(
+                      "Otherwise positions may remain unresolved while waiting for a resolver.",
+                    ),
+              },
+            )}
           </p>
         </div>
       ) : (
         <p className="rules-help">
-          No fallback: only the creator can propose. There is no automatic
-          timeout payout.
+          {t(
+            "No fallback: only the creator can propose. There is no automatic timeout payout.",
+          )}
         </p>
       )}
       <div className="rules-section-heading">
-        <h3>Additional rules</h3>
+        <h3>{t("Additional rules")}</h3>
         <button
           type="button"
           className="admin-action-button"
@@ -212,23 +221,18 @@ export function PredictionRulesEditor({
             ])
           }
         >
-          Add rule +
+          {t("Add rule +")}
         </button>
       </div>
-      {!value.additionalRules.length && (
-        <p className="rules-help">
-          Optional: add edge cases, reference links or other terms.
-        </p>
-      )}
       {value.additionalRules.map((row, index) => (
         <div className="rules-extra-row" key={row.id}>
           <label>
-            Rule key
+            {t("Rule key")}
             <input
               required
-              aria-label={`Rule ${index + 1} key`}
+              aria-label={t("Rule {value0} key", { value0: index + 1 })}
               value={row.key}
-              placeholder="edgeCases"
+              placeholder={t("edgeCases")}
               onChange={(e) =>
                 set(
                   "additionalRules",
@@ -242,9 +246,9 @@ export function PredictionRulesEditor({
             />
           </label>
           <label>
-            Value type
+            {t("Value type")}
             <select
-              aria-label={`Rule ${index + 1} value type`}
+              aria-label={t("Rule {value0} value type", { value0: index + 1 })}
               value={row.type}
               onChange={(e) =>
                 set(
@@ -257,15 +261,15 @@ export function PredictionRulesEditor({
                 )
               }
             >
-              <option value="text">Text</option>
-              <option value="json">JSON (object, list, number…)</option>
+              <option value="text">{t("Text")}</option>
+              <option value="json">{t("JSON (object, list, number…)")}</option>
             </select>
           </label>
           <label className="rules-extra-value">
-            Rule value
+            {t("Rule value")}
             <textarea
               required
-              aria-label={`Rule ${index + 1} value`}
+              aria-label={t("Rule {value0} value", { value0: index + 1 })}
               rows={2}
               value={row.value}
               onChange={(e) =>
@@ -283,7 +287,7 @@ export function PredictionRulesEditor({
           <button
             type="button"
             className="danger-button"
-            aria-label={`Remove rule ${index + 1}`}
+            aria-label={t("Remove rule {value0}", { value0: index + 1 })}
             onClick={() =>
               set(
                 "additionalRules",
@@ -291,18 +295,20 @@ export function PredictionRulesEditor({
               )
             }
           >
-            Remove
+            {t("Remove")}
           </button>
         </div>
       ))}
       {issue && (
         <p className="access-denied" role="alert">
-          {issue}
+          {t(issue ?? "")}
         </p>
       )}
       <details className="rules-json-preview">
-        <summary>Preview generated JSON</summary>
-        <pre>{json ?? "Complete the highlighted rules to generate JSON."}</pre>
+        <summary>{t("Preview generated JSON")}</summary>
+        <pre>
+          {json ?? t("Complete the highlighted rules to generate JSON.")}
+        </pre>
       </details>
       <button
         type="button"
@@ -310,7 +316,7 @@ export function PredictionRulesEditor({
         disabled={!json}
         onClick={download}
       >
-        Download JSON
+        {t("Download JSON")}
       </button>
     </fieldset>
   );

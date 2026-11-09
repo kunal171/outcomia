@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Owner-signed transfer of free legacy cash; order locks and prediction reserves never move. */
 import { useState } from "react";
 import { AnchorProvider, type BN } from "@anchor-lang/core";
@@ -11,12 +13,12 @@ import {
   sharedAccounts,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
+  getOutcomiaProgram,
   deriveVaultAuthorityPda,
   deriveVaultPda,
   deriveTraderBalancePda,
   TOKEN_PROGRAM_ID,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { derivePredictionPositionPda } from "../lib/prediction";
 export function LegacyBalanceTransfer({
   market,
@@ -33,6 +35,8 @@ export function LegacyBalanceTransfer({
   kind: "spot" | "prediction";
   onChanged: () => void;
 }) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet(),
     { connection } = useConnection(),
     [pending, setPending] = useState(false),
@@ -43,7 +47,7 @@ export function LegacyBalanceTransfer({
     setPending(true);
     setIssue(null);
     try {
-      const p = getTidebookProgram(connection, wallet),
+      const p = getOutcomiaProgram(connection, wallet),
         tx = new Transaction(),
         c = assetCustody(wallet.publicKey, mint);
       if (!(await sharedAccounts(p).assetBalance.fetchNullable(c.assetBalance)))
@@ -97,9 +101,11 @@ export function LegacyBalanceTransfer({
         disabled={pending}
         onClick={() => void move()}
       >
-        {pending ? "Confirm transfer…" : `Move free ${symbol} to shared wallet`}
+        {pending
+          ? t("Confirm transfer…")
+          : t("Move free {value0} to shared wallet", { value0: symbol })}
       </button>
-      {issue && <p role="alert">{issue}</p>}
+      {issue && <p role="alert">{t(issue ?? "")}</p>}
     </div>
   );
 }

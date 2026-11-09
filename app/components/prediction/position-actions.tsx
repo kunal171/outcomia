@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "../preferences-provider";
 
 import { useState } from "react";
 import { BN } from "@anchor-lang/core";
@@ -42,6 +43,8 @@ function whole(value: string): BN {
  * Locked contracts must first be canceled; a claim never consumes them implicitly.
  */
 export function PredictionPositionActions(props: Props) {
+  const { t } = useI18n();
+
   const { market, status, position, loaded, pending, now, symbol } = props;
   const [quantity, setQuantity] = useState(""),
     [yes, setYes] = useState(""),
@@ -103,34 +106,44 @@ export function PredictionPositionActions(props: Props) {
       {!loaded ? (
         <p className="prediction-empty-copy">
           {props.failed
-            ? "Your position is unavailable."
-            : "Loading your contracts…"}
+            ? t("Your position is unavailable.")
+            : t("Loading your contracts…")}
         </p>
       ) : !position ? (
-        <p className="prediction-empty-copy">No contracts in this market.</p>
+        <p className="prediction-empty-copy">
+          {t("No contracts in this market.")}
+        </p>
       ) : (
         <div className="prediction-contract-balances">
           <div>
-            <span>YES contracts</span>
+            <span>{t("YES contracts")}</span>
             <strong>{position.yesFree.toString()}</strong>
-            <small>{position.yesLocked.toString()} in orders</small>
+            <small>
+              {t("{value0} in orders", {
+                value0: position.yesLocked.toString(),
+              })}
+            </small>
           </div>
           <div>
-            <span>NO contracts</span>
+            <span>{t("NO contracts")}</span>
             <strong>{position.noFree.toString()}</strong>
-            <small>{position.noLocked.toString()} in orders</small>
+            <small>
+              {t("{value0} in orders", {
+                value0: position.noLocked.toString(),
+              })}
+            </small>
           </div>
         </div>
       )}
       {position && (position.yesLocked.gtn(0) || position.noLocked.gtn(0)) && (
         <p className="prediction-empty-copy">
-          Cancel sell orders to release contracts before claiming.
+          {t("Cancel sell orders to release contracts before claiming.")}
         </p>
       )}
       {SHARED_BALANCES_ENABLED && status === "resolved" && (
         <div className="prediction-claim">
           <dl className="prediction-claim-value">
-            <dt>Available payout</dt>
+            <dt>{t("Available payout")}</dt>
             <dd>
               {loaded ? `${readableAmount(payout, decimals)} ${symbol}` : "—"}
             </dd>
@@ -141,16 +154,16 @@ export function PredictionPositionActions(props: Props) {
             onClick={() => void submit("redeem", true)}
           >
             {pending
-              ? "Confirm in wallet…"
+              ? t("Confirm in wallet…")
               : payout.gtn(0)
-                ? "Claim all available payout"
-                : "Clear settled contracts"}
+                ? t("Claim all available payout")
+                : t("Clear settled contracts")}
           </button>
           <details>
-            <summary>Redeem a specific quantity</summary>
+            <summary>{t("Redeem a specific quantity")}</summary>
             <div className="prediction-entry-fields">
               <label>
-                YES contracts to redeem
+                {t("YES contracts to redeem")}
                 <input
                   inputMode="numeric"
                   value={yes}
@@ -159,7 +172,7 @@ export function PredictionPositionActions(props: Props) {
                 />
               </label>
               <label>
-                NO contracts to redeem
+                {t("NO contracts to redeem")}
                 <input
                   inputMode="numeric"
                   value={no}
@@ -172,7 +185,7 @@ export function PredictionPositionActions(props: Props) {
               disabled={pending || !canRedeem}
               onClick={() => void submit("redeem")}
             >
-              Redeem selected free contracts
+              {t("Redeem selected free contracts")}
             </button>
           </details>
         </div>
@@ -181,13 +194,15 @@ export function PredictionPositionActions(props: Props) {
         status !== "resolved" &&
         status !== "draft" && (
           <details>
-            <summary>Contract pairs</summary>
+            <summary>{t("Contract pairs")}</summary>
             <p className="prediction-empty-copy">
-              1 {symbol} creates 1 YES + 1 NO. Merging a free pair returns 1{" "}
-              {symbol}.
+              {t(
+                "1 {value0} creates 1 YES + 1 NO. Merging a free pair returns 1 {value1}.",
+                { value0: symbol, value1: symbol },
+              )}
             </p>
             <label>
-              Complete pairs
+              {t("Complete pairs")}
               <input
                 inputMode="numeric"
                 value={quantity}
@@ -207,13 +222,13 @@ export function PredictionPositionActions(props: Props) {
                 }
                 onClick={() => void submit("split")}
               >
-                Create YES + NO pairs
+                {t("Create YES + NO pairs")}
               </button>
               <button
                 disabled={pending || !canMerge}
                 onClick={() => void submit("merge")}
               >
-                Merge free pairs
+                {t("Merge free pairs")}
               </button>
             </div>
           </details>

@@ -4,7 +4,7 @@ use sqlx::types::Json;
 use thiserror::Error;
 
 use crate::{
-    decoder::{DecodedEventLog, TidebookEvent},
+    decoder::{DecodedEventLog, OutcomiaEvent},
     rpc::TransactionRecord,
 };
 
@@ -27,7 +27,7 @@ pub struct TransactionInsert {
     pub raw_logs: Json<Vec<String>>,
 }
 
-/// One decoded Tidebook event converted to PostgreSQL-compatible types.
+/// One decoded Outcomia event converted to PostgreSQL-compatible types.
 #[derive(Debug, Clone)]
 pub struct EventInsert {
     /// Checked source-log position and per-transaction event identity.
@@ -40,7 +40,7 @@ pub struct EventInsert {
     pub payload_base64: String,
 
     /// Current typed schema serialized as queryable JSONB.
-    pub decoded_event: Json<TidebookEvent>,
+    pub decoded_event: Json<OutcomiaEvent>,
 }
 
 /// Conversion failures caused by PostgreSQL's signed integer boundaries.
@@ -146,7 +146,7 @@ mod tests {
         DecodedEventLog {
             log_index,
             payload_base64: "payload".to_owned(),
-            event: TidebookEvent::Market(MarketEvent::Initialized(MarketInitializedEvent {
+            event: OutcomiaEvent::Market(MarketEvent::Initialized(MarketInitializedEvent {
                 market: Pubkey::new_from_array([1; 32]),
                 market_fees: Pubkey::new_from_array([2; 32]),
                 authority: Pubkey::new_from_array([3; 32]),

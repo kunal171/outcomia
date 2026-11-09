@@ -1,20 +1,27 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import {
   decodeMarketKind,
   deriveAdminRecordPda,
   deriveMarketMetadataPda,
-  getTidebookAccounts,
-  getTidebookProgram,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   transactionExplorerUrl,
   type MarketAccount,
   type MarketMetadataAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
 
@@ -27,6 +34,8 @@ function getErrorMessage(cause: unknown) {
 }
 
 export function MarketSettings({ address }: { address: string }) {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
   const { role, loading: roleLoading, error: roleError } = useProtocolRole();
@@ -50,11 +59,11 @@ export function MarketSettings({ address }: { address: string }) {
   }, [address]);
 
   const readProgram = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const signedProgram = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
 
@@ -68,7 +77,7 @@ export function MarketSettings({ address }: { address: string }) {
     setLoading(true);
     setError(null);
     try {
-      const accounts = getTidebookAccounts(readProgram);
+      const accounts = getOutcomiaAccounts(readProgram);
       const [marketAccount, metadataAccount] = await Promise.all([
         accounts.market.fetchNullable(marketAddress),
         accounts.marketMetadata.fetchNullable(
@@ -114,10 +123,14 @@ export function MarketSettings({ address }: { address: string }) {
       const normalizedName = displayName.trim();
 
       if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedBase)) {
-        throw new Error("Base symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+        throw new Error(
+          "Base symbol must contain 1-16 letters, digits, '.', '-' or '_'",
+        );
       }
       if (!/^[A-Za-z0-9._-]{1,16}$/.test(normalizedQuote)) {
-        throw new Error("Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'");
+        throw new Error(
+          "Quote symbol must contain 1-16 letters, digits, '.', '-' or '_'",
+        );
       }
       if (!normalizedName || normalizedName.length > 64) {
         throw new Error("Display name must contain 1-64 characters");
@@ -161,7 +174,8 @@ export function MarketSettings({ address }: { address: string }) {
   };
 
   const isAdmin = role === "super-admin" || role === "admin";
-  const title = metadata?.displayName ??
+  const title =
+    metadata?.displayName ??
     (marketAddress ? shortAddress(marketAddress.toBase58()) : "Market");
 
   return (
@@ -169,29 +183,33 @@ export function MarketSettings({ address }: { address: string }) {
       <AppHeader />
       <main className="route-shell route-shell-narrow">
         <div className="market-detail-back">
-          <Link href={marketAddress ? `/markets/${marketAddress.toBase58()}` : "/markets"}>
-            ← Back to market
+          <Link
+            href={
+              marketAddress
+                ? `/markets/${marketAddress.toBase58()}`
+                : "/markets"
+            }
+          >
+            {t("← Back to market")}
           </Link>
         </div>
 
         <div className="route-heading">
-          <div className="eyebrow">Administration</div>
-          <h1>Manage market</h1>
-          <p>
-            Update the human-readable identity for <strong>{title}</strong>.
-            The market address, mint pair, and trading state do not change.
-          </p>
+          <h1>{t("Manage market")}</h1>
+          <p>{title}</p>
         </div>
 
         {!wallet && (
-          <div className="access-card">Connect an administrator wallet to continue.</div>
+          <div className="access-card">
+            {t("Connect an administrator wallet to continue.")}
+          </div>
         )}
         {wallet && (roleLoading || loading) && (
-          <div className="access-card">Loading market permissions…</div>
+          <div className="access-card">{t("Loading market permissions…")}</div>
         )}
         {wallet && !roleLoading && !loading && !isAdmin && (
           <div className="access-card access-denied">
-            This page requires an active protocol administrator.
+            {t("This page requires an active protocol administrator.")}
           </div>
         )}
 
@@ -199,23 +217,25 @@ export function MarketSettings({ address }: { address: string }) {
           <section className="admin-card">
             <div className="admin-list-heading market-settings-summary">
               <div>
-                <div className="card-label">Market identity</div>
-                <h2>{metadata ? "Update labels" : "Initialize metadata"}</h2>
+                <div className="card-label">{t("Market identity")}</div>
+                <h2>
+                  {metadata ? t("Update labels") : t("Initialize metadata")}
+                </h2>
               </div>
               {metadata && (
                 <span className="role-badge">
-                  {decodeMarketKind(metadata.kind)}
+                  {t(decodeMarketKind(metadata.kind))}
                 </span>
               )}
             </div>
 
             <p className="market-settings-address">
-              Market <code>{marketAddress?.toBase58()}</code>
+              {t("Market")} <code>{marketAddress?.toBase58()}</code>
             </p>
 
             <form className="market-create-form" onSubmit={saveMetadata}>
               <label>
-                Base symbol
+                {t("Base symbol")}
                 <input
                   value={baseSymbol}
                   onChange={(event) => setBaseSymbol(event.target.value)}
@@ -226,7 +246,7 @@ export function MarketSettings({ address }: { address: string }) {
                 />
               </label>
               <label>
-                Quote symbol
+                {t("Quote symbol")}
                 <input
                   value={quoteSymbol}
                   onChange={(event) => setQuoteSymbol(event.target.value)}
@@ -237,18 +257,18 @@ export function MarketSettings({ address }: { address: string }) {
                 />
               </label>
               <label>
-                Display name
+                {t("Display name")}
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Tidebook SOL / USDC"
+                  placeholder={t("Outcomia SOL / USDC")}
                   maxLength={64}
                   autoComplete="off"
                   required
                 />
               </label>
               <label>
-                Market type
+                {t("Market type")}
                 <select
                   value={kind}
                   disabled={metadata !== null}
@@ -256,14 +276,13 @@ export function MarketSettings({ address }: { address: string }) {
                     setKind(event.target.value as "spot" | "other")
                   }
                 >
-                  <option value="spot">Spot</option>
-                  <option value="other">Other (experimental)</option>
-                  <option value="prediction" disabled>
-                    Prediction (coming later)
-                  </option>
+                  <option value="spot">{t("Spot")}</option>
+                  <option value="other">{t("Other (experimental)")}</option>
                 </select>
                 {metadata && (
-                  <small>Market type is immutable after initialization.</small>
+                  <small>
+                    {t("Market type is immutable after initialization.")}
+                  </small>
                 )}
               </label>
               <button
@@ -277,10 +296,10 @@ export function MarketSettings({ address }: { address: string }) {
                 }
               >
                 {pending
-                  ? "Saving metadata…"
+                  ? t("Saving metadata…")
                   : metadata
-                    ? "Update market"
-                    : "Initialize metadata"}
+                    ? t("Update market")
+                    : t("Initialize metadata")}
               </button>
             </form>
           </section>
@@ -288,18 +307,18 @@ export function MarketSettings({ address }: { address: string }) {
 
         {(roleError || error) && (
           <div className="transaction-message transaction-error">
-            {roleError || error}
+            {t(roleError || error || "")}
           </div>
         )}
         {signature && (
           <div className="transaction-message transaction-success">
-            Market metadata saved.{" "}
+            {t("Market metadata saved.")}{" "}
             <a
               href={transactionExplorerUrl(signature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}

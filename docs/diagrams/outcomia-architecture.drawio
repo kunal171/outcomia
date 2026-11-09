@@ -1,0 +1,146 @@
+<mxfile host="app.diagrams.net" modified="2026-11-04T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="outcomia-architecture" name="Outcomia Architecture">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1500" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Outcomia — Spot and Prediction Markets" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="360" y="20" width="880" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="authority" value="Market Authority&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;initialize / pause / unpause / close&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="130" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="trader" value="Trader&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;fund / place / match / cancel&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="270" width="210" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="program" value="Anchor Program: outcomia&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;live on devnet&lt;/font&gt;&lt;br&gt;&lt;br&gt;Account validation&lt;br&gt;Authorization&lt;br&gt;State transitions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="360" y="170" width="260" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="baseMint" value="Base Mint&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;SPL Token Mint&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="360" y="80" width="115" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="quoteMint" value="Quote Mint&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;SPL Token Mint&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656" vertex="1" parent="1">
+          <mxGeometry x="505" y="80" width="115" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="market" value="Market PDA&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;[market, base, quote]&lt;br&gt;authority / status&lt;br&gt;next_order_id / open count&lt;br&gt;best bid / ask&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="110" width="210" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="order" value="Order PDA&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;[order, market, order_id]&lt;br&gt;owner / side / price&lt;br&gt;quantity / remaining&lt;br&gt;locked collateral / status&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="290" width="210" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="tests" value="Rust + LiteSVM Tests&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;184 passing tests&lt;br&gt;transactions + state assertions&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="360" y="390" width="260" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="webApp" value="Outcomia Web App&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Next.js App Router&lt;br&gt;wallet + RPC discovery&lt;br&gt;placement / matching / admin&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="400" width="210" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="plannedGroup" value="BOUNDED MATCHING LAYER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;verticalAlign=top;spacingTop=12" vertex="1" parent="1">
+          <mxGeometry x="1060" y="90" width="460" height="430" as="geometry"/>
+        </mxCell>
+        <mxCell id="vaults" value="Market Vaults&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;vault-authority PDA&lt;br&gt;base + quote SPL accounts&lt;br&gt;collateral + safe closure&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="470" width="210" height="105" as="geometry"/>
+        </mxCell>
+        <mxCell id="queues" value="Sorted Price Levels + FIFO Queues&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;insert / cancel / fill removal&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1310" y="150" width="170" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="matching" value="Bounded Matching&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;best-price FIFO&lt;br&gt;up to 3 maker instructions&lt;br&gt;one atomic transaction&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1100" y="280" width="180" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="settlement" value="Internal Settlement&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;atomic ledger updates&lt;br&gt;quote-denominated taker fees&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1310" y="280" width="170" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="cancel" value="Safe Shutdown&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;paused + no open orders&lt;br&gt;zero fees + empty vaults&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="610" width="210" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="legendCurrent" value="Implemented" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="40" y="560" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="legendPlanned" value="Planned" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f5f5f5;strokeColor=#666666" vertex="1" parent="1">
+          <mxGeometry x="190" y="560" width="130" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="fees" value="ProtocolConfig + MarketFees PDA&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;global bps rate&lt;br&gt;per-market accrued quote claim&lt;br&gt;super-admin treasury withdrawal&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1060" y="610" width="420" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="eAuthority" value="lifecycle instructions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="authority" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eTrader" value="deposit + place / cancel / match" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="trader" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eBase" value="validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="baseMint">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eQuote" value="validate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="quoteMint">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eMarket" value="create / update / close" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="market">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eOrder" value="create / fill / cancel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="order">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eVaults" value="create atomically" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="vaults">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eShutdown" value="close empty state" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="program" target="cancel">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eCounter" value="allocates order_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=1" edge="1" parent="1" source="market" target="order">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eTests" value="executes transactions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="tests" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eWebApp" value="discover accounts + submit transactions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1" edge="1" parent="1" source="webApp" target="program">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="ePlanned" value="indexed state transitions" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#82b366" edge="1" parent="1" source="order" target="plannedGroup">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="eFees" value="configure / accrue / withdraw" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#82b366" edge="1" parent="1" source="program" target="fees">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionGroup" value="PREDICTION MARKETS: TRADING, RESOLUTION AND REDEMPTION" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontStyle=1;verticalAlign=top;spacingTop=15" vertex="1" parent="1">
+          <mxGeometry x="40" y="820" width="1480" height="610" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionMarket" value="PredictionMarket PDA&lt;br&gt;Opening: creator + active admin record&lt;br&gt;Creator is primary resolver; fixed terms&lt;br&gt;Whole pairs + checked backing reserve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="40" y="70" width="370" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionVault" value="Single collateral mint + vault&lt;br&gt;One SPL asset per market&lt;br&gt;Trader collateral + backing reserve + fees" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="560" y="70" width="350" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionPosition" value="PredictionPosition PDA per trader&lt;br&gt;Deposit / withdraw free collateral&lt;br&gt;Split / merge free YES + NO pairs&lt;br&gt;No outcome SPL mints; owner redemption into shared cash" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="1060" y="70" width="370" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionRules" value="Arweave rules + proposal evidence&lt;br&gt;Question, YES/NO criteria, evidence sources&lt;br&gt;Fallback procedure + deadlines&lt;br&gt;Document URI + SHA-256 committed on-chain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="40" y="270" width="370" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionResolution" value="Resolution lifecycle&lt;br&gt;Close -&gt; primary / optional fallback proposal&lt;br&gt;Evidence + delay -&gt; final payout&lt;br&gt;Invalid timeout requires a configured deadline&lt;br&gt;Cancel, redeem, withdraw after resolution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="560" y="270" width="350" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionBooks" value="Book root + sorted levels + FIFO orders&lt;br&gt;Owner cancellation: refund + unlink + level rent&lt;br&gt;Up to 3 maker fills + fees in one atomic transaction&lt;br&gt;Client overlay simulates head / price / claim changes&lt;br&gt;Unfilled quantity stays unposted; deployment flags off" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="1060" y="270" width="370" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionIntegration" value="UI: drafts, funding, pairs, Buy/Sell, safe remainders and YES/NO depth&lt;br&gt;Implemented: resolution and redemption. Typed prediction events remain planned.&lt;br&gt;Future events -&gt; existing Rust ingestion service -&gt; PostgreSQL; not deployed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="350" y="460" width="780" height="75" as="geometry"/>
+        </mxCell>
+        <mxCell id="predictionDetails" value="Open detailed prediction architecture: accounts, resolution and atomic switching" link="prediction-market-architecture.drawio" style="text;html=1;align=center;fontColor=#0066cc;whiteSpace=wrap;" vertex="1" parent="predictionGroup">
+          <mxGeometry x="250" y="560" width="980" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="ePredictionModule" value="draft / opening / cash / complete-set instructions" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#666666;endArrow=block;exitX=0;exitY=0.8;entryX=0;entryY=0.5;" edge="1" parent="1" source="program" target="predictionMarket">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="20" y="290"/><mxPoint x="20" y="940"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="ePredictionVault" value="canonical collateral" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionMarket" target="predictionVault"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionClaims" value="backed internal claims" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionVault" target="predictionPosition"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionRules" value="verify committed terms" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionRules" target="predictionMarket"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionEvidence" value="evaluate evidence under fixed rules" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionRules" target="predictionResolution"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionReserve" value="payout reserve" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionResolution" target="predictionVault"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionTrading" value="lock / fill / release" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionBooks" target="predictionPosition"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionResolutionEvents" value="resolution + redemption events" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionResolution" target="predictionIntegration"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ePredictionBookEvents" value="order + fill events" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=block;" edge="1" parent="predictionGroup" source="predictionBooks" target="predictionIntegration"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+<diagram id="shared-wallet-settlement" name="Shared wallet and settlement"><mxGraphModel grid="1" page="1" pageWidth="1200" pageHeight="1450"><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="s-title" value="Shared balances and prediction settlement - deployed on devnet" style="text;html=1;align=center;fontSize=22;fontStyle=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="80" y="20" width="1040" height="50" as="geometry"/></mxCell><mxCell id="s-ui" value="Next.js wallet + market pages&lt;br&gt;Explicit rollout flags; owner-signed actions" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="350" y="110" width="480" height="70" as="geometry"/></mxCell><mxCell id="s-ledger" value="AssetBalance PDA&lt;br&gt;[asset_balance, owner, mint]&lt;br&gt;free + locked across markets" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="90" y="270" width="310" height="100" as="geometry"/></mxCell><mxCell id="s-vault" value="One SPL vault per mint&lt;br&gt;backs global cash + shared-book fees&lt;br&gt;deposit / withdraw by owner" style="shape=cylinder3;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="90" y="460" width="310" height="100" as="geometry"/></mxCell><mxCell id="s-book" value="SharedBook / SharedOrder / SharedPriceLevel&lt;br&gt;Spot + YES / NO lists&lt;br&gt;price priority, FIFO, per-order locks, fees" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="500" y="270" width="530" height="100" as="geometry"/></mxCell><mxCell id="s-outcome" value="PredictionPosition (question + owner)&lt;br&gt;YES / NO free and locked contracts&lt;br&gt;Cash uses AssetBalance" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="580" y="460" width="400" height="100" as="geometry"/></mxCell><mxCell id="s-reserve" value="Question collateral vault&lt;br&gt;backing reserve stays isolated&lt;br&gt;split in; merge / redeem out" style="shape=cylinder3;fillColor=#fff2cc;strokeColor=#d6b656;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="300" y="660" width="560" height="85" as="geometry"/></mxCell><mxCell id="s-resolver" value="Stored active-admin resolver&lt;br&gt;propose / correct with evidence&lt;br&gt;published earliest time + fallback window" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="80" y="850" width="440" height="100" as="geometry"/></mxCell><mxCell id="s-final" value="Permissionless finalization&lt;br&gt;mature proposal or committed Invalid timeout&lt;br&gt;Caller cannot choose a different outcome" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="650" y="850" width="450" height="100" as="geometry"/></mxCell><mxCell id="s-claim" value="Owner redemption burns free contracts&lt;br&gt;YES winner: full payout; NO winner: full payout&lt;br&gt;Invalid: half each; locked claims must be canceled" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="310" y="1060" width="570" height="100" as="geometry"/></mxCell><mxCell id="s-legacy" value="Legacy queues and cash remain separate&lt;br&gt;Cancel old orders; transfer only free cash with owner signature&lt;br&gt;No account reinterpretation, automatic migration or mixing liquidity" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="210" y="1250" width="770" height="95" as="geometry"/></mxCell><mxCell id="s-e0" value="fund / recover" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-ui" target="s-ledger"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e1" value="place / fill / cancel" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-ui" target="s-book"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e2" value="equal claim / token movement" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-ledger" target="s-vault"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e3" value="global cash locks / settlement" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-ledger" target="s-book"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e4" value="per-question contract locks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-book" target="s-outcome"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e5" value="split / merge backing CPI" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-ledger" target="s-reserve"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e6" value="fully backed claims" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-outcome" target="s-reserve"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e7" value="proposal + review delay" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-resolver" target="s-final"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e8" value="fixed final payout schedule" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-final" target="s-claim"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e9" value="payout credited globally" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-claim" target="s-ledger"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e10" value="reserve reduced equally" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-claim" target="s-reserve"><mxGeometry relative="1" as="geometry"/></mxCell><mxCell id="s-e11" value="free cash migration only" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;" edge="1" parent="1" source="s-legacy" target="s-ledger"><mxGeometry relative="1" as="geometry"/></mxCell></root></mxGraphModel></diagram>
+</mxfile>

@@ -119,7 +119,7 @@ fn notification_to_wakeup(
     }))
 }
 
-/// Subscribes to finalized Tidebook logs and serially invokes recovery hooks.
+/// Subscribes to finalized Outcomia logs and serially invokes recovery hooks.
 ///
 /// `on_ready` runs after the subscription is active but before notifications
 /// are consumed. Notifications arriving during that HTTP catch-up remain

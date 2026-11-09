@@ -1,4 +1,4 @@
-//! Runtime configuration for the Tidebook indexer.
+//! Runtime configuration for the Outcomia indexer.
 
 use std::env;
 use thiserror::Error;
@@ -14,7 +14,7 @@ pub struct Config {
     /// HTTP RPC endpoint used for finalized history and transaction retrieval.
     pub rpc_url: String,
 
-    /// Tidebook program whose signatures and owned event logs are indexed.
+    /// Outcomia program whose signatures and owned event logs are indexed.
     pub program_id: String,
 
     /// PostgreSQL connection string; deliberately has no embedded default.
@@ -45,7 +45,8 @@ impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         Ok(Self {
             rpc_url: env::var("SOLANA_RPC_URL").unwrap_or_else(|_| DEFAULT_RPC_URL.to_owned()),
-            program_id: env::var("TIDEBOOK_PROGRAM_ID")
+            program_id: env::var("OUTCOMIA_PROGRAM_ID")
+                .or_else(|_| env::var("TIDEBOOK_PROGRAM_ID"))
                 .unwrap_or_else(|_| DEFAULT_PROGRAM_ID.to_owned()),
             database_url: env::var("DATABASE_URL").map_err(ConfigError::DatabaseUrl)?,
             websocket_url: env::var("SOLANA_WS_URL")

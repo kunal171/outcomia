@@ -1,8 +1,8 @@
-//! Human-readable, non-authoritative diagnostics for decoded Tidebook events.
+//! Human-readable, non-authoritative diagnostics for decoded Outcomia events.
 
 use crate::decoder::{
     BalanceEvent, DecodedEventLog, FaucetEvent, FeeEvent, GovernanceEvent, MarketEvent, OrderEvent,
-    TidebookEvent,
+    OutcomiaEvent,
 };
 
 /// Prints one decoded event without coupling display policy to ingestion.
@@ -29,7 +29,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
     );
 
     match &decoded.event {
-        TidebookEvent::Governance(event) => match event {
+        OutcomiaEvent::Governance(event) => match event {
             GovernanceEvent::ProtocolInitialized(event) => {
                 println!(
                     "    ProtocolInitialized protocol_config={} super_admin={} admin_record={}",
@@ -64,7 +64,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 );
             }
         },
-        TidebookEvent::Market(event) => match event {
+        OutcomiaEvent::Market(event) => match event {
             MarketEvent::Initialized(event) => {
                 println!(
                     "    MarketInitialized market={} authority={} base_mint={} quote_mint={} price_tick_size={} quantity_lot_size={}",
@@ -118,7 +118,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 );
             }
         },
-        TidebookEvent::Order(event) => match event {
+        OutcomiaEvent::Order(event) => match event {
             OrderEvent::Placed(event) => {
                 println!(
                     "    OrderPlaced market={} order={} order_id={} owner={} side={:?} price={} quantity={} locked_collateral={} price_level={}",
@@ -149,7 +149,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 );
             }
         },
-        TidebookEvent::Fill(event) => {
+        OutcomiaEvent::Fill(event) => {
             println!(
                 "    Fill market={} maker_order={} maker_order_id={} maker={} taker={} maker_side={:?} execution_price={} base_quantity={} quote_quantity={} taker_fee_quote={} maker_remaining_quantity={} taker_remaining_quantity={}",
                 event.market,
@@ -166,7 +166,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 event.taker_remaining_quantity,
             );
         }
-        TidebookEvent::Balance(event) => match event {
+        OutcomiaEvent::Balance(event) => match event {
             BalanceEvent::Initialized(event) => {
                 println!(
                     "    TraderBalanceInitialized market={} owner={} trader_balance={}",
@@ -198,7 +198,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 );
             }
         },
-        TidebookEvent::Fee(event) => match event {
+        OutcomiaEvent::Fee(event) => match event {
             FeeEvent::ProtocolFeesWithdrawn(event) => {
                 println!(
                     "    ProtocolFeesWithdrawn market={} market_fees={} super_admin={} quote_mint={} quote_vault={} destination_quote_account={} amount={} remaining_accrued_quote_fees={}",
@@ -213,7 +213,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
                 );
             }
         },
-        TidebookEvent::Faucet(event) => match event {
+        OutcomiaEvent::Faucet(event) => match event {
             FaucetEvent::Initialized(event) => {
                 println!(
                     "    TestFaucetInitialized market={} test_faucet={} faucet_authority={} base_mint={} quote_mint={} base_claim_amount={} quote_claim_amount={}",

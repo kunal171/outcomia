@@ -4,19 +4,17 @@
 
 Status: **Sorted price levels, FIFO queues, and indexed removal implemented.**
 
-This milestone organizes resting orders by price and arrival time. It does not
-match orders, partially fill them, or settle trades. Placement and cancellation
-must keep the index correct before matching logic is allowed to depend on it.
+This document covers the original `PriceLevel` index and its FIFO queues.
+Matching and settlement are implemented separately; they rely on these links
+and revalidate them on-chain. See [crankless settlement](crankless-settlement-design.md).
+The current shared book uses the same ordering rules with its own account
+names and per-asset custody; see [shared balances](shared-balances-resolution.md).
 
-The following matching milestone will use the bounded crankless model described
-in [`crankless-settlement-design.md`](crankless-settlement-design.md). That later
-instruction will require clients to supply the relevant levels, FIFO orders,
-and maker balance PDAs. Consequently, every link established here is a security
-boundary and must be validated rather than treated as trusted client input.
+Every price and queue link is a validation boundary, not trusted client input.
 
 ## Required ordering
 
-Tidebook uses price-time priority:
+Outcomia uses price-time priority:
 
 1. bids with higher prices have priority over lower bids;
 2. asks with lower prices have priority over higher asks;

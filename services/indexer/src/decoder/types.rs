@@ -1,4 +1,4 @@
-//! Off-chain representations of Tidebook's serialized Anchor events.
+//! Off-chain representations of Outcomia's serialized Anchor events.
 //!
 //! Field order and field types must exactly match the corresponding on-chain
 //! event declarations. Borsh is positional and does not encode field names.

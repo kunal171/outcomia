@@ -1,0 +1,660 @@
+import {
+  AnchorProvider,
+  BN,
+  EventParser,
+  Program,
+  type Idl,
+} from "@anchor-lang/core";
+import {
+  Connection,
+  PublicKey,
+  type GetProgramAccountsFilter,
+} from "@solana/web3.js";
+import outcomiaIdl from "../idl/outcomia.json";
+import { PROGRAM_ID } from "./solana";
+import type {
+  PredictionMarketAccount,
+  PredictionPositionAccount,
+  PredictionOrderBookAccount,
+  PredictionOrderAccount,
+  PredictionPriceLevelAccount,
+} from "./prediction";
+
+export const PROTOCOL_CONFIG_SEED = "protocol_config";
+export const ADMIN_SEED = "admin";
+export const MARKET_SEED = "market";
+export const MARKET_METADATA_SEED = "market_metadata";
+export const MARKET_FEES_SEED = "market_fees";
+export const ORDER_SEED = "order";
+export const PRICE_LEVEL_SEED = "price_level";
+export const TRADER_BALANCE_SEED = "trader_balance";
+export const VAULT_AUTHORITY_SEED = "vault-authority";
+export const VAULT_SEED = "vault";
+export const TEST_FAUCET_SEED = "test_faucet";
+export const TEST_FAUCET_AUTHORITY_SEED = "test_faucet_authority";
+
+// Markets currently use the original SPL Token program, not Token-2022.
+export const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+);
+
+const BPF_LOADER_UPGRADEABLE_PROGRAM_ID = new PublicKey(
+  "BPFLoaderUpgradeab1e11111111111111111111111",
+);
+
+type BrowserWallet = ConstructorParameters<typeof AnchorProvider>[1];
+
+export type ProtocolRole =
+  | "disconnected"
+  | "uninitialized"
+  | "super-admin"
+  | "admin"
+  | "disabled"
+  | "user";
+
+export type AdminStatus = "active" | "disabled";
+export type MarketStatus = "active" | "paused";
+export type MarketKind = "spot" | "prediction" | "other";
+
+export type OrderSide = "bid" | "ask";
+export type OrderStatus = "open" | "filled" | "canceled";
+
+export interface ProtocolConfigAccount {
+  superAdmin: PublicKey;
+  takerFeeBps: number;
+  bump: number;
+}
+
+export interface MarketFeesAccount {
+  market: PublicKey;
+  quoteMint: PublicKey;
+  accruedQuoteFees: BN;
+  bump: number;
+}
+
+export interface TestFaucetAccount {
+  market: PublicKey;
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  baseClaimAmount: BN;
+  quoteClaimAmount: BN;
+  authorityBump: number;
+  bump: number;
+}
+
+export interface AdminRecordAccount {
+  authority: PublicKey;
+  addedBy: PublicKey;
+  status: { active?: object; disabled?: object };
+  bump: number;
+}
+
+export interface AdminRecordView {
+  address: PublicKey;
+  authority: PublicKey;
+  addedBy: PublicKey;
+  status: AdminStatus;
+}
+
+export interface MarketAccount {
+  authority: PublicKey;
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  status: { active?: object; paused?: object };
+  nextOrderId: BN;
+
+  baseDecimals: number;
+  quoteDecimals: number;
+  priceTickSize: BN;
+  quantityLotSize: BN;
+
+  bestBid: BN | null;
+  bestAsk: BN | null;
+  openOrderCount: BN;
+  bump: number;
+}
+
+export interface MarketView extends MarketAccount {
+  address: PublicKey;
+}
+
+export interface MarketMetadataAccount {
+  market: PublicKey;
+  baseSymbol: string;
+  quoteSymbol: string;
+  displayName: string;
+  kind: { spot?: object; prediction?: object; other?: object };
+  bump: number;
+}
+
+export interface PriceLevelAccount {
+  market: PublicKey;
+  side: { bid?: object; ask?: object };
+  price: BN;
+  betterPrice: BN | null;
+  worsePrice: BN | null;
+  firstOrder: PublicKey | null;
+  lastOrder: PublicKey | null;
+  totalRemainingQuantity: BN;
+  orderCount: BN;
+  rentPayer: PublicKey;
+  bump: number;
+}
+
+export interface PriceLevelNeighbors {
+  betterLevel: PublicKey | null;
+  worseLevel: PublicKey | null;
+}
+
+export interface PriceLevelView extends PriceLevelAccount {
+  address: PublicKey;
+}
+
+export interface LastTradeView {
+  price: BN;
+  signature: string;
+  blockTime: number | null;
+}
+
+export interface OrderAccount {
+  owner: PublicKey;
+  market: PublicKey;
+  orderId: BN;
+  side: { bid?: object; ask?: object };
+  price: BN;
+  priceLevel: PublicKey;
+  previousOrder: PublicKey | null;
+  nextOrder: PublicKey | null;
+  quantity: BN;
+  remainingQuantity: BN;
+  lockedCollateral: BN;
+  status: {
+    open?: object;
+    filled?: object;
+    canceled?: object;
+  };
+  bump: number;
+}
+
+export interface OrderView extends OrderAccount {
+  address: PublicKey;
+}
+
+export interface TraderBalanceAccount {
+  market: PublicKey;
+  owner: PublicKey;
+  baseFree: BN;
+  baseLocked: BN;
+  quoteFree: BN;
+  quoteLocked: BN;
+  bump: number;
+}
+
+interface AccountClient<T> {
+  fetchNullable(address: PublicKey): Promise<T | null>;
+
+  all(
+    filters?: GetProgramAccountsFilter[],
+  ): Promise<Array<{ publicKey: PublicKey; account: T }>>;
+}
+
+interface OutcomiaAccounts {
+  predictionMarket: AccountClient<PredictionMarketAccount>;
+  predictionPosition: AccountClient<PredictionPositionAccount>;
+  predictionOrderBook: AccountClient<PredictionOrderBookAccount>;
+  predictionOrder: AccountClient<PredictionOrderAccount>;
+  predictionPriceLevel: AccountClient<PredictionPriceLevelAccount>;
+  protocolConfig: AccountClient<ProtocolConfigAccount>;
+  adminRecord: AccountClient<AdminRecordAccount>;
+  market: AccountClient<MarketAccount>;
+  marketMetadata: AccountClient<MarketMetadataAccount>;
+  marketFees: AccountClient<MarketFeesAccount>;
+  testFaucet: AccountClient<TestFaucetAccount>;
+  priceLevel: AccountClient<PriceLevelAccount>;
+  order: AccountClient<OrderAccount>;
+  traderBalance: AccountClient<TraderBalanceAccount>;
+}
+
+export function deriveVaultAuthorityPda(market: PublicKey) {
+  // This PDA has no account data; it exists only as the signing authority for
+  // both token vaults belonging to the market.
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(VAULT_AUTHORITY_SEED), market.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveVaultPda(market: PublicKey, mint: PublicKey) {
+  // Including the mint gives each market exactly one canonical vault per asset.
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(VAULT_SEED), market.toBuffer(), mint.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function getOutcomiaProgram(
+  connection: Connection,
+  wallet: BrowserWallet,
+) {
+  const provider = new AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+    preflightCommitment: "confirmed",
+  });
+
+  return new Program(outcomiaIdl as Idl, provider);
+}
+
+export function getOutcomiaReadProgram(connection: Connection) {
+  return new Program(outcomiaIdl as Idl, { connection });
+}
+
+export function getOutcomiaAccounts(program: Program): OutcomiaAccounts {
+  return program.account as unknown as OutcomiaAccounts;
+}
+
+export function deriveProtocolConfigPda() {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PROTOCOL_CONFIG_SEED)],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveAdminRecordPda(authority: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(ADMIN_SEED), authority.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveMarketPda(baseMint: PublicKey, quoteMint: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(MARKET_SEED), baseMint.toBuffer(), quoteMint.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveMarketMetadataPda(market: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(MARKET_METADATA_SEED), market.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveMarketFeesPda(market: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(MARKET_FEES_SEED), market.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveTestFaucetPda(market: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(TEST_FAUCET_SEED), market.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveTestFaucetAuthorityPda(testFaucet: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(TEST_FAUCET_AUTHORITY_SEED), testFaucet.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function derivePriceLevelPda(
+  market: PublicKey,
+  side: OrderSide,
+  price: BN,
+) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(PRICE_LEVEL_SEED),
+      market.toBuffer(),
+      Buffer.from(side),
+      price.toArrayLike(Buffer, "le", 8),
+    ],
+    PROGRAM_ID,
+  )[0];
+}
+
+export function deriveTraderBalancePda(market: PublicKey, owner: PublicKey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(TRADER_BALANCE_SEED), market.toBuffer(), owner.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+/**
+ * Reads one side of the program-maintained price-level linked list.
+ *
+ * This is deliberately an RPC traversal rather than a scan of every program
+ * account: `bestBid`/`bestAsk` and `worsePrice` define the canonical ordering.
+ * The bound prevents a malformed list from causing an unbounded browser loop;
+ * a production indexer can serve deeper books without sequential RPC calls.
+ */
+export async function fetchPriceLevelSide(
+  program: Program,
+  market: PublicKey,
+  side: OrderSide,
+  bestPrice: BN | null,
+  limit = 50,
+): Promise<PriceLevelView[]> {
+  const levels: PriceLevelView[] = [];
+  const visited = new Set<string>();
+  const accounts = getOutcomiaAccounts(program);
+  let currentPrice = bestPrice;
+
+  while (currentPrice && levels.length < limit) {
+    const address = derivePriceLevelPda(market, side, currentPrice);
+    const key = address.toBase58();
+    if (visited.has(key)) {
+      throw new Error("Price-level index contains a cycle");
+    }
+    visited.add(key);
+
+    const level = await accounts.priceLevel.fetchNullable(address);
+    if (!level) {
+      throw new Error(`Missing ${side} price level ${key}`);
+    }
+    const decodedSide: OrderSide = "bid" in level.side ? "bid" : "ask";
+    if (
+      !level.market.equals(market) ||
+      decodedSide !== side ||
+      !level.price.eq(currentPrice)
+    ) {
+      throw new Error(`Invalid ${side} price-level link`);
+    }
+
+    levels.push({ ...level, address });
+    currentPrice = level.worsePrice;
+  }
+
+  return levels;
+}
+
+/**
+ * Recovers the latest executed price from successful FillEvent logs.
+ *
+ * Outcomia does not currently store `lastTradePrice` in the Market account.
+ * Scanning a small recent window is acceptable for this research UI, but an
+ * indexer should own trade history and candles once market activity grows.
+ */
+export async function fetchLatestTrade(
+  connection: Connection,
+  program: Program,
+  market: PublicKey,
+  signatureLimit = 8,
+): Promise<LastTradeView | null> {
+  const signatures = await connection.getSignaturesForAddress(market, {
+    limit: signatureLimit,
+  });
+  const successful = signatures.filter((entry) => entry.err === null);
+  if (successful.length === 0) return null;
+
+  const parser = new EventParser(program.programId, program.coder);
+
+  // Stop at the newest fill instead of blasting 25 transaction requests at a
+  // shared RPC. A bounded recent window is not a complete historical index.
+  for (const entry of successful.slice(0, 6)) {
+    const transaction = await connection.getTransaction(entry.signature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    const logs = transaction?.meta?.logMessages;
+    if (!logs) continue;
+
+    let latestPrice: BN | null = null;
+    for (const event of parser.parseLogs(logs)) {
+      // Anchor's JS Program camel-cases IDL event names.
+      if (event.name !== "fillEvent" && event.name !== "FillEvent") continue;
+      const data = event.data as { market: PublicKey; executionPrice: BN };
+      if (data.market.equals(market)) latestPrice = data.executionPrice;
+    }
+    if (latestPrice) {
+      return {
+        price: latestPrice,
+        signature: entry.signature,
+        blockTime: entry.blockTime ?? null,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Walks the program-maintained price-level list to locate the insertion gap.
+ *
+ * The RPC traversal is intentionally treated as advisory: it detects malformed
+ * or cyclic client state early, while the instruction repeats all security
+ * checks atomically in case the book changes before the transaction lands.
+ * Traversal is O(number of price levels); a production client can replace it
+ * with an indexer without changing the on-chain neighbor contract.
+ */
+export async function findPriceLevelNeighbors(
+  program: Program,
+  market: PublicKey,
+  side: OrderSide,
+  price: BN,
+  bestPrice: BN | null,
+): Promise<PriceLevelNeighbors> {
+  if (!bestPrice) {
+    return { betterLevel: null, worseLevel: null };
+  }
+
+  const accounts = getOutcomiaAccounts(program);
+  const visited = new Set<string>();
+  let expectedBetterPrice: BN | null = null;
+  let betterLevel: PublicKey | null = null;
+  let currentPrice = bestPrice;
+
+  while (true) {
+    const currentLevel = derivePriceLevelPda(market, side, currentPrice);
+    const currentAddress = currentLevel.toBase58();
+
+    if (visited.has(currentAddress)) {
+      throw new Error("Price-level index contains a cycle");
+    }
+    visited.add(currentAddress);
+
+    const level = await accounts.priceLevel.fetchNullable(currentLevel);
+    if (!level) {
+      throw new Error(
+        "Price-level index points to missing account " + currentAddress,
+      );
+    }
+
+    const decodedSide: OrderSide = "bid" in level.side ? "bid" : "ask";
+    if (!level.market.equals(market) || decodedSide !== side) {
+      throw new Error("Price-level index crosses a market or side boundary");
+    }
+    if (!level.price.eq(currentPrice)) {
+      throw new Error("Price-level PDA and stored price do not match");
+    }
+
+    const betterLinkMatches = expectedBetterPrice
+      ? level.betterPrice?.eq(expectedBetterPrice) === true
+      : level.betterPrice === null;
+    if (!betterLinkMatches) {
+      throw new Error("Price-level index has a broken reciprocal link");
+    }
+
+    if (expectedBetterPrice) {
+      const strictlyOrdered =
+        side === "bid"
+          ? expectedBetterPrice.gt(level.price)
+          : expectedBetterPrice.lt(level.price);
+      if (!strictlyOrdered) {
+        throw new Error("Price-level index is not strictly ordered");
+      }
+    }
+
+    if (price.eq(level.price)) {
+      throw new Error(
+        "Price level appeared during traversal; refresh and retry",
+      );
+    }
+
+    const belongsBeforeCurrent =
+      side === "bid" ? price.gt(level.price) : price.lt(level.price);
+    if (belongsBeforeCurrent) {
+      return { betterLevel, worseLevel: currentLevel };
+    }
+
+    if (!level.worsePrice) {
+      return { betterLevel: currentLevel, worseLevel: null };
+    }
+
+    expectedBetterPrice = level.price;
+    betterLevel = currentLevel;
+    currentPrice = level.worsePrice;
+  }
+}
+
+export function deriveOrderPda(market: PublicKey, orderId: BN) {
+  return PublicKey.findProgramAddressSync(
+    [
+      Buffer.from(ORDER_SEED),
+      market.toBuffer(),
+      orderId.toArrayLike(Buffer, "le", 8),
+    ],
+    PROGRAM_ID,
+  )[0];
+}
+
+/** Converts a human decimal string to an exact u64 atomic amount. */
+export function parseTokenAmount(
+  value: string,
+  decimals: number,
+  label: string,
+) {
+  const normalized = value.trim();
+  if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(normalized)) {
+    throw new Error(`${label} must be a positive decimal number`);
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  if (fraction.length > decimals) {
+    throw new Error(`${label} supports at most ${decimals} decimal places`);
+  }
+
+  const atomic = new BN(
+    `${whole}${fraction.padEnd(decimals, "0")}`.replace(/^0+(?=\d)/, ""),
+    10,
+  );
+  if (atomic.isZero()) {
+    throw new Error(`${label} must be greater than zero`);
+  }
+  if (atomic.bitLength() > 64) {
+    throw new Error(`${label} exceeds the u64 limit`);
+  }
+
+  return atomic;
+}
+
+/** Sums every legacy SPL token account owned by a wallet for one mint. */
+export async function getOwnedTokenBalance(
+  connection: Connection,
+  owner: PublicKey,
+  mint: PublicKey,
+) {
+  const response = await connection.getParsedTokenAccountsByOwner(
+    owner,
+    { mint },
+    "confirmed",
+  );
+
+  return response.value.reduce((total, { account }) => {
+    if (!("parsed" in account.data)) return total;
+    const amount = account.data.parsed?.info?.tokenAmount?.amount;
+    return typeof amount === "string" ? total.add(new BN(amount, 10)) : total;
+  }, new BN(0));
+}
+
+/**
+ * Selects one owned token account that can fund the requested atomic amount.
+ */
+export async function findOwnedTokenAccount(
+  connection: Connection,
+  owner: PublicKey,
+  mint: PublicKey,
+  minimumAmount = new BN(0),
+) {
+  const response = await connection.getParsedTokenAccountsByOwner(
+    owner,
+    { mint },
+    "confirmed",
+  );
+
+  const tokenAccount = response.value.find(({ account }) => {
+    if (!("parsed" in account.data)) return false;
+
+    const amount = account.data.parsed?.info?.tokenAmount?.amount;
+    return typeof amount === "string" && new BN(amount, 10).gte(minimumAmount);
+  });
+
+  if (!tokenAccount) {
+    throw new Error(
+      `No token account for ${mint.toBase58()} has enough available balance`,
+    );
+  }
+
+  return tokenAccount.pubkey;
+}
+
+export function deriveProgramDataAddress() {
+  return PublicKey.findProgramAddressSync(
+    [PROGRAM_ID.toBuffer()],
+    BPF_LOADER_UPGRADEABLE_PROGRAM_ID,
+  )[0];
+}
+
+export function decodeAdminStatus(
+  status: AdminRecordAccount["status"],
+): AdminStatus {
+  return "disabled" in status ? "disabled" : "active";
+}
+
+export function decodeMarketStatus(
+  status: MarketAccount["status"],
+): MarketStatus {
+  return "paused" in status ? "paused" : "active";
+}
+
+export function decodeMarketKind(
+  kind: MarketMetadataAccount["kind"],
+): MarketKind {
+  if ("prediction" in kind) return "prediction";
+  if ("other" in kind) return "other";
+  return "spot";
+}
+
+export function decodeOrderSide(side: OrderAccount["side"]): OrderSide {
+  return "bid" in side ? "bid" : "ask";
+}
+
+export function decodeOrderStatus(status: OrderAccount["status"]): OrderStatus {
+  if ("open" in status) return "open";
+  if ("filled" in status) return "filled";
+  return "canceled";
+}
+
+export function formatAtomicAmount(value: BN, decimals: number) {
+  const raw = value.toString(10);
+
+  if (decimals === 0) return raw;
+
+  const padded = raw.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, -decimals);
+  const fraction = padded.slice(-decimals).replace(/0+$/, "");
+
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+export function transactionExplorerUrl(signature: string) {
+  return `https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+}
+
+export function accountExplorerUrl(address: PublicKey) {
+  return `https://explorer.solana.com/address/${address.toBase58()}?cluster=devnet`;
+}

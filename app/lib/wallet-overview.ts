@@ -13,12 +13,12 @@ import {
   deriveMarketMetadataPda,
   deriveMarketPda,
   deriveTraderBalancePda,
-  getTidebookAccounts,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaReadProgram,
   type MarketAccount,
   type MarketMetadataAccount,
   type TraderBalanceAccount,
-} from "./tidebook";
+} from "./outcomia";
 import {
   derivePredictionMarketPda,
   derivePredictionPositionPda,
@@ -212,7 +212,7 @@ async function readSpot(
   owner: PublicKey,
 ): Promise<SpotHolding[]> {
   // Both ledger structs store market first, then owner: discriminator 8 + market 32.
-  const records = await getTidebookAccounts(program).traderBalance.all([
+  const records = await getOutcomiaAccounts(program).traderBalance.all([
     { memcmp: { offset: 40, bytes: owner.toBase58() } },
   ]);
   for (const { publicKey, account } of records) {
@@ -250,7 +250,7 @@ async function readPredictions(
   program: Program,
   owner: PublicKey,
 ): Promise<PredictionHolding[]> {
-  const records = await getTidebookAccounts(program).predictionPosition.all([
+  const records = await getOutcomiaAccounts(program).predictionPosition.all([
     { memcmp: { offset: 40, bytes: owner.toBase58() } },
   ]);
   for (const { publicKey, account } of records) {
@@ -320,7 +320,7 @@ async function readShared(
  * Labels are optional; failed metadata reads do not invent or remove listings.
  */
 async function readCatalog(program: Program): Promise<ListedAsset[]> {
-  const accounts = getTidebookAccounts(program);
+  const accounts = getOutcomiaAccounts(program);
   const [spots, predictions, labels] = await Promise.all([
     accounts.market.all(),
     accounts.predictionMarket.all(),
@@ -377,7 +377,7 @@ export async function loadWalletOverview(
   connection: Connection,
   owner: PublicKey,
 ): Promise<WalletOverview> {
-  const program = getTidebookReadProgram(connection);
+  const program = getOutcomiaReadProgram(connection);
   const [sol, tokens, catalog, spot, predictions] = await Promise.all([
     read(async () => {
       const lamports = await connection.getBalance(owner, "confirmed");
@@ -421,7 +421,7 @@ export interface AssetRow {
 
 /** Group by mint/program, never by symbol. Contract claims are NOT collateral balances.
  * If any market's units are unknown, aggregate deposits are unavailable rather
- * than presenting a partial sum as the wallet's complete Tidebook balance.
+ * than presenting a partial sum as the wallet's complete Outcomia balance.
  */
 export function walletAssetRows(snapshot: WalletOverview): AssetRow[] {
   const spotComplete =

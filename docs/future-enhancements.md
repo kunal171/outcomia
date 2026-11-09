@@ -1,8 +1,14 @@
 # Future Enhancements
 
+The broader prediction-platform scope—public and private markets, clubs,
+multi-outcome trading and governance—is recorded in
+[future platform scope](future-scope.md). This document covers the separate
+indexing, pricing and liquidity research track. Its phases describe a roadmap;
+current implementation status is recorded in the feature and deployment docs.
+
 ## Purpose
 
-This document records Tidebook's planned evolution beyond the current
+This document records Outcomia's planned evolution beyond the current
 fee-aware central limit order book. It is a roadmap, not a description of
 implemented behavior. Each phase should be developed on a separate feature
 branch and merged only after its account model, failure paths, frontend, and
@@ -15,11 +21,11 @@ liquidity, and execution responsibilities:
 External price feeds ---> Reference-price service ---> Offchain market maker
                                                               |
                                                               v
-Next.js + monitoring <--- Indexer API <--- Tidebook CLOB <--- Smart router ---> Tidebook AMM
+Next.js + monitoring <--- Indexer API <--- Outcomia CLOB <--- Smart router ---> Outcomia AMM
 ```
 
 An oracle reports an external reference price. It does not create liquidity or
-force Tidebook's executable price to follow another venue. The market maker
+force Outcomia's executable price to follow another venue. The market maker
 creates CLOB liquidity around that reference, while arbitrage aligns executable
 prices. The optional AMM supplies backstop liquidity when the order book is
 thin.
@@ -60,7 +66,7 @@ Done when the existing fee-aware CLOB completes its full lifecycle on devnet.
 
 Foundation branch: `feature/indexer-foundation`.
 
-Tidebook already emits typed events for governance, markets, balances, orders,
+Outcomia already emits typed events for governance, markets, balances, orders,
 fills, and fees. The indexer should turn those finalized events into searchable
 history and read-optimized projections before the oracle, market maker, and AMM
 add more data volume.
@@ -122,7 +128,7 @@ decoding, persistence, and recovery can each be reviewed independently.
 
 1. `feature/indexer-foundation` establishes the independent Rust workspace,
    fetches a recent finalized transaction batch, rejects rolled-back execution,
-   preserves raw logs, and extracts only Tidebook-owned `Program data:` entries
+   preserves raw logs, and extracts only Outcomia-owned `Program data:` entries
    across nested CPI calls.
 2. `feature/indexer-event-decoding` establishes strict Base64, discriminator,
    and Borsh decoding; preserves raw source data; and implements the market and
@@ -197,7 +203,7 @@ GET /wallets/:owner/activity
 
 Required tests:
 
-- decode every Tidebook event type;
+- decode every Outcomia event type;
 - ignore events from failed transactions;
 - preserve multiple-event transaction order;
 - replay transactions and backfill ranges idempotently;
@@ -217,9 +223,9 @@ onchain correctness.
 Proposed branch: `feature/oracle-foundation`.
 
 Pyth is the initial provider candidate. Before adding it to production
-instructions, verify its current Solana receiver SDK against Tidebook's Anchor,
+instructions, verify its current Solana receiver SDK against Outcomia's Anchor,
 Solana SDK, and LiteSVM dependency graph. The provider must stay behind a small
-Tidebook-owned interface so a dependency or provider change does not spread
+Outcomia-owned interface so a dependency or provider change does not spread
 through the matching engine.
 
 Proposed account:
@@ -232,7 +238,7 @@ Candidate state:
 
 | Field | Purpose |
 | --- | --- |
-| `market` | Canonical Tidebook market |
+| `market` | Canonical Outcomia market |
 | `provider` | Validated oracle-provider variant |
 | `base_feed_id` | Base/USD feed identifier |
 | `quote_feed_id` | Quote/USD feed identifier |
@@ -276,7 +282,7 @@ Expose reference data on each market page:
 - midpoint-to-oracle and last-trade-to-oracle deviation.
 
 These values must retain distinct names. "Market price" is ambiguous because
-the external reference, midpoint, and most recent Tidebook execution can differ.
+the external reference, midpoint, and most recent Outcomia execution can differ.
 
 The first release should use oracle data for display and alerts only. A hard
 onchain price band is deferred until devnet data shows appropriate freshness
@@ -284,7 +290,7 @@ and deviation thresholds. A hard band protects against extreme execution but
 can also halt valid price discovery when an oracle is stale.
 
 Done when users can understand both external reference conditions and actual
-Tidebook liquidity without changing matching semantics.
+Outcomia liquidity without changing matching semantics.
 
 ## Phase 4: reference market-maker service
 
@@ -297,7 +303,7 @@ prices and submit transactions.
 The service should:
 
 1. consume oracle updates;
-2. read Tidebook levels and its own open orders;
+2. read Outcomia levels and its own open orders;
 3. calculate inventory-adjusted bid and ask quotes;
 4. cancel stale quotes and submit replacements;
 5. maintain multiple bounded price levels;

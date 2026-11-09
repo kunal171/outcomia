@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { SharedMarket } from "./shared-market";
 import {
   sharedBookPda,
@@ -39,9 +41,9 @@ import {
   findOwnedTokenAccount,
   fetchLatestTrade,
   fetchPriceLevelSide,
-  getTidebookAccounts,
-  getTidebookProgram,
-  getTidebookReadProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   parseTokenAmount,
   transactionExplorerUrl,
   deriveVaultPda,
@@ -54,7 +56,7 @@ import {
   type TestFaucetAccount,
   type OrderSide,
   type TraderBalanceAccount,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import {
   MAX_MATCHES_PER_TRANSACTION,
   planBoundedMatches,
@@ -95,6 +97,8 @@ type SubmissionResult =
     };
 
 export function MarketDetail({ address }: { address: string }) {
+  const { t } = useI18n();
+
   const router = useRouter();
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -158,11 +162,11 @@ export function MarketDetail({ address }: { address: string }) {
   }, [address]);
 
   const readProgram = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   const signedProgram = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
   const traderBalanceAddress = useMemo(
@@ -196,7 +200,7 @@ export function MarketDetail({ address }: { address: string }) {
     setError(null);
 
     try {
-      const accounts = getTidebookAccounts(readProgram);
+      const accounts = getOutcomiaAccounts(readProgram);
       const [account, fees, faucet, metadata] = await Promise.all([
         accounts.market.fetchNullable(marketAddress),
         accounts.marketFees.fetchNullable(deriveMarketFeesPda(marketAddress)),
@@ -279,7 +283,7 @@ export function MarketDetail({ address }: { address: string }) {
     setBalanceError(null);
     try {
       const [account, baseBalance, quoteBalance] = await Promise.all([
-        getTidebookAccounts(readProgram).traderBalance.fetchNullable(
+        getOutcomiaAccounts(readProgram).traderBalance.fetchNullable(
           traderBalanceAddress,
         ),
         getOwnedTokenBalance(connection, wallet.publicKey, market.baseMint),
@@ -585,7 +589,7 @@ export function MarketDetail({ address }: { address: string }) {
       );
 
       if (crossesBest && opposingBest) {
-        const protocolConfig = await getTidebookAccounts(
+        const protocolConfig = await getOutcomiaAccounts(
           readProgram,
         ).protocolConfig.fetchNullable(deriveProtocolConfigPda());
         if (!protocolConfig) {
@@ -697,7 +701,7 @@ export function MarketDetail({ address }: { address: string }) {
           postedOrder = placement.order;
         }
 
-        // getTidebookProgram always constructs an AnchorProvider. The explicit
+        // getOutcomiaProgram always constructs an AnchorProvider. The explicit
         // type communicates that this write path requires wallet signing, while
         // the read-only program elsewhere only exposes a generic Provider.
         const provider = signedProgram.provider as AnchorProvider;
@@ -1026,33 +1030,27 @@ export function MarketDetail({ address }: { address: string }) {
 
       <main className="route-shell">
         <div className="market-detail-back">
-          <Link href="/markets">← All markets</Link>
+          <Link href="/markets">{t("← All markets")}</Link>
         </div>
 
-        {loading && <div className="access-card">Loading market…</div>}
+        {loading && <div className="access-card">{t("Loading market…")}</div>}
 
         {!loading && market && marketAddress && status && (
           <>
             <div className="route-heading market-detail-heading">
               <div>
-                <div className="eyebrow">
-                  {marketKind ? `${marketKind} market` : "Market details"}
-                </div>
                 <h1>{labels.name}</h1>
-                <p>
-                  Cross the best FIFO maker or post a collateralized limit
-                  order. Every completed fill settles internal balances
-                  atomically at the resting maker price.
-                </p>
               </div>
               <div className="market-detail-heading-actions">
-                <span className={`role-badge market-${status}`}>{status}</span>
+                <span className={`role-badge market-${status}`}>
+                  {t(status ?? "")}
+                </span>
                 {canManageMetadata && (
                   <Link
                     className="market-open-link"
                     href={`/markets/${marketAddress.toBase58()}/settings`}
                   >
-                    Manage market
+                    {t("Manage market")}
                   </Link>
                 )}
               </div>
@@ -1073,23 +1071,19 @@ export function MarketDetail({ address }: { address: string }) {
             {!SHARED_BALANCES_ENABLED && (
               <section
                 className="market-rate-card"
-                aria-label="Pair exchange rate"
+                aria-label={t("Pair exchange rate")}
               >
                 <div>
                   <span className="card-label">
-                    {labels.base} / {labels.quote}
+                    {`${labels.base} / ${labels.quote}`}
                   </span>
                   {reference ? (
                     <>
                       <h2>
-                        1 {labels.base} {reference.indicative ? "≈" : "="}{" "}
-                        {readableAmount(reference.price, market.quoteDecimals)}{" "}
-                        {labels.quote}
+                        {`1 ${labels.base}  ${reference.indicative ? "≈" : "="} ${readableAmount(reference.price, market.quoteDecimals)} ${labels.quote}`}
                       </h2>
                       <p>
-                        1 {labels.quote} ≈{" "}
-                        {inversePrice(reference.price, market.quoteDecimals)}{" "}
-                        {labels.base}
+                        {`1 ${labels.quote} ≈ ${inversePrice(reference.price, market.quoteDecimals)} ${labels.base}`}
                       </p>
                       <span className="price-source">
                         <span aria-hidden="true">●</span> {reference.label}
@@ -1097,28 +1091,28 @@ export function MarketDetail({ address }: { address: string }) {
                     </>
                   ) : (
                     <>
-                      <h2>No price yet</h2>
+                      <h2>{t("No price yet")}</h2>
                       <p>
-                        A price appears when an order or trade is available.
+                        {t(
+                          "A price appears when an order or trade is available.",
+                        )}
                       </p>
                     </>
                   )}
                 </div>
                 {tradeError && (
                   <p className="market-rate-note">
-                    Recent trade history is unavailable. Any displayed quote is
-                    labeled by its book source.
+                    {t(
+                      "Recent trade history is unavailable. Any displayed quote is labeled by its book source.",
+                    )}
                   </p>
                 )}
                 <details className="inline-explainer rate-explainer">
-                  <summary>How is this price calculated?</summary>
+                  <summary>{t("How is this price calculated?")}</summary>
                   <p>
-                    The last traded price is the most recent fill found in
-                    recent history. If none is available, we show an indicative
-                    quote from the order book, labeled by its source. The
-                    reverse rate is 1 divided by that price. Your order fills at
-                    available resting prices, so the final execution price can
-                    differ.
+                    {t(
+                      "A recent trade is used when available. Otherwise the quote uses the midpoint of the best buy and sell prices, or the available side. An indicative quote is not an execution price.",
+                    )}
                   </p>
                 </details>
               </section>
@@ -1127,14 +1121,14 @@ export function MarketDetail({ address }: { address: string }) {
               className={`market-detail-layout ${SHARED_BALANCES_ENABLED ? "shared-layout" : ""}`}
             >
               <section className="admin-card market-information">
-                <div className="card-label">Pair</div>
+                <div className="card-label">{t("Pair")}</div>
                 <div className="market-symbol-pair">
                   <strong>{labels.base}</strong>
                   <span>/</span>
                   <strong>{labels.quote}</strong>
                 </div>
                 <details className="market-mint-details">
-                  <summary>Token mint addresses</summary>
+                  <summary>{t("Token mint addresses")}</summary>
                   <div className="market-detail-pair">
                     <div>
                       <span>{labels.base}</span>
@@ -1143,7 +1137,7 @@ export function MarketDetail({ address }: { address: string }) {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {market.baseMint.toBase58()} ↗
+                        {`${market.baseMint.toBase58()} ↗`}
                       </a>
                     </div>
                     <div>
@@ -1153,7 +1147,7 @@ export function MarketDetail({ address }: { address: string }) {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {market.quoteMint.toBase58()} ↗
+                        {`${market.quoteMint.toBase58()} ↗`}
                       </a>
                     </div>
                   </div>
@@ -1161,20 +1155,20 @@ export function MarketDetail({ address }: { address: string }) {
 
                 <dl className="market-metadata">
                   <div>
-                    <dt>Market address</dt>
+                    <dt>{t("Market address")}</dt>
                     <dd>{shortAddress(marketAddress.toBase58())}</dd>
                   </div>
                   {marketKind && (
                     <div>
-                      <dt>Market type</dt>
-                      <dd className="metadata-kind">{marketKind}</dd>
+                      <dt>{t("Market type")}</dt>
+                      <dd className="metadata-kind">{t(marketKind ?? "")}</dd>
                     </div>
                   )}
                   <div>
                     <dt>
                       {SHARED_BALANCES_ENABLED
-                        ? "Legacy last traded price"
-                        : "Last traded price"}
+                        ? t("Legacy last traded price")
+                        : t("Last traded price")}
                     </dt>
                     <dd>
                       {lastTrade ? (
@@ -1183,11 +1177,10 @@ export function MarketDetail({ address }: { address: string }) {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {readableAmount(
+                          {`${readableAmount(
                             lastTrade.price,
                             market.quoteDecimals,
-                          )}{" "}
-                          {labels.quote} ↗
+                          )} ${labels.quote} ↗`}
                         </a>
                       ) : tradeError ? (
                         "History unavailable"
@@ -1197,26 +1190,29 @@ export function MarketDetail({ address }: { address: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Authority</dt>
+                    <dt>{t("Authority")}</dt>
                     <dd>{shortAddress(market.authority.toBase58())}</dd>
                   </div>
                   <div>
-                    <dt>Next order</dt>
-                    <dd>#{market.nextOrderId.toString()}</dd>
+                    <dt>{t("Next order")}</dt>
+                    <dd>
+                      {"#"}
+                      {market.nextOrderId.toString()}
+                    </dd>
                   </div>
                   <div>
                     <dt>
                       {SHARED_BALANCES_ENABLED
-                        ? "Legacy open orders"
-                        : "Open orders"}
+                        ? t("Legacy open orders")
+                        : t("Open orders")}
                     </dt>
                     <dd>{market.openOrderCount.toString()}</dd>
                   </div>
                   <div>
                     <dt>
                       {SHARED_BALANCES_ENABLED
-                        ? "Legacy highest buy price"
-                        : "Highest buy price"}
+                        ? t("Legacy highest buy price")
+                        : t("Highest buy price")}
                     </dt>
                     <dd>
                       {market.bestBid
@@ -1224,14 +1220,14 @@ export function MarketDetail({ address }: { address: string }) {
                             market.bestBid,
                             market.quoteDecimals,
                           )} ${labels.quote}`
-                        : "No open bids"}
+                        : t("No open bids")}
                     </dd>
                   </div>
                   <div>
                     <dt>
                       {SHARED_BALANCES_ENABLED
-                        ? "Legacy lowest sell price"
-                        : "Lowest sell price"}
+                        ? t("Legacy lowest sell price")
+                        : t("Lowest sell price")}
                     </dt>
                     <dd>
                       {market.bestAsk
@@ -1239,19 +1235,27 @@ export function MarketDetail({ address }: { address: string }) {
                             market.bestAsk,
                             market.quoteDecimals,
                           )} ${labels.quote}`
-                        : "No open asks"}
+                        : t("No open asks")}
                     </dd>
                   </div>
                   <div>
-                    <dt>{labels.base} precision</dt>
-                    <dd>{market.baseDecimals} decimal places</dd>
+                    <dt>{t("{value0} precision", { value0: labels.base })}</dt>
+                    <dd>
+                      {t("{value0} decimal places", {
+                        value0: market.baseDecimals,
+                      })}
+                    </dd>
                   </div>
                   <div>
-                    <dt>{labels.quote} precision</dt>
-                    <dd>{market.quoteDecimals} decimal places</dd>
+                    <dt>{t("{value0} precision", { value0: labels.quote })}</dt>
+                    <dd>
+                      {t("{value0} decimal places", {
+                        value0: market.quoteDecimals,
+                      })}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Price step</dt>
+                    <dt>{t("Price step")}</dt>
                     <dd>
                       {formatAtomicAmount(
                         market.priceTickSize,
@@ -1261,7 +1265,7 @@ export function MarketDetail({ address }: { address: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt>Order size step</dt>
+                    <dt>{t("Order size step")}</dt>
                     <dd>
                       {formatAtomicAmount(
                         market.quantityLotSize,
@@ -1272,14 +1276,14 @@ export function MarketDetail({ address }: { address: string }) {
                   </div>
                   {baseVault && (
                     <div>
-                      <dt>Base vault</dt>
+                      <dt>{t("Base vault")}</dt>
                       <dd>
                         <a
                           href={accountExplorerUrl(baseVault)}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {shortAddress(baseVault.toBase58())} ↗
+                          {`${shortAddress(baseVault.toBase58())} ↗`}
                         </a>
                       </dd>
                     </div>
@@ -1287,27 +1291,26 @@ export function MarketDetail({ address }: { address: string }) {
 
                   {quoteVault && (
                     <div>
-                      <dt>Quote vault</dt>
+                      <dt>{t("Quote vault")}</dt>
                       <dd>
                         <a
                           href={accountExplorerUrl(quoteVault)}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {shortAddress(quoteVault.toBase58())} ↗
+                          {`${shortAddress(quoteVault.toBase58())} ↗`}
                         </a>
                       </dd>
                     </div>
                   )}
                   {marketFees && (
                     <div>
-                      <dt>Protocol fees</dt>
+                      <dt>{t("Protocol fees")}</dt>
                       <dd>
-                        {readableAmount(
+                        {`${readableAmount(
                           marketFees.accruedQuoteFees,
                           market.quoteDecimals,
-                        )}{" "}
-                        {labels.quote}
+                        )} ${labels.quote}`}
                       </dd>
                     </div>
                   )}
@@ -1319,7 +1322,7 @@ export function MarketDetail({ address }: { address: string }) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  View market account on Explorer ↗
+                  {t("View market account on Explorer ↗")}
                 </a>
 
                 {isMarketAuthority && (
@@ -1332,8 +1335,8 @@ export function MarketDetail({ address }: { address: string }) {
                         onClick={() => void manageMarket("pause")}
                       >
                         {lifecyclePending === "pause"
-                          ? "Pausing…"
-                          : "Pause market"}
+                          ? t("Pausing…")
+                          : t("Pause market")}
                       </button>
                     ) : (
                       <>
@@ -1344,8 +1347,8 @@ export function MarketDetail({ address }: { address: string }) {
                           onClick={() => void manageMarket("unpause")}
                         >
                           {lifecyclePending === "unpause"
-                            ? "Unpausing…"
-                            : "Unpause market"}
+                            ? t("Unpausing…")
+                            : t("Unpause market")}
                         </button>
                         <button
                           className="danger-button"
@@ -1356,14 +1359,14 @@ export function MarketDetail({ address }: { address: string }) {
                           }
                           title={
                             market.openOrderCount.isZero()
-                              ? "Close this market and both empty vaults"
-                              : "Cancel every open order before closing"
+                              ? t("Close this market and both empty vaults")
+                              : t("Cancel every open order before closing")
                           }
                           onClick={() => void manageMarket("close")}
                         >
                           {lifecyclePending === "close"
-                            ? "Closing…"
-                            : "Close market"}
+                            ? t("Closing…")
+                            : t("Close market")}
                         </button>
                       </>
                     )}
@@ -1373,19 +1376,20 @@ export function MarketDetail({ address }: { address: string }) {
 
               {!SHARED_BALANCES_ENABLED && (
                 <section className="admin-card">
-                  <div className="card-label">Limit order</div>
-                  <h2>Place an order</h2>
+                  <div className="card-label">{t("Limit order")}</div>
+                  <h2>{t("Place an order")}</h2>
 
                   {status === "paused" && (
                     <div className="market-order-notice">
-                      This market is paused. Existing orders may still be
-                      canceled, but new orders are disabled.
+                      {t(
+                        "This market is paused. Existing orders may still be canceled, but new orders are disabled.",
+                      )}
                     </div>
                   )}
 
                   {status === "active" && !wallet && (
                     <div className="market-order-notice">
-                      Connect your wallet to place an order.
+                      {t("Connect your wallet to place an order.")}
                     </div>
                   )}
 
@@ -1393,25 +1397,33 @@ export function MarketDetail({ address }: { address: string }) {
                     <form className="market-create-form" onSubmit={placeOrder}>
                       {!traderBalance && !balanceLoading && (
                         <div className="market-order-notice">
-                          Initialize your market balance below before placing an
-                          order.
+                          {t(
+                            "Initialize your market balance below before placing an order.",
+                          )}
                         </div>
                       )}
                       <label>
-                        Side
+                        {t("Side")}
                         <select
                           value={side}
                           onChange={(event) =>
                             setSide(event.target.value as OrderSide)
                           }
                         >
-                          <option value="bid">Buy {labels.base}</option>
-                          <option value="ask">Sell {labels.base}</option>
+                          <option value="bid">
+                            {t("Buy {value0}", { value0: labels.base })}
+                          </option>
+                          <option value="ask">
+                            {t("Sell {value0}", { value0: labels.base })}
+                          </option>
                         </select>
                       </label>
 
                       <label>
-                        Price per {labels.base} ({labels.quote})
+                        {t("Price per {value0} ({value1})", {
+                          value0: labels.base,
+                          value1: labels.quote,
+                        })}
                         <input
                           inputMode="decimal"
                           value={price}
@@ -1420,17 +1432,18 @@ export function MarketDetail({ address }: { address: string }) {
                           autoComplete="off"
                         />
                         <small>
-                          Minimum price increment:{" "}
-                          {formatAtomicAmount(
-                            market.priceTickSize,
-                            market.quoteDecimals,
-                          )}{" "}
-                          {labels.quote}
+                          {t("Minimum price increment: {value0} {value1}", {
+                            value0: formatAtomicAmount(
+                              market.priceTickSize,
+                              market.quoteDecimals,
+                            ),
+                            value1: labels.quote,
+                          })}
                         </small>
                       </label>
 
                       <label>
-                        Quantity ({labels.base})
+                        {t("Quantity ({value0})", { value0: labels.base })}
                         <input
                           inputMode="decimal"
                           value={quantity}
@@ -1439,12 +1452,13 @@ export function MarketDetail({ address }: { address: string }) {
                           autoComplete="off"
                         />
                         <small>
-                          Minimum quantity increment:{" "}
-                          {formatAtomicAmount(
-                            market.quantityLotSize,
-                            market.baseDecimals,
-                          )}{" "}
-                          {labels.base}
+                          {t("Minimum quantity increment: {value0} {value1}", {
+                            value0: formatAtomicAmount(
+                              market.quantityLotSize,
+                              market.baseDecimals,
+                            ),
+                            value1: labels.base,
+                          })}
                         </small>
                       </label>
 
@@ -1466,15 +1480,20 @@ export function MarketDetail({ address }: { address: string }) {
                       </button>
                       {crossesBest ? (
                         <small>
-                          Your limit price crosses an existing{" "}
-                          {side === "bid" ? "sell" : "buy"} order, so it will
-                          trade automatically. This transaction processes up to{" "}
-                          {MAX_MATCHES_PER_TRANSACTION} FIFO makers atomically.
-                          A safe remainder rests at your limit price; a
-                          cap-blocked remainder stays free for retry.
+                          {t(
+                            "Your limit price crosses an existing {value0} order, so it will trade automatically. This transaction processes up to {value1} FIFO makers atomically. A safe remainder rests at your limit price; a cap-blocked remainder stays free for retry.",
+                            {
+                              value0: side === "bid" ? t("sell") : t("buy"),
+                              value1: MAX_MATCHES_PER_TRANSACTION,
+                            },
+                          )}
                         </small>
                       ) : collateralPreview ? (
-                        <small>This order will lock {collateralPreview}.</small>
+                        <small>
+                          {t("This order will lock {value0}.", {
+                            value0: collateralPreview,
+                          })}
+                        </small>
                       ) : null}
                     </form>
                   )}
@@ -1485,8 +1504,8 @@ export function MarketDetail({ address }: { address: string }) {
             <section className="admin-card order-book-card">
               <div className="order-book-heading">
                 <div>
-                  <div className="card-label">Live on-chain depth</div>
-                  <h2>Order book</h2>
+                  <div className="card-label">{t("Live on-chain depth")}</div>
+                  <h2>{t("Order book")}</h2>
                 </div>
                 <button
                   className="text-button"
@@ -1494,26 +1513,34 @@ export function MarketDetail({ address }: { address: string }) {
                   disabled={loading}
                   onClick={() => void loadMarket()}
                 >
-                  Refresh
+                  {t("Refresh")}
                 </button>
               </div>
 
               {bookError && (
                 <div className="transaction-message transaction-error">
-                  Could not load the order book: {bookError}
+                  {t("Could not load the order book: {value0}", {
+                    value0: bookError,
+                  })}
                 </div>
               )}
 
               <div className="order-book-grid">
                 <div className="order-book-side">
-                  <h3>Buy orders</h3>
+                  <h3>{t("Buy orders")}</h3>
                   <div className="order-book-columns" aria-hidden="true">
-                    <span>Price ({labels.quote})</span>
-                    <span>Quantity ({labels.base})</span>
-                    <span>Orders</span>
+                    <span>
+                      {t("Price ({value0})", { value0: labels.quote })}
+                    </span>
+                    <span>
+                      {t("Quantity ({value0})", { value0: labels.base })}
+                    </span>
+                    <span>{t("Orders")}</span>
                   </div>
                   {bidLevels.length === 0 ? (
-                    <p className="order-book-empty">No open buy orders</p>
+                    <p className="order-book-empty">
+                      {t("No open buy orders")}
+                    </p>
                   ) : (
                     bidLevels.map((level) => (
                       <div
@@ -1539,14 +1566,20 @@ export function MarketDetail({ address }: { address: string }) {
                 </div>
 
                 <div className="order-book-side">
-                  <h3>Sell orders</h3>
+                  <h3>{t("Sell orders")}</h3>
                   <div className="order-book-columns" aria-hidden="true">
-                    <span>Price ({labels.quote})</span>
-                    <span>Quantity ({labels.base})</span>
-                    <span>Orders</span>
+                    <span>
+                      {t("Price ({value0})", { value0: labels.quote })}
+                    </span>
+                    <span>
+                      {t("Quantity ({value0})", { value0: labels.base })}
+                    </span>
+                    <span>{t("Orders")}</span>
                   </div>
                   {askLevels.length === 0 ? (
-                    <p className="order-book-empty">No open sell orders</p>
+                    <p className="order-book-empty">
+                      {t("No open sell orders")}
+                    </p>
                   ) : (
                     askLevels.map((level) => (
                       <div
@@ -1571,13 +1604,6 @@ export function MarketDetail({ address }: { address: string }) {
                   )}
                 </div>
               </div>
-
-              <p className="order-book-note">
-                Levels are ordered by the program&apos;s linked price index.
-                Last traded price is recovered from recent successful FillEvent
-                logs; a production indexer will provide complete trade history
-                and candles.
-              </p>
             </section>
 
             <ServerTestFaucet
@@ -1591,20 +1617,24 @@ export function MarketDetail({ address }: { address: string }) {
 
             {serverFaucetPair !== true && wallet && testFaucet && (
               <section className="admin-card market-balance-card" id="balances">
-                <div className="card-label">Devnet test faucet</div>
-                <h2>Get test assets</h2>
+                <div className="card-label">{t("Devnet test faucet")}</div>
+                <h2>{t("Get test assets")}</h2>
                 <p>
-                  These tokens have no value. Each claim mints{" "}
-                  {formatAtomicAmount(
-                    testFaucet.baseClaimAmount,
-                    market.baseDecimals,
-                  )}{" "}
-                  {labels.base} and{" "}
-                  {formatAtomicAmount(
-                    testFaucet.quoteClaimAmount,
-                    market.quoteDecimals,
-                  )}{" "}
-                  {labels.quote} to your wallet.
+                  {t(
+                    "These tokens have no value. Each claim mints {value0} {value1} and {value2} {value3} to your wallet.",
+                    {
+                      value0: formatAtomicAmount(
+                        testFaucet.baseClaimAmount,
+                        market.baseDecimals,
+                      ),
+                      value1: labels.base,
+                      value2: formatAtomicAmount(
+                        testFaucet.quoteClaimAmount,
+                        market.quoteDecimals,
+                      ),
+                      value3: labels.quote,
+                    },
+                  )}
                 </p>
                 <button
                   className="primary-button"
@@ -1612,7 +1642,9 @@ export function MarketDetail({ address }: { address: string }) {
                   disabled={faucetPending !== null}
                   onClick={() => void claimTestTokens()}
                 >
-                  {faucetPending === "claim" ? "Minting…" : "Claim test tokens"}
+                  {faucetPending === "claim"
+                    ? t("Minting…")
+                    : t("Claim test tokens")}
                 </button>
                 {faucetError && (
                   <div className="transaction-message transaction-error">
@@ -1621,13 +1653,13 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
                 {faucetSignature && (
                   <div className="transaction-message transaction-success">
-                    Test assets minted.{" "}
+                    {t("Test assets minted.")}{" "}
                     <a
                       href={transactionExplorerUrl(faucetSignature)}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      View transaction ↗
+                      {t("View transaction ↗")}
                     </a>
                   </div>
                 )}
@@ -1638,19 +1670,19 @@ export function MarketDetail({ address }: { address: string }) {
               role === "super-admin" &&
               !testFaucet && (
                 <section className="admin-card market-balance-card">
-                  <div className="card-label">Devnet test faucet</div>
-                  <h2>Enable public test minting</h2>
+                  <div className="card-label">{t("Devnet test faucet")}</div>
+                  <h2>{t("Enable public test minting")}</h2>
                   <p>
-                    This permanently transfers both mint authorities to
-                    Tidebook. Enable it only for fresh, zero-supply tokens with
-                    no economic value.
+                    {t(
+                      "This permanently transfers both mint authorities to Outcomia. Enable it only for fresh, zero-supply tokens with no economic value.",
+                    )}
                   </p>
                   <form
                     className="market-create-form balance-form"
                     onSubmit={(event) => event.preventDefault()}
                   >
                     <label>
-                      Base tokens per claim
+                      {t("Base tokens per claim")}
                       <input
                         inputMode="decimal"
                         value={baseClaimAmount}
@@ -1662,7 +1694,7 @@ export function MarketDetail({ address }: { address: string }) {
                       />
                     </label>
                     <label>
-                      Quote tokens per claim
+                      {t("Quote tokens per claim")}
                       <input
                         inputMode="decimal"
                         value={quoteClaimAmount}
@@ -1684,8 +1716,8 @@ export function MarketDetail({ address }: { address: string }) {
                       onClick={() => void initializeTestFaucet()}
                     >
                       {faucetPending === "initialize"
-                        ? "Enabling…"
-                        : "Enable public faucet"}
+                        ? t("Enabling…")
+                        : t("Enable public faucet")}
                     </button>
                   </form>
                   {faucetError && (
@@ -1701,9 +1733,9 @@ export function MarketDetail({ address }: { address: string }) {
                 <div className="admin-list-heading">
                   <div>
                     <div className="card-label">
-                      Wallet and internal balances
+                      {t("Wallet and internal balances")}
                     </div>
-                    <h2>Fund this market</h2>
+                    <h2>{t("Fund this market")}</h2>
                   </div>
                   <button
                     className="text-button"
@@ -1711,13 +1743,13 @@ export function MarketDetail({ address }: { address: string }) {
                     disabled={balanceLoading || balancePending !== null}
                     onClick={() => void loadBalances()}
                   >
-                    {balanceLoading ? "Refreshing…" : "Refresh"}
+                    {balanceLoading ? t("Refreshing…") : t("Refresh")}
                   </button>
                 </div>
 
                 <dl className="market-metadata balance-metadata">
                   <div>
-                    <dt>{labels.base} in wallet</dt>
+                    <dt>{t("{value0} in wallet", { value0: labels.base })}</dt>
                     <dd>
                       {formatAtomicAmount(
                         walletBaseBalance,
@@ -1726,7 +1758,7 @@ export function MarketDetail({ address }: { address: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt>{labels.quote} in wallet</dt>
+                    <dt>{t("{value0} in wallet", { value0: labels.quote })}</dt>
                     <dd>
                       {formatAtomicAmount(
                         walletQuoteBalance,
@@ -1739,8 +1771,9 @@ export function MarketDetail({ address }: { address: string }) {
                 {!balanceLoading && !traderBalance && (
                   <div className="balance-initialize">
                     <p>
-                      Create one balance ledger for this wallet and market. This
-                      does not move tokens.
+                      {t(
+                        "Create one balance ledger for this wallet and market. This does not move tokens.",
+                      )}
                     </p>
                     <button
                       className="primary-button"
@@ -1749,8 +1782,8 @@ export function MarketDetail({ address }: { address: string }) {
                       onClick={() => void initializeBalance()}
                     >
                       {balancePending === "initialize"
-                        ? "Initializing…"
-                        : "Initialize balance"}
+                        ? t("Initializing…")
+                        : t("Initialize balance")}
                     </button>
                   </div>
                 )}
@@ -1759,7 +1792,9 @@ export function MarketDetail({ address }: { address: string }) {
                   <>
                     <dl className="market-metadata balance-metadata">
                       <div>
-                        <dt>{labels.base} available</dt>
+                        <dt>
+                          {t("{value0} available", { value0: labels.base })}
+                        </dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.baseFree,
@@ -1768,7 +1803,9 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>{labels.base} in orders</dt>
+                        <dt>
+                          {t("{value0} in orders", { value0: labels.base })}
+                        </dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.baseLocked,
@@ -1777,7 +1814,9 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>{labels.quote} available</dt>
+                        <dt>
+                          {t("{value0} available", { value0: labels.quote })}
+                        </dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.quoteFree,
@@ -1786,7 +1825,9 @@ export function MarketDetail({ address }: { address: string }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>{labels.quote} in orders</dt>
+                        <dt>
+                          {t("{value0} in orders", { value0: labels.quote })}
+                        </dt>
                         <dd>
                           {formatAtomicAmount(
                             traderBalance.quoteLocked,
@@ -1801,7 +1842,7 @@ export function MarketDetail({ address }: { address: string }) {
                       onSubmit={(event) => event.preventDefault()}
                     >
                       <label>
-                        Asset
+                        {t("Asset")}
                         <select
                           value={balanceAsset}
                           onChange={(event) =>
@@ -1815,8 +1856,12 @@ export function MarketDetail({ address }: { address: string }) {
                         </select>
                       </label>
                       <label>
-                        Amount (
-                        {balanceAsset === "base" ? labels.base : labels.quote})
+                        {t("Amount ({value0})", {
+                          value0:
+                            balanceAsset === "base"
+                              ? labels.base
+                              : labels.quote,
+                        })}
                         <input
                           inputMode="decimal"
                           value={balanceAmount}
@@ -1841,8 +1886,8 @@ export function MarketDetail({ address }: { address: string }) {
                           onClick={() => void transferBalance("deposit")}
                         >
                           {balancePending === "deposit"
-                            ? "Depositing…"
-                            : "Deposit"}
+                            ? t("Depositing…")
+                            : t("Deposit")}
                         </button>
                         <button
                           className="admin-action-button"
@@ -1855,26 +1900,28 @@ export function MarketDetail({ address }: { address: string }) {
                           onClick={() => void transferBalance("withdraw")}
                         >
                           {balancePending === "withdraw"
-                            ? "Withdrawing…"
-                            : "Withdraw free balance"}
+                            ? t("Withdrawing…")
+                            : t("Withdraw free balance")}
                         </button>
                       </div>
                       {depositExceedsWallet && (
                         <small className="form-error">
-                          Deposit exceeds the selected asset balance in your
-                          wallet.
+                          {t(
+                            "Deposit exceeds the selected asset balance in your wallet.",
+                          )}
                         </small>
                       )}
                       {withdrawalExceedsFree && (
                         <small className="form-error">
-                          Withdrawal exceeds the selected asset&apos;s free
-                          internal balance.
+                          {t(
+                            "Withdrawal exceeds the selected asset's free internal balance.",
+                          )}
                         </small>
                       )}
                       <small>
-                        Orders move free balance to locked balance. Cancellation
-                        releases it back to free; only withdrawal moves tokens
-                        back to your wallet.
+                        {t(
+                          "Orders move free balance to locked balance. Cancellation releases it back to free; only withdrawal moves tokens back to your wallet.",
+                        )}
                       </small>
                     </form>
                   </>
@@ -1887,13 +1934,13 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
                 {balanceSignature && (
                   <div className="transaction-message transaction-success">
-                    Balance updated.{" "}
+                    {t("Balance updated.")}{" "}
                     <a
                       href={transactionExplorerUrl(balanceSignature)}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      View transaction ↗
+                      {t("View transaction ↗")}
                     </a>
                   </div>
                 )}
@@ -1902,31 +1949,34 @@ export function MarketDetail({ address }: { address: string }) {
 
             {role === "super-admin" && marketFees && (
               <section className="admin-card market-balance-card">
-                <div className="card-label">Protocol treasury</div>
-                <h2>Withdraw accrued fees</h2>
+                <div className="card-label">{t("Protocol treasury")}</div>
+                <h2>{t("Withdraw accrued fees")}</h2>
                 <p>
-                  Available:{" "}
-                  {readableAmount(
-                    marketFees.accruedQuoteFees,
-                    market.quoteDecimals,
-                  )}{" "}
-                  {labels.quote}. The destination may be any token account for
-                  this market&apos;s quote mint.
+                  {t(
+                    "Available: {value0} {value1}. The destination may be any token account for this market's quote mint.",
+                    {
+                      value0: readableAmount(
+                        marketFees.accruedQuoteFees,
+                        market.quoteDecimals,
+                      ),
+                      value1: labels.quote,
+                    },
+                  )}
                 </p>
                 <form className="admin-form" onSubmit={withdrawProtocolFees}>
                   <label>
-                    Destination quote-token account
+                    {t("Destination quote-token account")}
                     <input
                       value={feeDestination}
                       onChange={(event) =>
                         setFeeDestination(event.target.value)
                       }
-                      placeholder="Treasury token account"
+                      placeholder={t("Treasury token account")}
                       autoComplete="off"
                     />
                   </label>
                   <label>
-                    Amount ({labels.quote})
+                    {t("Amount ({value0})", { value0: labels.quote })}
                     <input
                       inputMode="decimal"
                       value={feeAmount}
@@ -1945,7 +1995,7 @@ export function MarketDetail({ address }: { address: string }) {
                       marketFees.accruedQuoteFees.isZero()
                     }
                   >
-                    {feePending ? "Withdrawing…" : "Withdraw fees"}
+                    {feePending ? t("Withdrawing…") : t("Withdraw fees")}
                   </button>
                 </form>
                 {feeError && (
@@ -1955,13 +2005,13 @@ export function MarketDetail({ address }: { address: string }) {
                 )}
                 {feeSignature && (
                   <div className="transaction-message transaction-success">
-                    Fee withdrawal confirmed.{" "}
+                    {t("Fee withdrawal confirmed.")}{" "}
                     <a
                       href={transactionExplorerUrl(feeSignature)}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      View on Explorer ↗
+                      {t("View on Explorer ↗")}
                     </a>
                   </div>
                 )}
@@ -1971,47 +2021,64 @@ export function MarketDetail({ address }: { address: string }) {
         )}
 
         {error && (
-          <div className="transaction-message transaction-error">{error}</div>
+          <div className="transaction-message transaction-error">
+            {t(error ?? "")}
+          </div>
         )}
 
         {result?.kind === "placed" && (
           <div className="transaction-message transaction-success">
-            Order created at {shortAddress(result.order.toBase58())}.{" "}
+            {t("Order created at {value0}.", {
+              value0: shortAddress(result.order.toBase58()),
+            })}{" "}
             <a
               href={transactionExplorerUrl(result.signature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}
 
         {result?.kind === "matched" && market && (
           <div className="transaction-message transaction-success">
-            Filled {readableAmount(result.filledQuantity, market.baseDecimals)}{" "}
-            {labels.base} across {result.makerCount} maker
-            {result.makerCount === 1 ? "" : "s"}.
+            {t(
+              result.makerCount === 1
+                ? "Filled {value0} {value1} across {value2} maker."
+                : "Filled {value0} {value1} across {value2} makers.",
+              {
+                value0: readableAmount(
+                  result.filledQuantity,
+                  market.baseDecimals,
+                ),
+                value1: labels.base,
+                value2: result.makerCount,
+              },
+            )}
             {result.postedOrder ? (
               <>
                 {" "}
-                Posted{" "}
-                {readableAmount(
-                  result.remainingQuantity,
-                  market.baseDecimals,
-                )}{" "}
-                {labels.base} as resting order{" "}
-                {shortAddress(result.postedOrder.toBase58())}.
+                {t("Posted {value0} {value1} as resting order {value2}.", {
+                  value0: readableAmount(
+                    result.remainingQuantity,
+                    market.baseDecimals,
+                  ),
+                  value1: labels.base,
+                  value2: shortAddress(result.postedOrder.toBase58()),
+                })}
               </>
             ) : (
               !result.remainingQuantity.isZero() && (
                 <>
                   {" "}
-                  {readableAmount(
-                    result.remainingQuantity,
-                    market.baseDecimals,
-                  )}{" "}
-                  {labels.base} remains unprocessed.
+                  {t("{value0} {value1} remains unprocessed.", {
+                    value0: readableAmount(
+                      result.remainingQuantity,
+                      market.baseDecimals,
+                    ),
+                    value1: labels.base,
+                  })}
                 </>
               )
             )}{" "}
@@ -2020,20 +2087,20 @@ export function MarketDetail({ address }: { address: string }) {
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}
 
         {lifecycleSignature && (
           <div className="transaction-message transaction-success">
-            Market lifecycle updated.{" "}
+            {t("Market lifecycle updated.")}{" "}
             <a
               href={transactionExplorerUrl(lifecycleSignature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}

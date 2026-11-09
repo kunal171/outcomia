@@ -1,4 +1,4 @@
-//! Tidebook off-chain indexing service.
+//! Outcomia off-chain indexing service.
 //!
 //! The binary constructs dependencies and coordinates historical bootstrap,
 //! live recovery, reconnect policy, and shutdown. Decoding, persistence, and
@@ -99,7 +99,7 @@ async fn main() -> Result<(), BoxError> {
     let program_id = Pubkey::from_str(&config.program_id)?;
     let pool = connect(&config.database_url).await?;
 
-    println!("Tidebook indexer");
+    println!("Outcomia indexer");
     println!("RPC endpoint: {}", config.rpc_url);
     println!("WebSocket endpoint: {}", config.websocket_url);
     println!("Program: {program_id}");

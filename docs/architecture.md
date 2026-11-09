@@ -1,4 +1,4 @@
-# Tidebook Architecture
+# Outcomia Architecture
 
 ## Browser RPC
 
@@ -48,7 +48,7 @@ instruction can pick a different outcome during finalization.
 
 ## 1. Purpose and current scope
 
-`tidebook` is an Anchor program being developed as a research study of an
+`outcomia` is an Anchor program being developed as a research study of an
 on-chain central limit order book.
 
 The current implementation establishes the account and authorization foundation:
@@ -100,7 +100,7 @@ calculated quote notional.
 
 The `app/` workspace is a Next.js App Router, React, and TypeScript client. It
 connects browser wallets to devnet and uses a checked-in copy of the generated
-Anchor IDL at `app/idl/tidebook.json`.
+Anchor IDL at `app/idl/outcomia.json`.
 
 The shared role provider reads the protocol config and the connected wallet's
 admin-record PDA. The header shows a `Super admin` or `Admin` badge only for an
@@ -114,7 +114,7 @@ active on-chain record. Role-aware routes are:
 | `/markets/new`       | Public chooser; creation requires an active admin                                     | Choose Spot or Prediction before entering the corresponding form                                                                                                      |
 | `/markets/new/spot`  | Active admin or super-admin                                                           | Create a Spot market for two SPL mints                                                                                                                                |
 | `/predictions/new`   | Active admin or super-admin; deployment gate                                          | Create a single-collateral prediction draft                                                                                                                           |
-| `/wallet`            | Any connected wallet                                                                  | Read native SOL, held/deposited Tidebook-listed assets, per-market balances and YES/NO positions; open market funding controls                                        |
+| `/wallet`            | Any connected wallet                                                                  | Read native SOL, held/deposited Outcomia-listed assets, per-market balances and YES/NO positions; open market funding controls                                        |
 | `/orders`            | Any connected wallet                                                                  | List wallet-owned orders and cancel orders whose status is `Open`                                                                                                     |
 
 The browser uses the configured Helius devnet RPC first, with verified public
@@ -161,8 +161,10 @@ atomically. A stale client transaction fails safely and can be retried after a
 refresh. The browser walk is O(number of price levels); a production indexer
 can replace it later without changing the program's neighbor-account contract.
 
-The orders page filters program accounts by owner, displays locked collateral,
-and refreshes after confirmation. Cancellation releases locked collateral to
+The Orders page filters shared orders by owner, provides Open/History/All
+views, and refreshes after confirmed cancellation. Legacy order readers mount
+only when their disclosure is opened. Closed-book history stays visible, with
+unavailable spot precision shown as a dash instead of guessed units. Cancellation releases locked collateral to
 the owner's free balance without a token transfer. It fetches the live level,
 supplies the order FIFO neighbors, and, only for a final-order removal, derives
 the better/worse level PDAs and supplies the recorded rent payer. These accounts
@@ -173,8 +175,8 @@ Every privileged action must also be constrained by the Anchor program because
 any client can submit an instruction directly.
 
 The root layout and route pages are Server Components. Wallet Adapter, RPC
-context, browser state, and future transaction signing are isolated behind
-client-component boundaries. Planned routes can therefore share layouts and
+context, browser state, and transaction signing are isolated behind
+client-component boundaries. Routes can therefore share layouts and
 loading/error boundaries without forcing the entire application into the client
 bundle.
 
@@ -187,7 +189,7 @@ and the deployment keypair.
 `services/indexer/` is an independent Rust workspace whose dependency graph can
 advance without changing the Anchor program and LiteSVM test stack. It reads
 only successful finalized transactions, scopes Anchor `Program data:` to the
-active Tidebook invocation, strictly decodes all emitted event families, and
+active Outcomia invocation, strictly decodes all emitted event families, and
 stores replayable source records in PostgreSQL.
 
 ```text
@@ -220,7 +222,7 @@ need a separate newest-signature or finalized-slot high-water mark so reconnect
 recovery cannot confuse historical progress with forward ingestion.
 
 The editable system diagram is available at
-[`diagrams/tidebook-architecture.drawio`](diagrams/tidebook-architecture.drawio).
+[`diagrams/outcomia-architecture.drawio`](diagrams/outcomia-architecture.drawio).
 
 ## 3. On-chain account model
 
@@ -266,8 +268,8 @@ program ID. Reversing the pair produces a different address.
 | `quote_decimals`    | Decimal precision read from the quote SPL mint during initialization           |
 | `price_tick_size`   | Smallest permitted price increment, expressed in raw price units               |
 | `quantity_lot_size` | Smallest permitted quantity increment, expressed in base-mint atoms            |
-| `best_bid`          | Price of the first bid level, or `None`; sorted advancement is not implemented |
-| `best_ask`          | Price of the first ask level, or `None`; sorted advancement is not implemented |
+| `best_bid`          | Price of the first bid level, or `None`; advances when a level is removed |
+| `best_ask`          | Price of the first ask level, or `None`; advances when a level is removed |
 | `bump`              | Canonical market PDA bump                                                      |
 
 ### Market-metadata PDA
@@ -313,12 +315,12 @@ and aggregate updates preserve `vault = cash claims + backing + fees`.
 Writable aggregate totals serialize conversions in one market. The stored market
 authority must still be an active admin to open a canonical Draft strictly before
 close; only status changes. Creation and opening bind the primary resolver to
-that creator wallet. Administrative closure and outcome proposals will require
-the same creator-plus-active-admin rule. Trader payout claims will require the
-position owner instead. Matching and
-resolution are still planned; these operations are tested
-locally and have not been deployed. See [prediction design](prediction-market-design.md)
-for lifecycle rules, accounting and the four-milestone implementation plan.
+that creator wallet. Administrative closure requires that creator and active admin status. Primary
+proposals require the configured creator-resolver and active admin status;
+fallback proposals use the predeclared fallback resolver and active admin status.
+Matching, delayed resolution and owner redemption are implemented. The shared
+custody path is the deployed default; these per-market ledgers remain available
+for legacy recovery. See [prediction design](prediction-market-design.md).
 
 Prediction order layouts are now defined separately in
 `state/prediction_book.rs`. A `PredictionOrderBook` root holds the four YES/NO
@@ -819,7 +821,7 @@ and both vaults intact.
 
 ### Fixed-point price model
 
-Tidebook does not use floating-point values on-chain. An order price represents
+Outcomia does not use floating-point values on-chain. An order price represents
 quote-mint atoms per one whole base token, while quantity represents base-mint
 atoms. Their human-readable forms are:
 
@@ -963,12 +965,12 @@ These are known limitations, not defects in the current research milestone:
 ## 7. Test architecture
 
 Integration tests run against LiteSVM in
-`programs/tidebook/tests/admin_flow.rs`,
-`programs/tidebook/tests/cancel_order.rs`,
-`programs/tidebook/tests/market_close.rs`,
-`programs/tidebook/tests/order_flow.rs`,
-`programs/tidebook/tests/test_faucet.rs`, and
-`programs/tidebook/tests/trader_balance.rs`.
+`programs/outcomia/tests/admin_flow.rs`,
+`programs/outcomia/tests/cancel_order.rs`,
+`programs/outcomia/tests/market_close.rs`,
+`programs/outcomia/tests/order_flow.rs`,
+`programs/outcomia/tests/test_faucet.rs`, and
+`programs/outcomia/tests/trader_balance.rs`.
 
 The test harness:
 
@@ -1084,8 +1086,8 @@ The 193-test suite currently covers:
 ## 8. Error architecture
 
 Anchor 1.2 permits only one `#[error_code]` enum in a generated program IDL.
-Tidebook therefore keeps its canonical on-chain error ABI in
-`programs/tidebook/src/errors/catalog.rs`. The `admin`, `market`, `order`,
+Outcomia therefore keeps its canonical on-chain error ABI in
+`programs/outcomia/src/errors/catalog.rs`. The `admin`, `market`, `order`,
 `balance`, and `matching` modules re-export only the variants used by their
 domain, so instruction code can use focused names such as
 `order::PriceNotOnTick` without defining incompatible independent Anchor error
@@ -1103,7 +1105,7 @@ This design deliberately separates two concerns:
 - domain modules are the internal organization used by program call sites.
 
 The tradeoff is that a new variant must be added in two places: once to the
-catalog and once to its domain re-export. In return, Tidebook keeps a single
+catalog and once to its domain re-export. In return, Outcomia keeps a single
 Anchor-compatible error definition while avoiding one undifferentiated error
 namespace throughout the instruction code.
 

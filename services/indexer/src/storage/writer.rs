@@ -28,7 +28,7 @@ pub enum StorageError {
     EventConflict { signature: String, log_index: i32 },
 }
 
-/// Atomically stores one finalized transaction and all its Tidebook events.
+/// Atomically stores one finalized transaction and all its Outcomia events.
 ///
 /// Exact replays succeed idempotently. A conflicting row with the same identity
 /// but different source data fails and rolls back the complete database
@@ -153,7 +153,7 @@ pub async fn persist_transaction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decoder::{MarketEvent, MarketInitializedEvent, TidebookEvent};
+    use crate::decoder::{MarketEvent, MarketInitializedEvent, OutcomiaEvent};
     use solana_pubkey::Pubkey;
 
     fn transaction(signature: &str, slot: u64) -> TransactionRecord {
@@ -170,7 +170,7 @@ mod tests {
         DecodedEventLog {
             log_index,
             payload_base64: payload_base64.to_owned(),
-            event: TidebookEvent::Market(MarketEvent::Initialized(MarketInitializedEvent {
+            event: OutcomiaEvent::Market(MarketEvent::Initialized(MarketInitializedEvent {
                 market: Pubkey::new_from_array([11; 32]),
                 market_fees: Pubkey::new_from_array([12; 32]),
                 authority: Pubkey::new_from_array([13; 32]),

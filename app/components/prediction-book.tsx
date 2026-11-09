@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 
 import { useEffect, useState } from "react";
@@ -12,7 +14,7 @@ import {
   readPredictionDepth,
   type PredictionDepth,
 } from "../lib/prediction-book";
-import { formatAtomicAmount, getTidebookAccounts } from "../lib/tidebook";
+import { formatAtomicAmount, getOutcomiaAccounts } from "../lib/outcomia";
 
 /** Public depth needs no wallet. A failed refresh clears stale rows visibly. */
 export function PredictionBook({
@@ -28,6 +30,8 @@ export function PredictionBook({
   symbol: string;
   revision: string;
 }) {
+  const { t } = useI18n();
+
   const [outcome, setOutcome] = useState<PredictionOutcome>("yes");
   const [depth, setDepth] = useState<{
     bids: PredictionDepth;
@@ -42,7 +46,7 @@ export function PredictionBook({
     setDepth(null);
     setError(null);
     async function load() {
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const book = await accounts.predictionOrderBook.fetchNullable(
         derivePredictionBookPda(market),
       );
@@ -86,9 +90,8 @@ export function PredictionBook({
     <section className="prediction-depth" aria-busy={loading}>
       <div className="market-list-heading">
         <div>
-          <span className="eyebrow">Live account snapshot</span>
           <h2>
-            {SHARED_BALANCES_ENABLED ? "Legacy order book" : "Order book"}
+            {SHARED_BALANCES_ENABLED ? t("Legacy order book") : t("Order book")}
           </h2>
         </div>
         <button
@@ -97,13 +100,13 @@ export function PredictionBook({
           disabled={loading}
           onClick={() => setRefresh((n) => n + 1)}
         >
-          Refresh depth
+          {t("Refresh depth")}
         </button>
       </div>
       <div
         className="prediction-tabs"
         role="group"
-        aria-label="Order book outcome"
+        aria-label={t("Order book outcome")}
       >
         {(["yes", "no"] as const).map((value) => (
           <button
@@ -119,28 +122,37 @@ export function PredictionBook({
           </button>
         ))}
       </div>
-      {loading && <p role="status">Reading {outcome.toUpperCase()} prices…</p>}
+      {loading && (
+        <p role="status">
+          {t("Reading {value0} prices…", { value0: outcome.toUpperCase() })}
+        </p>
+      )}
       {error && (
         <p className="access-denied" role="alert">
-          {error}
+          {t(error ?? "")}
         </p>
       )}
       {depth && (
         <div className="order-book-grid">
           {(["bids", "asks"] as const).map((side) => (
             <div className="order-book-side" key={side}>
-              <h3>{side === "bids" ? "Buy orders" : "Sell orders"}</h3>
+              <h3>{side === "bids" ? t("Buy orders") : t("Sell orders")}</h3>
               <table
                 className={`prediction-depth-table order-book-${side === "bids" ? "bid" : "ask"}`}
               >
                 <caption className="sr-only">
-                  {outcome.toUpperCase()} {side}, best price first
+                  {t("{value0}  {value1}, best price first", {
+                    value0: outcome.toUpperCase(),
+                    value1: side,
+                  })}
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col">Price ({symbol})</th>
-                    <th scope="col">Contracts</th>
-                    <th scope="col">Orders</th>
+                    <th scope="col">
+                      {t("Price ({value0})", { value0: symbol })}
+                    </th>
+                    <th scope="col">{t("Contracts")}</th>
+                    <th scope="col">{t("Orders")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -155,18 +167,21 @@ export function PredictionBook({
               </table>
               {!depth[side].levels.length && (
                 <p className="order-book-empty">
-                  No {outcome.toUpperCase()} {side === "bids" ? "buy" : "sell"}{" "}
-                  orders yet.
+                  {t("No {value0}  {value1} orders yet.", {
+                    value0: outcome.toUpperCase(),
+                    value1: side === "bids" ? t("buy") : t("sell"),
+                  })}
                 </p>
               )}
-              {depth[side].hasMore && <p>Showing the best 20 prices.</p>}
+              {depth[side].hasMore && <p>{t("Showing the best 20 prices.")}</p>}
             </div>
           ))}
         </div>
       )}
       <p className="order-book-note">
-        Prices are collateral per contract. Depth shows remaining contracts at
-        each price, not a last-trade price. Refresh to see new orders.
+        {t(
+          "Prices are collateral per contract. Depth shows remaining contracts at each price, not a last-trade price. Refresh to see new orders.",
+        )}
       </p>
     </section>
   );

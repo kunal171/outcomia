@@ -159,6 +159,7 @@ async function enforceRateLimit(
   const ipHash = createHash("sha256")
     .update(requesterIp(request))
     .digest("hex");
+  // Persistent counter names survive rebranding; changing them would reset quotas.
   const walletKey = `tidebook:faucet:wallet:${wallet.toBase58()}`;
   const ipKey = `tidebook:faucet:ip:${ipHash}`;
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");

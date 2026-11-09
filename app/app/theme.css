@@ -1,0 +1,497 @@
+/* Outcomia: cobalt, soft white and ink. All routes share these tokens. */
+:root {
+  color-scheme: dark;
+  --background: #101525;
+  --ink: #f1f4fc;
+  --muted: #b4c0d8;
+  --panel: #192238;
+  --surface-inset: #131b2d;
+  --line: rgb(195 210 241 / 0.18);
+  --accent: #abc4ff;
+  --accent-rgb: 171 196 255;
+  --accent-ink: #131c30;
+  --coral: #abc4ff;
+  --buy: #91ddc1;
+  --buy-rgb: 145 221 193;
+  --sell: #ffafc1;
+  --sell-rgb: 255 175 193;
+  --outcome-ink: #131c30;
+  --amber: #ebcc87;
+  --amber-rgb: 235 204 135;
+  --background-rgb: 16 21 37;
+  --surface-rgb: 25 34 56;
+  --ink-rgb: 241 244 252;
+  --shadow-rgb: 0 0 0;
+  --mint-dark: #24365a;
+  --hero-background: #254bc1;
+  --hero-ink: #ffffff;
+  --hero-muted: #eef2ff;
+  --mint: var(--accent);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f7f8fc;
+  --ink: #171d30;
+  --muted: #526078;
+  --panel: #ffffff;
+  --surface-inset: #eef1f8;
+  --line: rgb(28 47 86 / 0.16);
+  --accent: #284fc4;
+  --accent-rgb: 40 79 196;
+  --accent-ink: #ffffff;
+  --coral: #284fc4;
+  --buy: #09674f;
+  --buy-rgb: 9 103 79;
+  --sell: #a53657;
+  --sell-rgb: 165 54 87;
+  --outcome-ink: #ffffff;
+  --amber: #75520b;
+  --amber-rgb: 117 82 11;
+  --background-rgb: 247 248 252;
+  --surface-rgb: 255 255 255;
+  --ink-rgb: 23 29 48;
+  --shadow-rgb: 28 47 86;
+  --mint-dark: #e7edfc;
+  --hero-background: #254bc1;
+  --hero-ink: #ffffff;
+  --hero-muted: #eef2ff;
+  --mint: var(--accent);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --background: #f7f8fc;
+    --ink: #171d30;
+    --muted: #526078;
+    --panel: #ffffff;
+    --surface-inset: #eef1f8;
+    --line: rgb(28 47 86 / 0.16);
+    --accent: #284fc4;
+    --accent-rgb: 40 79 196;
+    --accent-ink: #ffffff;
+    --coral: #284fc4;
+    --buy: #09674f;
+    --buy-rgb: 9 103 79;
+    --sell: #a53657;
+    --sell-rgb: 165 54 87;
+    --outcome-ink: #ffffff;
+    --amber: #75520b;
+    --amber-rgb: 117 82 11;
+    --background-rgb: 247 248 252;
+    --surface-rgb: 255 255 255;
+    --ink-rgb: 23 29 48;
+    --shadow-rgb: 28 47 86;
+    --mint-dark: #e7edfc;
+    --hero-background: #254bc1;
+    --hero-ink: #ffffff;
+    --hero-muted: #eef2ff;
+    --mint: var(--accent);
+  }
+}
+body {
+  background: var(--background);
+}
+/* Preferences share the same surface and focus treatment as trading controls. */
+.preferences-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+.preferences-trigger:hover {
+  background: rgb(var(--accent-rgb) / 0.09);
+}
+.preferences-dialog {
+  width: min(380px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 24px 90px rgb(var(--shadow-rgb) / 0.2);
+}
+.preferences-dialog::backdrop {
+  background: rgb(7 20 27 / 0.5);
+}
+.preferences-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.preferences-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.preferences-heading button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 26px;
+  cursor: pointer;
+}
+.preferences-dialog label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.preferences-dialog select {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--surface-inset);
+  color: var(--ink);
+  font: inherit;
+}
+.preferences-trigger:focus-visible,
+.preferences-dialog :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.topbar-actions {
+  min-width: 0;
+}
+.wallet-adapter-modal-wrapper,
+.wallet-adapter-dropdown-list {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.wallet-adapter-modal-title,
+.wallet-adapter-modal-list .wallet-adapter-button,
+.wallet-adapter-dropdown-list-item,
+.wallet-adapter-modal-list-more {
+  color: var(--ink);
+}
+.wallet-adapter-modal-button-close,
+.wallet-adapter-modal-list-more {
+  background: var(--surface-inset);
+}
+.wallet-adapter-modal-button-close svg {
+  fill: var(--muted);
+}
+.wallet-adapter-dropdown-list-item:hover,
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: rgb(var(--accent-rgb) / 0.1);
+}
+.wallet-adapter-button-trigger {
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--ink);
+}
+@media (max-width: 380px) {
+  .mobile-brand-row .brand > span:last-child {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 6px;
+  }
+  .topbar-actions .wallet-adapter-button-trigger {
+    max-width: 104px;
+    padding-inline: 10px;
+  }
+}
+.wallet-picker ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.wallet-picker li + li {
+  border-top: 1px solid var(--line);
+}
+.wallet-picker li button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.wallet-picker li button:hover {
+  background: rgb(var(--accent-rgb) / 0.08);
+}
+.wallet-picker p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Translated loading labels must fit alongside the market heading on small screens. */
+.markets-heading {
+  flex-wrap: wrap;
+}
+.market-summary {
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .market-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 14px;
+    text-align: left;
+  }
+}
+
+/* Orders use one ledger table instead of nested cards per record. */
+.orders-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.orders-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orders-filters button {
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.orders-filters button[aria-pressed="true"] {
+  color: var(--ink);
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+.orders-table-scroll {
+  overflow-x: auto;
+}
+.orders-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  text-align: left;
+}
+.orders-table th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+}
+.orders-table th,
+.orders-table td {
+  padding: 18px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.orders-table th:first-child,
+.orders-table td:first-child {
+  padding-left: 0;
+}
+.orders-table td:first-child {
+  min-width: 190px;
+  max-width: 340px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.orders-market-link {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1.5;
+}
+.orders-market-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.orders-table small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.orders-buy {
+  color: var(--buy);
+}
+.orders-sell,
+.orders-cancel {
+  color: var(--sell);
+}
+.orders-empty {
+  padding: 36px 0;
+  border-block: 1px solid var(--line);
+  color: var(--muted);
+}
+.orders-legacy {
+  margin-top: 40px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.orders-legacy > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+.orders-legacy-content {
+  padding-top: 20px;
+}
+.orders-filters button:focus-visible,
+.orders-market-link:focus-visible,
+.orders-legacy > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Reference-led surfaces: a bold feature area, quiet content and rounded actions. */
+.app-sidebar,
+.sidebar-drawer {
+  background: var(--panel);
+}
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+}
+.outcomia-mark {
+  display: block;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.primary-button,
+.landing-action-primary,
+.landing-action-secondary,
+.market-open-link {
+  border-radius: 999px;
+}
+.landing-hero {
+  margin-top: 28px;
+  padding: 48px;
+  min-height: 480px;
+  border-radius: 28px;
+  background: var(--hero-background);
+  color: var(--hero-ink);
+  overflow: hidden;
+}
+.landing-copy h1 {
+  margin-top: 0;
+  font-size: clamp(46px, 5.7vw, 80px);
+  letter-spacing: -0.055em;
+}
+.landing-copy h1 > span {
+  color: var(--hero-ink);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.landing-copy > p {
+  color: var(--hero-muted);
+}
+.landing-hero .landing-action-primary {
+  background: #111827;
+  color: #ffffff;
+  border: 1px solid #111827;
+  box-shadow: none;
+}
+.landing-hero .landing-action-primary:hover {
+  background: #202d48;
+}
+.landing-hero .landing-action-secondary {
+  color: var(--hero-ink);
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background: transparent;
+}
+.landing-hero .landing-action-secondary:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+.landing-hero .flow-orbit {
+  border-color: rgb(255 255 255 / 0.2);
+}
+.landing-hero .flow-order {
+  color: #ffffff;
+  border-color: rgb(255 255 255 / 0.4);
+  background: rgb(255 255 255 / 0.16);
+  box-shadow: 0 18px 48px rgb(5 19 70 / 0.18);
+}
+.landing-hero .flow-order span {
+  color: #ffffff;
+}
+.landing-hero .flow-order b {
+  background: rgb(255 255 255 / 0.4);
+}
+.landing-hero .flow-center {
+  color: #111827;
+  background: #ffffff;
+  border-color: #ffffff;
+}
+.landing-rollout-note {
+  border-left: 0;
+  background: transparent;
+  padding-inline: 0;
+}
+.journey-market {
+  background: var(--panel);
+  box-shadow: 0 14px 40px rgb(var(--shadow-rgb) / 0.08);
+}
+.journey-step {
+  opacity: 1;
+}
+.journey-step > span {
+  color: var(--accent);
+}
+.journey-step h3 {
+  letter-spacing: -0.035em;
+}
+.admin-card {
+  box-shadow: none;
+}
+@media (max-width: 760px) {
+  .landing-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 30px 24px;
+    border-radius: 20px;
+    gap: 12px;
+  }
+  .landing-copy h1 {
+    font-size: clamp(38px, 9vw, 62px);
+    overflow-wrap: anywhere;
+  }
+  .prediction-hero-art {
+    margin-top: 0;
+  }
+  .landing-hero .landing-actions {
+    align-items: stretch;
+  }
+}
+
+/* Keep retained position panels and their wide order tables inside the viewport. */
+.prediction-workspace [role="tabpanel"],
+.shared-orders-view,
+.shared-open-orders,
+.prediction-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+}

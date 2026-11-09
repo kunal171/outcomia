@@ -14,10 +14,10 @@ import {
   decodeAdminStatus,
   deriveAdminRecordPda,
   deriveProtocolConfigPda,
-  getTidebookAccounts,
-  getTidebookProgram,
+  getOutcomiaAccounts,
+  getOutcomiaProgram,
   type ProtocolRole,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 interface ProtocolRoleContextValue {
   role: ProtocolRole;
@@ -46,8 +46,8 @@ export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const program = getTidebookProgram(connection, wallet);
-      const accounts = getTidebookAccounts(program);
+      const program = getOutcomiaProgram(connection, wallet);
+      const accounts = getOutcomiaAccounts(program);
       const protocolConfig = await accounts.protocolConfig.fetchNullable(
         deriveProtocolConfigPda(),
       );

@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useEffect, useMemo, useState } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -11,11 +12,11 @@ import {
   type PredictionMarketAccount,
 } from "../lib/prediction";
 import {
-  getTidebookAccounts,
+  getOutcomiaAccounts,
   deriveAdminRecordPda,
-  getTidebookProgram,
+  getOutcomiaProgram,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { useProtocolRole } from "./protocol-role-provider";
 
 interface Props {
@@ -49,9 +50,11 @@ function ConnectedLifecycle({
 }: Props & {
   wallet: NonNullable<ReturnType<typeof useAnchorWallet>>;
 }) {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const program = useMemo(
-    () => getTidebookProgram(connection, wallet),
+    () => getOutcomiaProgram(connection, wallet),
     [connection, wallet],
   );
   const [pending, setPending] = useState(false);
@@ -85,7 +88,7 @@ function ConnectedLifecycle({
     try {
       // A displayed draft may have expired or opened elsewhere. Re-read before
       // asking for a signature, then let the instruction check again atomically.
-      const accounts = getTidebookAccounts(program);
+      const accounts = getOutcomiaAccounts(program);
       const latest = await accounts.predictionMarket.fetchNullable(address);
       if (!latest) throw new Error("Prediction market was not found");
       const problem = predictionOpeningIssue(
@@ -135,26 +138,23 @@ function ConnectedLifecycle({
 
   return (
     <section className="admin-card" aria-busy={pending}>
-      <h2>Market authority</h2>
+      <h2>{t("Market authority")}</h2>
       {draft ? (
         <>
-          <p>
-            You must remain an active protocol admin to open your market.
-            Opening allows collateral-backed YES/NO pair creation before close.
-            Check the published rules and closing time before opening. These
-            terms cannot be changed after creation.
-          </p>
+          <p>{t("Rules and deadlines are fixed when the draft is created.")}</p>
           {!PREDICTION_OPENING_ENABLED && (
             <p>
-              Opening prediction markets is disabled in this app configuration.
+              {t(
+                "Opening prediction markets is disabled in this app configuration.",
+              )}
             </p>
           )}
           {roleLoading ? (
-            <p>Checking administrator role…</p>
+            <p>{t("Checking administrator role…")}</p>
           ) : (
-            issue && <p>{issue}</p>
+            issue && <p>{t(issue ?? "")}</p>
           )}
-          {roleError && <p role="alert">{roleError}</p>}
+          {roleError && <p role="alert">{t(roleError ?? "")}</p>}
           <button
             className="primary-button"
             type="button"
@@ -162,31 +162,33 @@ function ConnectedLifecycle({
             onClick={() => void open()}
           >
             {pending
-              ? "Opening…"
+              ? t("Opening…")
               : signature
-                ? "Confirmed; refresh market"
-                : "Open market"}
+                ? t("Confirmed; refresh market")
+                : t("Open market")}
           </button>
         </>
       ) : (
         <p>
-          This market is {predictionStatus(market)}. Only a draft can be opened.
+          {t("This market is {value0}. Only a draft can be opened.", {
+            value0: predictionStatus(market),
+          })}
         </p>
       )}
       {error && (
         <p className="access-denied" role="alert">
-          {error}
+          {t(error ?? "")}
         </p>
       )}
       {signature && (
         <p className="transaction-message transaction-success">
-          Market opening confirmed.{" "}
+          {t("Market opening confirmed.")}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"
             rel="noreferrer"
           >
-            View transaction ↗
+            {t("View transaction ↗")}
           </a>
         </p>
       )}

@@ -6,10 +6,10 @@ import {
   decodeOrderStatus,
   derivePriceLevelPda,
   deriveTraderBalancePda,
-  getTidebookAccounts,
+  getOutcomiaAccounts,
   type MarketAccount,
   type OrderSide,
-} from "./tidebook";
+} from "./outcomia";
 
 // Keep the batch deliberately small. Each match step introduces writable
 // maker, order, and price-level accounts, so an unbounded plan would eventually
@@ -79,7 +79,7 @@ export async function planBoundedMatches(
   // If traversal naturally runs out of opposing levels, the book is
   // exhausted. More specific exit paths replace this default below.
   let stopReason: MatchPlanStopReason = "book-exhausted";
-  const accounts = getTidebookAccounts(program);
+  const accounts = getOutcomiaAccounts(program);
   const makerSide: OrderSide = takerSide === "bid" ? "ask" : "bid";
   const steps: MatchStep[] = [];
 

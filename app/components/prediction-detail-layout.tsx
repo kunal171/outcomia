@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { BN } from "@anchor-lang/core";
@@ -8,7 +9,7 @@ import {
   predictionStatus,
   type PredictionMarketAccount,
 } from "../lib/prediction";
-import type { MarketMetadataAccount } from "../lib/tidebook";
+import type { MarketMetadataAccount } from "../lib/outcomia";
 import { PredictionMarketOverview } from "./prediction/market-overview";
 import { PredictionMarketRules } from "./prediction/market-rules";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -30,6 +31,8 @@ interface Props {
  * No balances or lifecycle state are inferred from a missing RPC response.
  */
 export function PredictionDetailLayout(props: Props) {
+  const { t } = useI18n();
+
   const { market, metadata } = props;
   const wallet = useAnchorWallet();
   const role = useProtocolRole();
@@ -101,7 +104,7 @@ export function PredictionDetailLayout(props: Props) {
       <div
         className="prediction-task-tabs"
         role="tablist"
-        aria-label="Prediction market sections"
+        aria-label={t("Prediction market sections")}
       >
         {tabs.map((item, index) => (
           <button
@@ -133,7 +136,7 @@ export function PredictionDetailLayout(props: Props) {
               }
             }}
           >
-            {item.label}
+            {t(item.label ?? "")}
           </button>
         ))}
       </div>
@@ -154,16 +157,22 @@ export function PredictionDetailLayout(props: Props) {
                     <h2>
                       {status === "draft"
                         ? expired
-                          ? "This draft never opened"
-                          : "Trading hasn’t started"
-                        : "Trading has ended"}
+                          ? t("This draft never opened")
+                          : t("Trading hasn’t started")
+                        : t("Trading has ended")}
                     </h2>
                     <p>
                       {status === "draft"
                         ? expired
-                          ? "Its closing time has passed. This draft cannot be opened; a creator needs to publish a new market."
-                          : "The creator needs to open this market before anyone can trade."
-                        : "Check your position to cancel remaining orders or claim after the outcome is final."}
+                          ? t(
+                              "Its closing time has passed. This draft cannot be opened; a creator needs to publish a new market.",
+                            )
+                          : t(
+                              "The creator needs to open this market before anyone can trade.",
+                            )
+                        : t(
+                            "Check your position to cancel remaining orders or claim after the outcome is final.",
+                          )}
                     </p>
                     <button
                       className="admin-action-button"
@@ -172,12 +181,12 @@ export function PredictionDetailLayout(props: Props) {
                       }
                     >
                       {status === "draft"
-                        ? "Read the rules"
-                        : "View your position"}
+                        ? t("Read the rules")
+                        : t("View your position")}
                     </button>
                     {canManage && status === "draft" && (
                       <Link className="text-button" href="/markets/new">
-                        Create a new market →
+                        {t("Create a new market →")}
                       </Link>
                     )}
                   </div>
@@ -190,7 +199,7 @@ export function PredictionDetailLayout(props: Props) {
               <>
                 <div className="prediction-position-intro">
                   <Link className="text-button" href="/wallet">
-                    Wallet →
+                    {t("Wallet →")}
                   </Link>
                 </div>
                 {props.position}

@@ -47,7 +47,7 @@ pub async fn process_signature(
     let raw_events = extract_program_data(&transaction.logs, program_id);
 
     println!(
-        "slot={} signature={} block_time={:?} logs={} tidebook_events={}",
+        "slot={} signature={} block_time={:?} logs={} outcomia_events={}",
         transaction.slot,
         transaction.signature,
         transaction.block_time,

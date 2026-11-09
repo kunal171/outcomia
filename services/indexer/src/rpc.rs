@@ -1,4 +1,4 @@
-//! Historical Solana RPC access for the Tidebook indexer.
+//! Historical Solana RPC access for the Outcomia indexer.
 //!
 //! These calls use the synchronous RpcClient, even when an async controller
 //! calls them. They block that Tokio worker during network IO. Sequential
@@ -260,7 +260,7 @@ pub fn fetch_transaction(
     }))
 }
 
-/// Applies Tidebook's ingestion policy to transaction execution logs.
+/// Applies Outcomia's ingestion policy to transaction execution logs.
 ///
 /// A failed execution cannot become an indexed source record because Solana
 /// rolled back its state changes. Missing log fields are valid for a successful

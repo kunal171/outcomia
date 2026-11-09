@@ -32,7 +32,7 @@ const { handleRpcProxy } = module.exports,
   programId = "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL";
 let peer = 0;
 const request = (method, params = [], headers = {}) =>
-  new Request("https://tidebook.example/api/solana", {
+  new Request("https://outcomia.example/api/solana", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -192,7 +192,7 @@ test("bounds batches and charges each RPC call to the per-instance peer allowanc
     params: [],
   };
   const make = () =>
-    new Request("https://tidebook.example/api/solana", {
+    new Request("https://outcomia.example/api/solana", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

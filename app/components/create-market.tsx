@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -12,10 +13,10 @@ import {
   deriveMarketPda,
   deriveVaultAuthorityPda,
   deriveVaultPda,
-  getTidebookProgram,
+  getOutcomiaProgram,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
 
@@ -42,6 +43,8 @@ function parsePositiveU64(value: string, label: string) {
 }
 
 export function CreateMarket() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
   const { role, loading: roleLoading, error: roleError } = useProtocolRole();
@@ -60,7 +63,7 @@ export function CreateMarket() {
   const [displayName, setDisplayName] = useState("");
 
   const program = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
 
@@ -158,26 +161,23 @@ export function CreateMarket() {
       <AppHeader />
       <main className="route-shell route-shell-narrow">
         <Link className="market-type-back" href="/markets/new">
-          ← Change market type
+          {t("← Change market type")}
         </Link>
         <div className="route-heading">
-          <div className="eyebrow">Spot market setup</div>
-          <h1>Create a spot market</h1>
-          <p>
-            The connected wallet must have an active on-chain administrator
-            record.
-          </p>
+          <h1>{t("Create a spot market")}</h1>
         </div>
 
         {!wallet && (
-          <div className="access-card">Connect your wallet to continue.</div>
+          <div className="access-card">
+            {t("Connect your wallet to continue.")}
+          </div>
         )}
         {wallet && roleLoading && (
-          <div className="access-card">Checking administrator role…</div>
+          <div className="access-card">{t("Checking administrator role…")}</div>
         )}
         {wallet && !roleLoading && !roleError && !isAdmin && (
           <div className="access-card access-denied">
-            This route requires an active administrator wallet.
+            {t("This route requires an active administrator wallet.")}
           </div>
         )}
 
@@ -187,25 +187,25 @@ export function CreateMarket() {
             onSubmit={(event) => void createMarket(event)}
           >
             <label>
-              Base mint
+              {t("Base mint")}
               <input
                 value={baseMint}
                 onChange={(event) => setBaseMint(event.target.value)}
-                placeholder="SPL Token mint address"
+                placeholder={t("SPL Token mint address")}
                 autoComplete="off"
               />
             </label>
             <label>
-              Quote mint
+              {t("Quote mint")}
               <input
                 value={quoteMint}
                 onChange={(event) => setQuoteMint(event.target.value)}
-                placeholder="SPL Token mint address"
+                placeholder={t("SPL Token mint address")}
                 autoComplete="off"
               />
             </label>
             <label>
-              Base symbol
+              {t("Base symbol")}
               <input
                 value={baseSymbol}
                 onChange={(event) => setBaseSymbol(event.target.value)}
@@ -216,7 +216,7 @@ export function CreateMarket() {
               />
             </label>
             <label>
-              Quote symbol
+              {t("Quote symbol")}
               <input
                 value={quoteSymbol}
                 onChange={(event) => setQuoteSymbol(event.target.value)}
@@ -227,18 +227,18 @@ export function CreateMarket() {
               />
             </label>
             <label>
-              Display name
+              {t("Display name")}
               <input
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Tidebook SOL / USDC"
+                placeholder={t("Outcomia SOL / USDC")}
                 maxLength={64}
                 autoComplete="off"
                 required
               />
             </label>
             <label>
-              Price tick size
+              {t("Price tick size")}
               <input
                 inputMode="numeric"
                 value={priceTickSize}
@@ -250,7 +250,7 @@ export function CreateMarket() {
             </label>
 
             <label>
-              Quantity lot size
+              {t("Quantity lot size")}
               <input
                 inputMode="numeric"
                 value={quantityLotSize}
@@ -274,7 +274,7 @@ export function CreateMarket() {
                 pending
               }
             >
-              {pending ? "Creating market…" : "Create spot market"}
+              {pending ? t("Creating market…") : t("Create spot market")}
             </button>
           </form>
         )}
@@ -286,13 +286,13 @@ export function CreateMarket() {
         )}
         {result && (
           <div className="transaction-message transaction-success">
-            <strong>Market created:</strong> {result.market.toBase58()}{" "}
+            <strong>{t("Market created:")}</strong> {result.market.toBase58()}{" "}
             <a
               href={transactionExplorerUrl(result.signature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}

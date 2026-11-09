@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 
 import Link from "next/link";
@@ -11,11 +13,15 @@ type ProgramStatus = "checking" | "deployed" | "not-deployed" | "unavailable";
 
 /** Decorative order flow, not live prices or a simulated trading result. */
 function OrderFlow() {
+  const { t } = useI18n();
+
   return (
     <div
       className="landing-flow"
       role="img"
-      aria-label="Illustration of buy and sell orders for a YES contract meeting"
+      aria-label={t(
+        "Illustration of buy and sell orders for a YES contract meeting",
+      )}
     >
       <div className="flow-orbit flow-orbit-outer" aria-hidden="true" />
       <div className="flow-orbit flow-orbit-inner" aria-hidden="true" />
@@ -34,8 +40,8 @@ function OrderFlow() {
             y2="220"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#ff9b86" />
-            <stop offset="1" stopColor="#b5a2ff" />
+            <stop stopColor="var(--sell)" />
+            <stop offset="1" stopColor="var(--accent)" />
           </linearGradient>
           <linearGradient
             id="flow-buy"
@@ -45,8 +51,8 @@ function OrderFlow() {
             y2="220"
             gradientUnits="userSpaceOnUse"
           >
-            <stop stopColor="#6de6d1" />
-            <stop offset="1" stopColor="#b5a2ff" />
+            <stop stopColor="var(--buy)" />
+            <stop offset="1" stopColor="var(--accent)" />
           </linearGradient>
         </defs>
         <path
@@ -72,7 +78,7 @@ function OrderFlow() {
       </svg>
       <div className="flow-order flow-order-sell" aria-hidden="true">
         <span>
-          Sell YES <i>↘</i>
+          {t("Sell YES")} <i>↘</i>
         </span>
         <div>
           <b />
@@ -85,7 +91,7 @@ function OrderFlow() {
       </div>
       <div className="flow-order flow-order-buy" aria-hidden="true">
         <span>
-          Buy YES <i>↗</i>
+          {t("Buy YES")} <i>↗</i>
         </span>
         <div>
           <b />
@@ -93,9 +99,6 @@ function OrderFlow() {
           <b />
         </div>
       </div>
-      <span className="flow-caption" aria-hidden="true">
-        One outcome. Two sides of the book.
-      </span>
     </div>
   );
 }
@@ -136,6 +139,8 @@ const PREDICTION_EXAMPLES = [
 
 /** Scroll changes only this illustration. Prices are examples, never fetched quotes. */
 function PredictionJourney() {
+  const { t } = useI18n();
+
   const [exampleIndex, setExampleIndex] = useState(0);
   const example = PREDICTION_EXAMPLES[exampleIndex];
   const section = useRef<HTMLElement>(null);
@@ -186,68 +191,54 @@ function PredictionJourney() {
       aria-labelledby="journey-title"
     >
       <div className="journey-intro">
-        <span className="eyebrow">A question. An order book. Your call.</span>
-        <h2 id="journey-title">
-          From “what if”
-          <br />
-          to your next move.
-        </h2>
-        <p>Scroll through a prediction.</p>
+        <h2 id="journey-title">{t("How it works")}</h2>
       </div>
       <div className="journey-layout">
         <div className="journey-steps">
           <article className="journey-step">
-            <span>01 / Choose</span>
-            <h3>
-              Have a view?
-              <br />
-              Take a side.
-            </h3>
-            <p>Find a question. Read its rules. Choose YES or NO.</p>
+            <span>{t("01 / Choose")}</span>
+            <h3>{t("Read the rules")}</h3>
+            <p>{t("Find a question. Read its rules. Choose YES or NO.")}</p>
           </article>
           <article className="journey-step">
-            <span>02 / Trade</span>
-            <h3>
-              Your conviction.
-              <br />
-              Your limit price.
-            </h3>
+            <span>{t("02 / Trade")}</span>
+            <h3>{t("Place an order")}</h3>
             <p>
-              Buy or sell outcome contracts with other traders. Your limit sets
-              the price you’ll accept.
+              {t(
+                "Buy or sell outcome contracts with other traders. Your limit sets the price you’ll accept.",
+              )}
             </p>
           </article>
           <article className="journey-step">
-            <span>03 / Understand</span>
-            <h3>
-              Clear rules.
-              <br />
-              Before your trade.
-            </h3>
+            <span>{t("03 / Understand")}</span>
+            <h3>{t("Claim after resolution")}</h3>
             <p>
-              Check the evidence, resolver and cutoff. A winning contract is
-              designed to pay 1 collateral token after final resolution.
+              {t(
+                "Check the evidence, resolver and cutoff. A winning contract is designed to pay 1 collateral token after final resolution.",
+              )}
             </p>
             <small>
               {PREDICTION_RESOLUTION_ENABLED
-                ? "Finalized winning contracts can be redeemed into your shared wallet."
-                : "Resolution and claims require the next program upgrade."}
+                ? t(
+                    "Finalized winning contracts can be redeemed into your shared wallet.",
+                  )
+                : t("Resolution and claims require the next program upgrade.")}
             </small>
           </article>
         </div>
         <div className="journey-sticky">
           <div
             className="journey-market"
-            aria-label="Illustrative prediction market"
+            aria-label={t("Illustrative prediction market")}
           >
             <div className="journey-market-top">
-              <span>EXAMPLE MARKET</span>
-              <span className="journey-demo">Illustration only</span>
+              <span>{t("EXAMPLE MARKET")}</span>
+              <span className="journey-demo">{t("Illustration only")}</span>
             </div>
             <div
               className="journey-example-tabs"
               role="group"
-              aria-label="Choose an example market"
+              aria-label={t("Choose an example market")}
             >
               {PREDICTION_EXAMPLES.map((item, index) => (
                 <button
@@ -256,48 +247,53 @@ function PredictionJourney() {
                   aria-pressed={index === exampleIndex}
                   onClick={() => setExampleIndex(index)}
                 >
-                  {item.category}
+                  {t(item.category)}
                 </button>
               ))}
             </div>
             <div className="journey-question-icon" aria-hidden="true">
               {example.icon}
             </div>
-            <h3>{example.question}</h3>
-            <p className="journey-question-note">{example.criteria}</p>
+            <h3>{t(example.question)}</h3>
+            <p className="journey-question-note">{t(example.criteria)}</p>
             <div className="journey-outcomes">
               <div>
-                <span>YES</span>
+                <span>{t("YES")}</span>
                 <strong>
                   {example.yes} <small>tUSDC</small>
                 </strong>
               </div>
               <div>
-                <span>NO</span>
+                <span>{t("NO")}</span>
                 <strong>
                   {example.no} <small>tUSDC</small>
                 </strong>
               </div>
             </div>
             <div className="journey-order">
-              <span>Example limit buy</span>
+              <span>{t("Example limit buy")}</span>
               <strong>
-                10 YES × {example.yes} = {example.cost} tUSDC
+                {t("10 YES × {value0} = {value1} tUSDC", {
+                  value0: example.yes,
+                  value1: example.cost,
+                })}
               </strong>
-              <small>Before fees · only if the order fills</small>
+              <small>{t("Before fees · only if the order fills")}</small>
             </div>
             <div className="journey-terms">
               <span aria-hidden="true">✓</span>
               <div>
-                <strong>Know what decides the outcome</strong>
-                <small>{example.evidence}</small>
+                <strong>{t("Know what decides the outcome")}</strong>
+                <small>{t(example.evidence)}</small>
               </div>
             </div>
             <div className="journey-progress" aria-hidden="true">
               <span />
             </div>
             <p className="journey-card-caption">
-              Example prices, not live quotes or guaranteed probabilities.
+              {t(
+                "Example prices, not live quotes or guaranteed probabilities.",
+              )}
             </p>
           </div>
         </div>
@@ -307,6 +303,8 @@ function PredictionJourney() {
 }
 
 export function Dashboard() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const [programStatus, setProgramStatus] = useState<ProgramStatus>("checking");
   const refreshProgramStatus = useCallback(async () => {
@@ -335,46 +333,34 @@ export function Dashboard() {
       <main id="top">
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-copy">
-            <span className="landing-kicker">
-              <i aria-hidden="true" /> Prediction markets on Solana.
-            </span>
             <h1 id="landing-title">
-              Predict what
-              <br />
-              <span>comes next.</span>
+              <span>{t("Every Outcome Has a Market.")}</span>
             </h1>
-            <p>
-              Trade your view on what comes next. YES or NO. Your price, your
-              call.
-            </p>
+            <p>{t("Trade YES or NO on Solana.")}</p>
             <div className="landing-actions">
               <Link className="landing-action-primary" href="/predictions">
-                Explore predictions <span aria-hidden="true">↗</span>
+                {t("Explore predictions")} <span aria-hidden="true">↗</span>
               </Link>
               <Link
                 className="landing-action-secondary"
                 href="#how-predictions-work"
               >
-                How it works <span aria-hidden="true">→</span>
+                {t("How it works")} <span aria-hidden="true">→</span>
               </Link>
-            </div>
-            <div className="landing-tags">
-              <span>YES / NO order books</span>
-              <i aria-hidden="true" />
-              <span>One collateral asset</span>
             </div>
           </div>
           <div className="prediction-hero-art">
-            <span className="hero-art-label">
-              A market for every point of view.
-            </span>
             <OrderFlow />
           </div>
         </section>
         <p className="landing-rollout-note">
           {PREDICTION_RESOLUTION_ENABLED
-            ? "Devnet test markets · Trade, resolve and redeem under published market rules."
-            : "Devnet preview · Prediction trading is deployed. Resolution and claims require the next program upgrade."}
+            ? t(
+                "Devnet test markets · Trade, resolve and redeem under published market rules.",
+              )
+            : t(
+                "Devnet preview · Prediction trading is deployed. Resolution and claims require the next program upgrade.",
+              )}
         </p>
         <PredictionJourney />
         <section
@@ -382,10 +368,12 @@ export function Dashboard() {
           aria-labelledby="secondary-title"
         >
           <div className="secondary-heading">
-            <span className="eyebrow">More on Tidebook</span>
-            <h2 id="secondary-title">Beyond predictions.</h2>
+            <h2 id="secondary-title">{t("Spot & orders")}</h2>
           </div>
-          <nav className="landing-destinations" aria-label="More on Tidebook">
+          <nav
+            className="landing-destinations"
+            aria-label={t("More on Outcomia")}
+          >
             <Link
               className="landing-destination destination-spot"
               href="/markets"
@@ -394,8 +382,7 @@ export function Dashboard() {
                 ↗
               </span>
               <div>
-                <h2>Spot markets</h2>
-                <p>Find your next trade.</p>
+                <h2>{t("Spot markets")}</h2>
               </div>
               <span className="destination-arrow" aria-hidden="true">
                 ↗
@@ -409,8 +396,7 @@ export function Dashboard() {
                 ≋
               </span>
               <div>
-                <h2>Your orders</h2>
-                <p>Track fills. Cancel open orders.</p>
+                <h2>{t("Your orders")}</h2>
               </div>
               <span className="destination-arrow" aria-hidden="true">
                 ↗
@@ -424,30 +410,32 @@ export function Dashboard() {
               className={`landing-status-dot landing-status-${programStatus}`}
               aria-hidden="true"
             />
-            {statusLabel}
+            {t(statusLabel ?? "")}
           </div>
           <button
             type="button"
             disabled={programStatus === "checking"}
             onClick={() => void refreshProgramStatus()}
-            aria-label="Refresh program status"
+            aria-label={t("Refresh program status")}
           >
-            Refresh <span aria-hidden="true">↻</span>
+            {t("Refresh")} <span aria-hidden="true">↻</span>
           </button>
           <a href={PROGRAM_EXPLORER_URL} target="_blank" rel="noreferrer">
-            View program <span aria-hidden="true">↗</span>
+            {t("View program")} <span aria-hidden="true">↗</span>
           </a>
-          <span className="landing-devnet-note">Devnet · test tokens only</span>
+          <span className="landing-devnet-note">
+            {t("Devnet · test tokens only")}
+          </span>
         </div>
       </main>
       <footer className="landing-footer">
-        <span>Tidebook. Built on Solana.</span>
+        <span>Outcomia</span>
         <a
-          href="https://github.com/kunal171/tidebook"
+          href="https://github.com/kunal171/outcomia"
           target="_blank"
           rel="noreferrer"
         >
-          Open source ↗
+          {t("Open source ↗")}
         </a>
       </footer>
     </div>

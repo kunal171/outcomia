@@ -1,11 +1,12 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useCallback, useEffect, useState } from "react";
 import { BN } from "@anchor-lang/core";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 
-import { formatAtomicAmount, transactionExplorerUrl } from "../lib/tidebook";
+import { formatAtomicAmount, transactionExplorerUrl } from "../lib/outcomia";
 
 type FaucetConfiguration = {
   enabled: boolean;
@@ -37,6 +38,8 @@ export function ServerTestFaucet({
   onClaimed,
   onPairDetected,
 }: ServerTestFaucetProps) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet();
   const [configuration, setConfiguration] =
     useState<FaucetConfiguration | null>(null);
@@ -123,22 +126,28 @@ export function ServerTestFaucet({
 
   return (
     <section className="admin-card market-balance-card">
-      <div className="card-label">Rate-limited devnet faucet</div>
-      <h2>Get test assets</h2>
+      <div className="card-label">{t("Rate-limited devnet faucet")}</div>
+      <h2>{t("Get test assets")}</h2>
       <p>
-        Each request mints{" "}
-        {formatAtomicAmount(new BN(configuration.baseClaimAtoms), baseDecimals)}{" "}
-        base and{" "}
-        {formatAtomicAmount(
-          new BN(configuration.quoteClaimAtoms),
-          quoteDecimals,
-        )}{" "}
-        quote tokens. These devnet assets have no monetary value.
+        {t(
+          "Each request mints {value0} base and {value1} quote tokens. These devnet assets have no monetary value.",
+          {
+            value0: formatAtomicAmount(
+              new BN(configuration.baseClaimAtoms),
+              baseDecimals,
+            ),
+            value1: formatAtomicAmount(
+              new BN(configuration.quoteClaimAtoms),
+              quoteDecimals,
+            ),
+          },
+        )}
       </p>
       {!enabled && (
         <div className="transaction-message transaction-error">
-          Faucet temporarily unavailable: durable rate limiting is not
-          configured.
+          {t(
+            "Faucet temporarily unavailable: durable rate limiting is not configured.",
+          )}
         </div>
       )}
       <button
@@ -148,23 +157,25 @@ export function ServerTestFaucet({
         onClick={() => void claim()}
       >
         {pending
-          ? "Minting…"
+          ? t("Minting…")
           : wallet
-            ? "Claim test tokens"
-            : "Connect wallet to claim"}
+            ? t("Claim test tokens")
+            : t("Connect wallet to claim")}
       </button>
       {error && (
-        <div className="transaction-message transaction-error">{error}</div>
+        <div className="transaction-message transaction-error">
+          {t(error ?? "")}
+        </div>
       )}
       {signature && (
         <div className="transaction-message transaction-success">
-          Test assets minted.{" "}
+          {t("Test assets minted.")}{" "}
           <a
             href={transactionExplorerUrl(signature)}
             target="_blank"
             rel="noreferrer"
           >
-            View transaction ↗
+            {t("View transaction ↗")}
           </a>
         </div>
       )}

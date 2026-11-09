@@ -1,4 +1,4 @@
-//! Ownership-aware extraction of Tidebook event payloads from execution logs.
+//! Ownership-aware extraction of Outcomia event payloads from execution logs.
 
 use solana_pubkey::Pubkey;
 
@@ -8,7 +8,7 @@ const SUCCESS_SUFFIX: &str = " success";
 const FAILED_MARKER: &str = " failed: ";
 const PROGRAM_DATA_PREFIX: &str = "Program data: ";
 
-/// Raw program-data payload proven to have been emitted by Tidebook itself.
+/// Raw program-data payload proven to have been emitted by Outcomia itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawEventLog {
     /// Original position in the transaction's complete log list.
@@ -18,12 +18,12 @@ pub struct RawEventLog {
     pub payload_base64: String,
 }
 
-/// Extracts data logs emitted directly by Tidebook.
+/// Extracts data logs emitted directly by Outcomia.
 ///
 /// Solana transactions can invoke multiple nested programs. We therefore track
-/// the active invocation stack and accept `Program data:` only when Tidebook is
+/// the active invocation stack and accept `Program data:` only when Outcomia is
 /// at the top of that stack. This prevents a nested CPI program from emitting
-/// bytes that the Tidebook decoder would otherwise misclassify as protocol
+/// bytes that the Outcomia decoder would otherwise misclassify as protocol
 /// state. The function preserves original log indexes for stable event keys.
 ///
 /// # Inputs
@@ -209,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn extracts_target_event_when_tidebook_is_invoked_through_cpi() {
+    fn extracts_target_event_when_outcomia_is_invoked_through_cpi() {
         let target = Pubkey::new_from_array([1; 32]);
         let parent = Pubkey::new_from_array([2; 32]);
         let lines = logs(&[

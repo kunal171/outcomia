@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 /** Shared funds are reusable across markets. Never count contract backing as spendable cash. */
 import { useEffect, useState, useMemo } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -16,13 +18,13 @@ import {
   type AssetBalance,
 } from "../lib/shared";
 import {
-  getTidebookProgram,
+  getOutcomiaProgram,
   accountExplorerUrl,
-  getTidebookReadProgram,
+  getOutcomiaReadProgram,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 import { readableAmount } from "../lib/market-display";
 
 export function SharedAssetFunds(props: {
@@ -54,6 +56,8 @@ function Funds({
   symbol: string;
   onChanged?: () => void;
 }) {
+  const { t } = useI18n();
+
   const wallet = useAnchorWallet()!,
     { connection } = useConnection();
   const [balance, setBalance] = useState<AssetBalance | null>(null),
@@ -64,7 +68,7 @@ function Funds({
     [signature, setSignature] = useState<string | null>(null),
     [revision, setRevision] = useState(0);
   const program = useMemo(
-    () => getTidebookReadProgram(connection),
+    () => getOutcomiaReadProgram(connection),
     [connection],
   );
   useEffect(() => {
@@ -91,7 +95,7 @@ function Funds({
     setIssue(null);
     setSignature(null);
     try {
-      const p = getTidebookProgram(connection, wallet),
+      const p = getOutcomiaProgram(connection, wallet),
         tx = new Transaction(),
         custody = assetCustody(wallet.publicKey, mint);
       if (!balance)
@@ -179,13 +183,13 @@ function Funds({
   return (
     <section className="admin-card shared-funds">
       <div className="section-heading">
-        <h3>{symbol} · shared wallet</h3>
+        <h3>{t("{value0} · shared wallet", { value0: symbol })}</h3>
         <button
           type="button"
           disabled={pending}
           onClick={() => setRevision((v) => v + 1)}
         >
-          Refresh
+          {t("Refresh")}
         </button>
       </div>
       <a
@@ -194,30 +198,31 @@ function Funds({
         target="_blank"
         rel="noreferrer"
       >
-        {mint.toBase58().slice(0, 6)}…{mint.toBase58().slice(-6)} ↗
+        {`${mint.toBase58().slice(0, 6)}…${mint.toBase58().slice(-6)} ↗`}
       </a>
       <p>
-        Available:{" "}
+        {t("Available:")}{" "}
         <strong>
           {loaded ? readableAmount(balance?.free ?? new BN(0), decimals) : "—"}
         </strong>{" "}
-        · In orders:{" "}
-        {loaded ? readableAmount(balance?.locked ?? new BN(0), decimals) : "—"}
+        {t("· In orders: {value0}", {
+          value0: loaded
+            ? readableAmount(balance?.locked ?? new BN(0), decimals)
+            : "—",
+        })}
       </p>
-      <p className="muted">
-        One deposit works across all shared-wallet markets using this mint.
-      </p>
+
       {loaded && !balance && (
         <button
           type="button"
           disabled={pending}
           onClick={() => void act(false, true)}
         >
-          Initialize {symbol} balance once
+          {t("Initialize {value0} balance once", { value0: symbol })}
         </button>
       )}
       <label>
-        Amount ({symbol})
+        {t("Amount ({value0})", { value0: symbol })}
         <input
           inputMode="decimal"
           value={amount}
@@ -232,7 +237,7 @@ function Funds({
           disabled={pending || !loaded || !positive}
           onClick={() => void act(false)}
         >
-          {pending ? "Confirm in wallet…" : "Deposit"}
+          {pending ? t("Confirm in wallet…") : t("Deposit")}
         </button>
         <button
           type="button"
@@ -245,17 +250,17 @@ function Funds({
           }
           onClick={() => void act(true)}
         >
-          Withdraw available
+          {t("Withdraw available")}
         </button>
       </div>
-      {issue && <p role="alert">{issue}</p>}
+      {issue && <p role="alert">{t(issue ?? "")}</p>}
       {signature && (
         <a
           href={transactionExplorerUrl(signature)}
           target="_blank"
           rel="noreferrer"
         >
-          View transaction ↗
+          {t("View transaction ↗")}
         </a>
       )}
     </section>

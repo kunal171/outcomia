@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useCallback, useEffect, useState } from "react";
 import { AnchorProvider, type Program } from "@anchor-lang/core";
@@ -11,8 +12,8 @@ import {
 import {
   accountExplorerUrl,
   formatAtomicAmount,
-  getTidebookAccounts,
-} from "../lib/tidebook";
+  getOutcomiaAccounts,
+} from "../lib/outcomia";
 
 interface Props {
   program: Program;
@@ -37,6 +38,8 @@ export function PredictionOrders({
   setPending,
   onCanceled,
 }: Props) {
+  const { t } = useI18n();
+
   const [orders, setOrders] = useState<
     Array<{ publicKey: PublicKey; account: PredictionOrderAccount }>
   >([]);
@@ -49,7 +52,7 @@ export function PredictionOrders({
     setError(null);
     // Borsh stores the discriminator (8 bytes), owner (32), then market (32).
     // Filter on both fixed fields so RPC returns only this wallet/market pair.
-    getTidebookAccounts(program)
+    getOutcomiaAccounts(program)
       .predictionOrder.all([
         { memcmp: { offset: 8, bytes: owner.toBase58() } },
         { memcmp: { offset: 40, bytes: market.toBase58() } },
@@ -86,7 +89,7 @@ export function PredictionOrders({
       setPending(true);
       setError(null);
       try {
-        const reader = getTidebookAccounts(program);
+        const reader = getOutcomiaAccounts(program);
         const accounts = await readPredictionCancellationAccounts(
           reader,
           market,
@@ -117,34 +120,32 @@ export function PredictionOrders({
   return (
     <section className="prediction-orders">
       <div className="market-list-heading">
-        <h3>Your prediction orders</h3>
+        <h3>{t("Your prediction orders")}</h3>
         <button
           className="text-button"
           type="button"
           disabled={pending || loading}
           onClick={() => setRefresh((value) => value + 1)}
         >
-          Refresh orders
+          {t("Refresh orders")}
         </button>
       </div>
-      <p>
-        Cancel an open order to release its remaining funds. Cancellation stays
-        available after trading closes; withdrawing moves free collateral back
-        to your wallet.
-      </p>
+      <p>{t("Cancel orders to release reserved funds.")}</p>
       {!PREDICTION_CANCELLATION_ENABLED && (
         <p>
-          Prediction order cancellation is disabled in this app configuration.
+          {t(
+            "Prediction order cancellation is disabled in this app configuration.",
+          )}
         </p>
       )}
-      {loading && <p role="status">Loading orders…</p>}
+      {loading && <p role="status">{t("Loading orders…")}</p>}
       {error && (
         <p className="access-denied" role="alert">
-          {error}
+          {t(error ?? "")}
         </p>
       )}
       {!loading && !error && orders.length === 0 && (
-        <p>No orders for this wallet in this market.</p>
+        <p>{t("No orders for this wallet in this market.")}</p>
       )}
       {!loading &&
         !error &&
@@ -154,33 +155,38 @@ export function PredictionOrders({
             key={publicKey.toBase58()}
           >
             <h4>
-              #{account.orderId.toString()} ·{" "}
-              {"yes" in account.outcome ? "YES" : "NO"} ·{" "}
-              {"bid" in account.side ? "Buy" : "Sell"}
+              {"#"}
+              {account.orderId.toString()}
+              {" · "}
+              {"yes" in account.outcome ? t("YES") : t("NO")}
+              {" · "}
+              {"bid" in account.side ? t("Buy") : t("Sell")}
             </h4>
             <dl className="market-metadata">
               <div>
-                <dt>Price</dt>
+                <dt>{t("Price")}</dt>
                 <dd>
-                  {formatAtomicAmount(account.price, decimals)} {symbol}
+                  {formatAtomicAmount(account.price, decimals)}
+                  {"  "}
+                  {symbol}
                 </dd>
               </div>
               <div>
-                <dt>Contracts</dt>
+                <dt>{t("Contracts")}</dt>
                 <dd>{account.quantity.toString()}</dd>
               </div>
               <div>
-                <dt>Remaining</dt>
+                <dt>{t("Remaining")}</dt>
                 <dd>{account.remainingQuantity.toString()}</dd>
               </div>
               <div>
-                <dt>Status</dt>
+                <dt>{t("Status")}</dt>
                 <dd>
                   {"open" in account.status
-                    ? "Open"
+                    ? t("Open")
                     : "canceled" in account.status
-                      ? "Canceled"
-                      : "Filled"}
+                      ? t("Canceled")
+                      : t("Filled")}
                 </dd>
               </div>
             </dl>
@@ -190,7 +196,7 @@ export function PredictionOrders({
               target="_blank"
               rel="noreferrer"
             >
-              View order ↗
+              {t("View order ↗")}
             </a>
             {"open" in account.status && (
               <button
@@ -199,7 +205,7 @@ export function PredictionOrders({
                 disabled={pending || !PREDICTION_CANCELLATION_ENABLED}
                 onClick={() => void cancel(publicKey)}
               >
-                {pending ? "Confirming…" : "Cancel order"}
+                {pending ? t("Confirming…") : t("Cancel order")}
               </button>
             )}
           </article>

@@ -9,10 +9,10 @@ import {
   deriveOrderPda,
   derivePriceLevelPda,
   findPriceLevelNeighbors,
-  getTidebookAccounts,
+  getOutcomiaAccounts,
   type MarketAccount,
   type OrderSide,
-} from "./tidebook";
+} from "./outcomia";
 
 export interface RestingOrderInstruction {
   instruction: TransactionInstruction;
@@ -41,7 +41,7 @@ export async function buildRestingOrderInstruction(
   const order = deriveOrderPda(marketAddress, market.nextOrderId);
   const priceLevel = derivePriceLevelPda(marketAddress, side, price);
 
-  const priceLevelState = await getTidebookAccounts(
+  const priceLevelState = await getOutcomiaAccounts(
     program,
   ).priceLevel.fetchNullable(priceLevel);
 

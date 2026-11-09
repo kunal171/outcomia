@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "./preferences-provider";
+
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 
 import { useId, useRef, useState } from "react";
@@ -8,7 +10,7 @@ import {
   type PredictionMarketAccount,
   type PredictionOrderBookAccount,
 } from "../lib/prediction";
-import { formatAtomicAmount } from "../lib/tidebook";
+import { formatAtomicAmount } from "../lib/outcomia";
 
 /** Read-only help uses the loaded market terms and book; opening it sends no RPC. */
 export function PredictionGuide({
@@ -22,6 +24,8 @@ export function PredictionGuide({
   symbol?: string;
   compact?: boolean;
 }) {
+  const { t } = useI18n();
+
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [outcome, setOutcome] = useState<"yes" | "no">("yes");
@@ -42,9 +46,9 @@ export function PredictionGuide({
   const amount = (value: BN) =>
     `${formatAtomicAmount(value, decimals)} ${symbol}`;
   const source = ask
-    ? `Current lowest ${chosen} sell offer`
+    ? t("Current lowest {value0} sell offer", { value0: chosen })
     : bid
-      ? `Current highest ${chosen} buy offer`
+      ? t("Current highest {value0} buy offer", { value0: chosen })
       : "Illustrative price · not a live quote";
   return (
     <>
@@ -53,10 +57,10 @@ export function PredictionGuide({
         type="button"
         onClick={() => dialog.current?.showModal()}
         aria-haspopup="dialog"
-        aria-label={compact ? "How predictions work" : undefined}
+        aria-label={compact ? t("How predictions work") : undefined}
       >
         <span aria-hidden="true">?</span>
-        {!compact && " How predictions work"}
+        {!compact && t(" How predictions work")}
       </button>
       <dialog
         className="prediction-guide"
@@ -77,28 +81,30 @@ export function PredictionGuide({
       >
         <div className="guide-heading">
           <div>
-            <span className="eyebrow">A quick guide</span>
             <h2 id={titleId}>
-              {market ? "This market, explained" : "From a price to a payout"}
+              {market
+                ? t("This market, explained")
+                : t("From a price to a payout")}
             </h2>
           </div>
           <button
             className="guide-close"
             type="button"
-            aria-label="Close prediction guide"
+            aria-label={t("Close prediction guide")}
             onClick={() => dialog.current?.close()}
           >
             ×
           </button>
         </div>
         <p>
-          YES backs the question happening. NO backs it not happening. Both use
-          the same collateral asset.
+          {t(
+            "YES backs the question happening. NO backs it not happening. Both use the same collateral asset.",
+          )}
         </p>
         <div
           className="prediction-tabs"
           role="group"
-          aria-label="Example outcome"
+          aria-label={t("Example outcome")}
         >
           {(["yes", "no"] as const).map((value) => (
             <button
@@ -113,100 +119,141 @@ export function PredictionGuide({
         </div>
         {market && (
           <p className="guide-market-terms">
-            Price step: <strong>{amount(market.priceTick)}</strong> · Winning
-            contract: <strong>{amount(payout)}</strong>
+            {t("Price step:")} <strong>{amount(market.priceTick)}</strong>{" "}
+            {t("· Winning contract:")} <strong>{amount(payout)}</strong>
           </p>
         )}
         {validExample && (
           <section
             className="guide-example"
-            aria-label="Prediction price example"
+            aria-label={t("Prediction price example")}
           >
-            <span className="card-label">{source}</span>
+            <span className="card-label">{t(source ?? "")}</span>
             <strong>
-              1 {chosen} costs {amount(examplePrice)}
+              {t("1 {value0} costs {value1}", {
+                value0: chosen,
+                value1: amount(examplePrice),
+              })}
             </strong>
             <div className="guide-outcomes">
               <div>
-                <span>If {chosen} wins</span>
-                <strong>{amount(payout)} payout</strong>
+                <span>{t("If {value0} wins", { value0: chosen })}</span>
+                <strong>
+                  {t("{value0} payout", { value0: amount(payout) })}
+                </strong>
                 <small>
-                  {amount(payout.sub(examplePrice))} gain before fees
+                  {t("{value0} gain before fees", {
+                    value0: amount(payout.sub(examplePrice)),
+                  })}
                 </small>
               </div>
               <div>
-                <span>If {opposite} wins</span>
-                <strong>0 {symbol} payout</strong>
-                <small>{amount(examplePrice)} purchase cost lost</small>
+                <span>{t("If {value0} wins", { value0: opposite })}</span>
+                <strong>{t("0 {value0} payout", { value0: symbol })}</strong>
+                <small>
+                  {t("{value0} purchase cost lost", {
+                    value0: amount(examplePrice),
+                  })}
+                </small>
               </div>
             </div>
             {!ask && bid && (
               <p>
-                This is a buyer’s offer, not an available sell price. A new buy
-                order may wait for a seller.
+                {t(
+                  "This is a buyer’s offer, not an available sell price. A new buy order may wait for a seller.",
+                )}
               </p>
             )}
             <p>
-              An order must fill first. Offers can change; an unfilled order is
-              not a position. Price reflects what traders offer, not a
-              guaranteed probability.
+              {t(
+                "Unfilled orders are not positions. Prices are offers, not guaranteed probabilities.",
+              )}
             </p>
           </section>
         )}
         <ol className="guide-steps">
           <li>
-            <strong>Fund & trade</strong>
+            <strong>{t("Fund & trade")}</strong>
             <p>
-              Deposit collateral, then buy YES or NO. A seller needs outcome
-              contracts: splitting {amount(payout)} creates one YES and one NO.
-              Merging a complete pair returns its backing. Buys match sells at
-              the resting order’s price; fees reduce your return.
+              {t(
+                "Deposit collateral, then buy YES or NO. A seller needs outcome contracts: splitting {value0} creates one YES and one NO. Merging a complete pair returns its backing. Buys match sells at the resting order’s price; fees reduce your return.",
+                { value0: amount(payout) },
+              )}
             </p>
           </li>
           <li>
-            <strong>Check the rules</strong>
+            <strong>{t("Check the rules")}</strong>
             <p>
               {market
-                ? `Trading closes ${predictionTime(market.closeTs)}. Earliest outcome proposal: ${predictionTime(market.earliestResolutionTs ?? market.closeTs)}.`
-                : "Every question has a trading cutoff, evidence requirements and a designated resolver. Read its published rules before buying."}
+                ? t(
+                    "Trading closes {value0}. Earliest outcome proposal: {value1}.",
+                    {
+                      value0: predictionTime(market.closeTs),
+                      value1: predictionTime(
+                        market.earliestResolutionTs ?? market.closeTs,
+                      ),
+                    },
+                  )
+                : t(
+                    "Every question has a trading cutoff, evidence requirements and a designated resolver. Read its published rules before buying.",
+                  )}
             </p>
             {market && (
               <p>
-                Creator / primary resolver:{" "}
-                <code>{market.resolver.toBase58()}</code>. Review delay:{" "}
-                {market.resolutionDelaySeconds.toString()} seconds.
+                {t("Creator / primary resolver:")}{" "}
+                <code>{market.resolver.toBase58()}</code>
+                {t(". Review delay: {value0} seconds.", {
+                  value0: market.resolutionDelaySeconds.toString(),
+                })}
               </p>
             )}
           </li>
           <li>
-            <strong>Resolution & settlement</strong>
+            <strong>{t("Resolution & settlement")}</strong>
             <p>
-              The designated active-admin resolver proposes the outcome using
-              the published evidence. After review and finalization, the winning
-              contract pays {amount(payout)}; the losing contract pays zero. A
-              proposed outcome is not final.
+              {t(
+                "The designated active-admin resolver proposes the outcome using the published evidence. After review and finalization, the winning contract pays {value0}; the losing contract pays zero. A proposed outcome is not final.",
+                { value0: amount(payout) },
+              )}
             </p>
             <p className="guide-notice">
               {PREDICTION_RESOLUTION_ENABLED
-                ? "Finalized outcomes can be redeemed into your shared wallet. Invalid pays half to each outcome. Cancel locked contracts before claiming."
-                : "Resolution and claims are implemented behind the next program-upgrade rollout flag."}
+                ? t(
+                    "Finalized outcomes can be redeemed into your shared wallet. Invalid pays half to each outcome. Cancel locked contracts before claiming.",
+                  )
+                : t(
+                    "Resolution and claims are implemented behind the next program-upgrade rollout flag.",
+                  )}
             </p>
           </li>
         </ol>
         {market && (
           <section className="guide-fallback">
-            <strong>Fallback for this market</strong>
+            <strong>{t("Fallback for this market")}</strong>
             <p>
-              {market.fallback
-                ? `Fallback resolver: ${market.fallback.resolver.toBase58()}. Available ${predictionTime(market.fallback.availableTs)}. ${market.fallback.deadlineTs ? `Proposal deadline: ${predictionTime(market.fallback.deadlineTs)}.` : "No proposal deadline is configured."}`
-                : "No fallback resolver is configured."}{" "}
-              Resolver silence can leave unpaired positions unresolved; do not
-              assume an automatic refund.
+              {t(
+                "{value0} Resolver silence can leave unpaired positions unresolved; do not assume an automatic refund.",
+                {
+                  value0: market.fallback
+                    ? t(
+                        "Fallback resolver: {value0}. Available {value1}. {value2}",
+                        {
+                          value0: market.fallback.resolver.toBase58(),
+                          value1: predictionTime(market.fallback.availableTs),
+                          value2: market.fallback.deadlineTs
+                            ? t("Proposal deadline: {value0}.", {
+                                value0: predictionTime(
+                                  market.fallback.deadlineTs,
+                                ),
+                              })
+                            : t("No proposal deadline is configured."),
+                        },
+                      )
+                    : t("No fallback resolver is configured."),
+                },
+              )}
             </p>
-            <p>
-              Full criteria and the immutable rules reference are under “Market
-              rules & resolution terms”.
-            </p>
+            <p>{t("Read the published rules in Rules & outcome.")}</p>
           </section>
         )}
       </dialog>

@@ -5,7 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: tidebook
+    app.kubernetes.io/part-of: outcomia
 spec:
   clusterIP: None
   selector:

@@ -445,7 +445,7 @@ test("placement IDL binds a signed trader to exact units and canonical order/lev
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -664,7 +664,7 @@ test("append IDL writes the old tail without requiring its owner's signature", a
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -959,7 +959,7 @@ test("insertion IDL encodes optional neighbors and stays within packet limits", 
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -1331,7 +1331,7 @@ test("matching IDL encodes one taker signature, optional removal accounts and a 
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -1665,7 +1665,7 @@ test("cancellation IDL requires only the owner signature and fits the maximum ac
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -1953,7 +1953,7 @@ test("opening IDL requires the authority signature, writable market and canonica
   const { Program } = require("@anchor-lang/core");
   const { Connection } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -2124,7 +2124,7 @@ test("withdrawal and complete-set IDL agree with wallet account roles and units"
     createAssociatedTokenAccountIdempotentInstruction,
   } = require("@solana/spl-token");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -2197,7 +2197,7 @@ test("deposit arguments encode exact collateral atoms and canonical account role
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -2247,7 +2247,7 @@ test("position instruction and all six balance buckets agree with the IDL", asyn
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, SystemProgram } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),
@@ -2301,7 +2301,7 @@ test("creation arguments encode against the checked-in IDL within transaction li
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection, SystemProgram, Transaction } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   // Every account is supplied explicitly; building this instruction needs no RPC.
   const program = new Program(idl, {
@@ -2379,7 +2379,7 @@ test("book account IDL round-trips four empty/populated heads and full-width IDs
   const { Program, BN } = require("@anchor-lang/core");
   const { Connection } = require("@solana/web3.js");
   const idl = JSON.parse(
-    readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+    readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
   );
   const program = new Program(idl, {
     connection: new Connection("http://127.0.0.1:8899"),

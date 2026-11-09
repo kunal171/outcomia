@@ -17,7 +17,7 @@ const {
   ComputeBudgetInstruction,
 } = require("@solana/web3.js");
 const idl = JSON.parse(
-  readFileSync(new URL("../idl/tidebook.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../idl/outcomia.json", import.meta.url), "utf8"),
 );
 const programId = new PublicKey(idl.address);
 function load(file, overrides) {
@@ -57,7 +57,7 @@ const {
   canPostPredictionRemainder,
 } = load("../lib/prediction-matching-plan.ts", {
   "./prediction": prediction,
-  "./tidebook": {
+  "./outcomia": {
     deriveMarketFeesPda: (market) => derive("market_fees", market),
     deriveProtocolConfigPda: () => derive("protocol_config"),
   },

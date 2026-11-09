@@ -3,11 +3,11 @@ kind: ConfigMap
 metadata:
   name: indexer-config
   labels:
-    app.kubernetes.io/name: tidebook-indexer
+    app.kubernetes.io/name: outcomia-indexer
     app.kubernetes.io/component: indexer
-    app.kubernetes.io/part-of: tidebook
+    app.kubernetes.io/part-of: outcomia
 data:
   SOLANA_RPC_URL: https://api.devnet.solana.com
   SOLANA_WS_URL: wss://api.devnet.solana.com
-  TIDEBOOK_PROGRAM_ID: AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
+  OUTCOMIA_PROGRAM_ID: AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL
   HEALTH_ADDRESS: 0.0.0.0:8080

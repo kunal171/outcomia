@@ -1,4 +1,5 @@
 "use client";
+import { useI18n } from "./preferences-provider";
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -36,14 +37,16 @@ import {
   deriveMarketMetadataPda,
   deriveVaultAuthorityPda,
   deriveVaultPda,
-  getTidebookProgram,
-  getTidebookAccounts,
+  getOutcomiaProgram,
+  getOutcomiaAccounts,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
-} from "../lib/tidebook";
+} from "../lib/outcomia";
 
 export function CreatePredictionMarket() {
+  const { t } = useI18n();
+
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
   const { signMessage } = useWallet();
@@ -53,7 +56,7 @@ export function CreatePredictionMarket() {
   const { role, loading, error: roleError } = useProtocolRole();
   const isAdmin = !loading && (role === "admin" || role === "super-admin");
   const program = useMemo(
-    () => (wallet ? getTidebookProgram(connection, wallet) : null),
+    () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
   );
   const [name, setName] = useState("");
@@ -122,7 +125,7 @@ export function CreatePredictionMarket() {
       validatePredictionCreatorResolver(rules.resolver, wallet.publicKey);
       if (rules.closeTs.lte(new BN(String(Math.floor(Date.now() / 1000)))))
         throw new Error("Trading close time must be in the future");
-      const admin = await getTidebookAccounts(
+      const admin = await getOutcomiaAccounts(
         program,
       ).adminRecord.fetchNullable(deriveAdminRecordPda(wallet.publicKey));
       if (
@@ -244,36 +247,34 @@ export function CreatePredictionMarket() {
       <AppHeader />
       <main className="route-shell route-shell-narrow">
         <Link className="market-type-back" href="/markets/new">
-          ← Change market type
+          {t("← Change market type")}
         </Link>
         <div className="route-heading">
-          <div className="eyebrow">Prediction market setup</div>
-          <h1>Create a prediction market</h1>
-          <p>
-            Set the question, collateral and resolution rules. Create a draft,
-            then open it as its active-admin creator. Resolution and reward
-            claims are still being built.
-          </p>
+          <h1>{t("Create a prediction market")}</h1>
         </div>
         {!PREDICTION_DRAFTS_ENABLED && (
           <div className="access-card">
-            Prediction draft creation is disabled in this app configuration.
+            {t(
+              "Prediction draft creation is disabled in this app configuration.",
+            )}
           </div>
         )}
         {!wallet ? (
-          <div className="access-card">Connect your administrator wallet.</div>
+          <div className="access-card">
+            {t("Connect your administrator wallet.")}
+          </div>
         ) : loading ? (
-          <div className="access-card">Checking role…</div>
+          <div className="access-card">{t("Checking role…")}</div>
         ) : (
           !isAdmin && (
             <div className="access-card">
-              An active administrator role is required.
+              {t("An active administrator role is required.")}
             </div>
           )
         )}
         {roleError && (
           <div className="access-card access-denied" role="alert">
-            {roleError}
+            {t(roleError ?? "")}
           </div>
         )}
         {isAdmin && (
@@ -286,12 +287,11 @@ export function CreatePredictionMarket() {
                 01
               </span>
               <div>
-                <h2>Market details</h2>
-                <p>Name the question and choose its collateral.</p>
+                <h2>{t("Market details")}</h2>
               </div>
             </div>
             <label>
-              Short display name
+              {t("Short display name")}
               <input
                 required
                 maxLength={64}
@@ -301,17 +301,17 @@ export function CreatePredictionMarket() {
               />
             </label>
             <label>
-              Collateral mint
+              {t("Collateral mint")}
               <input
                 required
                 value={mint}
                 disabled={pending}
                 onChange={(e) => setMint(e.target.value)}
-                placeholder="SPL token mint address"
+                placeholder={t("SPL token mint address")}
               />
             </label>
             <label>
-              Collateral symbol
+              {t("Collateral symbol")}
               <input
                 required
                 maxLength={16}
@@ -322,7 +322,7 @@ export function CreatePredictionMarket() {
               />
             </label>
             <label>
-              Price increment per contract
+              {t("Price increment per contract")}
               <input
                 required
                 value={tick}
@@ -332,12 +332,11 @@ export function CreatePredictionMarket() {
               />
             </label>
             <details className="inline-explainer">
-              <summary>How does the price increment work?</summary>
+              <summary>{t("How does the price increment work?")}</summary>
               <p>
-                Prices are quoted in collateral per contract. A 0.01 increment
-                allows prices such as 0.40 or 0.41. A winning contract is
-                designed to pay 1 collateral token after settlement; resolution
-                and claims are still in development.
+                {t(
+                  "For example, a 0.01 increment allows prices of 0.50 or 0.51, but not 0.505.",
+                )}
               </p>
             </details>
             <PredictionRulesEditor
@@ -353,8 +352,9 @@ export function CreatePredictionMarket() {
             />
             {!signMessage && (
               <p className="access-denied" role="alert">
-                This wallet does not support message signing. Choose a wallet
-                with message signing to upload the rules.
+                {t(
+                  "This wallet does not support message signing. Choose a wallet with message signing to upload the rules.",
+                )}
               </p>
             )}
             <label className="rules-checkbox rules-review">
@@ -367,15 +367,14 @@ export function CreatePredictionMarket() {
                   setReviewedContent(e.target.checked ? preview.json : null)
                 }
               />
-              I reviewed these rules and authorize their public, permanent
-              upload. Turbo may use existing storage credits; this app never
-              tops up or sends SOL for storage.
+              {t(
+                "I reviewed these rules and authorize their public, permanent upload. Turbo may use existing storage credits; this app never tops up or sends SOL for storage.",
+              )}
             </label>
             <p className="rules-help">
-              The app uploads and checks the JSON, then asks you to sign market
-              creation. If creation fails, retrying the same rules reuses the
-              upload. Uploading cannot be undone by cancelling the market
-              transaction.
+              {t(
+                "Rules upload is permanent, even if market creation is canceled. Retrying unchanged rules reuses the upload.",
+              )}
             </p>
             {stage && (
               <p className="rules-progress" role="status">
@@ -395,24 +394,28 @@ export function CreatePredictionMarket() {
                 !!result
               }
             >
-              {pending ? "Creating draft…" : "Upload rules & create draft"}
+              {pending
+                ? t("Creating draft…")
+                : t("Upload rules & create draft")}
             </button>
           </form>
         )}
         {uploaded && (
           <div className="access-card rules-upload-receipt">
-            <h2>Rules upload saved</h2>
+            <h2>{t("Rules upload saved")}</h2>
             <p>
               {uploaded.content === preview.json && uploaded.owner === creator
-                ? "This upload can be reused for the current rules."
-                : "The rules or creator changed. Creation will require a new upload."}
+                ? t("This upload can be reused for the current rules.")
+                : t(
+                    "The rules or creator changed. Creation will require a new upload.",
+                  )}
             </p>
             <a
               href={`${RULES_GATEWAY}${uploaded.id}`}
               target="_blank"
               rel="noreferrer"
             >
-              View uploaded JSON ↗
+              {t("View uploaded JSON ↗")}
             </a>
             <code>{uploaded.uri}</code>
             <button
@@ -426,26 +429,26 @@ export function CreatePredictionMarket() {
                 );
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = "tidebook-rules-upload-receipt.json";
+                link.download = "outcomia-rules-upload-receipt.json";
                 link.click();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
             >
-              Download upload receipt
+              {t("Download upload receipt")}
             </button>
           </div>
         )}
         {error && (
           <div className="access-card access-denied" role="alert">
-            {error}
+            {t(error ?? "")}
           </div>
         )}
         {result && (
           <div className="access-card transaction-success">
             <p>
-              Draft confirmed.{" "}
+              {t("Draft confirmed.")}{" "}
               <Link href={`/predictions/${result.market}`}>
-                Inspect draft →
+                {t("Inspect draft →")}
               </Link>
             </p>
             <a
@@ -453,7 +456,7 @@ export function CreatePredictionMarket() {
               target="_blank"
               rel="noreferrer"
             >
-              View transaction ↗
+              {t("View transaction ↗")}
             </a>
           </div>
         )}

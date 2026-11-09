@@ -25,7 +25,7 @@ import {
   deriveMarketFeesPda,
   deriveProtocolConfigPda,
   type OrderSide,
-} from "./tidebook";
+} from "./outcomia";
 
 export const MAX_PREDICTION_MATCHES_PER_TRANSACTION = 3;
 // A fixed ceiling bounds the batch. Preflight still determines whether the
