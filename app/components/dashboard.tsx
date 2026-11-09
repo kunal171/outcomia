@@ -334,7 +334,7 @@ export function Dashboard() {
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-copy">
             <h1 id="landing-title">
-              <span>{t("Prediction markets")}</span>
+              <span>{t("Every Outcome Has a Market.")}</span>
             </h1>
             <p>{t("Trade YES or NO on Solana.")}</p>
             <div className="landing-actions">
@@ -431,7 +431,7 @@ export function Dashboard() {
       <footer className="landing-footer">
         <span>Outcomia</span>
         <a
-          href="https://github.com/kunal171/tidebook"
+          href="https://github.com/kunal171/outcomia"
           target="_blank"
           rel="noreferrer"
         >

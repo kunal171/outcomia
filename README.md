@@ -1,5 +1,7 @@
 # Outcomia
 
+**Every Outcome Has a Market.**
+
 Prediction markets on Solana, with YES/NO order books and one collateral asset
 per market. Outcomia also supports spot trading and includes a Rust indexer
 that stores finalized transactions in PostgreSQL.

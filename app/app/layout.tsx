@@ -11,7 +11,7 @@ import "./theme.css";
 import { SolanaProvider } from "@/components/solana-provider";
 
 export const metadata: Metadata = {
-  title: "Outcomia | Prediction markets on Solana",
+  title: "Outcomia | Every Outcome Has a Market.",
   description:
     "Explore YES/NO prediction markets on Solana, with limit orders and transparent market rules. Spot trading also available.",
 };
