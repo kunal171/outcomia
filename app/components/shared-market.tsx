@@ -39,6 +39,7 @@ import {
 } from "@solana/spl-token";
 import { readableAmount, inversePrice } from "../lib/market-display";
 import { SharedAssetFunds } from "./shared-wallet";
+import { SpotTradeWorkspace } from "./spot-trade-workspace";
 import { PredictionTradeWorkspace } from "./prediction/trade-workspace";
 import { SharedOpenOrders } from "./shared-open-orders";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -294,6 +295,7 @@ function Market(props: Props) {
       decimals={props.quoteDecimals}
       quantityDecimals={props.kind === "prediction" ? 0 : props.baseDecimals!}
       symbol={props.quoteSymbol}
+      assetSymbol={props.baseSymbol}
       onCancel={(order) => void transact("cancel", order)}
     />
   );
@@ -391,14 +393,11 @@ function Market(props: Props) {
       />
     );
 
-  const orders = (snapshot?.orders ?? []).filter(
-    ({ account }) => "open" in account.status && "spot" in account.outcome,
-  );
   const bid = snapshot?.book.bestPrices[0],
     ask = snapshot?.book.bestPrices[1];
   const quote = bid && ask ? bid.add(ask).divn(2) : (bid ?? ask);
   return (
-    <section className="admin-card shared-market">
+    <section className="shared-market spot-market">
       <div className="section-heading">
         <h2>{t("Trade this pair")}</h2>
         <button
@@ -428,11 +427,11 @@ function Market(props: Props) {
               {t("Enable shared-wallet book")}
             </button>
           ) : (
-            "The market creator has not enabled the shared book."
+            t("The market creator has not enabled the shared book.")
           )}
         </p>
       )}
-      {quote && (
+      {loaded && quote && (
         <div className="market-rate-card">
           <div>
             <h3>
@@ -452,107 +451,58 @@ function Market(props: Props) {
       )}
       {snapshot && (
         <>
-          <div className="shared-depth">
-            {(["bid", "ask"] as const).map((value) => (
-              <div key={value}>
-                <h3>{value === "bid" ? t("Buy orders") : t("Sell orders")}</h3>
-                {orders
-                  .filter(({ account }) => value in account.side)
-                  .sort((a, b) =>
-                    value === "bid"
-                      ? b.account.price.cmp(a.account.price)
-                      : a.account.price.cmp(b.account.price),
-                  )
-                  .map(({ publicKey, account }) => (
-                    <p key={publicKey.toBase58()}>
-                      {`${readableAmount(account.price, props.quoteDecimals)} ${props.quoteSymbol} × ${readableAmount(
-                        account.remainingQuantity,
-                        props.baseDecimals!,
-                      )}`}
-                    </p>
-                  ))}
-              </div>
-            ))}
-          </div>
-          {wallet ? (
-            <>
-              <label>
-                {t("Buy or sell")}
-                <select
-                  value={side}
-                  disabled={pending}
-                  onChange={(event) => setSide(event.target.value as Side)}
-                >
-                  <option value="bid">
-                    {t("Buy {value0}", { value0: props.baseSymbol })}
-                  </option>
-                  <option value="ask">
-                    {t("Sell {value0}", { value0: props.baseSymbol })}
-                  </option>
-                </select>
-              </label>
-              <label>
-                {t("Price ({value0} per {value1})", {
-                  value0: props.quoteSymbol,
-                  value1: props.baseSymbol,
-                })}
-                <input
-                  inputMode="decimal"
-                  value={price}
-                  onChange={(event) => setPrice(event.target.value)}
-                  disabled={pending}
-                />
-              </label>
-              <label>
-                {t("Quantity ({value0})", { value0: props.baseSymbol })}
-                <input
-                  inputMode="decimal"
-                  value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
-                  disabled={pending}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={
-                  pending ||
-                  !loaded ||
-                  !props.tradingOpen ||
-                  !!props.entryDisabled ||
-                  !price ||
-                  !quantity
-                }
-                onClick={() => void transact("trade")}
-              >
-                {pending
-                  ? t("Confirm in wallet…")
-                  : `${side === "bid" ? t("Buy") : t("Sell")} ${props.baseSymbol}`}
-              </button>
-            </>
-          ) : (
-            <p>{t("Connect a wallet to trade.")}</p>
-          )}
-          {openOrders}
+          <SpotTradeWorkspace
+            snapshot={snapshot}
+            loaded={loaded}
+            failed={!!issue}
+            pending={pending}
+            connected={!!wallet}
+            canTrade={props.tradingOpen && !props.entryDisabled}
+            baseSymbol={props.baseSymbol!}
+            quoteSymbol={props.quoteSymbol}
+            baseDecimals={props.baseDecimals!}
+            quoteDecimals={props.quoteDecimals}
+            side={side}
+            price={price}
+            quantity={quantity}
+            onSide={setSide}
+            onPrice={setPrice}
+            onQuantity={setQuantity}
+            onTrade={() => void transact("trade")}
+          />
+          {wallet && openOrders}
         </>
       )}
       {feedback}
       {fees}
-      <SharedAssetFunds
-        key={`quote:${revision}`}
-        mint={props.quoteMint}
-        decimals={props.quoteDecimals}
-        symbol={props.quoteSymbol}
-        onChanged={() => setRevision((v) => v + 1)}
-      />
-      {props.baseMint && (
-        <SharedAssetFunds
-          key={`base:${revision}`}
-          mint={props.baseMint}
-          decimals={props.baseDecimals!}
-          symbol={props.baseSymbol!}
-          onChanged={() => setRevision((v) => v + 1)}
-        />
-      )}
+      <details
+        className="spot-funding"
+        onToggle={(event) => {
+          if (event.currentTarget.open) setFundingOpen(true);
+        }}
+      >
+        <summary>{t("Deposit & withdraw")}</summary>
+        {fundingOpen && (
+          <div className="spot-funding-assets">
+            <SharedAssetFunds
+              key={`quote:${revision}`}
+              mint={props.quoteMint}
+              decimals={props.quoteDecimals}
+              symbol={props.quoteSymbol}
+              onChanged={() => setRevision((v) => v + 1)}
+            />
+            {props.baseMint && (
+              <SharedAssetFunds
+                key={`base:${revision}`}
+                mint={props.baseMint}
+                decimals={props.baseDecimals!}
+                symbol={props.baseSymbol!}
+                onChanged={() => setRevision((v) => v + 1)}
+              />
+            )}
+          </div>
+        )}
+      </details>
     </section>
   );
 }

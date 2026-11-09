@@ -18,9 +18,11 @@ their original bytes. Existing market names are on-chain data, not UI branding.
   sidebar preferences are read as fallbacks.
 - Redis faucet counters retain their original namespace so a rename cannot reset
   claim quotas.
-- Compose retains the existing database/user and named PostgreSQL volume.
-  Its service/image branding changes; its stored data does not. Stop the old
-  Compose indexer before starting the renamed stack: only one indexer should
+- Fresh Compose setups use the Outcomia database, user and named volume.
+  Existing setups must add `-f services/indexer/compose.legacy.yaml` after the
+  base file on every Compose command. That override reuses the old database
+  credentials and volume without modifying them. Keep the existing host `.env`
+  database URL. Stop the old Compose indexer first: only one indexer should
   write checkpoints for a given database/program.
 - New Kind/Kubernetes manifests use the Outcomia namespace and image. They do
   not migrate an existing cluster, Secrets or persistent volumes. Export and
@@ -37,3 +39,21 @@ evidence. Hosting project/domain names are separate Vercel resources; changing
 source code does not rename them. Protected local environment files remain intact. Historical Arweave documents and transaction
 reports retain their original labels and URLs. Do not rewrite signed evidence to
 make its spelling match the new brand.
+
+## Remaining old names
+
+Old-name references are limited to compatibility and recorded evidence:
+
+| Location                               | Reason                                                         |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `services/indexer/compose.legacy.yaml` | Reuses the existing database and volume.                       |
+| App and indexer program-ID fallbacks   | Existing deployments may still supply the old variable name.   |
+| App cookie and sidebar fallbacks       | Keeps visitors' saved language, theme and navigation settings. |
+| Faucet rate-limit keys                 | Preserves active claim limits in Redis.                        |
+| `docs/devnet/shared-smoke-result.json` | Captured evidence contains its original repository URL.        |
+
+Ignored build output, local environment files and hosting project settings are
+not repository branding. Rebuild generated artifacts after pulling. Existing
+on-chain market names require an authorized metadata update; editing source
+files cannot change them. The local checkout directory can be renamed without
+changing the GitHub repository or program identity.

@@ -67,3 +67,25 @@ The palette follows [Radix's semantic color guidance](https://www.radix-ui.com/c
 `test:theme` measures the defined text/action color pairs against the
 [WCAG text contrast threshold](https://www.w3.org/TR/WCAG22/#contrast-minimum).
 It does not establish full accessibility compliance for every rendered state.
+
+## Spot market detail
+
+Spot uses the metadata market name as its title. The shared order book and
+controlled trade form sit side by side on desktop; the form comes first on
+mobile. `spot-trade-workspace.tsx` formats the snapshot and groups remaining
+open orders at the same price using exact BN arithmetic. It does not fetch
+accounts, build instructions or sign transactions.
+
+`shared-market.tsx` owns reads, matching and confirmation. Refresh retains the
+entered price and quantity. A failed read disables entry and shows unavailable
+book data, rather than empty liquidity. Cancellation has no trading-status gate.
+
+Deposit/withdraw controls mount on the first opening of their disclosure and
+stay mounted after closing it. Market details are collapsed for the shared path;
+legacy precision, prices and fee accounts remain labeled separately. Authority
+pause/unpause/closure controls remain outside that disclosure.
+
+The older per-market book, deposits and treasury controls are inside a separate
+recovery disclosure. Public test-token claims stay outside it; admin faucet setup
+is a separate disclosure. This groups the
+legacy controls; the parent market component still performs its legacy reads.

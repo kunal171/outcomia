@@ -1,0 +1,18 @@
+# Compatibility only: select this override when reusing the pre-rename database.
+# docker compose -f services/indexer/compose.yaml -f services/indexer/compose.legacy.yaml up -d
+# This reuses the stored data; it does not rename a database or migrate its volume.
+services:
+  indexer:
+    environment:
+      DATABASE_URL: postgres://tidebook:tidebook_dev@postgres:5432/tidebook_indexer
+      OUTCOMIA_PROGRAM_ID: ${OUTCOMIA_PROGRAM_ID:-${TIDEBOOK_PROGRAM_ID:-AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL}}
+  postgres:
+    environment:
+      POSTGRES_DB: tidebook_indexer
+      POSTGRES_USER: tidebook
+      POSTGRES_PASSWORD: tidebook_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tidebook -d tidebook_indexer"]
+volumes:
+  outcomia_postgres_data:
+    name: tidebook-indexer_tidebook_postgres_data

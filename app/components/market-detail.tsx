@@ -2,6 +2,7 @@
 import { useI18n } from "./preferences-provider";
 
 import { SharedMarket } from "./shared-market";
+import { LegacyRecovery } from "./legacy-recovery";
 import {
   sharedBookPda,
   sharedAccounts,
@@ -1121,210 +1122,219 @@ export function MarketDetail({ address }: { address: string }) {
               className={`market-detail-layout ${SHARED_BALANCES_ENABLED ? "shared-layout" : ""}`}
             >
               <section className="admin-card market-information">
-                <div className="card-label">{t("Pair")}</div>
-                <div className="market-symbol-pair">
-                  <strong>{labels.base}</strong>
-                  <span>/</span>
-                  <strong>{labels.quote}</strong>
-                </div>
-                <details className="market-mint-details">
-                  <summary>{t("Token mint addresses")}</summary>
-                  <div className="market-detail-pair">
-                    <div>
-                      <span>{labels.base}</span>
-                      <a
-                        href={accountExplorerUrl(market.baseMint)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {`${market.baseMint.toBase58()} ↗`}
-                      </a>
-                    </div>
-                    <div>
-                      <span>{labels.quote}</span>
-                      <a
-                        href={accountExplorerUrl(market.quoteMint)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {`${market.quoteMint.toBase58()} ↗`}
-                      </a>
-                    </div>
-                  </div>
-                </details>
-
-                <dl className="market-metadata">
-                  <div>
-                    <dt>{t("Market address")}</dt>
-                    <dd>{shortAddress(marketAddress.toBase58())}</dd>
-                  </div>
-                  {marketKind && (
-                    <div>
-                      <dt>{t("Market type")}</dt>
-                      <dd className="metadata-kind">{t(marketKind ?? "")}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt>
-                      {SHARED_BALANCES_ENABLED
-                        ? t("Legacy last traded price")
-                        : t("Last traded price")}
-                    </dt>
-                    <dd>
-                      {lastTrade ? (
-                        <a
-                          href={transactionExplorerUrl(lastTrade.signature)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {`${readableAmount(
-                            lastTrade.price,
-                            market.quoteDecimals,
-                          )} ${labels.quote} ↗`}
-                        </a>
-                      ) : tradeError ? (
-                        "History unavailable"
-                      ) : (
-                        "No recent trade found"
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("Authority")}</dt>
-                    <dd>{shortAddress(market.authority.toBase58())}</dd>
-                  </div>
-                  <div>
-                    <dt>{t("Next order")}</dt>
-                    <dd>
-                      {"#"}
-                      {market.nextOrderId.toString()}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {SHARED_BALANCES_ENABLED
-                        ? t("Legacy open orders")
-                        : t("Open orders")}
-                    </dt>
-                    <dd>{market.openOrderCount.toString()}</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {SHARED_BALANCES_ENABLED
-                        ? t("Legacy highest buy price")
-                        : t("Highest buy price")}
-                    </dt>
-                    <dd>
-                      {market.bestBid
-                        ? `${readableAmount(
-                            market.bestBid,
-                            market.quoteDecimals,
-                          )} ${labels.quote}`
-                        : t("No open bids")}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>
-                      {SHARED_BALANCES_ENABLED
-                        ? t("Legacy lowest sell price")
-                        : t("Lowest sell price")}
-                    </dt>
-                    <dd>
-                      {market.bestAsk
-                        ? `${readableAmount(
-                            market.bestAsk,
-                            market.quoteDecimals,
-                          )} ${labels.quote}`
-                        : t("No open asks")}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("{value0} precision", { value0: labels.base })}</dt>
-                    <dd>
-                      {t("{value0} decimal places", {
-                        value0: market.baseDecimals,
-                      })}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("{value0} precision", { value0: labels.quote })}</dt>
-                    <dd>
-                      {t("{value0} decimal places", {
-                        value0: market.quoteDecimals,
-                      })}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("Price step")}</dt>
-                    <dd>
-                      {formatAtomicAmount(
-                        market.priceTickSize,
-                        market.quoteDecimals,
-                      )}{" "}
-                      {labels.quote}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("Order size step")}</dt>
-                    <dd>
-                      {formatAtomicAmount(
-                        market.quantityLotSize,
-                        market.baseDecimals,
-                      )}{" "}
-                      {labels.base}
-                    </dd>
-                  </div>
-                  {baseVault && (
-                    <div>
-                      <dt>{t("Base vault")}</dt>
-                      <dd>
-                        <a
-                          href={accountExplorerUrl(baseVault)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {`${shortAddress(baseVault.toBase58())} ↗`}
-                        </a>
-                      </dd>
-                    </div>
-                  )}
-
-                  {quoteVault && (
-                    <div>
-                      <dt>{t("Quote vault")}</dt>
-                      <dd>
-                        <a
-                          href={accountExplorerUrl(quoteVault)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {`${shortAddress(quoteVault.toBase58())} ↗`}
-                        </a>
-                      </dd>
-                    </div>
-                  )}
-                  {marketFees && (
-                    <div>
-                      <dt>{t("Protocol fees")}</dt>
-                      <dd>
-                        {`${readableAmount(
-                          marketFees.accruedQuoteFees,
-                          market.quoteDecimals,
-                        )} ${labels.quote}`}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
-
-                <a
-                  className="market-explorer-link"
-                  href={accountExplorerUrl(marketAddress)}
-                  target="_blank"
-                  rel="noreferrer"
+                <details
+                  className="spot-market-details"
+                  open={!SHARED_BALANCES_ENABLED}
                 >
-                  {t("View market account on Explorer ↗")}
-                </a>
+                  <summary>{t("Market details")}</summary>
+                  <div className="card-label">{t("Pair")}</div>
+                  <div className="market-symbol-pair">
+                    <strong>{labels.base}</strong>
+                    <span>/</span>
+                    <strong>{labels.quote}</strong>
+                  </div>
+                  <details className="market-mint-details">
+                    <summary>{t("Token mint addresses")}</summary>
+                    <div className="market-detail-pair">
+                      <div>
+                        <span>{labels.base}</span>
+                        <a
+                          href={accountExplorerUrl(market.baseMint)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {`${market.baseMint.toBase58()} ↗`}
+                        </a>
+                      </div>
+                      <div>
+                        <span>{labels.quote}</span>
+                        <a
+                          href={accountExplorerUrl(market.quoteMint)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {`${market.quoteMint.toBase58()} ↗`}
+                        </a>
+                      </div>
+                    </div>
+                  </details>
 
+                  <dl className="market-metadata">
+                    <div>
+                      <dt>{t("Market address")}</dt>
+                      <dd>{shortAddress(marketAddress.toBase58())}</dd>
+                    </div>
+                    {marketKind && (
+                      <div>
+                        <dt>{t("Market type")}</dt>
+                        <dd className="metadata-kind">{t(marketKind ?? "")}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt>
+                        {SHARED_BALANCES_ENABLED
+                          ? t("Legacy last traded price")
+                          : t("Last traded price")}
+                      </dt>
+                      <dd>
+                        {lastTrade ? (
+                          <a
+                            href={transactionExplorerUrl(lastTrade.signature)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {`${readableAmount(
+                              lastTrade.price,
+                              market.quoteDecimals,
+                            )} ${labels.quote} ↗`}
+                          </a>
+                        ) : tradeError ? (
+                          "History unavailable"
+                        ) : (
+                          "No recent trade found"
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t("Authority")}</dt>
+                      <dd>{shortAddress(market.authority.toBase58())}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("Next order")}</dt>
+                      <dd>
+                        {"#"}
+                        {market.nextOrderId.toString()}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {SHARED_BALANCES_ENABLED
+                          ? t("Legacy open orders")
+                          : t("Open orders")}
+                      </dt>
+                      <dd>{market.openOrderCount.toString()}</dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {SHARED_BALANCES_ENABLED
+                          ? t("Legacy highest buy price")
+                          : t("Highest buy price")}
+                      </dt>
+                      <dd>
+                        {market.bestBid
+                          ? `${readableAmount(
+                              market.bestBid,
+                              market.quoteDecimals,
+                            )} ${labels.quote}`
+                          : t("No open bids")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {SHARED_BALANCES_ENABLED
+                          ? t("Legacy lowest sell price")
+                          : t("Lowest sell price")}
+                      </dt>
+                      <dd>
+                        {market.bestAsk
+                          ? `${readableAmount(
+                              market.bestAsk,
+                              market.quoteDecimals,
+                            )} ${labels.quote}`
+                          : t("No open asks")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("{value0} precision", { value0: labels.base })}
+                      </dt>
+                      <dd>
+                        {t("{value0} decimal places", {
+                          value0: market.baseDecimals,
+                        })}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("{value0} precision", { value0: labels.quote })}
+                      </dt>
+                      <dd>
+                        {t("{value0} decimal places", {
+                          value0: market.quoteDecimals,
+                        })}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t("Price step")}</dt>
+                      <dd>
+                        {formatAtomicAmount(
+                          market.priceTickSize,
+                          market.quoteDecimals,
+                        )}{" "}
+                        {labels.quote}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t("Order size step")}</dt>
+                      <dd>
+                        {formatAtomicAmount(
+                          market.quantityLotSize,
+                          market.baseDecimals,
+                        )}{" "}
+                        {labels.base}
+                      </dd>
+                    </div>
+                    {baseVault && (
+                      <div>
+                        <dt>{t("Base vault")}</dt>
+                        <dd>
+                          <a
+                            href={accountExplorerUrl(baseVault)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {`${shortAddress(baseVault.toBase58())} ↗`}
+                          </a>
+                        </dd>
+                      </div>
+                    )}
+
+                    {quoteVault && (
+                      <div>
+                        <dt>{t("Quote vault")}</dt>
+                        <dd>
+                          <a
+                            href={accountExplorerUrl(quoteVault)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {`${shortAddress(quoteVault.toBase58())} ↗`}
+                          </a>
+                        </dd>
+                      </div>
+                    )}
+                    {marketFees && (
+                      <div>
+                        <dt>{t("Protocol fees")}</dt>
+                        <dd>
+                          {`${readableAmount(
+                            marketFees.accruedQuoteFees,
+                            market.quoteDecimals,
+                          )} ${labels.quote}`}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  <a
+                    className="market-explorer-link"
+                    href={accountExplorerUrl(marketAddress)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("View market account on Explorer ↗")}
+                  </a>
+                </details>
                 {isMarketAuthority && (
                   <div className="market-card-actions">
                     {status === "active" ? (
@@ -1501,111 +1511,6 @@ export function MarketDetail({ address }: { address: string }) {
               )}
             </div>
 
-            <section className="admin-card order-book-card">
-              <div className="order-book-heading">
-                <div>
-                  <div className="card-label">{t("Live on-chain depth")}</div>
-                  <h2>{t("Order book")}</h2>
-                </div>
-                <button
-                  className="text-button"
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void loadMarket()}
-                >
-                  {t("Refresh")}
-                </button>
-              </div>
-
-              {bookError && (
-                <div className="transaction-message transaction-error">
-                  {t("Could not load the order book: {value0}", {
-                    value0: bookError,
-                  })}
-                </div>
-              )}
-
-              <div className="order-book-grid">
-                <div className="order-book-side">
-                  <h3>{t("Buy orders")}</h3>
-                  <div className="order-book-columns" aria-hidden="true">
-                    <span>
-                      {t("Price ({value0})", { value0: labels.quote })}
-                    </span>
-                    <span>
-                      {t("Quantity ({value0})", { value0: labels.base })}
-                    </span>
-                    <span>{t("Orders")}</span>
-                  </div>
-                  {bidLevels.length === 0 ? (
-                    <p className="order-book-empty">
-                      {t("No open buy orders")}
-                    </p>
-                  ) : (
-                    bidLevels.map((level) => (
-                      <div
-                        className="order-book-row order-book-bid"
-                        key={level.address.toBase58()}
-                      >
-                        <span>
-                          {formatAtomicAmount(
-                            level.price,
-                            market.quoteDecimals,
-                          )}
-                        </span>
-                        <span>
-                          {formatAtomicAmount(
-                            level.totalRemainingQuantity,
-                            market.baseDecimals,
-                          )}
-                        </span>
-                        <span>{level.orderCount.toString()}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="order-book-side">
-                  <h3>{t("Sell orders")}</h3>
-                  <div className="order-book-columns" aria-hidden="true">
-                    <span>
-                      {t("Price ({value0})", { value0: labels.quote })}
-                    </span>
-                    <span>
-                      {t("Quantity ({value0})", { value0: labels.base })}
-                    </span>
-                    <span>{t("Orders")}</span>
-                  </div>
-                  {askLevels.length === 0 ? (
-                    <p className="order-book-empty">
-                      {t("No open sell orders")}
-                    </p>
-                  ) : (
-                    askLevels.map((level) => (
-                      <div
-                        className="order-book-row order-book-ask"
-                        key={level.address.toBase58()}
-                      >
-                        <span>
-                          {formatAtomicAmount(
-                            level.price,
-                            market.quoteDecimals,
-                          )}
-                        </span>
-                        <span>
-                          {formatAtomicAmount(
-                            level.totalRemainingQuantity,
-                            market.baseDecimals,
-                          )}
-                        </span>
-                        <span>{level.orderCount.toString()}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </section>
-
             <ServerTestFaucet
               baseMint={market.baseMint}
               quoteMint={market.quoteMint}
@@ -1669,9 +1574,8 @@ export function MarketDetail({ address }: { address: string }) {
             {serverFaucetPair === false &&
               role === "super-admin" &&
               !testFaucet && (
-                <section className="admin-card market-balance-card">
-                  <div className="card-label">{t("Devnet test faucet")}</div>
-                  <h2>{t("Enable public test minting")}</h2>
+                <details className="admin-card spot-faucet-setup">
+                  <summary>{t("Enable public test minting")}</summary>
                   <p>
                     {t(
                       "This permanently transfers both mint authorities to Outcomia. Enable it only for fresh, zero-supply tokens with no economic value.",
@@ -1725,298 +1629,409 @@ export function MarketDetail({ address }: { address: string }) {
                       {faucetError}
                     </div>
                   )}
-                </section>
+                </details>
               )}
 
-            {wallet && (
-              <section className="admin-card market-balance-card">
-                <div className="admin-list-heading">
+            <LegacyRecovery title={t("Older deposits and orders")}>
+              <section className="admin-card order-book-card">
+                <div className="order-book-heading">
                   <div>
-                    <div className="card-label">
-                      {t("Wallet and internal balances")}
-                    </div>
-                    <h2>{t("Fund this market")}</h2>
+                    <div className="card-label">{t("Live on-chain depth")}</div>
+                    <h2>{t("Order book")}</h2>
                   </div>
                   <button
                     className="text-button"
                     type="button"
-                    disabled={balanceLoading || balancePending !== null}
-                    onClick={() => void loadBalances()}
+                    disabled={loading}
+                    onClick={() => void loadMarket()}
                   >
-                    {balanceLoading ? t("Refreshing…") : t("Refresh")}
+                    {t("Refresh")}
                   </button>
                 </div>
 
-                <dl className="market-metadata balance-metadata">
-                  <div>
-                    <dt>{t("{value0} in wallet", { value0: labels.base })}</dt>
-                    <dd>
-                      {formatAtomicAmount(
-                        walletBaseBalance,
-                        market.baseDecimals,
-                      )}
-                    </dd>
+                {bookError && (
+                  <div className="transaction-message transaction-error">
+                    {t("Could not load the order book: {value0}", {
+                      value0: bookError,
+                    })}
                   </div>
-                  <div>
-                    <dt>{t("{value0} in wallet", { value0: labels.quote })}</dt>
-                    <dd>
-                      {formatAtomicAmount(
-                        walletQuoteBalance,
-                        market.quoteDecimals,
-                      )}
-                    </dd>
-                  </div>
-                </dl>
+                )}
 
-                {!balanceLoading && !traderBalance && (
-                  <div className="balance-initialize">
-                    <p>
-                      {t(
-                        "Create one balance ledger for this wallet and market. This does not move tokens.",
-                      )}
-                    </p>
+                <div className="order-book-grid">
+                  <div className="order-book-side">
+                    <h3>{t("Buy orders")}</h3>
+                    <div className="order-book-columns" aria-hidden="true">
+                      <span>
+                        {t("Price ({value0})", { value0: labels.quote })}
+                      </span>
+                      <span>
+                        {t("Quantity ({value0})", { value0: labels.base })}
+                      </span>
+                      <span>{t("Orders")}</span>
+                    </div>
+                    {bidLevels.length === 0 ? (
+                      <p className="order-book-empty">
+                        {t("No open buy orders")}
+                      </p>
+                    ) : (
+                      bidLevels.map((level) => (
+                        <div
+                          className="order-book-row order-book-bid"
+                          key={level.address.toBase58()}
+                        >
+                          <span>
+                            {formatAtomicAmount(
+                              level.price,
+                              market.quoteDecimals,
+                            )}
+                          </span>
+                          <span>
+                            {formatAtomicAmount(
+                              level.totalRemainingQuantity,
+                              market.baseDecimals,
+                            )}
+                          </span>
+                          <span>{level.orderCount.toString()}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="order-book-side">
+                    <h3>{t("Sell orders")}</h3>
+                    <div className="order-book-columns" aria-hidden="true">
+                      <span>
+                        {t("Price ({value0})", { value0: labels.quote })}
+                      </span>
+                      <span>
+                        {t("Quantity ({value0})", { value0: labels.base })}
+                      </span>
+                      <span>{t("Orders")}</span>
+                    </div>
+                    {askLevels.length === 0 ? (
+                      <p className="order-book-empty">
+                        {t("No open sell orders")}
+                      </p>
+                    ) : (
+                      askLevels.map((level) => (
+                        <div
+                          className="order-book-row order-book-ask"
+                          key={level.address.toBase58()}
+                        >
+                          <span>
+                            {formatAtomicAmount(
+                              level.price,
+                              market.quoteDecimals,
+                            )}
+                          </span>
+                          <span>
+                            {formatAtomicAmount(
+                              level.totalRemainingQuantity,
+                              market.baseDecimals,
+                            )}
+                          </span>
+                          <span>{level.orderCount.toString()}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {wallet && (
+                <section className="admin-card market-balance-card">
+                  <div className="admin-list-heading">
+                    <div>
+                      <div className="card-label">
+                        {t("Wallet and internal balances")}
+                      </div>
+                      <h2>{t("Fund this market")}</h2>
+                    </div>
                     <button
-                      className="primary-button"
+                      className="text-button"
                       type="button"
-                      disabled={balancePending !== null}
-                      onClick={() => void initializeBalance()}
+                      disabled={balanceLoading || balancePending !== null}
+                      onClick={() => void loadBalances()}
                     >
-                      {balancePending === "initialize"
-                        ? t("Initializing…")
-                        : t("Initialize balance")}
+                      {balanceLoading ? t("Refreshing…") : t("Refresh")}
                     </button>
                   </div>
-                )}
 
-                {traderBalance && (
-                  <>
-                    <dl className="market-metadata balance-metadata">
-                      <div>
-                        <dt>
-                          {t("{value0} available", { value0: labels.base })}
-                        </dt>
-                        <dd>
-                          {formatAtomicAmount(
-                            traderBalance.baseFree,
-                            market.baseDecimals,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {t("{value0} in orders", { value0: labels.base })}
-                        </dt>
-                        <dd>
-                          {formatAtomicAmount(
-                            traderBalance.baseLocked,
-                            market.baseDecimals,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {t("{value0} available", { value0: labels.quote })}
-                        </dt>
-                        <dd>
-                          {formatAtomicAmount(
-                            traderBalance.quoteFree,
-                            market.quoteDecimals,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {t("{value0} in orders", { value0: labels.quote })}
-                        </dt>
-                        <dd>
-                          {formatAtomicAmount(
-                            traderBalance.quoteLocked,
-                            market.quoteDecimals,
-                          )}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <form
-                      className="market-create-form balance-form"
-                      onSubmit={(event) => event.preventDefault()}
-                    >
-                      <label>
-                        {t("Asset")}
-                        <select
-                          value={balanceAsset}
-                          onChange={(event) =>
-                            setBalanceAsset(
-                              event.target.value as "base" | "quote",
-                            )
-                          }
-                        >
-                          <option value="base">{labels.base}</option>
-                          <option value="quote">{labels.quote}</option>
-                        </select>
-                      </label>
-                      <label>
-                        {t("Amount ({value0})", {
-                          value0:
-                            balanceAsset === "base"
-                              ? labels.base
-                              : labels.quote,
-                        })}
-                        <input
-                          inputMode="decimal"
-                          value={balanceAmount}
-                          onChange={(event) =>
-                            setBalanceAmount(event.target.value)
-                          }
-                          placeholder={
-                            balanceAsset === "base" ? "1.0" : "100.0"
-                          }
-                          autoComplete="off"
-                        />
-                      </label>
-                      <div className="balance-actions">
-                        <button
-                          className="primary-button"
-                          type="button"
-                          disabled={
-                            !rawBalanceAmount ||
-                            depositExceedsWallet ||
-                            balancePending !== null
-                          }
-                          onClick={() => void transferBalance("deposit")}
-                        >
-                          {balancePending === "deposit"
-                            ? t("Depositing…")
-                            : t("Deposit")}
-                        </button>
-                        <button
-                          className="admin-action-button"
-                          type="button"
-                          disabled={
-                            !rawBalanceAmount ||
-                            withdrawalExceedsFree ||
-                            balancePending !== null
-                          }
-                          onClick={() => void transferBalance("withdraw")}
-                        >
-                          {balancePending === "withdraw"
-                            ? t("Withdrawing…")
-                            : t("Withdraw free balance")}
-                        </button>
-                      </div>
-                      {depositExceedsWallet && (
-                        <small className="form-error">
-                          {t(
-                            "Deposit exceeds the selected asset balance in your wallet.",
-                          )}
-                        </small>
-                      )}
-                      {withdrawalExceedsFree && (
-                        <small className="form-error">
-                          {t(
-                            "Withdrawal exceeds the selected asset's free internal balance.",
-                          )}
-                        </small>
-                      )}
-                      <small>
-                        {t(
-                          "Orders move free balance to locked balance. Cancellation releases it back to free; only withdrawal moves tokens back to your wallet.",
+                  <dl className="market-metadata balance-metadata">
+                    <div>
+                      <dt>
+                        {t("{value0} in wallet", { value0: labels.base })}
+                      </dt>
+                      <dd>
+                        {formatAtomicAmount(
+                          walletBaseBalance,
+                          market.baseDecimals,
                         )}
-                      </small>
-                    </form>
-                  </>
-                )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>
+                        {t("{value0} in wallet", { value0: labels.quote })}
+                      </dt>
+                      <dd>
+                        {formatAtomicAmount(
+                          walletQuoteBalance,
+                          market.quoteDecimals,
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
 
-                {balanceError && (
-                  <div className="transaction-message transaction-error">
-                    {balanceError}
-                  </div>
-                )}
-                {balanceSignature && (
-                  <div className="transaction-message transaction-success">
-                    {t("Balance updated.")}{" "}
-                    <a
-                      href={transactionExplorerUrl(balanceSignature)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t("View transaction ↗")}
-                    </a>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {role === "super-admin" && marketFees && (
-              <section className="admin-card market-balance-card">
-                <div className="card-label">{t("Protocol treasury")}</div>
-                <h2>{t("Withdraw accrued fees")}</h2>
-                <p>
-                  {t(
-                    "Available: {value0} {value1}. The destination may be any token account for this market's quote mint.",
-                    {
-                      value0: readableAmount(
-                        marketFees.accruedQuoteFees,
-                        market.quoteDecimals,
-                      ),
-                      value1: labels.quote,
-                    },
+                  {!balanceLoading && !traderBalance && (
+                    <div className="balance-initialize">
+                      <p>
+                        {t(
+                          "Create one balance ledger for this wallet and market. This does not move tokens.",
+                        )}
+                      </p>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={balancePending !== null}
+                        onClick={() => void initializeBalance()}
+                      >
+                        {balancePending === "initialize"
+                          ? t("Initializing…")
+                          : t("Initialize balance")}
+                      </button>
+                    </div>
                   )}
-                </p>
-                <form className="admin-form" onSubmit={withdrawProtocolFees}>
-                  <label>
-                    {t("Destination quote-token account")}
-                    <input
-                      value={feeDestination}
-                      onChange={(event) =>
-                        setFeeDestination(event.target.value)
+
+                  {traderBalance && (
+                    <>
+                      <dl className="market-metadata balance-metadata">
+                        <div>
+                          <dt>
+                            {t("{value0} available", { value0: labels.base })}
+                          </dt>
+                          <dd>
+                            {formatAtomicAmount(
+                              traderBalance.baseFree,
+                              market.baseDecimals,
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>
+                            {t("{value0} in orders", { value0: labels.base })}
+                          </dt>
+                          <dd>
+                            {formatAtomicAmount(
+                              traderBalance.baseLocked,
+                              market.baseDecimals,
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>
+                            {t("{value0} available", { value0: labels.quote })}
+                          </dt>
+                          <dd>
+                            {formatAtomicAmount(
+                              traderBalance.quoteFree,
+                              market.quoteDecimals,
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>
+                            {t("{value0} in orders", { value0: labels.quote })}
+                          </dt>
+                          <dd>
+                            {formatAtomicAmount(
+                              traderBalance.quoteLocked,
+                              market.quoteDecimals,
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <form
+                        className="market-create-form balance-form"
+                        onSubmit={(event) => event.preventDefault()}
+                      >
+                        <label>
+                          {t("Asset")}
+                          <select
+                            value={balanceAsset}
+                            onChange={(event) =>
+                              setBalanceAsset(
+                                event.target.value as "base" | "quote",
+                              )
+                            }
+                          >
+                            <option value="base">{labels.base}</option>
+                            <option value="quote">{labels.quote}</option>
+                          </select>
+                        </label>
+                        <label>
+                          {t("Amount ({value0})", {
+                            value0:
+                              balanceAsset === "base"
+                                ? labels.base
+                                : labels.quote,
+                          })}
+                          <input
+                            inputMode="decimal"
+                            value={balanceAmount}
+                            onChange={(event) =>
+                              setBalanceAmount(event.target.value)
+                            }
+                            placeholder={
+                              balanceAsset === "base" ? "1.0" : "100.0"
+                            }
+                            autoComplete="off"
+                          />
+                        </label>
+                        <div className="balance-actions">
+                          <button
+                            className="primary-button"
+                            type="button"
+                            disabled={
+                              !rawBalanceAmount ||
+                              depositExceedsWallet ||
+                              balancePending !== null
+                            }
+                            onClick={() => void transferBalance("deposit")}
+                          >
+                            {balancePending === "deposit"
+                              ? t("Depositing…")
+                              : t("Deposit")}
+                          </button>
+                          <button
+                            className="admin-action-button"
+                            type="button"
+                            disabled={
+                              !rawBalanceAmount ||
+                              withdrawalExceedsFree ||
+                              balancePending !== null
+                            }
+                            onClick={() => void transferBalance("withdraw")}
+                          >
+                            {balancePending === "withdraw"
+                              ? t("Withdrawing…")
+                              : t("Withdraw free balance")}
+                          </button>
+                        </div>
+                        {depositExceedsWallet && (
+                          <small className="form-error">
+                            {t(
+                              "Deposit exceeds the selected asset balance in your wallet.",
+                            )}
+                          </small>
+                        )}
+                        {withdrawalExceedsFree && (
+                          <small className="form-error">
+                            {t(
+                              "Withdrawal exceeds the selected asset's free internal balance.",
+                            )}
+                          </small>
+                        )}
+                        <small>
+                          {t(
+                            "Orders move free balance to locked balance. Cancellation releases it back to free; only withdrawal moves tokens back to your wallet.",
+                          )}
+                        </small>
+                      </form>
+                    </>
+                  )}
+
+                  {balanceError && (
+                    <div className="transaction-message transaction-error">
+                      {balanceError}
+                    </div>
+                  )}
+                  {balanceSignature && (
+                    <div className="transaction-message transaction-success">
+                      {t("Balance updated.")}{" "}
+                      <a
+                        href={transactionExplorerUrl(balanceSignature)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t("View transaction ↗")}
+                      </a>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {role === "super-admin" && marketFees && (
+                <section className="admin-card market-balance-card">
+                  <div className="card-label">{t("Protocol treasury")}</div>
+                  <h2>{t("Withdraw accrued fees")}</h2>
+                  <p>
+                    {t(
+                      "Available: {value0} {value1}. The destination may be any token account for this market's quote mint.",
+                      {
+                        value0: readableAmount(
+                          marketFees.accruedQuoteFees,
+                          market.quoteDecimals,
+                        ),
+                        value1: labels.quote,
+                      },
+                    )}
+                  </p>
+                  <form className="admin-form" onSubmit={withdrawProtocolFees}>
+                    <label>
+                      {t("Destination quote-token account")}
+                      <input
+                        value={feeDestination}
+                        onChange={(event) =>
+                          setFeeDestination(event.target.value)
+                        }
+                        placeholder={t("Treasury token account")}
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label>
+                      {t("Amount ({value0})", { value0: labels.quote })}
+                      <input
+                        inputMode="decimal"
+                        value={feeAmount}
+                        onChange={(event) => setFeeAmount(event.target.value)}
+                        placeholder="0"
+                        autoComplete="off"
+                      />
+                    </label>
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={
+                        feePending ||
+                        !feeDestination.trim() ||
+                        !feeAmount.trim() ||
+                        marketFees.accruedQuoteFees.isZero()
                       }
-                      placeholder={t("Treasury token account")}
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label>
-                    {t("Amount ({value0})", { value0: labels.quote })}
-                    <input
-                      inputMode="decimal"
-                      value={feeAmount}
-                      onChange={(event) => setFeeAmount(event.target.value)}
-                      placeholder="0"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <button
-                    className="primary-button"
-                    type="submit"
-                    disabled={
-                      feePending ||
-                      !feeDestination.trim() ||
-                      !feeAmount.trim() ||
-                      marketFees.accruedQuoteFees.isZero()
-                    }
-                  >
-                    {feePending ? t("Withdrawing…") : t("Withdraw fees")}
-                  </button>
-                </form>
-                {feeError && (
-                  <div className="transaction-message transaction-error">
-                    {feeError}
-                  </div>
-                )}
-                {feeSignature && (
-                  <div className="transaction-message transaction-success">
-                    {t("Fee withdrawal confirmed.")}{" "}
-                    <a
-                      href={transactionExplorerUrl(feeSignature)}
-                      target="_blank"
-                      rel="noreferrer"
                     >
-                      {t("View on Explorer ↗")}
-                    </a>
-                  </div>
-                )}
-              </section>
-            )}
+                      {feePending ? t("Withdrawing…") : t("Withdraw fees")}
+                    </button>
+                  </form>
+                  {feeError && (
+                    <div className="transaction-message transaction-error">
+                      {feeError}
+                    </div>
+                  )}
+                  {feeSignature && (
+                    <div className="transaction-message transaction-success">
+                      {t("Fee withdrawal confirmed.")}{" "}
+                      <a
+                        href={transactionExplorerUrl(feeSignature)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t("View on Explorer ↗")}
+                      </a>
+                    </div>
+                  )}
+                </section>
+              )}
+            </LegacyRecovery>
           </>
         )}
 

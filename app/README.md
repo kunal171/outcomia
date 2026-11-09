@@ -117,7 +117,7 @@ is a different step. The UI's help dialogs explain this distinction.
 | `/markets/new/spot`           | Admin spot-market creation                                                                     |
 | `/predictions/new`            | Admin prediction draft creation and rules upload                                               |
 | `/wallet`                     | Connected wallet SOL, held/deposited Outcomia assets, market balances and prediction positions |
-| `/orders`                     | Shared spot/prediction orders, Open/History filters and optional legacy orders                                                                 |
+| `/orders`                     | Shared spot/prediction orders, Open/History filters and optional legacy orders                 |
 | `/admin`                      | Super-admin governance and administrator management                                            |
 
 Shared prediction orders appear on `/orders` and in the relevant market’s position panel.
@@ -127,6 +127,12 @@ its stored creator and an active admin record. Trading needs a wallet, not an
 admin role.
 
 ## Trading and display
+
+Spot detail uses a price-level book beside the trade form, with the form first
+on mobile. Same-price quantities are grouped exactly; selecting a price fills
+the existing input. Deposit/withdraw controls load when expanded, and technical
+market details start collapsed. Older per-market orders, deposits and fee
+withdrawals remain in a recovery disclosure. Refresh keeps entered trade values.
 
 Spot amounts use the stored base/quote mint decimals. Prediction quantities
 are whole contracts; prices use the collateral mint's precision. The client

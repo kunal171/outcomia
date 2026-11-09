@@ -31,6 +31,12 @@ setup; preserve an existing `.env`.
 cp services/indexer/.env.example services/indexer/.env
 ```
 
+For an existing pre-rename Compose database, add
+`-f services/indexer/compose.legacy.yaml` after `-f services/indexer/compose.yaml`
+to **every** Compose command below. Keep the existing `.env` database URL. The
+override reuses the existing volume and credentials; omitting it selects a new,
+empty Outcomia database. Neither setup deletes the other volume.
+
 Choose one runtime:
 
 **Docker Compose** runs both the database and the indexer:
@@ -60,8 +66,8 @@ Stop an existing Compose indexer before using the host process; both would
 otherwise compete for port `8080` and write the same checkpoints. Run one
 indexer per program/database configuration.
 
-Compose retains the pre-rename database/user/volume to preserve existing history.
-See [rename notes](../../docs/rebranding.md) before switching existing workloads.
+New Compose setups use the Outcomia database, user and volume. Existing setups
+use the compatibility override above; see [rename notes](../../docs/rebranding.md).
 
 The database is exposed on loopback port `5434`; containers use `postgres:5432`.
 `DATABASE_URL` is required. RPC, WebSocket and program settings default to devnet
@@ -103,10 +109,12 @@ cargo test --manifest-path services/indexer/Cargo.toml
 cargo clippy --manifest-path services/indexer/Cargo.toml --all-targets -- -D warnings
 ```
 
-Run the isolated PostgreSQL integration tests against a local test database:
+Run the isolated PostgreSQL integration tests against a local test database
+(the example uses fresh-install credentials; use the existing credentials with
+the compatibility override):
 
 ```bash
-DATABASE_URL=postgres://tidebook:tidebook_dev@127.0.0.1:5434/postgres \
+DATABASE_URL=postgres://outcomia:outcomia_dev@127.0.0.1:5434/postgres \
   cargo test --manifest-path services/indexer/Cargo.toml -- --ignored
 ```
 
