@@ -13,6 +13,7 @@ interface Props {
   decimals: number;
   quantityDecimals: number;
   symbol: string;
+  assetSymbol?: string;
   onCancel: (order: PublicKey) => void;
 }
 
@@ -25,10 +26,12 @@ export function SharedOpenOrders({
   decimals,
   quantityDecimals,
   symbol,
+  assetSymbol,
   onCancel,
 }: Props) {
   const { t } = useI18n();
 
+  const spot = !!snapshot && "spot" in snapshot.book.kind;
   const orders =
     snapshot?.orders.filter(
       ({ account }) => owner?.equals(account.owner) && "open" in account.status,
@@ -52,7 +55,7 @@ export function SharedOpenOrders({
           <table>
             <thead>
               <tr>
-                <th>{t("Contract")}</th>
+                <th>{spot ? t("Asset") : t("Contract")}</th>
                 <th>{t("Side")}</th>
                 <th>{t("Price ({value0})", { value0: symbol })}</th>
                 <th>{t("Remaining")}</th>
@@ -65,7 +68,9 @@ export function SharedOpenOrders({
               {orders.map(({ publicKey, account }) => (
                 <tr key={publicKey.toBase58()}>
                   <td>
-                    {t(Object.keys(account.outcome)[0].toUpperCase() ?? "")}
+                    {spot
+                      ? (assetSymbol ?? t("Spot"))
+                      : t(Object.keys(account.outcome)[0].toUpperCase() ?? "")}
                   </td>
                   <td>{"bid" in account.side ? t("Buy") : t("Sell")}</td>
                   <td>{readableAmount(account.price, decimals)}</td>
