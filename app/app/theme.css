@@ -495,3 +495,212 @@ body {
   min-width: 0;
   max-width: 100%;
 }
+
+/* Spot trading follows the same book/ticket hierarchy as prediction trading. */
+.spot-market {
+  margin-top: 28px;
+}
+.spot-market > .section-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.spot-market .market-rate-card {
+  padding: 20px 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.spot-trading-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 352px);
+  gap: 32px;
+  align-items: start;
+  margin: 24px 0 32px;
+}
+.spot-book,
+.spot-book-side,
+.spot-ticket {
+  min-width: 0;
+}
+.spot-book h3,
+.spot-ticket h3 {
+  margin: 0 0 24px;
+  font-size: 18px;
+}
+.spot-book-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.spot-book h4 {
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.spot-ladder-scroll {
+  overflow-x: auto;
+}
+.spot-book table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.spot-book th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 12px 0;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.spot-book th:last-child,
+.spot-book td:last-child {
+  text-align: right;
+}
+.spot-book td {
+  padding: 10px 0;
+  font-variant-numeric: tabular-nums;
+}
+.spot-market .spot-book button {
+  min-height: 36px;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  color: var(--buy);
+}
+.spot-market .spot-book .book-ask button {
+  color: var(--sell);
+}
+.spot-market .spot-book button:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+}
+.spot-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+.spot-ticket {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.spot-market .spot-submit {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 48px;
+  border: 0;
+  background: var(--buy);
+  color: var(--outcome-ink);
+}
+.spot-market .spot-submit[data-side="ask"] {
+  background: var(--sell);
+}
+.spot-market .spot-submit:hover:not(:disabled) {
+  background: var(--buy);
+  filter: brightness(1.06);
+}
+.spot-market .spot-submit[data-side="ask"]:hover:not(:disabled) {
+  background: var(--sell);
+}
+.spot-funding {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.spot-funding > summary,
+.spot-market-details > summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+}
+.spot-funding-assets {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.spot-funding-assets .shared-funds {
+  min-width: 0;
+  border: 0;
+  padding: 16px 0;
+  background: transparent;
+}
+.spot-market-details[open] > summary {
+  margin-bottom: 24px;
+}
+.spot-market-details + .market-card-actions {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 950px) {
+  .spot-trading-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .spot-ticket {
+    grid-row: 1;
+  }
+}
+@media (max-width: 600px) {
+  .spot-funding-assets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .spot-book-sides {
+    gap: 16px;
+  }
+  .spot-ticket {
+    padding: 20px;
+  }
+}
+
+/* Hidden table labels must share the scroller's containing block; otherwise an
+   absolutely positioned label in a far-right column can widen the whole page. */
+.prediction-table-scroll,
+.prediction-ladder-scroll,
+.spot-ladder-scroll,
+.orders-table-scroll {
+  position: relative;
+}
+.spot-ticket .spot-field > small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.spot-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.spot-market .shared-open-orders table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.spot-market .shared-open-orders th,
+.spot-market .shared-open-orders td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.spot-market .shared-open-orders th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.spot-market .shared-open-orders td:last-child {
+  text-align: right;
+}
+.spot-faucet-setup > summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.spot-faucet-setup[open] > summary {
+  margin-bottom: 20px;
+}
