@@ -572,7 +572,7 @@ async function main() {
     const rules = fs.readFileSync(
       path.join(root, "docs/devnet/shared-smoke-rules.json"),
     );
-    state.rulesUri = `https://raw.githubusercontent.com/kunal171/tidebook/${state.sourceCommit}/docs/devnet/shared-smoke-rules.json`;
+    state.rulesUri = `https://raw.githubusercontent.com/kunal171/outcomia/${state.sourceCommit}/docs/devnet/shared-smoke-rules.json`;
     save();
     await send("initialize_prediction", a, [
       await a.methods
@@ -722,7 +722,7 @@ async function main() {
       "Set SMOKE_EVIDENCE_COMMIT to the published evidence commit",
     );
   const evidence = fs.readFileSync(publicEvidence),
-    evidenceUri = `https://raw.githubusercontent.com/kunal171/tidebook/${evidenceCommit}/docs/devnet/shared-smoke-evidence.json`;
+    evidenceUri = `https://raw.githubusercontent.com/kunal171/outcomia/${evidenceCommit}/docs/devnet/shared-smoke-evidence.json`;
   const remote = Buffer.from(await (await fetch(evidenceUri)).arrayBuffer());
   assert(
     hash(remote).equals(hash(evidence)),

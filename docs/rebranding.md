@@ -31,8 +31,9 @@ The original deployment keypair is copied to the ignored
 the existing program ID; never generate a replacement as part of branding.
 The former keypair is retained as a backup.
 
-Existing GitHub/Vercel URLs remain valid external resource names. The repository
-remote, hosting project, production domain and protected local environment files
-are not renamed by a source change. Historical Arweave documents and transaction
+The GitHub repository is now [kunal171/outcomia](https://github.com/kunal171/outcomia),
+and the local origin uses that URL. Historical repository URLs remain in captured
+evidence. Hosting project/domain names are separate Vercel resources; changing
+source code does not rename them. Protected local environment files remain intact. Historical Arweave documents and transaction
 reports retain their original labels and URLs. Do not rewrite signed evidence to
 make its spelling match the new brand.
