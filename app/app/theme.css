@@ -442,7 +442,7 @@ body {
 .landing-hero .flow-order b {
   background: rgb(255 255 255 / 0.4);
 }
-.landing-hero .flow-match {
+.landing-hero .flow-center {
   color: #111827;
   background: #ffffff;
   border-color: #ffffff;
@@ -485,4 +485,13 @@ body {
   .landing-hero .landing-actions {
     align-items: stretch;
   }
+}
+
+/* Keep retained position panels and their wide order tables inside the viewport. */
+.prediction-workspace [role="tabpanel"],
+.shared-orders-view,
+.shared-open-orders,
+.prediction-table-scroll {
+  min-width: 0;
+  max-width: 100%;
 }
