@@ -9,11 +9,15 @@ import "./navigation.css";
 import "./prediction-detail.css";
 import "./theme.css";
 import { SolanaProvider } from "@/components/solana-provider";
+import { CantonWalletProvider } from "@/components/canton-wallet-provider";
+import { NetworkWalletProvider } from "@/components/network-wallet-provider";
+import { NetworkBoundary } from "@/components/network-workspace";
+import "./network.css";
 
 export const metadata: Metadata = {
   title: "Outcomia | Every Outcome Has a Market.",
   description:
-    "Explore YES/NO prediction markets on Solana, with limit orders and transparent market rules. Spot trading also available.",
+    "Prediction markets on Solana and Canton. Connect your wallet to choose your network.",
 };
 
 export default async function RootLayout({
@@ -34,7 +38,13 @@ export default async function RootLayout({
     <html lang={locale} data-theme={theme}>
       <body>
         <PreferencesProvider initialLocale={locale} initialTheme={theme}>
-          <SolanaProvider>{children}</SolanaProvider>
+          <SolanaProvider>
+            <CantonWalletProvider>
+              <NetworkWalletProvider>
+                <NetworkBoundary>{children}</NetworkBoundary>
+              </NetworkWalletProvider>
+            </CantonWalletProvider>
+          </SolanaProvider>
         </PreferencesProvider>
       </body>
     </html>

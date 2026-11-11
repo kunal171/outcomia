@@ -4,7 +4,7 @@ import { useI18n } from "./preferences-provider";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BaseWalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { SharedWalletButton } from "./network-wallet-provider";
 import { DisplayPreferences } from "./display-preferences";
 import { NETWORK } from "../lib/solana";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -17,43 +17,6 @@ const roleLabels = {
   disabled: "Admin disabled",
   user: null,
 };
-
-function HydrationSafeWalletButton() {
-  const { t } = useI18n();
-
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <button
-        className="wallet-adapter-button wallet-adapter-button-trigger"
-        type="button"
-        disabled
-        aria-label={t("Loading wallet")}
-      >
-        {t("Select Wallet")}
-      </button>
-    );
-  }
-
-  return (
-    <BaseWalletMultiButton
-      labels={{
-        "change-wallet": t("Change wallet"),
-        connecting: t("Connecting…"),
-        "copy-address": t("Copy address"),
-        copied: t("Copied"),
-        disconnect: t("Disconnect"),
-        "has-wallet": t("Connect"),
-        "no-wallet": t("Select Wallet"),
-      }}
-    />
-  );
-}
 
 type NavigationItem = {
   href: string;
@@ -85,7 +48,7 @@ function BrandMark() {
   );
 }
 
-function OutcomiaBrand() {
+export function OutcomiaBrand() {
   const { t } = useI18n();
 
   return (
@@ -323,7 +286,7 @@ export function AppHeader() {
             {NETWORK}
           </span>
           <DisplayPreferences />
-          <HydrationSafeWalletButton />
+          <SharedWalletButton />
         </div>
       </header>
       <dialog

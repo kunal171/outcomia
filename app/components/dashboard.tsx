@@ -1,15 +1,15 @@
 "use client";
+import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
 
-import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
-
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PROGRAM_EXPLORER_URL, PROGRAM_ID } from "../lib/solana";
-import { AppHeader } from "./app-header";
-
-type ProgramStatus = "checking" | "deployed" | "not-deployed" | "unavailable";
+import { useEffect, useRef, useState } from "react";
+import { NetworkHeader } from "./network-workspace";
+import {
+  SharedWalletButton,
+  useNetworkWallet,
+} from "./network-wallet-provider";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 /** Decorative order flow, not live prices or a simulated trading result. */
 function OrderFlow() {
@@ -305,42 +305,21 @@ function PredictionJourney() {
 export function Dashboard() {
   const { t } = useI18n();
 
-  const { connection } = useConnection();
-  const [programStatus, setProgramStatus] = useState<ProgramStatus>("checking");
-  const refreshProgramStatus = useCallback(async () => {
-    setProgramStatus("checking");
-    try {
-      const account = await connection.getAccountInfo(PROGRAM_ID, "confirmed");
-      setProgramStatus(account?.executable ? "deployed" : "not-deployed");
-    } catch {
-      setProgramStatus("unavailable");
-    }
-  }, [connection]);
-
-  useEffect(() => {
-    void refreshProgramStatus();
-  }, [refreshProgramStatus]);
-  const statusLabel = {
-    checking: "Checking program…",
-    deployed: "Program live on devnet",
-    "not-deployed": "Program not found",
-    unavailable: "RPC unavailable",
-  }[programStatus];
+  const { error } = useNetworkWallet();
+  const { setVisible } = useWalletModal();
 
   return (
-    <div className="app-shell landing-shell">
-      <AppHeader />
+    <div className="network-shell landing-shell">
+      <NetworkHeader />
       <main id="top">
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-copy">
             <h1 id="landing-title">
               <span>{t("Every Outcome Has a Market.")}</span>
             </h1>
-            <p>{t("Trade YES or NO on Solana.")}</p>
+            <p>{t("Choose your wallet. Trade your view.")}</p>
             <div className="landing-actions">
-              <Link className="landing-action-primary" href="/predictions">
-                {t("Explore predictions")} <span aria-hidden="true">↗</span>
-              </Link>
+              <SharedWalletButton />
               <Link
                 className="landing-action-secondary"
                 href="#how-predictions-work"
@@ -353,79 +332,19 @@ export function Dashboard() {
             <OrderFlow />
           </div>
         </section>
-        <p className="landing-rollout-note">
-          {PREDICTION_RESOLUTION_ENABLED
-            ? t(
-                "Devnet test markets · Trade, resolve and redeem under published market rules.",
-              )
-            : t(
-                "Devnet preview · Prediction trading is deployed. Resolution and claims require the next program upgrade.",
-              )}
-        </p>
+        {error && (
+          <p role="alert" className="error-message">
+            {error}
+          </p>
+        )}
         <PredictionJourney />
-        <section
-          className="landing-secondary"
-          aria-labelledby="secondary-title"
-        >
-          <div className="secondary-heading">
-            <h2 id="secondary-title">{t("Spot & orders")}</h2>
-          </div>
-          <nav
-            className="landing-destinations"
-            aria-label={t("More on Outcomia")}
-          >
-            <Link
-              className="landing-destination destination-spot"
-              href="/markets"
-            >
-              <span className="destination-icon" aria-hidden="true">
-                ↗
-              </span>
-              <div>
-                <h2>{t("Spot markets")}</h2>
-              </div>
-              <span className="destination-arrow" aria-hidden="true">
-                ↗
-              </span>
-            </Link>
-            <Link
-              className="landing-destination destination-orders"
-              href="/orders"
-            >
-              <span className="destination-icon" aria-hidden="true">
-                ≋
-              </span>
-              <div>
-                <h2>{t("Your orders")}</h2>
-              </div>
-              <span className="destination-arrow" aria-hidden="true">
-                ↗
-              </span>
-            </Link>
-          </nav>
-        </section>
-        <div className="landing-status">
-          <div role="status">
-            <span
-              className={`landing-status-dot landing-status-${programStatus}`}
-              aria-hidden="true"
-            />
-            {t(statusLabel ?? "")}
-          </div>
-          <button
-            type="button"
-            disabled={programStatus === "checking"}
-            onClick={() => void refreshProgramStatus()}
-            aria-label={t("Refresh program status")}
-          >
-            {t("Refresh")} <span aria-hidden="true">↻</span>
+        <div className="network-choices">
+          <button type="button" onClick={() => setVisible(true)}>
+            Solana <span>{t("Predictions & spot")}</span> ↗
           </button>
-          <a href={PROGRAM_EXPLORER_URL} target="_blank" rel="noreferrer">
-            {t("View program")} <span aria-hidden="true">↗</span>
-          </a>
-          <span className="landing-devnet-note">
-            {t("Devnet · test tokens only")}
-          </span>
+          <button type="button" onClick={() => setVisible(true)}>
+            Canton <span>{t("Predictions")}</span> ↗
+          </button>
         </div>
       </main>
       <footer className="landing-footer">

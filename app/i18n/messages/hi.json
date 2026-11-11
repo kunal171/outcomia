@@ -860,5 +860,12 @@
   "← All markets": "← सभी बाज़ार",
   "← Back to market": "← बाज़ार पर वापस",
   "← Change market type": "← बाज़ार प्रकार बदलें",
-  "← Prediction markets": "← पूर्वानुमान बाज़ार"
+  "← Prediction markets": "← पूर्वानुमान बाज़ार",
+  "Get Console Wallet": "Console Wallet प्राप्त करें",
+  "Checking wallet…": "वॉलेट जाँचा जा रहा है…",
+  "Choose your wallet. Trade your view.": "अपना वॉलेट चुनें। अपनी राय पर ट्रेड करें।",
+  "Predictions & spot": "पूर्वानुमान और स्पॉट",
+  "Market deployment pending": "मार्केट डिप्लॉयमेंट लंबित है",
+  "Canton prediction markets will appear here after contract deployment.": "कॉन्ट्रैक्ट डिप्लॉय होने के बाद Canton के पूर्वानुमान मार्केट यहाँ दिखेंगे।",
+  "Connected wallet": "कनेक्टेड वॉलेट"
 }
