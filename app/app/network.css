@@ -1,0 +1,153 @@
+/* Shared landing and Canton workspace reuse the original Outcomia tokens. */
+body:has(.network-shell),
+body:has(.network-wait) {
+  padding-left: 0;
+}
+.network-shell {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+}
+.network-header {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.network-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+.network-header-actions,
+.network-wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.network-disconnect {
+  border: 0;
+  color: var(--muted);
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+.network-choices {
+  display: flex;
+  gap: 24px;
+  border-top: 1px solid var(--line);
+  padding: 32px 0;
+}
+.network-choices button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 12px;
+}
+.network-choices button span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.network-wait {
+  min-height: 65vh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.chain-wallet-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.wallet-picker small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+}
+.canton-workspace {
+  padding: 64px 0;
+}
+.canton-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.canton-heading h1 {
+  margin: 0;
+  font-size: clamp(36px, 6vw, 64px);
+  letter-spacing: -0.04em;
+}
+.canton-session {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 24px 0;
+  margin: 16px 0 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+.canton-session code {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.canton-empty {
+  padding: 100px 16px;
+  text-align: center;
+}
+.canton-empty-symbol {
+  font-size: 48px;
+  color: var(--accent);
+}
+.canton-empty h2 {
+  font-size: 24px;
+}
+.canton-empty p {
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .network-shell {
+    width: calc(100% - 32px);
+  }
+  .network-header {
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 20px 0;
+  }
+  .network-header-actions {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .network-header .network-pill {
+    display: none;
+  }
+  .network-header .wallet-adapter-button {
+    font-size: 12px;
+    padding: 0 12px;
+  }
+  .network-choices {
+    flex-direction: column;
+    gap: 0;
+  }
+  .canton-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+  .canton-empty {
+    padding: 70px 0;
+  }
+}

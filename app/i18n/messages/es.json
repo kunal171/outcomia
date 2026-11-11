@@ -860,5 +860,12 @@
   "← All markets": "← Todos los mercados",
   "← Back to market": "← Volver al mercado",
   "← Change market type": "← Cambiar tipo de mercado",
-  "← Prediction markets": "← Mercados de predicción"
+  "← Prediction markets": "← Mercados de predicción",
+  "Get Console Wallet": "Obtener Console Wallet",
+  "Checking wallet…": "Comprobando cartera…",
+  "Choose your wallet. Trade your view.": "Elige tu cartera. Negocia tu visión.",
+  "Predictions & spot": "Predicciones y spot",
+  "Market deployment pending": "Despliegue de mercados pendiente",
+  "Canton prediction markets will appear here after contract deployment.": "Los mercados de predicción de Canton aparecerán aquí tras desplegar los contratos.",
+  "Connected wallet": "Cartera conectada"
 }

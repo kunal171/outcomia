@@ -860,5 +860,12 @@
   "← All markets": "← All markets",
   "← Back to market": "← Back to market",
   "← Change market type": "← Change market type",
-  "← Prediction markets": "← Prediction markets"
+  "← Prediction markets": "← Prediction markets",
+  "Get Console Wallet": "Get Console Wallet",
+  "Checking wallet…": "Checking wallet…",
+  "Choose your wallet. Trade your view.": "Choose your wallet. Trade your view.",
+  "Predictions & spot": "Predictions & spot",
+  "Market deployment pending": "Market deployment pending",
+  "Canton prediction markets will appear here after contract deployment.": "Canton prediction markets will appear here after contract deployment.",
+  "Connected wallet": "Connected wallet"
 }
