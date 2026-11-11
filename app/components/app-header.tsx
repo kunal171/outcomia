@@ -6,6 +6,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SharedWalletButton } from "./network-wallet-provider";
 import { DisplayPreferences } from "./display-preferences";
+import { BrandMark, OutcomiaBrand } from "./workspace-brand";
+export { OutcomiaBrand } from "./workspace-brand";
 import { NETWORK } from "../lib/solana";
 import { useProtocolRole } from "./protocol-role-provider";
 
@@ -24,40 +26,6 @@ type NavigationItem = {
   icon: "prediction" | "spot" | "wallet" | "orders" | "admins" | "create";
   active: boolean;
 };
-
-function BrandMark() {
-  return (
-    <span className="brand-mark" aria-hidden="true">
-      <svg className="outcomia-mark" viewBox="0 0 36 36" fill="none">
-        <circle
-          cx="17"
-          cy="19"
-          r="11"
-          stroke="currentColor"
-          strokeWidth="3.5"
-        />
-        <path
-          d="M19 17 29 7m-7 0h7v7"
-          stroke="currentColor"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
-export function OutcomiaBrand() {
-  const { t } = useI18n();
-
-  return (
-    <Link className="brand" href="/" aria-label={t("Outcomia home")}>
-      <BrandMark />
-      <span>Outcomia</span>
-    </Link>
-  );
-}
 
 function NavigationIcon({ name }: { name: NavigationItem["icon"] }) {
   const paths = {

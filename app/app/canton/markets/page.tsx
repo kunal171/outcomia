@@ -1,5 +1,5 @@
-import { CantonWorkspace } from "../../../components/network-workspace";
+import { CantonMarkets } from "../../../components/canton/markets";
 
 export default function CantonMarketsPage() {
-  return <CantonWorkspace />;
+  return <CantonMarkets />;
 }
