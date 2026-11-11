@@ -4,6 +4,11 @@ The shared Next.js UI for Outcomia. Connect a Solana wallet for existing predict
 and spot markets, or Console Wallet for the Canton prediction workspace. Canton
 contracts are not deployed yet. See [the network boundary](../docs/shared-frontend.md).
 
+Canton has prediction, position, order and wallet routes. The wallet reads assets
+from Console Wallet; the other routes show deployment status. The order preview
+only calculates locally. Canton transactions remain disabled until deployment
+and wallet submission are verified.
+
 ## Local setup
 
 From this directory:

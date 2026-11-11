@@ -8,9 +8,8 @@ Connect a wallet on the landing page:
 
 - A Solana wallet opens `/predictions`. Existing spot, wallet and order pages
   remain available on Solana.
-- Console Wallet opens `/canton/markets`. This workspace shows the verified
-  primary party and network. Markets remain unavailable until Canton contracts
-  are implemented and deployed. Canton spot is outside the current scope.
+- Console Wallet opens `/canton/markets`, with separate positions, orders and
+  wallet routes. Canton spot is outside the current scope.
 
 Both use the existing Outcomia layout, colors, display settings and translations.
 
@@ -45,6 +44,44 @@ paths, switching, rejection, wrong-network responses, restore and disconnect.
 A mocked extension proves application behavior; a real Console Wallet approval
 on the presentation machine still needs a separate smoke check. No Canton market
 submission or settlement is implemented by the gateway.
+
+## Canton workspace
+
+The `/canton` layout reuses Outcomia's palette, brand, languages and wallet picker.
+Its sidebar collapses on desktop and becomes a row of links on mobile. No Solana
+role/account providers mount inside it. The shared brand component has no chain
+reader dependency.
+
+- `/canton/markets`: deployment status and the future prediction-market list.
+- `/canton/positions`: unavailable until deployed position data can be read.
+- `/canton/orders`: unavailable until deployed order data can be read.
+- `/canton/wallet`: read-only assets from Console Wallet, with exact amounts,
+  token IDs, refresh, an empty-asset filter and a copyable party ID.
+
+The wallet reader calls SDK 3.0.0's `getBalance` for the verified party/network.
+It rechecks the live session before and after the request. Account changes
+unmount financial children; late responses are ignored. Responses with duplicate
+asset IDs, invalid amounts or a different network fail closed. Amounts stay
+decimal strings and use BigInt for locale grouping, without rounding balances.
+These are wallet-reported assets, not proof of approved collateral or deposits.
+
+Workspace verification used a mocked extension: all four routes, exact large
+balances, zero-asset filtering, errors, wrong-network assets, delayed responses
+after party changes, local buy/sell previews, sidebar collapse, 320–1440 px
+layouts, five languages and light/dark themes passed. The existing two-wallet
+switching regression also passed. No signatures, live balance reads or Canton
+transactions were submitted during these checks.
+
+Market, position and order data show **unavailable**, rather than zero or an empty
+account. The Daml contracts are locally tested in `outcomia-canton`, but public
+deployment, read/disclosure services and wallet submission are not verified.
+Deposits, withdrawals, split/merge, placement, cancellation, admin actions and
+claims are therefore not enabled in this UI. No public toggle bypasses that gate.
+
+The optional order-preview dialog is a local calculator. It explains buy cash
+escrow, sell contract escrow and complete-set merge/cancellation. Its exact
+Decimal/Int arithmetic matches current contract number bounds; it does not know
+a market's tick, lot, fees or available balance. It cannot sign or submit orders.
 
 ## Checks for this integration
 
