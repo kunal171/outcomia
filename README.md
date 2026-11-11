@@ -13,6 +13,11 @@ Use test tokens only.
 See [shared balances and settlement](docs/shared-balances-resolution.md) for the
 new custody model, legacy recovery and rollout checks.
 
+The shared [frontend](docs/shared-frontend.md) also connects Console Wallet for
+the Canton prediction workspace. Canton contracts and services are developed in
+[`outcomia-canton`](https://github.com/kunal171/outcomia-canton); market deployment
+is pending there. Solana functionality below remains available.
+
 ## What works
 
 - Admin-created prediction markets with named questions, published rules,

@@ -1,7 +1,8 @@
 # Outcomia app
 
-Next.js App Router UI for Outcomia's prediction and spot markets. The landing
-page leads with predictions; spot markets and order management remain available.
+The shared Next.js UI for Outcomia. Connect a Solana wallet for existing prediction
+and spot markets, or Console Wallet for the Canton prediction workspace. Canton
+contracts are not deployed yet. See [the network boundary](../docs/shared-frontend.md).
 
 ## Local setup
 
@@ -17,6 +18,7 @@ Open `http://localhost:3000`. For checks:
 
 ```bash
 npm run typecheck
+npm run test:canton
 npm run test:prediction
 npm run test:wallet
 npm run test:rpc-proxy
@@ -42,6 +44,12 @@ Translation files are in `i18n/messages/`. Add interface text to all five files;
 market names, token symbols and provider diagnostics remain unchanged. Amounts
 keep exact decimal strings and displayed deadlines remain in UTC. See the
 [UI guide](../docs/ui-design.md) for layout and content rules.
+
+## Canton wallet
+
+`NEXT_PUBLIC_CANTON_NETWORK_ID=canton:devnet` selects the expected Console Wallet
+network. The browser validates the live primary party before opening
+`/canton/markets`. No private keys or wallet tokens belong in environment files.
 
 ## RPC and program settings
 
