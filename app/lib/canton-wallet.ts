@@ -7,6 +7,8 @@ import { parseWalletAssets, walletNetworks } from "./canton-display";
  * Signing material and the SDK's optional network access tokens are not retained.
  */
 export async function readCantonWalletAssets(session: CantonSession) {
+  if (session.wallet === "loop")
+    return (await import("./loop-wallet")).readLoopAssets(session);
   const sdk = await import("@console-wallet/dapp-sdk");
   const wallet = sdk.consoleWallet;
   const verify = async () => {

@@ -11,6 +11,7 @@ export type CantonWalletAsset = {
   symbol: string;
   name: string;
   amount: string;
+  locked?: string;
 };
 const decimal = /^(\d+)(?:\.(\d+))?$/;
 
@@ -99,4 +100,44 @@ export function previewCantonOrder(
   return canonicalAmount(
     `${total / scale}.${(total % scale).toString().padStart(10, "0")}`,
   );
+}
+
+/** Loop holdings use (instrument admin, instrument ID) as identity. Preserve
+ * unlocked and locked amounts separately; neither symbols nor floats are keys.
+ */
+export function parseLoopAssets(value: unknown): CantonWalletAsset[] {
+  if (!Array.isArray(value))
+    throw new Error("Wallet returned an invalid balance response.");
+  const seen = new Set<string>();
+  return value.map((holding: unknown) => {
+    if (!holding || typeof holding !== "object")
+      throw new Error("Wallet returned an invalid asset.");
+    const item = holding as Record<string, unknown>;
+    const instrument = item.instrument_id as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      !instrument ||
+      typeof instrument.admin !== "string" ||
+      !instrument.admin.trim() ||
+      typeof instrument.id !== "string" ||
+      !instrument.id.trim() ||
+      typeof item.symbol !== "string" ||
+      !item.symbol.trim() ||
+      typeof item.org_name !== "string" ||
+      typeof item.total_unlocked_coin !== "string" ||
+      typeof item.total_locked_coin !== "string"
+    )
+      throw new Error("Wallet returned an invalid asset.");
+    const id = JSON.stringify([instrument.admin, instrument.id]);
+    if (seen.has(id)) throw new Error("Wallet returned an invalid asset.");
+    seen.add(id);
+    return {
+      id,
+      symbol: item.symbol,
+      name: item.org_name,
+      amount: canonicalAmount(item.total_unlocked_coin),
+      locked: canonicalAmount(item.total_locked_coin),
+    };
+  });
 }

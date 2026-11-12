@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verifySession, configuredNetwork } from "../lib/canton-session.ts";
+import {
+  verifySession,
+  verifyLoopSession,
+  configuredNetwork,
+} from "../lib/canton-session.ts";
 const status = {
   connection: { isConnected: true, isNetworkConnected: true },
   network: { networkId: "canton:devnet" },
@@ -92,4 +96,30 @@ test("requires explicit valid network configuration", () => {
   assert.equal(configuredNetwork("canton:testnet"), "canton:testnet");
   for (const value of ["devnet", "solana:devnet", "", "canton:unknown"])
     assert.throws(() => configuredNetwork(value));
+});
+
+test("Loop identity requires live health, matching network and enabled primary party", () => {
+  const loopAccount = { ...account, networkId: "canton:devnet" };
+  assert.equal(
+    verifyLoopSession(status, loopAccount, "canton:devnet").wallet,
+    "loop",
+  );
+  for (const candidate of [
+    undefined,
+    { ...loopAccount, disabled: true },
+    { ...loopAccount, primary: false },
+    { ...loopAccount, status: "removed" },
+    { ...loopAccount, networkId: "canton:mainnet" },
+    { ...loopAccount, partyId: "bad" },
+  ])
+    assert.throws(() => verifyLoopSession(status, candidate, "canton:devnet"));
+  for (const candidate of [
+    { ...status, network: undefined },
+    { ...status, network: { networkId: "canton:mainnet" } },
+    { ...status, connection: { isConnected: false, isNetworkConnected: true } },
+    { ...status, connection: { isConnected: true, isNetworkConnected: false } },
+  ])
+    assert.throws(() =>
+      verifyLoopSession(candidate, loopAccount, "canton:devnet"),
+    );
 });

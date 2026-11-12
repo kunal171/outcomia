@@ -23,6 +23,7 @@
     "@anchor-lang/core": "1.2.0",
     "@ardrive/turbo-sdk": "2.2.0",
     "@console-wallet/dapp-sdk": "3.0.0",
+    "@fivenorth/loop-sdk": "0.16.0",
     "@solana/spl-token": "0.4.15",
     "@solana/wallet-adapter-react": "0.15.40",
     "@solana/wallet-adapter-react-ui": "0.9.40",
