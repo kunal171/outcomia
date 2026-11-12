@@ -52,7 +52,7 @@ keep exact decimal strings and displayed deadlines remain in UTC. See the
 
 ## Canton wallet
 
-`NEXT_PUBLIC_CANTON_NETWORK_ID=canton:devnet` selects the expected Canton
+`NEXT_PUBLIC_CANTON_NETWORK_ID=canton:testnet` selects the expected Canton
 network for both wallets. The browser validates the live primary party before opening
 `/canton/markets`. No private keys or wallet tokens belong in environment files.
 
@@ -68,6 +68,12 @@ balance checks run before and after holdings requests. Disconnect revokes the
 remote ticket before switching wallets. A failed revoke blocks further switches
 until retry succeeds. A real Loop approval and balance read are still required
 on the presentation machine; local browser checks use fixture accounts.
+
+The current Canton target is testnet, where the presentation wallet was funded.
+Use [Loop Testnet Wallet](https://wallet.testnet.looptech.io) and reconnect after
+changing networks. Devnet and testnet have separate accounts and balances.
+Solana remains on devnet. The network setting is public and must be rebuilt into
+the client; changing it only at runtime cannot update an existing browser bundle.
 
 ## RPC and program settings
 
