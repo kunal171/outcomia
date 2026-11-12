@@ -16,7 +16,7 @@ const accountNetworks: Record<string, CantonNetwork> = {
   CANTON_NETWORK: "canton:mainnet",
 };
 
-export function configuredNetwork(value = "canton:devnet"): CantonNetwork {
+export function configuredNetwork(value = "canton:testnet"): CantonNetwork {
   if (!["canton:devnet", "canton:testnet", "canton:mainnet"].includes(value)) {
     throw new Error(
       "Configure NEXT_PUBLIC_CANTON_NETWORK_ID with a Canton CAIP-2 network ID.",
@@ -96,7 +96,9 @@ export function verifyLoopSession(
     account.networkId !== expected ||
     !/^[A-Za-z0-9:_-]+::[A-Za-z0-9:_-]+$/.test(account.partyId)
   ) {
-    throw new Error("Connect Loop Wallet to the configured Canton network.");
+    throw new Error(
+      `Connect Loop Wallet to ${expected.replace("canton:", "")} and reconnect.`,
+    );
   }
   return {
     chain: "canton",
