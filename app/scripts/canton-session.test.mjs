@@ -92,7 +92,8 @@ test("rejects contradictory wallet network responses and unexpected mainnet", ()
   );
 });
 test("requires explicit valid network configuration", () => {
-  assert.equal(configuredNetwork(), "canton:devnet");
+  assert.equal(configuredNetwork(), "canton:testnet");
+  assert.equal(configuredNetwork("canton:devnet"), "canton:devnet");
   assert.equal(configuredNetwork("canton:testnet"), "canton:testnet");
   for (const value of ["devnet", "solana:devnet", "", "canton:unknown"])
     assert.throws(() => configuredNetwork(value));
@@ -122,4 +123,42 @@ test("Loop identity requires live health, matching network and enabled primary p
     assert.throws(() =>
       verifyLoopSession(candidate, loopAccount, "canton:devnet"),
     );
+});
+
+test("testnet Loop sessions reject devnet account/status combinations", () => {
+  const testnetStatus = { ...status, network: { networkId: "canton:testnet" } };
+  const testnetAccount = { ...account, networkId: "canton:testnet" };
+  assert.deepEqual(
+    verifyLoopSession(testnetStatus, testnetAccount, "canton:testnet"),
+    {
+      chain: "canton",
+      wallet: "loop",
+      partyId: account.partyId,
+      networkId: "canton:testnet",
+    },
+  );
+  for (const [networkStatus, party] of [
+    [status, { ...account, networkId: "canton:devnet" }],
+    [status, testnetAccount],
+    [testnetStatus, { ...account, networkId: "canton:devnet" }],
+  ])
+    assert.throws(
+      () => verifyLoopSession(networkStatus, party, "canton:testnet"),
+      /testnet/,
+    );
+});
+
+test("Console also verifies the shared Canton testnet target", () => {
+  const testnetStatus = { ...status, network: { networkId: "canton:testnet" } };
+  const active = { networkId: "canton:testnet" };
+  const testnetAccount = { ...account, networkId: "CANTON_NETWORK_TEST" };
+  assert.equal(
+    verifySession(testnetStatus, testnetAccount, active, "canton:testnet")
+      .networkId,
+    "canton:testnet",
+  );
+  assert.throws(
+    () => verifySession(testnetStatus, account, active, "canton:testnet"),
+    /testnet/,
+  );
 });

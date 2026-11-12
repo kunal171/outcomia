@@ -34,7 +34,7 @@ and settlement rights independently.
 
 ## Configuration and verification
 
-Set `NEXT_PUBLIC_CANTON_NETWORK_ID=canton:devnet` in the shared app's environment.
+Set `NEXT_PUBLIC_CANTON_NETWORK_ID=canton:testnet` in the shared app's environment.
 Only the public network identifier is configured here; signing stays in the
 wallet. Existing Solana and server RPC environment settings stay in this app.
 
@@ -126,3 +126,14 @@ prove real Loop service availability. Public unauthenticated status probes from
 the development environment returned HTTP 403. No authenticated live Loop read or
 Canton transaction has been verified. Do not bypass missing network health or
 backend CIP-0103 metadata to make connection appear successful.
+
+## Canton testnet target
+
+The shared Canton target now defaults to `canton:testnet`, matching the funded
+Loop wallet. Local development/production overrides and the Vercel public network
+setting select testnet. Loop SDK 0.16.0 derives its testnet wallet/API endpoints
+from that network; credentials remain SDK-owned. Explicit devnet/mainnet configs
+remain supported, and a devnet account cannot pass testnet session verification.
+Reconnect through Loop's testnet wallet after the deployment. Previously reported
+devnet connection/health checks above remain historical; they do not demonstrate
+a funded testnet read. Solana's devnet configuration is independent and unchanged.
