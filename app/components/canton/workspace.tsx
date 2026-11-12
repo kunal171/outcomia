@@ -42,7 +42,7 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   if (!state.session) return null;
   const session = state.session;
-  const identity = `${session.networkId}:${session.partyId}`;
+  const identity = `${session.wallet}:${session.networkId}:${session.partyId}`;
   const navigation = (
     <nav className="canton-nav" aria-label={t("Primary navigation")}>
       {destinations.map(({ href, label, icon }) => (

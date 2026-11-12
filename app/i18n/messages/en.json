@@ -901,5 +901,9 @@
   "Wallet returned assets for another network.": "Wallet returned assets for another network.",
   "Your YES and NO contracts will appear here.": "Your YES and NO contracts will appear here.",
   "Your funded orders and cancellations will appear here.": "Your funded orders and cancellations will appear here.",
-  "{amount} collateral": "{amount} collateral"
+  "{amount} collateral": "{amount} collateral",
+  "Reading wallet balances…": "Reading wallet balances…",
+  "Your wallet returned no assets for this network.": "Your wallet returned no assets for this network.",
+  "Locked": "Locked",
+  "Available": "Available"
 }
