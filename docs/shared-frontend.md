@@ -8,7 +8,7 @@ Connect a wallet on the landing page:
 
 - A Solana wallet opens `/predictions`. Existing spot, wallet and order pages
   remain available on Solana.
-- Console Wallet opens `/canton/markets`, with separate positions, orders and
+- Loop or Console Wallet opens `/canton/markets`, with separate positions, orders and
   wallet routes. Canton spot is outside the current scope.
 
 Both use the existing Outcomia layout, colors, display settings and translations.
@@ -18,7 +18,7 @@ Both use the existing Outcomia layout, colors, display settings and translations
 `NetworkWalletProvider` selects the workspace from a live wallet connection.
 Session storage remembers which wallet to restore; it cannot grant entry.
 Solana connections require a connected adapter and public key. Canton connections
-require an allocated primary party and consistent configured network responses.
+require a verified primary party and consistent configured network responses. Console requires an allocated party; Loop accepts the authenticated initialized or allocated states supported by its bridge.
 
 `NetworkBoundary` mounts `ProtocolRoleProvider` and Solana pages only for Solana.
 Opening a URL for the other network redirects to the connected network's default
@@ -41,7 +41,7 @@ wallet. Existing Solana and server RPC environment settings stay in this app.
 Run `npm run test:canton` for session validation and the existing app checks in
 [the app README](../app/README.md). Browser verification must cover both wallet
 paths, switching, rejection, wrong-network responses, restore and disconnect.
-A mocked extension proves application behavior; a real Console Wallet approval
+Mocked wallet transports prove application behavior; a real wallet approval
 on the presentation machine still needs a separate smoke check. No Canton market
 submission or settlement is implemented by the gateway.
 
@@ -55,10 +55,14 @@ reader dependency.
 - `/canton/markets`: deployment status and the future prediction-market list.
 - `/canton/positions`: unavailable until deployed position data can be read.
 - `/canton/orders`: unavailable until deployed order data can be read.
-- `/canton/wallet`: read-only assets from Console Wallet, with exact amounts,
+- `/canton/wallet`: read-only assets from Loop or Console Wallet, with exact amounts,
   token IDs, refresh, an empty-asset filter and a copyable party ID.
 
-The wallet reader calls SDK 3.0.0's `getBalance` for the verified party/network.
+Console uses SDK 3.0.0's `getBalance`; Loop uses SDK 0.16.0's authenticated
+`getHolding`. Loop verifies account metadata and provider network health through
+its native CIP-0103 bridge. Its assets are keyed by instrument admin and ID, with
+available and locked amounts shown separately. A shared symbol never merges
+instruments from different issuers.
 It rechecks the live session before and after the request. Account changes
 unmount financial children; late responses are ignored. Responses with duplicate
 asset IDs, invalid amounts or a different network fail closed. Amounts stay
@@ -103,3 +107,22 @@ The dependency audit is not clean. On 2026-11-11, the master lockfile reported
 53 findings and this integration reported 50 after compatible updates. Next.js
 is updated to 16.4.6. Remaining transitive findings need a separate dependency
 review; no forced major downgrades were applied to the financial client.
+
+## Loop connection checks
+
+Loop is initialized once in the browser; React rerenders do not reset its bridge.
+Only wallet ID, party ID and network ID enter app state. The SDK owns its session
+credentials. Restoration is reverified, and account/network events immediately
+remove the old workspace while checking the replacement. Financial views are
+keyed by provider as well as party and network. Remote revocation must succeed
+before another connection begins, including after a failed approval or revoke.
+
+The SDK browser fixture covers approval, exact holdings, restoration, Loop/Console
+switching with balance clearing, wrong
+network, rejected approval, remote disconnect, failed-revoke retries and expired
+authorization. Console/Solana switching and the existing Canton workspace checks
+also pass. These use mocked HTTP, WebSocket and extension responses; they do not
+prove real Loop service availability. Public unauthenticated status probes from
+the development environment returned HTTP 403. No authenticated live Loop read or
+Canton transaction has been verified. Do not bypass missing network health or
+backend CIP-0103 metadata to make connection appear successful.

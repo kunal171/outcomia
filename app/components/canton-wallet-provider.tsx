@@ -10,7 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import type { CantonSession } from "../lib/canton-session";
-import { loadWallet, readSession, walletError } from "../lib/console-wallet";
+import { walletError } from "../lib/console-wallet";
+import { cantonAdapter, type CantonWalletId } from "../lib/canton-adapter";
 
 type State =
   | {
@@ -22,12 +23,13 @@ type State =
   | { kind: "error"; session: null; error: string };
 type WalletContext = {
   state: State;
-  connect: () => Promise<void>;
+  connect: (wallet?: CantonWalletId) => Promise<void>;
   disconnect: () => Promise<void>;
+  requiresDisconnect: boolean;
 };
 const Context = createContext<WalletContext | null>(null);
 const idle: State = { kind: "idle", session: null, error: null };
-const restoreKey = "outcomia-canton:restore-console";
+const restoreKey = "outcomia-canton:wallet";
 
 /** One live wallet session owns the workspace. Generations reject stale async reads.
  * Only a restore hint is saved; every reload rechecks the wallet and its network.
@@ -38,13 +40,15 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
     session: null,
     error: null,
   });
-  const [watching, setWatching] = useState(false);
+  const [watching, setWatching] = useState<CantonWalletId | null>(null);
+  const selected = useRef<CantonWalletId>("console");
   const generation = useRef(0);
   const mounted = useRef(false);
   const pending = useRef(false);
+  const requiresDisconnect = useRef(false);
   const saveHint = (value: boolean) => {
     try {
-      if (value) sessionStorage.setItem(restoreKey, "1");
+      if (value) sessionStorage.setItem(restoreKey, selected.current);
       else sessionStorage.removeItem(restoreKey);
     } catch {
       /* A session remains usable when browser storage is unavailable. */
@@ -58,8 +62,7 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
     const ticket = ++generation.current;
     setState({ kind: "checking", session: null, error: null });
     try {
-      const wallet = await loadWallet();
-      const session = await readSession(wallet);
+      const session = await (await cantonAdapter(selected.current)).read();
       publish(ticket, { kind: "connected", session, error: null });
     } catch (cause) {
       if (generation.current !== ticket) return;
@@ -74,16 +77,25 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true;
-    let restore = false;
+    let restore: CantonWalletId | null = null;
     try {
-      restore =
-        sessionStorage.getItem(restoreKey) === "1" &&
-        sessionStorage.getItem("outcomia:active-chain") === "canton";
+      const saved = sessionStorage.getItem(restoreKey);
+      const legacy = sessionStorage.getItem("outcomia-canton:restore-console");
+      if (sessionStorage.getItem("outcomia:active-chain") === "canton") {
+        if (saved === "loop" || saved === "console") restore = saved;
+        else if (legacy === "1") {
+          restore = "console";
+          sessionStorage.setItem(restoreKey, restore);
+        }
+      }
+      sessionStorage.removeItem("outcomia-canton:restore-console");
     } catch {
       /* No stored connection hint. */
     }
     if (restore) {
-      setWatching(true);
+      selected.current = restore;
+      requiresDisconnect.current = true;
+      setWatching(restore);
       void refresh();
     } else setState(idle);
     return () => {
@@ -95,38 +107,15 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!watching) return;
     let disposed = false;
-    let unsubscribe: Array<() => void> = [];
-    void loadWallet()
-      .then((wallet) => {
+    let unsubscribe: (() => void) | undefined;
+    void cantonAdapter(watching)
+      .then((adapter) => {
         if (disposed) return;
-        const clear = () => {
-          generation.current++;
-          saveHint(false);
-          setState(idle);
-        };
-        unsubscribe = [
-          wallet.onAccountsChanged(
-            { id: "outcomia-canton-account" },
-            (account) => {
-              if (disposed || pending.current) return;
-              // Invalidate the old party immediately, before querying its replacement.
-              if (!account) clear();
-              else void refresh();
-            },
-          ),
-          wallet.onConnectionStatusChanged(
-            { id: "outcomia-canton-status" },
-            (status) => {
-              if (disposed || pending.current) return;
-              if (
-                !status?.connection.isConnected ||
-                status.connection.isNetworkConnected === false
-              )
-                clear();
-              else void refresh();
-            },
-          ),
-        ];
+        unsubscribe = adapter.watch(() => {
+          if (disposed || pending.current) return;
+          // Clear the old identity before verifying an account or network event.
+          void refresh();
+        });
       })
       .catch((cause) => {
         if (!disposed) {
@@ -137,35 +126,27 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
       });
     return () => {
       disposed = true;
-      unsubscribe.forEach((remove) => remove());
+      unsubscribe?.();
     };
   }, [watching, refresh]);
 
-  async function connect() {
+  async function connect(id: CantonWalletId = "console") {
     if (pending.current) return;
     pending.current = true;
+    selected.current = id;
+    setWatching(null);
     const ticket = ++generation.current;
     setState({ kind: "connecting", session: null, error: null });
     try {
-      const wallet = await loadWallet();
-      const availability = await wallet.checkExtensionAvailability();
-      if (availability.status !== "installed")
-        throw new Error(
-          "Install Console Wallet to continue, then reload this page.",
-        );
-      if (availability.isExtensionCapableByVersion === false)
-        throw new Error("Update Console Wallet before connecting.");
-      const response = await wallet.connect({
-        name: "Outcomia",
-        target: "local",
-      });
-      if (!response.isConnected)
-        throw new Error("The wallet connection was not approved.");
-      const session = await readSession(wallet);
+      // Loop may have issued an authorization ticket before approval fails.
+      // Require revocation before another wallet even when verification fails.
+      if (id === "loop") requiresDisconnect.current = true;
+      const session = await (await cantonAdapter(id)).connect();
+      requiresDisconnect.current = true;
       if (generation.current === ticket) {
         saveHint(true);
         publish(ticket, { kind: "connected", session, error: null });
-        setWatching(true);
+        setWatching(id);
       }
     } catch (cause) {
       saveHint(false);
@@ -174,6 +155,7 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
         session: null,
         error: walletError(cause),
       });
+      throw cause;
     } finally {
       pending.current = false;
     }
@@ -184,27 +166,35 @@ export function CantonWalletProvider({ children }: { children: ReactNode }) {
     pending.current = true;
     const ticket = ++generation.current;
     saveHint(false);
-    setWatching(false);
+    setWatching(null);
     setState({ kind: "disconnecting", session: null, error: null });
     try {
-      await (await loadWallet()).disconnect();
+      await (await cantonAdapter(selected.current)).disconnect();
+      requiresDisconnect.current = false;
       publish(ticket, idle);
     } catch {
       publish(ticket, {
         kind: "error",
         session: null,
         error:
-          "Disconnected locally. Review this site's access in Console Wallet.",
+          "Disconnected locally. Review this site's access in your Canton wallet.",
       });
       throw new Error(
-        "Console Wallet disconnection failed. Review this site's access before switching wallets.",
+        "Canton wallet disconnection failed. Review this site's access before switching wallets.",
       );
     } finally {
       pending.current = false;
     }
   }
   return (
-    <Context.Provider value={{ state, connect, disconnect }}>
+    <Context.Provider
+      value={{
+        state,
+        connect,
+        disconnect,
+        requiresDisconnect: requiresDisconnect.current,
+      }}
+    >
       {children}
     </Context.Provider>
   );

@@ -128,7 +128,7 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
     try {
       if (solana.connected) await solana.disconnect();
       solana.select(null);
-      if (canton.state.session) await canton.disconnect();
+      if (canton.requiresDisconnect) await canton.disconnect();
     } catch (cause) {
       setError(walletError(cause));
     } finally {
@@ -149,10 +149,14 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
       // stay locally disconnected and show the diagnostic instead of proceeding.
       if (solana.connected) await solana.disconnect();
       if (chain === "canton") solana.select(null);
-      if (canton.state.session) await canton.disconnect();
+      if (canton.requiresDisconnect) await canton.disconnect();
       if (chain === "canton") {
         remember("canton");
-        await canton.connect();
+        // Loop mounts its approval dialog outside this picker. Release the
+        // native modal first so its QR code and wallet links remain interactive.
+        setVisible(false);
+        dialog.current?.close();
+        await canton.connect(name === "loop" ? "loop" : "console");
       } else {
         const target = solana.wallets.find(
           ({ adapter }) => adapter.name === name,
@@ -220,6 +224,20 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
             <button
               type="button"
               disabled={locked}
+              onClick={() => void choose("canton", "loop")}
+            >
+              <span className="chain-wallet-icon" aria-hidden="true">
+                L
+              </span>
+              <span>
+                Loop Wallet <small>Canton</small>
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              disabled={locked}
               onClick={() => void choose("canton")}
             >
               <span className="chain-wallet-icon" aria-hidden="true">
@@ -249,6 +267,9 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
         {!available.length && (
           <p>{t("Install a compatible Solana wallet to continue.")}</p>
         )}
+        <a href="https://looptech.io/" target="_blank" rel="noreferrer">
+          Loop Wallet ↗
+        </a>
         <a href="https://consolewallet.io/" target="_blank" rel="noreferrer">
           {t("Get Console Wallet")} ↗
         </a>

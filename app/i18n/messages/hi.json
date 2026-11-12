@@ -901,5 +901,9 @@
   "Wallet returned assets for another network.": "वॉलेट ने दूसरे नेटवर्क की संपत्तियाँ दीं।",
   "Your YES and NO contracts will appear here.": "आपके YES और NO कॉन्ट्रैक्ट यहाँ दिखाई देंगे।",
   "Your funded orders and cancellations will appear here.": "आपके संपत्ति से समर्थित ऑर्डर और रद्द किए गए ऑर्डर यहाँ दिखाई देंगे।",
-  "{amount} collateral": "{amount} कोलेटरल"
+  "{amount} collateral": "{amount} कोलेटरल",
+  "Reading wallet balances…": "वॉलेट बैलेंस पढ़ रहे हैं…",
+  "Your wallet returned no assets for this network.": "आपके वॉलेट ने इस नेटवर्क के लिए कोई एसेट नहीं लौटाया।",
+  "Locked": "लॉक किया गया",
+  "Available": "उपलब्ध"
 }

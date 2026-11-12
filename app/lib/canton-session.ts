@@ -1,9 +1,11 @@
 /** Public session identity only. Wallet tokens and signing material never enter app state. */
 export type CantonNetwork =
-  "canton:devnet" | "canton:testnet" | "canton:mainnet";
+  | "canton:devnet"
+  | "canton:testnet"
+  | "canton:mainnet";
 export type CantonSession = {
   chain: "canton";
-  wallet: "console";
+  wallet: "console" | "loop";
   partyId: string;
   networkId: CantonNetwork;
 };
@@ -59,6 +61,46 @@ export function verifySession(
   return {
     chain: "canton",
     wallet: "console",
+    partyId: account.partyId,
+    networkId: expected,
+  };
+}
+
+/** Loop's bridge has already authenticated its account. This second boundary
+ * checks the app network and disabled-party state, without retaining SDK tokens.
+ */
+export function verifyLoopSession(
+  status: {
+    connection: { isConnected: boolean; isNetworkConnected: boolean };
+    network?: { networkId: string };
+  },
+  account:
+    | {
+        partyId: string;
+        networkId: string;
+        status: string;
+        primary: boolean;
+        disabled?: boolean;
+      }
+    | undefined,
+  expected: CantonNetwork,
+): CantonSession {
+  if (
+    status.connection.isConnected !== true ||
+    status.connection.isNetworkConnected !== true ||
+    !account ||
+    account.disabled ||
+    !account.primary ||
+    !["allocated", "initialized"].includes(account.status) ||
+    status.network?.networkId !== expected ||
+    account.networkId !== expected ||
+    !/^[A-Za-z0-9:_-]+::[A-Za-z0-9:_-]+$/.test(account.partyId)
+  ) {
+    throw new Error("Connect Loop Wallet to the configured Canton network.");
+  }
+  return {
+    chain: "canton",
+    wallet: "loop",
     partyId: account.partyId,
     networkId: expected,
   };

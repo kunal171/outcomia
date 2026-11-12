@@ -4,6 +4,7 @@ import {
   canonicalAmount,
   formatCantonAmount,
   parseWalletAssets,
+  parseLoopAssets,
   previewCantonOrder,
 } from "../lib/canton-display.ts";
 
@@ -77,4 +78,40 @@ test("order preview uses exact Daml Decimal arithmetic and Int bounds", () => {
     ["0.4", "9223372036854775808"],
   ])
     assert.equal(previewCantonOrder(price, quantity), null);
+});
+
+test("Loop holdings preserve exact unlocked/locked balances and instrument identity", () => {
+  const holding = {
+    instrument_id: { admin: "issuer::1220", id: "USD" },
+    symbol: "USD",
+    org_name: "Dollar",
+    total_unlocked_coin: "18446744073709551615.1234567890",
+    total_locked_coin: "0.0020",
+  };
+  assert.deepEqual(parseLoopAssets([holding]), [
+    {
+      id: JSON.stringify(["issuer::1220", "USD"]),
+      symbol: "USD",
+      name: "Dollar",
+      amount: "18446744073709551615.123456789",
+      locked: "0.002",
+    },
+  ]);
+  assert.equal(
+    parseLoopAssets([
+      holding,
+      { ...holding, instrument_id: { admin: "another", id: "USD" } },
+    ]).length,
+    2,
+  );
+  for (const bad of [
+    null,
+    {},
+    [null],
+    [holding, holding],
+    [{ ...holding, instrument_id: null }],
+    [{ ...holding, total_unlocked_coin: 1 }],
+    [{ ...holding, total_locked_coin: "-1" }],
+  ])
+    assert.throws(() => parseLoopAssets(bad));
 });

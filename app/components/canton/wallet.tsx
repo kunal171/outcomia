@@ -22,7 +22,7 @@ export function CantonWallet() {
   if (!state.session) return null;
   return (
     <CantonWalletView
-      key={`${state.session.networkId}:${state.session.partyId}`}
+      key={`${state.session.wallet}:${state.session.networkId}:${state.session.partyId}`}
       session={state.session}
     />
   );
@@ -53,10 +53,15 @@ function CantonWalletView({ session }: { session: CantonSession }) {
     return () => {
       active = false;
     };
-  }, [session.partyId, session.networkId, revision]);
+  }, [session.wallet, session.partyId, session.networkId, revision]);
   const assets =
     state.kind === "ready"
-      ? state.assets.filter((asset) => !hideEmpty || asset.amount !== "0")
+      ? state.assets.filter(
+          (asset) =>
+            !hideEmpty ||
+            asset.amount !== "0" ||
+            (asset.locked !== undefined && asset.locked !== "0"),
+        )
       : [];
   async function copyParty() {
     try {
@@ -83,7 +88,9 @@ function CantonWalletView({ session }: { session: CantonSession }) {
         aria-label={t("Connected wallet")}
       >
         <div>
-          <span>Console Wallet</span>
+          <span>
+            {session.wallet === "loop" ? "Loop Wallet" : "Console Wallet"}
+          </span>
           <code>{session.partyId}</code>
         </div>
         <button
@@ -115,7 +122,7 @@ function CantonWalletView({ session }: { session: CantonSession }) {
         </div>
         {state.kind === "loading" ? (
           <p className="canton-wallet-status" role="status">
-            {t("Reading balances from Console Wallet…")}
+            {t("Reading wallet balances…")}
           </p>
         ) : state.kind === "error" ? (
           <div className="canton-wallet-error" role="alert">
@@ -127,7 +134,7 @@ function CantonWalletView({ session }: { session: CantonSession }) {
             {t(
               hideEmpty && state.assets.length > 0
                 ? "No non-zero assets. Turn off the filter to see all assets."
-                : "Console Wallet returned no assets for this network.",
+                : "Your wallet returned no assets for this network.",
             )}
           </p>
         ) : (
@@ -136,7 +143,12 @@ function CantonWalletView({ session }: { session: CantonSession }) {
               <thead>
                 <tr>
                   <th scope="col">{t("Asset")}</th>
-                  <th scope="col">{t("In wallet")}</th>
+                  <th scope="col">
+                    {t(session.wallet === "loop" ? "Available" : "In wallet")}
+                  </th>
+                  {session.wallet === "loop" && (
+                    <th scope="col">{t("Locked")}</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -157,9 +169,18 @@ function CantonWalletView({ session }: { session: CantonSession }) {
                         </div>
                       </div>
                     </td>
-                    <td data-label={t("In wallet")}>
+                    <td
+                      data-label={t(
+                        session.wallet === "loop" ? "Available" : "In wallet",
+                      )}
+                    >
                       {formatCantonAmount(asset.amount, locale)}
                     </td>
+                    {session.wallet === "loop" && (
+                      <td data-label={t("Locked")}>
+                        {formatCantonAmount(asset.locked ?? "0", locale)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

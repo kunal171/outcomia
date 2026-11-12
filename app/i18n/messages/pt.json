@@ -901,5 +901,9 @@
   "Wallet returned assets for another network.": "A carteira retornou ativos de outra rede.",
   "Your YES and NO contracts will appear here.": "Seus contratos YES e NO aparecerão aqui.",
   "Your funded orders and cancellations will appear here.": "Suas ordens com fundos reservados e cancelamentos aparecerão aqui.",
-  "{amount} collateral": "{amount} de colateral"
+  "{amount} collateral": "{amount} de colateral",
+  "Reading wallet balances…": "Lendo saldos da carteira…",
+  "Your wallet returned no assets for this network.": "Sua carteira não retornou ativos para esta rede.",
+  "Locked": "Bloqueado",
+  "Available": "Disponível"
 }
