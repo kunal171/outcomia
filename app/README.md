@@ -1,11 +1,11 @@
 # Outcomia app
 
 The shared Next.js UI for Outcomia. Connect a Solana wallet for existing prediction
-and spot markets, or Console Wallet for the Canton prediction workspace. Canton
+and spot markets, or Loop / Console Wallet for the Canton prediction workspace. Canton
 contracts are not deployed yet. See [the network boundary](../docs/shared-frontend.md).
 
 Canton has prediction, position, order and wallet routes. The wallet reads assets
-from Console Wallet; the other routes show deployment status. The order preview
+from the selected Canton wallet; the other routes show deployment status. The order preview
 only calculates locally. Canton transactions remain disabled until deployment
 and wallet submission are verified.
 
@@ -52,9 +52,22 @@ keep exact decimal strings and displayed deadlines remain in UTC. See the
 
 ## Canton wallet
 
-`NEXT_PUBLIC_CANTON_NETWORK_ID=canton:devnet` selects the expected Console Wallet
-network. The browser validates the live primary party before opening
+`NEXT_PUBLIC_CANTON_NETWORK_ID=canton:devnet` selects the expected Canton
+network for both wallets. The browser validates the live primary party before opening
 `/canton/markets`. No private keys or wallet tokens belong in environment files.
+
+Loop uses `@fivenorth/loop-sdk` 0.16.0 and its CIP-0103 bridge. Choose **Loop
+Wallet** in the shared picker; approve in Loop, then open Wallet for available
+and locked assets. The SDK owns credentials and approval. No API key is needed.
+Devnet, testnet and mainnet use the SDK's corresponding hosted wallet endpoints;
+changing the configured network requires rebuilding the app.
+
+The app verifies authenticated party metadata and network health before entering
+the Canton workspace. Missing CIP-0103 backend metadata fails closed. Read-only
+balance checks run before and after holdings requests. Disconnect revokes the
+remote ticket before switching wallets. A failed revoke blocks further switches
+until retry succeeds. A real Loop approval and balance read are still required
+on the presentation machine; local browser checks use fixture accounts.
 
 ## RPC and program settings
 

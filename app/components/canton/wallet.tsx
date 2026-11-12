@@ -143,7 +143,9 @@ function CantonWalletView({ session }: { session: CantonSession }) {
               <thead>
                 <tr>
                   <th scope="col">{t("Asset")}</th>
-                  <th scope="col">{t("Available")}</th>
+                  <th scope="col">
+                    {t(session.wallet === "loop" ? "Available" : "In wallet")}
+                  </th>
                   {session.wallet === "loop" && (
                     <th scope="col">{t("Locked")}</th>
                   )}
@@ -167,7 +169,11 @@ function CantonWalletView({ session }: { session: CantonSession }) {
                         </div>
                       </div>
                     </td>
-                    <td data-label={t("Available")}>
+                    <td
+                      data-label={t(
+                        session.wallet === "loop" ? "Available" : "In wallet",
+                      )}
+                    >
                       {formatCantonAmount(asset.amount, locale)}
                     </td>
                     {session.wallet === "loop" && (
