@@ -11,116 +11,23 @@ import {
 import { catalog, registryContext, deployment } from "../lib/canton/server.ts";
 import { selectInputs } from "../lib/canton/holdings.ts";
 import { executeWallet } from "../lib/canton/wallet-flow.ts";
-const d = {
-  packageId: "a".repeat(64),
-  network: "canton:testnet",
-  operator: "operator",
-  vault: "vault",
-  namespace: "outcomia",
-  synchronizerId: "sync",
-  trading: true,
-};
-const instrument = { admin: "issuer", id: "USD" },
-  key = { operator: d.operator, protocolName: d.namespace, marketId: "1" };
-const terms = {
-  question: "Will the booster launch twice?",
-  collateral: instrument,
-  priceTick: "0.01",
-  quantityLot: "1",
-  closeAt: "2099-01-01T00:00:00Z",
-  earliestResolutionAt: null,
-  fallback: null,
-  resolutionDelaySeconds: "3600",
-  rules: {
-    yesCriteria: "Two launches",
-    noCriteria: "No second launch",
-    invalidCriteria: "No evidence",
-    evidenceRequirements: "Official records",
-    documentUri: "https://example.com/rules",
-    documentSha256: "a".repeat(64),
-  },
-};
-const c = (kind, id, data) => ({
-  kind,
-  id,
-  templateId: templateId(d, kind),
-  data,
-  blob: "YmxvYg==",
-});
-const policy = c("Protocol", "policy", {
-  operator: d.operator,
-  protocolName: d.namespace,
-  admins: [d.operator, "alice"],
-  takerFeeBps: "25",
-  feeRevision: "3",
-});
-const market = c("BinaryMarket", "market", {
-  ...key,
-  creator: "alice",
-  terms,
-  status: "Open",
-  createdAt: "2026-01-01T00:00:00Z",
-  openedAt: "2026-01-01T00:00:00Z",
-});
-const book = c("OrderBook", "book", {
-  key,
-  vault: d.vault,
-  creator: "alice",
-  terms,
-  factory: "factory",
-  assetDecimals: "6",
-  orders: [],
-  fees: { amount: "0", cash: null },
-});
-const balance = c("AssetBalance", "balance", {
-  ...key,
-  owner: "alice",
-  vault: d.vault,
+import {
+  d,
   instrument,
-  factory: "factory",
-  available: "5",
-  cash: "cash",
-});
-const position = c("PositionLot", "position", {
   key,
-  vault: d.vault,
-  owner: "alice",
-  yes: "5",
-  no: "5",
-});
-const admission = c("AssetAdmission", "admission", {
-  operator: d.operator,
-  instrument,
-  factory: "factory",
-  assetDecimals: "6",
-});
-const roots = ["VaultAuthority", "PositionRegistry", "OrderRegistry"].map((k) =>
-  c(k, k, {
-    operator: d.operator,
-    vault: d.vault,
-    protocolName: d.namespace,
-    accounts: [],
-    marketIds: [],
-  }),
-);
-const snapshot = {
-  deployment: d,
-  contracts: [policy, market, book, admission, ...roots],
-  quotes: [],
-};
-const owned = [balance, position];
-const event = (x) => ({
-  contractEntry: {
-    JsActiveContract: {
-      createdEvent: {
-        contractId: x.id,
-        templateId: x.templateId,
-        createArgument: x.data,
-        createdEventBlob: x.blob,
-      },
-    },
-  },
-});
+  terms,
+  c,
+  policy,
+  market,
+  book,
+  balance,
+  position,
+  admission,
+  roots,
+  snapshot,
+  owned,
+  event,
+} from "./fixtures/canton.mjs";
 
 test("buy command binds owner, exact fee quote and current IDs without numeric conversion", () => {
   const p = buildPlan("alice", snapshot, owned, {
@@ -427,4 +334,190 @@ test("unconfirmed/mismatched receipts and disabled deployments never become succ
       },
     ),
   );
+});
+
+test("creator setup, funding and complete-set commands bind current roots", () => {
+  const reserve = c("MarketReserve", "reserve", {
+    key,
+    vault: d.vault,
+    creator: "alice",
+    terms,
+    factory: "factory",
+    assetDecimals: "6",
+  });
+  const view = { ...snapshot, contracts: [...snapshot.contracts, reserve] };
+  const cases = [
+    ["enroll", "admission", {}, "VaultAuthority_OpenBalance"],
+    ["deposit", "balance", { amount: "1.25" }, "AssetBalance_Deposit"],
+    ["withdraw", "balance", { amount: "1.25" }, "AssetBalance_Withdraw"],
+    ["split", "reserve", { quantity: "2" }, "MarketReserve_Split"],
+    ["merge", "reserve", { quantity: "2" }, "MarketReserve_Merge"],
+    [
+      "sell",
+      "book",
+      { price: "0.4", quantity: "2", outcome: "No" },
+      "OrderBook_PlaceSell",
+    ],
+    ["create", "policy", { terms }, "Protocol_CreateBinary"],
+    ["reserve", "market", {}, "PositionRegistry_CreateReserve"],
+    ["book", "market", {}, "OrderRegistry_CreateBook"],
+    ["open", "market", {}, "Binary_Open"],
+    ["close", "market", { reason: "Admin closed" }, "Binary_Close"],
+    ["cancelDraft", "market", {}, "Binary_CancelDraft"],
+  ];
+  for (const [action, target, values, choice] of cases) {
+    const plan = buildPlan("alice", view, owned, { action, target, values });
+    assert.equal(plan.command.ExerciseCommand.choice, choice);
+    assert.ok(
+      plan.dependencies.includes(plan.command.ExerciseCommand.contractId),
+    );
+  }
+});
+
+test("resolution commands preserve evidence, roles, deadlines and final binding", () => {
+  const past = { ...terms, closeAt: "2020-01-01T00:00:00Z" };
+  const closed = {
+    ...market,
+    data: { ...market.data, terms: past, status: "Closed" },
+  };
+  const pending = c("ResolutionProposal", "proposal", {
+    key,
+    creator: "alice",
+    terms: past,
+    finalizableAt: "2099-01-01T00:00:00Z",
+  });
+  const evidence = {
+    summary: "Official result",
+    documentUri: "https://example.com/evidence",
+    documentSha256: "b".repeat(64),
+  };
+  const view = { ...snapshot, contracts: [policy, closed, pending] };
+  for (const [action, target] of [
+    ["propose", "market"],
+    ["correct", "proposal"],
+  ]) {
+    const plan = buildPlan("alice", view, owned, {
+      action,
+      target,
+      values: { outcome: "YesWins", evidence },
+    });
+    assert.deepEqual(
+      plan.command.ExerciseCommand.choiceArgument[
+        action === "correct" ? "replacementEvidence" : "evidence"
+      ],
+      evidence,
+    );
+  }
+  assert.throws(
+    () =>
+      buildPlan("operator", view, [], {
+        action: "finalize",
+        target: "proposal",
+      }),
+    /delay/,
+  );
+  pending.data.finalizableAt = "2020-01-01T01:00:00Z";
+  assert.equal(
+    buildPlan("operator", view, [], { action: "finalize", target: "proposal" })
+      .command.ExerciseCommand.choice,
+    "ResolutionProposal_Finalize",
+  );
+  assert.throws(
+    () =>
+      buildPlan("alice", view, owned, {
+        action: "correct",
+        target: "proposal",
+        values: { outcome: "NoWins", evidence },
+      }),
+    /closed/,
+  );
+  const reserve = c("MarketReserve", "reserve", { key, terms: past });
+  const final = c("FinalResolution", "final", {
+    proposal: { key, terms: past, creator: "alice" },
+  });
+  const binding = buildPlan(
+    "operator",
+    { ...view, contracts: [...view.contracts, reserve, final] },
+    [],
+    { action: "bind", target: "reserve" },
+  );
+  assert.equal(
+    binding.command.ExerciseCommand.choiceArgument.resolution,
+    "final",
+  );
+});
+
+test("operator matching chooses price and FIFO and supplies both owner balances", () => {
+  const orders = [
+    c("LimitOrder", "bid", {
+      key,
+      owner: "alice",
+      outcome: "Yes",
+      side: "Buy",
+      price: "0.6",
+      quantity: "2",
+      orderId: "3",
+    }),
+    c("LimitOrder", "ask-first", {
+      key,
+      owner: "bob",
+      outcome: "Yes",
+      side: "Sell",
+      price: "0.4",
+      quantity: "1",
+      orderId: "1",
+    }),
+    c("LimitOrder", "ask-second", {
+      key,
+      owner: "carol",
+      outcome: "Yes",
+      side: "Sell",
+      price: "0.4",
+      quantity: "1",
+      orderId: "2",
+    }),
+  ];
+  const b = {
+    ...book,
+    data: { ...book.data, orders: orders.map((o) => ({ order: o.id })) },
+  };
+  const accounts = [
+    balance,
+    ...["bob", "carol"].map((owner) =>
+      c("AssetBalance", owner + "-balance", { ...balance.data, owner }),
+    ),
+  ];
+  const plan = buildPlan(
+    "operator",
+    { ...snapshot, contracts: [policy, market, b] },
+    [...orders, ...accounts],
+    { action: "match", target: "book", values: { outcome: "Yes" } },
+  );
+  assert.equal(
+    plan.command.ExerciseCommand.choiceArgument.buyerBalance,
+    "balance",
+  );
+  assert.equal(
+    plan.command.ExerciseCommand.choiceArgument.sellerBalance,
+    "bob-balance",
+  );
+  assert.throws(
+    () =>
+      buildPlan(
+        "operator",
+        { ...snapshot, contracts: [policy, market, b] },
+        accounts,
+        { action: "match", target: "book" },
+      ),
+    /Incomplete/,
+  );
+});
+
+test("malformed final outcomes cannot be displayed as refundable invalid results", () => {
+  const bad = c("SettledReserve", "bad-final", {
+    key,
+    vault: d.vault,
+    outcome: "Unknown",
+  });
+  assert.throws(() => decodeContracts([event(bad)], d), /outcome/);
 });

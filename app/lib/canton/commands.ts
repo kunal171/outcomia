@@ -58,6 +58,12 @@ export type Plan = {
   instrument?: RecordValue;
   dependencies: string[];
 };
+/** Inputs: a verified party, one current catalog, wallet-visible private contracts
+ * and a UI intent. Rejects stale/ambiguous roots, unauthorized roles, ownership
+ * mismatches and invalid money/increments. Returns one fixed choice plus the
+ * disclosure dependencies; registry preparation and signing happen separately.
+ * Ledger checks remain authoritative if state/time changes after this preflight.
+ */
 export function buildPlan(
   party: string,
   catalog: Catalog,

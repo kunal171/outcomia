@@ -1,4 +1,9 @@
 import { cid, list, obj, raw, sameInstrument, text } from "./model.ts";
+/** Inputs: authenticated ACS interface views, owner, exact instrument and amount.
+ * Returns at most 15 unlocked wallet holdings and authentic disclosures. Rejects
+ * a shortage, malformed values or repeated inputs. Largest-first limits transfer
+ * fragmentation; the existing balance cash occupies the factory's 16th slot.
+ */
 export function selectInputs(
   response: unknown,
   party: string,

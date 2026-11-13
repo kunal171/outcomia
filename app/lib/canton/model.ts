@@ -232,6 +232,10 @@ export function sameMarket(c: Contract, key: string): boolean {
     return false;
   }
 }
+/** Exact maximum funding, not a promise that the order fills at its limit.
+ * Example: 3 contracts at 0.40 and 25 bps with 6-decimal collateral need 1.203.
+ * Fees round down once to the collateral quantum, matching the ledger policy.
+ */
 export function orderQuote(
   price: string,
   quantity: string,
