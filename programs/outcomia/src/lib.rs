@@ -8,7 +8,7 @@
 //! ownership, seeds, signers and constraints before calling a handler. A UI
 //! route or wallet badge is never an authorization boundary.
 //!
-//! Spot quantities are base-mint atoms; prediction quantities are whole YES/NO
+//! Spot quantities are base-mint atoms; prediction quantities are whole outcome
 //! contracts. Both use integer collateral/quote prices. Only custody instructions
 //! move SPL tokens; resting orders, matching and cancellation move backed
 //! internal claims. Handler modules explain those state transitions in detail.
@@ -41,6 +41,52 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 #[program]
 pub mod outcomia {
     use super::*;
+
+    /// Creates an active-admin creator's immutable Draft and SPL reserve.
+    /// Inputs: ID, terms and display labels. Errors: role, terms, mint or PDAs.
+    /// Returns: zero-backed new market; no outcome issuance yet.
+    pub fn initialize_multi_outcome_market(
+        ctx: Context<InitializeMultiOutcomeMarket>,
+        market_id: [u8; 32],
+        terms: MultiOutcomeTerms,
+        display_name: String,
+        collateral_symbol: String,
+    ) -> Result<()> {
+        instructions::multi_outcome_market::handle_initialize_multi_outcome_market(
+            ctx,
+            market_id,
+            terms,
+            display_name,
+            collateral_symbol,
+        )
+    }
+    /// Opens the creator's Draft before cutoff. Inputs: active-admin creator.
+    /// Errors: role/state/time. Returns: Open without changing immutable terms.
+    pub fn open_multi_outcome_market(ctx: Context<ManageMultiOutcomeMarket>) -> Result<()> {
+        instructions::multi_outcome_market::handle_open_multi_outcome_market(ctx)
+    }
+    /// Stops new exposure. Inputs: active-admin creator. Errors: role/state.
+    /// Returns: Frozen while preserving owner merge/withdrawal rights.
+    pub fn close_multi_outcome_trading(ctx: Context<ManageMultiOutcomeMarket>) -> Result<()> {
+        instructions::multi_outcome_market::handle_close_multi_outcome_trading(ctx)
+    }
+    /// Creates an owner's empty position. Inputs: owner/canonical market/PDA.
+    /// Errors: duplicates, seeds or rent. Returns: zero outcome balances.
+    pub fn initialize_multi_outcome_position(
+        ctx: Context<InitializeMultiOutcomePosition>,
+    ) -> Result<()> {
+        instructions::multi_outcome_market::handle_initialize_multi_outcome_position(ctx)
+    }
+    /// Splits/merges complete sets. Inputs: owner, canonical shared custody,
+    /// positive lot quantity and split flag. Errors: funds, state, accounting or CPI.
+    /// Returns: equal physical reserve/cash movement and N backed outcome updates.
+    pub fn multi_outcome_complete_set(
+        ctx: Context<MultiOutcomeCustody>,
+        quantity: u64,
+        split: bool,
+    ) -> Result<()> {
+        instructions::multi_outcome_custody::handle_multi_outcome_complete_set(ctx, quantity, split)
+    }
 
     /// Proposes/corrects a published outcome. Inputs: active resolver, outcome and evidence.
     /// Errors: role, timing, state or evidence. Returns: restarted delayed proposal, no payout yet.

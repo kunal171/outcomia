@@ -1,7 +1,8 @@
 //! Foundation for single-winner markets with a bounded outcome list.
 //!
 //! These are new wire types, not extensions of the deployed binary enums.
-//! No instruction accepts them yet. Outcome IDs are immutable list indices;
+//! Creation and custody use the layouts below; outcome-specific trading and
+//! resolution instructions are not implemented. IDs are immutable list indices;
 //! their validity depends on the particular market's frozen outcome count.
 
 use anchor_lang::prelude::*;
@@ -118,7 +119,7 @@ pub struct MultiOutcomeProposal {
 }
 
 /// New layout, never decoded as a deployed binary PredictionMarket.
-/// Planned PDA: ["multi_market", market_id]. Initializers are not implemented.
+/// PDA: ["multi_market", market_id]. Creation initializes a zero-backed Draft.
 /// The reserve vault will back outcome liabilities; shared AssetBalance accounts
 /// remain the only ledger for a trader's free or order-locked collateral.
 #[account]

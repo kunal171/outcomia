@@ -74,3 +74,8 @@ pub mod prediction_resolution;
 pub use prediction_resolution::*;
 pub mod shared_prediction;
 pub use shared_prediction::*;
+
+pub mod multi_outcome_market;
+pub use multi_outcome_market::*;
+pub mod multi_outcome_custody;
+pub use multi_outcome_custody::*;

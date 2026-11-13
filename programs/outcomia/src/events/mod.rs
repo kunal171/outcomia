@@ -21,3 +21,6 @@ pub use fill::*;
 pub use market::*;
 pub use metadata::*;
 pub use order::*;
+
+mod multi_outcome;
+pub use multi_outcome::*;

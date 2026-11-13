@@ -466,4 +466,8 @@ pub enum OutcomiaError {
     MultiOutcomeSupplyMismatch = 163,
     #[msg("Unused outcome slots must remain zero")]
     MultiOutcomeInactiveSlot = 164,
+    #[msg("Multi-outcome position owner, market or quantities are inconsistent")]
+    InvalidMultiOutcomePosition = 165,
+    #[msg("Multi-outcome reserve accounting or physical backing is inconsistent")]
+    MultiOutcomeReserveMismatch = 166,
 }
