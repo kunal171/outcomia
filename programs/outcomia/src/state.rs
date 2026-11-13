@@ -5,6 +5,9 @@
 
 use anchor_lang::prelude::*;
 
+pub mod multi_outcome;
+pub use multi_outcome::*;
+
 pub mod shared;
 pub use shared::*;
 

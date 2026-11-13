@@ -41,9 +41,10 @@ not change how collateral backs its contracts.
 - **User-created events:** the creator supplies the question, outcomes,
   deadlines, evidence requirements and resolution rules.
 
-Before adding multi-outcome trading, decide whether exactly one outcome can
-win or several can win together. These require different backing and payout
-rules. A multi-outcome market is not just a binary market with more buttons.
+The first multi-outcome version will have exactly one winner. Several
+simultaneous winners require different backing and payout rules and remain
+outside that version. See the [multi-outcome foundation](multi-outcome-markets.md)
+for bounded IDs and exact Invalid refunds. Trading instructions are not implemented yet.
 
 Published terms must define who resolves the event, when resolution is allowed,
 what evidence counts, and any fallback process or deadline. Governance for

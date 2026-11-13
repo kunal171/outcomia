@@ -14,6 +14,8 @@ shared custody and payout instructions are deployed and verified on devnet.
   balances and application routes.
 - [Prediction market design](prediction-market-design.md): single-collateral
   YES/NO positions, trading, rules commitments and resolution/claims.
+- [Multi-outcome foundation](multi-outcome-markets.md): single-winner scope,
+  exact refund rules and bounded outcome IDs. Not deployed.
 - [Shared balances and settlement](shared-balances-resolution.md): reusable asset
   custody, legacy recovery, resolver windows and redemption.
 - [App setup](../app/README.md): RPC settings, prediction rollout flags and
