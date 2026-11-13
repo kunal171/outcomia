@@ -585,3 +585,192 @@ body:has(.canton-shell) {
     font-size: 11px;
   }
 }
+
+/* Financial views share the existing light/dark palette. Controls keep native
+   focus/disabled behavior; tables scroll locally rather than widening the page. */
+.canton-toolbar,
+.canton-market-meta,
+.canton-tabs {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.canton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 24px;
+  margin-block: 20px;
+}
+.canton-panel {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  min-width: 0;
+}
+.canton-panel h2 {
+  font-size: 1.15rem;
+  margin: 0 0 18px;
+}
+.canton-message {
+  padding: 14px 18px;
+  border-inline-start: 3px solid var(--accent);
+  overflow-wrap: anywhere;
+}
+.canton-market-list {
+  display: grid;
+  gap: 16px;
+}
+.canton-market-row {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.canton-market-row:hover h2 {
+  text-decoration: underline;
+}
+.canton-market-row h2 {
+  font-size: 1.25rem;
+  margin: 0 0 12px;
+}
+.canton-market-meta {
+  margin-block: 16px;
+  color: var(--muted);
+}
+.canton-tabs {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
+}
+.canton-tabs button {
+  background: none;
+  border: 0;
+  padding: 14px 6px;
+  color: inherit;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.canton-tabs button[aria-pressed="true"] {
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.canton-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+}
+.canton-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+.canton-form input,
+.canton-form select,
+.canton-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-inset);
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+.canton-form textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.canton-action {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  margin: 4px 8px 4px 0;
+  align-self: end;
+}
+.canton-action:disabled,
+.canton-form fieldset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.canton-table-wrap {
+  overflow-x: auto;
+}
+.canton-main table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+.canton-main th,
+.canton-main td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.canton-main th {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.canton-panel dl div {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.canton-panel dt {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.canton-panel dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+@media (max-width: 600px) {
+  .canton-panel {
+    padding: 16px;
+  }
+  .canton-page-heading h1 {
+    font-size: 1.8rem;
+  }
+  .canton-main td,
+  .canton-main th {
+    padding: 10px 6px;
+  }
+  .canton-form fieldset {
+    grid-template-columns: 1fr;
+  }
+}
+
+.canton-refresh {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.canton-refresh:hover:enabled {
+  border-color: var(--accent);
+}
+.canton-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.canton-order-summary {
+  grid-column: 1 / -1;
+  margin: 6px 0;
+  line-height: 1.6;
+}
+.canton-form fieldset > .canton-action {
+  grid-column: 1 / -1;
+  margin: 0;
+}
