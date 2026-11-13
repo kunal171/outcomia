@@ -119,3 +119,8 @@ pub const MULTI_OUTCOME_MARKET_SEED: &[u8] = b"multi_market";
 /// Outcome quantities only; shared per-asset balances remain independently reusable.
 #[constant]
 pub const MULTI_OUTCOME_POSITION_SEED: &[u8] = b"multi_position";
+
+#[constant]
+pub const MULTI_OUTCOME_BOOK_SEED: &[u8] = b"multi_book";
+#[constant]
+pub const MULTI_OUTCOME_ORDER_SEED: &[u8] = b"multi_order";

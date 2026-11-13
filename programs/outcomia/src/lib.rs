@@ -20,6 +20,7 @@ pub mod fees;
 pub mod instructions;
 pub mod matching;
 pub mod multi_outcome;
+pub mod multi_outcome_trading;
 pub mod pda;
 pub mod prediction_config;
 mod prediction_orders;
@@ -41,6 +42,82 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 #[program]
 pub mod outcomia {
     use super::*;
+
+    /// Proposes/corrects an evidence-backed result; only the active published resolver.
+    pub fn propose_multi_outcome(
+        ctx: Context<ResolveMultiOutcome>,
+        outcome: MultiOutcomeResolution,
+        evidence_uri: String,
+        evidence_hash: [u8; 32],
+        correction: bool,
+    ) -> Result<()> {
+        instructions::multi_outcome_resolution::handle_propose_multi_outcome(
+            ctx,
+            outcome,
+            evidence_uri,
+            evidence_hash,
+            correction,
+        )
+    }
+    /// Permissionless freeze/fallback/finalize/timeout, bound to published clocks.
+    pub fn advance_multi_outcome(ctx: Context<AdvanceMultiOutcome>, action: u8) -> Result<()> {
+        instructions::multi_outcome_resolution::handle_advance_multi_outcome(ctx, action)
+    }
+    /// Burns selected free claims and pays exact winner/Invalid collateral once.
+    pub fn redeem_multi_outcome(
+        ctx: Context<MultiOutcomeCustody>,
+        quantities: [u64; 8],
+    ) -> Result<()> {
+        instructions::multi_outcome_custody::handle_redeem_multi_outcome(ctx, quantities)
+    }
+
+    /// Initializes the creator's bounded price/FIFO book. Errors: role, duplicate or lifecycle.
+    pub fn initialize_multi_outcome_book(ctx: Context<InitializeMultiOutcomeBook>) -> Result<()> {
+        instructions::multi_outcome_orders::handle_initialize_multi_outcome_book(ctx)
+    }
+    /// Locks funded noncrossing maker claims. Inputs: outcome/side/price/quantity/ID.
+    /// Errors: closed/capacity/priority/funds/overflow. Returns: indexed resting order.
+    pub fn place_multi_outcome_order(
+        ctx: Context<PlaceMultiOutcomeOrder>,
+        outcome: OutcomeId,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+    ) -> Result<()> {
+        instructions::multi_outcome_orders::handle_place_multi_outcome_order(
+            ctx, outcome, side, price, quantity, order_id,
+        )
+    }
+    /// Owner cancellation remains available after closure and resolution.
+    pub fn cancel_multi_outcome_order(ctx: Context<CancelMultiOutcomeOrder>) -> Result<()> {
+        instructions::multi_outcome_orders::handle_cancel_multi_outcome_order(ctx)
+    }
+    /// Matches one best-price FIFO maker atomically; taker pays quoted global fees.
+    pub fn match_multi_outcome_order(
+        ctx: Context<MatchMultiOutcomeOrder>,
+        outcome: OutcomeId,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+        expected_fee_bps: u16,
+    ) -> Result<()> {
+        instructions::multi_outcome_match::handle_match_multi_outcome_order(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+            expected_fee_bps,
+        )
+    }
+    /// Withdraws only earned fees to a super-admin-owned SPL destination.
+    pub fn withdraw_multi_outcome_fees(
+        ctx: Context<WithdrawMultiOutcomeFees>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::multi_outcome_fees::handle_withdraw_multi_outcome_fees(ctx, amount)
+    }
 
     /// Creates an active-admin creator's immutable Draft and SPL reserve.
     /// Inputs: ID, terms and display labels. Errors: role, terms, mint or PDAs.

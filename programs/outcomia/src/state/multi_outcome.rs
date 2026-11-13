@@ -157,6 +157,54 @@ pub struct MultiOutcomePosition {
     pub bump: u8,
 }
 
+/// Initial bounded index: price/FIFO selection scans at most 64 references.
+/// This avoids changing the deployed binary linked-list books. Capacity is a
+/// product limit; higher-volume indexing needs a separately versioned layout.
+pub const MULTI_OUTCOME_MAX_ORDERS: usize = 64;
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
+pub struct MultiOutcomeOrderReference {
+    pub order: Pubkey,
+    pub order_id: u64,
+    pub outcome: OutcomeId,
+    pub side: super::OrderSide,
+    pub price: u64,
+}
+
+/// PDA ["multi_book", market]. No close/reinitialize path resets acceptance IDs.
+/// Cash fees are backed by global collateral custody, separately from outcomes.
+#[account]
+#[derive(InitSpace)]
+pub struct MultiOutcomeBook {
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    #[max_len(MULTI_OUTCOME_MAX_ORDERS)]
+    pub orders: Vec<MultiOutcomeOrderReference>,
+    pub next_order_id: u64,
+    pub accrued_collateral_fees: u64,
+    pub bump: u8,
+}
+
+/// PDA ["multi_order", book, order_id_le]. Filled/canceled history is retained.
+/// A bid locks exactly remaining_quantity*price cash atoms; an ask locks exactly
+/// remaining_quantity outcome contracts. Resting orders are makers and pay no fee.
+#[account]
+#[derive(InitSpace)]
+pub struct MultiOutcomeOrder {
+    pub owner: Pubkey,
+    pub market: Pubkey,
+    pub book: Pubkey,
+    pub order_id: u64,
+    pub outcome: OutcomeId,
+    pub side: super::OrderSide,
+    pub price: u64,
+    pub quantity: u64,
+    pub remaining_quantity: u64,
+    pub locked_amount: u64,
+    pub status: super::OrderStatus,
+    pub bump: u8,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

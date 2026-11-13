@@ -470,4 +470,10 @@ pub enum OutcomiaError {
     InvalidMultiOutcomePosition = 165,
     #[msg("Multi-outcome reserve accounting or physical backing is inconsistent")]
     MultiOutcomeReserveMismatch = 166,
+    #[msg("Multi-outcome book has reached its resting order capacity")]
+    MultiOutcomeBookFull = 167,
+    #[msg("Multi-outcome book index, order or counters are inconsistent")]
+    InvalidMultiOutcomeBook = 168,
+    #[msg("The taker fee changed; refresh the quote before signing")]
+    MultiOutcomeFeeQuoteChanged = 169,
 }

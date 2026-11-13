@@ -166,7 +166,14 @@ pub fn handle_multi_outcome_complete_set(
 /// Inputs: checked canonical custody, positive exact amount, transfer direction.
 /// Errors: token freeze, physical shortage or rejected CPI. Returns: real SPL
 /// movement signed by the global mint authority or this market's authority.
-fn transfer(ctx: &Context<MultiOutcomeCustody>, amount: u64, into_reserve: bool) -> Result<()> {
+pub(crate) fn transfer(
+    ctx: &Context<MultiOutcomeCustody>,
+    amount: u64,
+    into_reserve: bool,
+) -> Result<()> {
+    if amount == 0 {
+        return Ok(());
+    }
     let mint = ctx.accounts.mint.key();
     let market = ctx.accounts.market.key();
     let (from, to, authority, seed, key, bump) = if into_reserve {
@@ -204,4 +211,72 @@ fn transfer(ctx: &Context<MultiOutcomeCustody>, amount: u64, into_reserve: bool)
         amount,
         ctx.accounts.mint.decimals,
     )
+}
+
+/// Inputs: owner, canonical custody and selected free outcome quantities.
+/// Errors: unresolved/invalid result, forged ownership, lot/supply/backing,
+/// replayed/locked quantities, overflow or CPI. Returns: burned owned contracts
+/// and exact shared-wallet payout; losing outcomes clear without a zero transfer.
+pub fn handle_redeem_multi_outcome(
+    ctx: Context<MultiOutcomeCustody>,
+    quantities: [u64; MULTI_OUTCOME_CAPACITY],
+) -> Result<()> {
+    let m = &ctx.accounts.market;
+    require!(
+        m.status == PredictionStatus::Resolved,
+        shared::PredictionNotResolved
+    );
+    let result = m.final_outcome.ok_or(shared::PredictionNotResolved)?;
+    let e = MultiOutcomeEconomics::from_terms(&m.terms)?;
+    crate::multi_outcome_trading::position(
+        m,
+        &ctx.accounts.position,
+        ctx.accounts.owner.key(),
+        m.key(),
+    )?;
+    require!(quantities.iter().any(|q| *q > 0), shared::NothingToRedeem);
+    let payout = crate::multi_outcome::redemption_payout(e, result, &quantities)?;
+    require!(
+        reserve_liability(e, &m.supplies, Some(result))? == m.backing_reserve
+            && ctx.accounts.market_vault.amount >= m.backing_reserve,
+        multi::MultiOutcomeReserveMismatch
+    );
+    let mut supply = m.supplies;
+    let mut free = ctx.accounts.position.free;
+    for i in 0..MULTI_OUTCOME_CAPACITY {
+        free[i] = free[i]
+            .checked_sub(quantities[i])
+            .ok_or(prediction::InsufficientPredictionPositions)?;
+        supply[i] = supply[i]
+            .checked_sub(quantities[i])
+            .ok_or(multi::MultiOutcomeReserveMismatch)?;
+    }
+    let reserve = m
+        .backing_reserve
+        .checked_sub(payout)
+        .ok_or(multi::MultiOutcomeReserveMismatch)?;
+    require!(
+        reserve_liability(e, &supply, Some(result))? == reserve,
+        multi::MultiOutcomeReserveMismatch
+    );
+    let cash = ctx
+        .accounts
+        .asset_balance
+        .free
+        .checked_add(payout)
+        .ok_or(balance::FreeBalanceOverflow)?;
+    transfer(&ctx, payout, false)?;
+    ctx.accounts.market.supplies = supply;
+    ctx.accounts.market.backing_reserve = reserve;
+    ctx.accounts.position.free = free;
+    ctx.accounts.asset_balance.free = cash;
+    emit!(crate::MultiOutcomeRedeemedEvent {
+        market: ctx.accounts.market.key(),
+        owner: ctx.accounts.owner.key(),
+        outcome: result,
+        quantities,
+        payout,
+        backing_reserve: reserve
+    });
+    Ok(())
 }
