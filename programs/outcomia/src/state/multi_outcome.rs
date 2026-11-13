@@ -77,6 +77,85 @@ impl MultiOutcomeResolution {
     }
 }
 
+/// Fixed array capacity follows the supported outcome-count bound.
+pub const MULTI_OUTCOME_CAPACITY: usize = MULTI_OUTCOME_MAX_COUNT as usize;
+/// Bytes, not Unicode character count; bounds rent and serialized input size.
+pub const MULTI_OUTCOME_LABEL_MAX_BYTES: usize = 64;
+
+/// Economic and resolution terms frozen at market creation. An initializer must
+/// call `validate_multi_outcome_terms` and bind resolver to the active-admin
+/// creator. Structural deserialization and InitSpace do not enforce these rules.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace, Debug)]
+pub struct MultiOutcomeTerms {
+    pub resolver: Pubkey,
+    pub fallback: Option<super::PredictionFallback>,
+    /// Order determines permanent OutcomeIds; edits/reordering are forbidden.
+    #[max_len(MULTI_OUTCOME_CAPACITY, MULTI_OUTCOME_LABEL_MAX_BYTES)]
+    pub outcome_labels: Vec<String>,
+    pub question_hash: [u8; 32],
+    pub rules_hash: [u8; 32],
+    #[max_len(super::PREDICTION_URI_MAX_LENGTH)]
+    pub rules_uri: String,
+    pub close_ts: i64,
+    pub earliest_resolution_ts: Option<i64>,
+    pub resolution_delay_seconds: u64,
+    /// Raw SPL collateral atoms per winning whole contract, not a display price.
+    pub payout_per_contract: u64,
+    pub price_tick: u64,
+    /// All splits, fills, merges and claims must preserve this lot. For N=3,
+    /// P=1,000,000, L=3 permits exact Invalid refunds; L=1 does not.
+    pub quantity_lot: u64,
+}
+
+/// Evidence for a pending result; correction replaces this entire record.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace, Debug)]
+pub struct MultiOutcomeProposal {
+    pub outcome: MultiOutcomeResolution,
+    pub proposed_at: i64,
+    #[max_len(super::PREDICTION_URI_MAX_LENGTH)]
+    pub evidence_uri: String,
+    pub evidence_hash: [u8; 32],
+}
+
+/// New layout, never decoded as a deployed binary PredictionMarket.
+/// Planned PDA: ["multi_market", market_id]. Initializers are not implemented.
+/// The reserve vault will back outcome liabilities; shared AssetBalance accounts
+/// remain the only ledger for a trader's free or order-locked collateral.
+#[account]
+#[derive(InitSpace)]
+pub struct MultiOutcomeMarket {
+    pub market_id: [u8; 32],
+    pub authority: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub collateral_vault: Pubkey,
+    pub metadata: Pubkey,
+    pub terms: MultiOutcomeTerms,
+    pub resolution_phase: super::PredictionResolutionPhase,
+    pub status: super::PredictionStatus,
+    pub proposal: Option<MultiOutcomeProposal>,
+    pub final_outcome: Option<MultiOutcomeResolution>,
+    /// Outstanding contracts, including ask escrow; unused slots stay zero.
+    /// Before resolution all active supplies must equal the complete-set count.
+    pub supplies: [u64; MULTI_OUTCOME_CAPACITY],
+    pub backing_reserve: u64,
+    pub open_order_count: u64,
+    pub bump: u8,
+}
+
+/// New per-market owner position: ["multi_position", market, owner].
+/// Quantities are whole contracts. Each active free/locked amount must follow
+/// the market lot; unused outcome slots must stay zero. No collateral is stored
+/// here, so another market can reuse the same shared per-asset wallet balance.
+#[account]
+#[derive(InitSpace)]
+pub struct MultiOutcomePosition {
+    pub market: Pubkey,
+    pub owner: Pubkey,
+    pub free: [u64; MULTI_OUTCOME_CAPACITY],
+    pub locked: [u64; MULTI_OUTCOME_CAPACITY],
+    pub bump: u8,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
