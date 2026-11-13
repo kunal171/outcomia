@@ -112,3 +112,10 @@ pub const SHARED_BOOK_SEED: &[u8] = b"shared_book";
 pub const SHARED_ORDER_SEED: &[u8] = b"shared_order";
 #[constant]
 pub const SHARED_LEVEL_SEED: &[u8] = b"shared_level";
+
+/// Single-winner multi-outcome namespace, separate from deployed binary markets.
+#[constant]
+pub const MULTI_OUTCOME_MARKET_SEED: &[u8] = b"multi_market";
+/// Outcome quantities only; shared per-asset balances remain independently reusable.
+#[constant]
+pub const MULTI_OUTCOME_POSITION_SEED: &[u8] = b"multi_position";

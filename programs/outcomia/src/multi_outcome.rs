@@ -24,6 +24,22 @@ pub struct MultiOutcomeEconomics {
 }
 
 impl MultiOutcomeEconomics {
+    /// Inputs: terms from the canonical market, not caller-supplied economics.
+    /// Errors: unsupported count or invalid numeric terms. Returns: validated
+    /// arithmetic view without rechecking creation deadlines on an exit path.
+    pub fn from_terms(terms: &MultiOutcomeTerms) -> Result<Self> {
+        let outcome_count = u8::try_from(terms.outcome_labels.len())
+            .map_err(|_| error!(multi::InvalidMultiOutcomeCount))?;
+        let economics = Self {
+            outcome_count,
+            payout_per_contract: terms.payout_per_contract,
+            price_tick: terms.price_tick,
+            quantity_lot: terms.quantity_lot,
+        };
+        economics.validate()?;
+        Ok(economics)
+    }
+
     /// Inputs: proposed count, face payout, tick and lot in exact integer units.
     /// Errors: unsupported count, zero terms, unusable tick, inexact Invalid
     /// refunds or a single complete-set lot exceeding u64 collateral capacity.
@@ -65,15 +81,7 @@ pub fn validate_multi_outcome_terms(
     terms: &MultiOutcomeTerms,
     now: i64,
 ) -> Result<MultiOutcomeEconomics> {
-    let count = u8::try_from(terms.outcome_labels.len())
-        .map_err(|_| error!(multi::InvalidMultiOutcomeCount))?;
-    let economics = MultiOutcomeEconomics {
-        outcome_count: count,
-        payout_per_contract: terms.payout_per_contract,
-        price_tick: terms.price_tick,
-        quantity_lot: terms.quantity_lot,
-    };
-    economics.validate()?;
+    let economics = MultiOutcomeEconomics::from_terms(terms)?;
     for (index, label) in terms.outcome_labels.iter().enumerate() {
         require!(
             !label.is_empty()
@@ -220,7 +228,7 @@ pub fn reserve_liability(
 
 /// Inputs: validated economics and a fixed quantity vector. Errors: inexact lots
 /// or inactive nonzero slots. Returns: structural/economic vector validity only.
-fn validate_quantities(
+pub(crate) fn validate_quantities(
     economics: MultiOutcomeEconomics,
     quantities: &[u64; MULTI_OUTCOME_CAPACITY],
 ) -> Result<()> {

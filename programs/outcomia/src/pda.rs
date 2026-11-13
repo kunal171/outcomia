@@ -570,3 +570,56 @@ mod tests {
         assert_ne!(first.0, second.0);
     }
 }
+
+/// Inputs: program ID and creator-chosen 32-byte ID. Errors: none.
+/// Returns: canonical multi-outcome market address/bump, separate from binary PDAs.
+pub fn derive_multi_outcome_market_pda(program_id: &Pubkey, market_id: &[u8; 32]) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[crate::MULTI_OUTCOME_MARKET_SEED, market_id], program_id)
+}
+
+/// Inputs: program ID, canonical market and owner. Errors: none.
+/// Returns: outcome-only position address/bump; it does not create a balance
+/// or establish ownership/market account validity without instruction checks.
+pub fn derive_multi_outcome_position_pda(
+    program_id: &Pubkey,
+    market: &Pubkey,
+    owner: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            crate::MULTI_OUTCOME_POSITION_SEED,
+            market.as_ref(),
+            owner.as_ref(),
+        ],
+        program_id,
+    )
+}
+
+#[cfg(test)]
+mod multi_outcome_tests {
+    use super::*;
+    #[test]
+    fn multi_outcome_pdas_are_market_owner_and_binary_namespace_isolated() {
+        let program = Pubkey::new_unique();
+        let owner = Pubkey::new_unique();
+        let market = derive_multi_outcome_market_pda(&program, &[1; 32]).0;
+        assert_ne!(market, derive_prediction_market_pda(&program, &[1; 32]).0);
+        assert_ne!(
+            market,
+            derive_multi_outcome_market_pda(&program, &[2; 32]).0
+        );
+        let position = derive_multi_outcome_position_pda(&program, &market, &owner).0;
+        assert_ne!(
+            position,
+            derive_multi_outcome_position_pda(&program, &market, &Pubkey::new_unique()).0
+        );
+        assert_ne!(
+            position,
+            derive_multi_outcome_position_pda(&program, &Pubkey::new_unique(), &owner).0
+        );
+        assert_eq!(
+            position,
+            derive_multi_outcome_position_pda(&program, &market, &owner).0
+        );
+    }
+}
