@@ -521,3 +521,23 @@ test("malformed final outcomes cannot be displayed as refundable invalid results
   });
   assert.throws(() => decodeContracts([event(bad)], d), /outcome/);
 });
+
+test("revocation keeps withdrawal accounts visible while removing new deposits", async () => {
+  const { assetRows } = await import("../lib/canton/portfolio.ts");
+  const rows = assetRows([], [balance], "alice");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].balance.id, "balance");
+  assert.equal(rows[0].admission, undefined);
+  assert.deepEqual(assetRows([], [balance], "bob"), []);
+  assert.throws(
+    () => assetRows([admission, admission], [balance], "alice"),
+    /Ambiguous/,
+  );
+  const plan = buildPlan(
+    "alice",
+    { ...snapshot, contracts: [policy] },
+    [balance],
+    { action: "withdraw", target: "balance", values: { amount: "1" } },
+  );
+  assert.equal(plan.command.ExerciseCommand.choice, "AssetBalance_Withdraw");
+});

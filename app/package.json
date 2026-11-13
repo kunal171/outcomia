@@ -17,7 +17,8 @@
     "test:rpc-proxy": "node scripts/rpc-proxy.test.mjs",
     "test:theme": "node scripts/theme.test.mjs",
     "test:i18n": "node scripts/i18n.test.mjs",
-    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs"
+    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs",
+    "test:canton:browser": "node scripts/canton-browser.test.mjs"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

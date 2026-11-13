@@ -18,6 +18,7 @@ import {
   type Contract,
   type RecordValue,
 } from "../../lib/canton/model";
+import { assetRows } from "../../lib/canton/portfolio";
 import type { Intent } from "../../lib/canton/commands";
 import { walletError } from "../../lib/console-wallet";
 
@@ -115,9 +116,11 @@ export function ActionForm({
   label,
   fields,
   build,
+  disabled = false,
 }: {
   label: string;
   fields: Field[];
+  disabled?: boolean;
   build: (values: Record<string, string>) => Intent;
 }) {
   const s = useCantonTrading(),
@@ -142,7 +145,11 @@ export function ActionForm({
     >
       <fieldset
         disabled={
-          s.busy || s.loading || s.syncing || !s.catalog?.deployment.trading
+          disabled ||
+          s.busy ||
+          s.loading ||
+          s.syncing ||
+          !s.catalog?.deployment.trading
         }
       >
         {fields.map((f) => (
@@ -378,59 +385,54 @@ export function Balances() {
   const s = useCantonTrading(),
     { state: wallet } = useCantonWallet(),
     { t } = useI18n();
-  const balances = s.owned.filter(
-    (c) =>
-      c.kind === "AssetBalance" && c.data.owner === wallet.session?.partyId,
+  const rows = assetRows(
+    s.catalog?.contracts ?? [],
+    s.owned,
+    wallet.session?.partyId ?? "",
   );
   return (
     <TradingFrame title="Trading balances">
       <div className="canton-grid">
-        {s.catalog?.contracts
-          .filter((c) => c.kind === "AssetAdmission")
-          .map((asset) => {
-            const instrument = obj(asset.data.instrument),
-              balance = balances.find(
-                (c) =>
-                  obj(c.data.instrument).admin === instrument.admin &&
-                  obj(c.data.instrument).id === instrument.id,
-              );
-            return (
-              <section className="canton-panel" key={asset.id}>
-                <h2>{text(instrument.id)}</h2>
-                {balance ? (
-                  <>
-                    <p>
-                      {t("Available")}:{" "}
-                      <strong>{text(balance.data.available)}</strong>
-                    </p>
-                    <ActionForm
-                      label="Deposit"
-                      fields={[{ name: "amount", label: "Amount" }]}
-                      build={(v) => ({
-                        action: "deposit",
-                        target: balance.id,
-                        values: v,
-                      })}
-                    />
-                    <ActionForm
-                      label="Withdraw"
-                      fields={[{ name: "amount", label: "Amount" }]}
-                      build={(v) => ({
-                        action: "withdraw",
-                        target: balance.id,
-                        values: v,
-                      })}
-                    />
-                  </>
-                ) : (
-                  <ActionButton
-                    label="Initialize balance"
-                    intent={{ action: "enroll", target: asset.id }}
+        {rows.map(({ key, instrument, admission, balance }) => {
+          return (
+            <section className="canton-panel" key={key}>
+              <h2>{text(instrument.id)}</h2>
+              {balance ? (
+                <>
+                  <p>
+                    {t("Available")}:{" "}
+                    <strong>{text(balance.data.available)}</strong>
+                  </p>
+                  <ActionForm
+                    label="Deposit"
+                    disabled={!admission}
+                    fields={[{ name: "amount", label: "Amount" }]}
+                    build={(v) => ({
+                      action: "deposit",
+                      target: balance.id,
+                      values: v,
+                    })}
                   />
-                )}
-              </section>
-            );
-          })}
+                  <ActionForm
+                    label="Withdraw"
+                    disabled={raw(balance.data.available) === BigInt(0)}
+                    fields={[{ name: "amount", label: "Amount" }]}
+                    build={(v) => ({
+                      action: "withdraw",
+                      target: balance.id,
+                      values: v,
+                    })}
+                  />
+                </>
+              ) : admission ? (
+                <ActionButton
+                  label="Initialize balance"
+                  intent={{ action: "enroll", target: admission.id }}
+                />
+              ) : null}
+            </section>
+          );
+        })}
       </div>
     </TradingFrame>
   );
