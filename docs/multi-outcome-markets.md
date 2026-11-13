@@ -1,10 +1,10 @@
 # Multi-outcome prediction markets
 
-Status: state and arithmetic implemented locally. `state/multi_outcome.rs`
-defines outcome IDs, immutable terms and new market/position layouts.
-`multi_outcome.rs` validates creation terms and calculates exact collateral
-liabilities. No account initializer, trading instruction, UI or deployed
-multi-outcome market exists yet.
+Status: market creation and complete-set custody implemented and tested locally.
+`state/multi_outcome.rs` defines immutable terms and new market/position layouts;
+`multi_outcome.rs` validates terms and computes exact liabilities. New instructions
+create/open/freeze markets and split/merge funded complete sets. Outcome-specific
+orders, resolution/redemption instructions, UI and deployment remain outstanding.
 
 ## Scope
 
@@ -89,7 +89,7 @@ Nothing in this foundation requires a devnet upgrade.
 
 These new accounts do not reinterpret existing binary data:
 
-| Account | Maximum Borsh payload | With 8-byte discriminator | Planned seeds |
+| Account | Maximum Borsh payload | With 8-byte discriminator | Seeds |
 | --- | ---: | ---: | --- |
 | `MultiOutcomeMarket` | 1,440 bytes | 1,448 bytes | `multi_market`, market ID |
 | `MultiOutcomePosition` | 193 bytes | 201 bytes | `multi_position`, market, owner |
@@ -115,30 +115,77 @@ review-delay overflow and rules commitments. It also rejects terms where one
 complete-set lot cannot fit within u64 collateral capacity. Arithmetic widens
 to u128 before multiplication and narrows only after any exact division.
 
-These are pure checks, not authorization or proof of token custody. Initializers
-must use chain Clock, verify an active-admin creator/resolver and canonical SPL
-mint/vault accounts, and freeze the validated terms. Trading/custody handlers must
-derive economics from the actual market, verify ownership and compare liability
-against both the recorded reserve and the physical vault. No caller-supplied
-array or helper return value can establish those account relationships.
+These are pure checks, not authorization or proof of token custody. The initializer uses chain Clock, requires the active-admin creator as resolver,
+checks the legacy SPL mint and canonical vault accounts, and fixes the terms.
+Custody derives economics from the actual market, verifies ownership and compares
+liability with recorded and physical reserve backing. Future trading and claim
+handlers must preserve those relationships too.
+
+## Implemented custody flow
+
+1. `initialize_multi_outcome_market` creates a Draft, canonical SPL reserve and
+   metadata atomically. The creator must be an active protocol admin. A winning
+   contract pays one actual collateral token (`10^mint.decimals` atoms); the lot
+   rule makes equal Invalid refunds exact. Zero-decimal collateral cannot offer
+   a valid sub-face raw price tick in this first version.
+2. `initialize_multi_outcome_position` creates an empty position for its signer.
+   It does not require an admin or an Open market and rejects duplicates.
+3. `open_multi_outcome_market` requires the same active-admin creator and a Draft
+   before cutoff. Only status changes; it does not create a trading book yet.
+4. `multi_outcome_complete_set(quantity, split)` moves actual SPL backing between
+   the shared mint vault and this market's reserve. Splitting debits free cash
+   and issues Q of each active outcome; merging burns Q free contracts from
+   every outcome and credits shared free cash. Locked cash/contracts are excluded.
+5. `close_multi_outcome_trading` freezes an Open market under its active-admin
+   creator. Splits stop at closure/cutoff. Owner merging remains available while
+   Open/Frozen/Proposed, without an admin check. Resolved markets must use the
+   separate future redemption path; they cannot merge against final liabilities.
+
+Each quantity vector is validated, including zero inactive slots. Checked state
+updates are calculated before the token CPI. A rejected CPI or serialization
+failure rolls back the whole transaction. The reserve must physically cover its
+recorded liability; exact equality is deliberately not required because anyone
+can donate SPL tokens to a vault. Donations create no claims and cannot block
+legitimate exits. A donation-recovery instruction is not part of this milestone.
+
+Each successful creation, lifecycle change, position initialization and complete-
+set movement emits a dedicated multi-outcome event. Indexer decoding and client
+rollout must include these before enabling the feature publicly.
+
+## Creation transaction size
+
+Tests serialize signed legacy creation transactions for 2–8 short outcome labels
+and confirm they fit within 1,232 bytes. Maximum account allocation is not the
+maximum transport size: combining all maximum label/URI lengths and optional
+fields exceeds a single packet. The future creation UI must check the assembled
+transaction and request shorter fields or use a separately designed staged-terms
+flow. Staged configuration is not implemented. Do not present every combination
+of per-field allocation bounds as a supported single-transaction form.
 
 ## Verification
 
-The local Rust suite passes 82 unit tests. The new nine checks cover maximum
+The local Rust suite passes 83 unit tests. The new nine checks cover maximum
 serialization sizes and distinct discriminators, UTF-8 limits, bad schedules,
 precision, unused slots, overflow and supply mismatches. A 224-case grid spans
 2–8 outcomes and 32 complete-set quantities, checking every winner and Invalid.
 Sequential claims reconcile each payout against the remaining liability;
 separate claims equal batched claims. Existing binary enum/layout tests pass.
-These checks do not exercise SPL transfers, new instruction authorization or a
-live multi-outcome market; those paths are not implemented.
+A separate 17-test LiteSVM suite now executes the SBF instructions with actual
+SPL transfers. It covers lifecycle/role gates, creation rollback, wrong accounts,
+shared funding, duplicates, exact split/merge/withdrawal, frozen-vault rollback,
+physical underbacking and unsolicited donations. The complete program suite
+passes 365 tests, including existing binary/spot flows; strict Clippy across all
+targets and the Anchor build also pass. No live deployment is claimed.
+
+Run `anchor build` before `cargo test -p outcomia`, because LiteSVM tests embed
+the generated SBF artifact. These are local checks and do not deploy anything.
 
 ## Delivery checkpoints
 
 1. **Foundation (implemented locally):** bounded IDs, resolution types, wire-format tests and this design.
 2. **State and arithmetic (implemented locally):** immutable terms/layouts, lot/precision validation,
    exact payout helpers and conservation tests.
-3. **Custody:** market creation, shared-wallet complete-set split/merge and exits.
+3. **Custody (implemented locally):** market creation, shared-wallet complete-set split/merge and exits.
 4. **Trading:** outcome-specific placement, cancellation, FIFO matching and fees.
 5. **Resolution and UI:** proposals, finalization, claims, creation/discovery and
    full-lifecycle tests. Deployment and live smoke are separate release steps.
