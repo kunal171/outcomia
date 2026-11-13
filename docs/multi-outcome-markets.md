@@ -1,10 +1,10 @@
 # Multi-outcome prediction markets
 
-Status: market creation and complete-set custody implemented and tested locally.
-`state/multi_outcome.rs` defines immutable terms and new market/position layouts;
-`multi_outcome.rs` validates terms and computes exact liabilities. New instructions
-create/open/freeze markets and split/merge funded complete sets. Outcome-specific
-orders, resolution/redemption instructions, UI and deployment remain outstanding.
+Status: market creation, complete-set custody, bounded order book, resting placement,
+cancellation, best-price FIFO matching, fee withdrawal, and outcome resolution/redemption
+instructions are implemented and verified locally with LiteSVM integration tests
+(`tests/multi_outcome_custody.rs` and `tests/multi_outcome_orders.rs`). UI and deployment
+remain outstanding.
 
 ## Scope
 

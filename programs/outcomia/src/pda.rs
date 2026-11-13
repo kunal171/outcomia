@@ -595,6 +595,32 @@ pub fn derive_multi_outcome_position_pda(
     )
 }
 
+/// Inputs: program ID and canonical market. Errors: none.
+/// Returns: canonical multi-outcome book address and bump.
+pub fn derive_multi_outcome_book_pda(program_id: &Pubkey, market: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[crate::MULTI_OUTCOME_BOOK_SEED, market.as_ref()],
+        program_id,
+    )
+}
+
+/// Inputs: program ID, canonical book and numeric order ID. Errors: none.
+/// Returns: canonical multi-outcome order address and bump.
+pub fn derive_multi_outcome_order_pda(
+    program_id: &Pubkey,
+    book: &Pubkey,
+    order_id: u64,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            crate::MULTI_OUTCOME_ORDER_SEED,
+            book.as_ref(),
+            &order_id.to_le_bytes(),
+        ],
+        program_id,
+    )
+}
+
 #[cfg(test)]
 mod multi_outcome_tests {
     use super::*;
@@ -620,6 +646,50 @@ mod multi_outcome_tests {
         assert_eq!(
             position,
             derive_multi_outcome_position_pda(&program, &market, &owner).0
+        );
+        let book = derive_multi_outcome_book_pda(&program, &market).0;
+        assert_eq!(
+            book,
+            Pubkey::find_program_address(
+                &[crate::MULTI_OUTCOME_BOOK_SEED, market.as_ref()],
+                &program
+            )
+            .0
+        );
+        let order = derive_multi_outcome_order_pda(&program, &book, 1).0;
+        assert_eq!(
+            order,
+            Pubkey::find_program_address(
+                &[
+                    crate::MULTI_OUTCOME_ORDER_SEED,
+                    book.as_ref(),
+                    &1u64.to_le_bytes()
+                ],
+                &program
+            )
+            .0
+        );
+        let book = derive_multi_outcome_book_pda(&program, &market).0;
+        assert_eq!(
+            book,
+            Pubkey::find_program_address(
+                &[crate::MULTI_OUTCOME_BOOK_SEED, market.as_ref()],
+                &program
+            )
+            .0
+        );
+        let order = derive_multi_outcome_order_pda(&program, &book, 1).0;
+        assert_eq!(
+            order,
+            Pubkey::find_program_address(
+                &[
+                    crate::MULTI_OUTCOME_ORDER_SEED,
+                    book.as_ref(),
+                    &1u64.to_le_bytes()
+                ],
+                &program
+            )
+            .0
         );
     }
 }
