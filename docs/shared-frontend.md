@@ -137,3 +137,13 @@ remain supported, and a devnet account cannot pass testnet session verification.
 Reconnect through Loop's testnet wallet after the deployment. Previously reported
 devnet connection/health checks above remain historical; they do not demonstrate
 a funded testnet read. Solana's devnet configuration is independent and unchanged.
+
+## Binary trading implementation
+
+The shared app now has typed Canton lifecycle commands, private wallet reads,
+operator matching, resolution and redemption screens. The public discovery and
+registry-context endpoints only read; the wallet signs and submits. See
+[Canton trading setup](canton-trading.md) for configuration, visibility and actual
+registry compatibility requirements. Deployment and live smoke testing remain
+outstanding. Earlier connection-only and local-preview notes describe the initial
+checkpoint, not the new trading implementation.
