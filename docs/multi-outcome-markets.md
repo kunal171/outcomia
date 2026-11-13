@@ -1,8 +1,10 @@
 # Multi-outcome prediction markets
 
-Status: foundation only. `state/multi_outcome.rs` defines bounded outcome IDs
-and single-winner resolution types. No account initializer, trading instruction,
-UI or deployed multi-outcome market exists yet.
+Status: state and arithmetic implemented locally. `state/multi_outcome.rs`
+defines outcome IDs, immutable terms and new market/position layouts.
+`multi_outcome.rs` validates creation terms and calculates exact collateral
+liabilities. No account initializer, trading instruction, UI or deployed
+multi-outcome market exists yet.
 
 ## Scope
 
@@ -83,10 +85,58 @@ layouts and PDA namespaces will be specified before their initializer is added.
 Existing YES/NO markets and their clients continue using their current types.
 Nothing in this foundation requires a devnet upgrade.
 
+## Account layouts and validation
+
+These new accounts do not reinterpret existing binary data:
+
+| Account | Maximum Borsh payload | With 8-byte discriminator | Planned seeds |
+| --- | ---: | ---: | --- |
+| `MultiOutcomeMarket` | 1,440 bytes | 1,448 bytes | `multi_market`, market ID |
+| `MultiOutcomePosition` | 193 bytes | 201 bytes | `multi_position`, market, owner |
+
+The market stores immutable terms, a pending/final resolution, eight outstanding
+supply counters and reserve accounting. A position stores eight free and eight
+locked contract quantities. Cash remains in the shared per-asset account.
+Outcome count is derived from the immutable label list, rather than maintaining
+a second counter that could disagree. Labels are distinct exact UTF-8 strings,
+trimmed and at most 64 bytes; this does not normalize Unicode or prevent visually
+confusable names. Rules hashes commit the exact published document bytes.
+
+Only the first N quantity slots are active; the rest must be zero. Active
+quantities must follow the lot rule. Before resolution all active supplies must
+be equal: every complete-set split/merge changes them equally. After resolution,
+claims reduce them independently. Remaining liability is the winning supply
+multiplied by P, or the sum of exact per-outcome Invalid refunds. Zero-valued
+losing positions can remain after the cash reserve reaches zero and must still
+be clearable by their owner.
+
+The creation validator checks labels, payout/tick/lot, resolver, optional windows,
+review-delay overflow and rules commitments. It also rejects terms where one
+complete-set lot cannot fit within u64 collateral capacity. Arithmetic widens
+to u128 before multiplication and narrows only after any exact division.
+
+These are pure checks, not authorization or proof of token custody. Initializers
+must use chain Clock, verify an active-admin creator/resolver and canonical SPL
+mint/vault accounts, and freeze the validated terms. Trading/custody handlers must
+derive economics from the actual market, verify ownership and compare liability
+against both the recorded reserve and the physical vault. No caller-supplied
+array or helper return value can establish those account relationships.
+
+## Verification
+
+The local Rust suite passes 82 unit tests. The new nine checks cover maximum
+serialization sizes and distinct discriminators, UTF-8 limits, bad schedules,
+precision, unused slots, overflow and supply mismatches. A 224-case grid spans
+2–8 outcomes and 32 complete-set quantities, checking every winner and Invalid.
+Sequential claims reconcile each payout against the remaining liability;
+separate claims equal batched claims. Existing binary enum/layout tests pass.
+These checks do not exercise SPL transfers, new instruction authorization or a
+live multi-outcome market; those paths are not implemented.
+
 ## Delivery checkpoints
 
-1. **Foundation:** bounded IDs, resolution types, wire-format tests and this design.
-2. **State and arithmetic:** immutable terms/layouts, lot/precision validation,
+1. **Foundation (implemented locally):** bounded IDs, resolution types, wire-format tests and this design.
+2. **State and arithmetic (implemented locally):** immutable terms/layouts, lot/precision validation,
    exact payout helpers and conservation tests.
 3. **Custody:** market creation, shared-wallet complete-set split/merge and exits.
 4. **Trading:** outcome-specific placement, cancellation, FIFO matching and fees.

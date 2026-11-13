@@ -19,6 +19,7 @@ pub mod events;
 pub mod fees;
 pub mod instructions;
 pub mod matching;
+pub mod multi_outcome;
 pub mod pda;
 pub mod prediction_config;
 mod prediction_orders;
