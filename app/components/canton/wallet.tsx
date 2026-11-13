@@ -10,7 +10,7 @@ import {
 } from "../../lib/canton-display";
 import { readCantonWalletAssets } from "../../lib/canton-wallet";
 import { walletError } from "../../lib/console-wallet";
-import { CantonPageHeading, CantonDeploymentNotice } from "./workspace";
+import { CantonPageHeading } from "./workspace";
 
 type BalanceState =
   | { kind: "loading" }
@@ -193,7 +193,6 @@ function CantonWalletView({ session }: { session: CantonSession }) {
         aria-labelledby="canton-funding-heading"
       >
         <h2 id="canton-funding-heading">{t("Outcomia balance")}</h2>
-        <CantonDeploymentNotice />
       </section>
     </>
   );

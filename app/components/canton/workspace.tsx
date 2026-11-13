@@ -7,6 +7,7 @@ import { useCantonWallet } from "../canton-wallet-provider";
 import { SharedWalletButton } from "../network-wallet-provider";
 import { DisplayPreferences } from "../display-preferences";
 import { useI18n } from "../preferences-provider";
+import { CantonTradingProvider } from "./trading-provider";
 import { BrandMark, OutcomiaBrand } from "../workspace-brand";
 
 const destinations = [
@@ -120,7 +121,9 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
         </header>
         <div className="canton-mobile-nav">{navigation}</div>
         <main className="canton-main" key={identity}>
-          {children}
+          <CantonTradingProvider key={identity}>
+            {children}
+          </CantonTradingProvider>
         </main>
       </div>
     </div>
