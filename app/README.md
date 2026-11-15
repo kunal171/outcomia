@@ -283,3 +283,16 @@ files are hashed locally; the resolver uploads evidence independently and suppli
 its permanent reference. The app does not verify the remote bytes. Anyone can
 finalize a mature proposal; only the configured active-admin resolver can propose.
 Legacy cash stays withdrawable; redemption credits the shared mint balance.
+
+## Multi-outcome workspace
+
+`/predictions/multi` provides discovery and links to creation and market detail.
+Creation, linked order books, bounded atomic matching, complete sets, resolution
+and redemption use the checked-in IDL. Keep `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED`
+false until the matching program is deployed and verified; shared balances must
+also be enabled. No devnet upgrade or live smoke is part of this local change.
+
+Run `npm run test:multi-outcome`; see the [full status and local browser fixture](../docs/multi-outcome-markets.md).
+Smoke-test markets are hidden from discovery, while direct detail links and owner
+recovery actions remain available. The creation form supports chunked term upload
+when a legacy transaction exceeds 1,232 bytes and owner recovery of upload rent.

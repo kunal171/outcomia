@@ -1,8 +1,7 @@
 //! Foundation for single-winner markets with a bounded outcome list.
 //!
 //! These are new wire types, not extensions of the deployed binary enums.
-//! Creation and custody use the layouts below; outcome-specific trading and
-//! resolution instructions are not implemented. IDs are immutable list indices;
+//! Creation, custody, linked trading and resolution use the layouts below. IDs are immutable list indices;
 //! their validity depends on the particular market's frozen outcome count.
 
 use anchor_lang::prelude::*;

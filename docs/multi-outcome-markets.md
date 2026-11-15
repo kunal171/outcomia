@@ -1,10 +1,13 @@
 # Multi-outcome prediction markets
 
-Status: market creation, complete-set custody, bounded order book, resting placement,
-cancellation, best-price FIFO matching, fee withdrawal, and outcome resolution/redemption
-instructions are implemented and verified locally with LiteSVM integration tests
-(`tests/multi_outcome_custody.rs` and `tests/multi_outcome_orders.rs`). UI and deployment
-remain outstanding.
+Status: contracts, linked price-time books, multi-maker transaction builders,
+creation/discovery/trading/claims UI, and indexer event decoding are implemented
+and checked locally. The shared app exposes `/predictions/multi` and
+`/predictions/multi/new`. Transactions require both
+`NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true` and
+`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. Keep the latter disabled until the
+matching program is deliberately deployed and verified. No multi-outcome devnet
+upgrade or live smoke test has been performed.
 
 ## Scope
 
@@ -19,8 +22,10 @@ An ID is valid only relative to the actual market's outcome count. Structural
 Borsh decoding does not perform that economic validation.
 
 The eight-outcome cap bounds account sizes, complete-set work and validation
-costs. It is an initial engineering limit, not a claim that eight outcomes fit
-within the current transaction budget. Measure that when instructions exist.
+costs. Local LiteSVM tests now measure signed legacy transaction size and compute
+for eight-outcome creation, custody, placement, atomic matching, resolution and
+redemption. These measurements cover the documented fixtures, not every possible
+account/label combination or production throughput.
 
 ## Collateral and complete sets
 
@@ -139,7 +144,7 @@ handlers must preserve those relationships too.
 5. `close_multi_outcome_trading` freezes an Open market under its active-admin
    creator. Splits stop at closure/cutoff. Owner merging remains available while
    Open/Frozen/Proposed, without an admin check. Resolved markets must use the
-   separate future redemption path; they cannot merge against final liabilities.
+   separate redemption path; they cannot merge against final liabilities.
 
 Each quantity vector is validated, including zero inactive slots. Checked state
 updates are calculated before the token CPI. A rejected CPI or serialization
@@ -148,37 +153,103 @@ recorded liability; exact equality is deliberately not required because anyone
 can donate SPL tokens to a vault. Donations create no claims and cannot block
 legitimate exits. A donation-recovery instruction is not part of this milestone.
 
-Each successful creation, lifecycle change, position initialization and complete-
-set movement emits a dedicated multi-outcome event. Indexer decoding and client
-rollout must include these before enabling the feature publicly.
+Nine multi-outcome event types cover creation, lifecycle, positions, complete
+sets, orders, fills, fees, resolution and redemption. The indexer decodes all nine
+with independent wire fixtures and rejects malformed/trailing bytes. Query
+projections and an indexing API remain outside this change.
 
-## Creation transaction size
+## Linked order books and atomic batches
 
-Tests serialize signed legacy creation transactions for 2–8 short outcome labels
-and confirm they fit within 1,232 bytes. Maximum account allocation is not the
-maximum transport size: combining all maximum label/URI lengths and optional
-fields exceeds a single packet. The future creation UI must check the assembled
-transaction and request shorter fields or use a separately designed staged-terms
-flow. Staged configuration is not implemented. Do not present every combination
-of per-field allocation bounds as a supported single-transaction form.
+`MultiOutcomeBook` stores 16 roots: a bid and ask ladder for each of eight possible
+outcomes. Every `MultiOutcomeOrder` has reciprocal previous/next links. Orders
+are sorted by maker price, then increasing acceptance ID at equal prices. This
+is an order-level ladder, without a separate aggregated price-level account.
+There is no 64-order cap or book-wide vector scan. Placement validates the exact
+insertion neighbors; cancellation and full fills repair the adjacent links.
+One integration test places 70 orders and exercises head/middle/tail removal
+and rollback with an unrelated neighbor.
 
-## Verification
+The browser validates all reachable links, market/PDA identities, counts and
+priority before planning a transaction. It packs up to three maker fills, then
+a resting remainder only when no crossing maker remains. A packet-size limit
+may reduce that batch. Unsubmitted quantity remains explicit for a fresh retry;
+the client never skips a crossing FIFO order or silently broadcasts another
+transaction. The program revalidates the live queue. A stale second instruction
+rolls back all earlier fills in the transaction.
 
-The local Rust suite passes 83 unit tests. The new nine checks cover maximum
-serialization sizes and distinct discriminators, UTF-8 limits, bad schedules,
-precision, unused slots, overflow and supply mismatches. A 224-case grid spans
-2–8 outcomes and 32 complete-set quantities, checking every winner and Invalid.
-Sequential claims reconcile each payout against the remaining liability;
-separate claims equal batched claims. Existing binary enum/layout tests pass.
-A separate 17-test LiteSVM suite now executes the SBF instructions with actual
-SPL transfers. It covers lifecycle/role gates, creation rollback, wrong accounts,
-shared funding, duplicates, exact split/merge/withdrawal, frozen-vault rollback,
-physical underbacking and unsolicited donations. The complete program suite
-passes 365 tests, including existing binary/spot flows; strict Clippy across all
-targets and the Anchor build also pass. No live deployment is claimed.
+The former bounded multi-outcome book layout was local-only. Its replacement
+changes multi-outcome book/order layouts and instruction accounts. Rebuild the
+program and sync the app IDL together. Deployed binary/spot layouts and error
+codes remain unchanged; the obsolete capacity error retains its ABI number.
 
-Run `anchor build` before `cargo test -p outcomia`, because LiteSVM tests embed
-the generated SBF artifact. These are local checks and do not deploy anything.
+## Creation transaction size and staged terms
+
+Short-label creation transactions for all 2–8 outcomes fit within 1,232 bytes.
+Combining maximum-length labels, URI and optional fields exceeds that legacy
+packet limit. The UI checks every assembled transaction before wallet approval.
+It uses direct creation when it fits, otherwise uploads serialized terms in
+contiguous chunks of at most 600 bytes to the creator's canonical buffer.
+
+Final creation binds the exact SHA-256 of that buffer and runs the normal
+active-admin, mint, time, label, lot and reserve validation. Uploads alone create
+no market or customer claims. Wrong owners, offsets and hashes fail. The creator
+can close the buffer to recover rent; the UI does this after creation and also
+finds abandoned buffers on-ledger for recovery after a reload. Terms become
+immutable only in the created market. Each upload/creation requires its own
+wallet approval; no staged submission is retried automatically.
+
+The app hashes the entered question and exact rules document, verifies the
+published HTTPS/Arweave document bytes, and shows outcomes, collateral, lot,
+close time, review delay and optional fallback before the creator checks review.
+Editing a form field clears that approval. Splits/merges, open-order cancellation,
+resolution/correction/finalization and redemption are available on market detail.
+Collateral funding reuses the existing shared-wallet controls.
+
+## Local verification
+
+`anchor build`, `cargo test -p outcomia` and strict all-target Clippy pass locally.
+The full program suite has 379 tests, including 14 multi-outcome order/staging
+tests and 17 custody tests. Indexer tests pass 75 checks; seven PostgreSQL tests
+require a separately configured database and were not run. Client tests use the
+real IDL to check tuple OutcomeIds, exact fees, reciprocal links, self-trades,
+lots, safe remainders, maximum terms and signed packet sizing.
+
+The eight-outcome budget fixture reports:
+
+| Operation | Signed legacy bytes | Compute units |
+| --- | ---: | ---: |
+| Short-label creation | 842 | 35,270 |
+| Complete-set split | 484 | 37,683 |
+| First resting order | 404 | 35,521 |
+| Same-price append | 436 | 39,255 |
+| Two atomic maker fills | 536 | 90,848 |
+| Proposal | 303 | 13,208 |
+| Finalization | 211 | 10,511 |
+| Redemption | 539 | 36,222 |
+| Staged creation, maximum labels/URI | 569 | 46,956 |
+
+Run `anchor build` before tests; LiteSVM embeds `target/deploy/outcomia.so`.
+Run `npm --prefix app run idl:sync` after building. IDL sync preserves existing
+entry documentation and order while adopting the generated ABI.
+
+`npm --prefix app run test:multi-outcome` checks the client. The local browser
+fixture uses an ephemeral wallet and mock RPC, blocks external requests, and
+exercises discovery, cancellation, trading, claims, creation with published-rule
+verification, review reset and mobile layout. It never reads the CLI keypair.
+
+```bash
+# Terminal 1
+OUTCOMIA_BUILD_DIR=target/multi-browser NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true \
+NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true npm --prefix app run dev -- \
+  --webpack --hostname 127.0.0.1 --port 3017
+# Terminal 2 (provide locally installed Playwright/Chromium paths if needed)
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
+MULTI_BROWSER_EXECUTABLE=/path/to/chromium \
+node app/scripts/multi-outcome-browser.test.mjs
+```
+
+Screenshots go to ignored `target/multi-browser-artifacts`. Local mocks do not
+establish public-network deployment, wallet compatibility or live execution.
 
 ## Delivery checkpoints
 
@@ -186,8 +257,8 @@ the generated SBF artifact. These are local checks and do not deploy anything.
 2. **State and arithmetic (implemented locally):** immutable terms/layouts, lot/precision validation,
    exact payout helpers and conservation tests.
 3. **Custody (implemented locally):** market creation, shared-wallet complete-set split/merge and exits.
-4. **Trading:** outcome-specific placement, cancellation, FIFO matching and fees.
-5. **Resolution and UI:** proposals, finalization, claims, creation/discovery and
+4. **Trading (implemented locally):** linked price-time placement, cancellation, atomic bounded client matching and fees.
+5. **Resolution and UI (implemented locally):** proposals, finalization, claims, creation/discovery and
    full-lifecycle tests. Deployment and live smoke are separate release steps.
 
 Clubs/private participation and governance follow this feature. Their access

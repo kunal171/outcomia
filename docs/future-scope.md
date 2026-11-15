@@ -15,7 +15,7 @@ are backed by one collateral asset per market. Complete pairs can be created
 and merged; final resolution permits redemption into the shared asset wallet.
 
 Market creation currently requires an active protocol admin. Permissionless
-creation, private trading permissions, clubs, multi-outcome markets, governance
+creation, private trading permissions, clubs, governance
 and cross-outcome matching are future work. See
 [prediction design](prediction-market-design.md) and
 [shared custody and settlement](shared-balances-resolution.md) for the current
@@ -44,7 +44,7 @@ not change how collateral backs its contracts.
 The first multi-outcome version will have exactly one winner. Several
 simultaneous winners require different backing and payout rules and remain
 outside that version. See the [multi-outcome foundation](multi-outcome-markets.md)
-for bounded IDs and exact Invalid refunds. Trading instructions are not implemented yet.
+for linked books, locally verified UI, exact Invalid refunds and transaction budgets. Multi-outcome deployment and live smoke testing remain outstanding.
 
 Published terms must define who resolves the event, when resolution is allowed,
 what evidence counts, and any fallback process or deadline. Governance for
