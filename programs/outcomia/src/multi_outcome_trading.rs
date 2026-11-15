@@ -17,9 +17,7 @@ pub fn book_terms(
 ) -> Result<MultiOutcomeEconomics> {
     let e = MultiOutcomeEconomics::from_terms(&market.terms)?;
     require!(
-        book.orders.len() <= MULTI_OUTCOME_MAX_ORDERS
-            && market.open_order_count == book.orders.len() as u64
-            && book.next_order_id > 0,
+        market.open_order_count == book.open_order_count && book.next_order_id > 0,
         multi::InvalidMultiOutcomeBook
     );
     if trading {
@@ -28,23 +26,6 @@ pub fn book_terms(
                 && market.final_outcome.is_none()
                 && Clock::get()?.unix_timestamp < market.terms.close_ts,
             prediction::PredictionOrderUnavailable
-        );
-    }
-    for (index, r) in book.orders.iter().enumerate() {
-        require!(
-            r.outcome.is_valid_for(e.outcome_count)
-                && r.order_id > 0
-                && r.order_id < book.next_order_id
-                && r.price > 0
-                && r.price < e.payout_per_contract
-                && r.price.is_multiple_of(e.price_tick),
-            multi::InvalidMultiOutcomeBook
-        );
-        require!(
-            !book.orders[..index]
-                .iter()
-                .any(|old| old.order_id == r.order_id || old.order == r.order),
-            multi::InvalidMultiOutcomeBook
         );
     }
     require!(
@@ -83,23 +64,7 @@ pub fn best(
     outcome: OutcomeId,
     side: OrderSide,
 ) -> Option<MultiOutcomeOrderReference> {
-    book.orders
-        .iter()
-        .filter(|r| r.outcome == outcome && r.side == side)
-        .copied()
-        .reduce(|a, b| {
-            if (b.price == a.price && b.order_id < a.order_id)
-                || (b.price != a.price
-                    && match side {
-                        OrderSide::Bid => b.price > a.price,
-                        OrderSide::Ask => b.price < a.price,
-                    })
-            {
-                b
-            } else {
-                a
-            }
-        })
+    book.heads[slot(outcome, side)]
 }
 /// Inputs: canonical open order and book. Errors: malformed remainder/backing
 /// or absent/mismatched reference. Returns: index removed on fill/cancellation.
@@ -108,7 +73,7 @@ pub fn order_index(
     economics: MultiOutcomeEconomics,
     key: Pubkey,
     value: &MultiOutcomeOrder,
-) -> Result<usize> {
+) -> Result<()> {
     require!(
         value.status == OrderStatus::Open
             && value.remaining_quantity > 0
@@ -134,16 +99,17 @@ pub fn order_index(
         value.locked_amount == expected,
         multi::InvalidMultiOutcomeBook
     );
-    book.orders
-        .iter()
-        .position(|r| {
-            r.order == key
-                && r.order_id == value.order_id
-                && r.outcome == value.outcome
-                && r.side == value.side
-                && r.price == value.price
-        })
-        .ok_or_else(|| error!(multi::InvalidMultiOutcomeBook))
+    require!(
+        value.order_id > 0 && value.order_id < book.next_order_id,
+        multi::InvalidMultiOutcomeBook
+    );
+    if value.previous.is_none() {
+        require!(
+            best(book, value.outcome, value.side).is_some_and(|r| r.order == key),
+            multi::InvalidMultiOutcomeBook
+        );
+    }
+    Ok(())
 }
 /// Inputs: market, position, owner and exact market key. Errors: wrong binding,
 /// off-lot/inactive slots or owned amounts beyond outstanding supply. Returns:
@@ -170,5 +136,105 @@ pub fn position(
             multi::InvalidMultiOutcomePosition
         );
     }
+    Ok(())
+}
+
+/// Stable root slot for an outcome/side pair. Callers validate the outcome first.
+pub fn slot(outcome: OutcomeId, side: OrderSide) -> usize {
+    usize::from(outcome.index()) * 2 + usize::from(side == OrderSide::Ask)
+}
+/// Reference cached in a root when its first order changes.
+pub fn reference(key: Pubkey, o: &MultiOutcomeOrder) -> MultiOutcomeOrderReference {
+    MultiOutcomeOrderReference {
+        order: key,
+        order_id: o.order_id,
+        outcome: o.outcome,
+        side: o.side,
+        price: o.price,
+    }
+}
+/// Validates a neighbor's canonical identity, escrow, and queue membership.
+pub fn neighbor(
+    book: &Account<MultiOutcomeBook>,
+    e: MultiOutcomeEconomics,
+    market: Pubkey,
+    o: &Account<MultiOutcomeOrder>,
+    outcome: OutcomeId,
+    side: OrderSide,
+) -> Result<()> {
+    require!(
+        o.market == market && o.book == book.key() && o.outcome == outcome && o.side == side,
+        multi::InvalidMultiOutcomeBook
+    );
+    require_keys_eq!(
+        o.key(),
+        Pubkey::find_program_address(
+            &[
+                crate::constants::MULTI_OUTCOME_ORDER_SEED,
+                book.key().as_ref(),
+                &o.order_id.to_le_bytes()
+            ],
+            &crate::ID
+        )
+        .0,
+        multi::InvalidMultiOutcomeBook
+    );
+    order_index(book, e, o.key(), o)
+}
+/// True when a precedes b in maker price-time priority.
+pub fn precedes(a: &MultiOutcomeOrder, b: &MultiOutcomeOrder) -> bool {
+    if a.price == b.price {
+        a.order_id < b.order_id
+    } else if a.side == OrderSide::Bid {
+        a.price > b.price
+    } else {
+        a.price < b.price
+    }
+}
+/// Removes one order with exact reciprocal neighbors. No scan or fixed capacity.
+pub fn unlink(
+    book: &mut Account<MultiOutcomeBook>,
+    e: MultiOutcomeEconomics,
+    key: Pubkey,
+    o: &MultiOutcomeOrder,
+    previous: Option<&mut Account<MultiOutcomeOrder>>,
+    next: Option<&mut Account<MultiOutcomeOrder>>,
+) -> Result<()> {
+    require!(
+        o.previous == previous.as_ref().map(|p| p.key())
+            && o.next == next.as_ref().map(|n| n.key()),
+        multi::InvalidMultiOutcomeBook
+    );
+    if let Some(p) = previous.as_ref() {
+        neighbor(book, e, o.market, p, o.outcome, o.side)?;
+        require!(
+            p.next == Some(key) && precedes(p, o),
+            multi::InvalidMultiOutcomeBook
+        );
+    } else {
+        require!(
+            best(book, o.outcome, o.side).is_some_and(|r| r.order == key),
+            multi::InvalidMultiOutcomeBook
+        );
+    }
+    if let Some(n) = next.as_ref() {
+        neighbor(book, e, o.market, n, o.outcome, o.side)?;
+        require!(
+            n.previous == Some(key) && precedes(o, n),
+            multi::InvalidMultiOutcomeBook
+        );
+    }
+    if let Some(p) = previous {
+        p.next = o.next;
+    } else {
+        book.heads[slot(o.outcome, o.side)] = next.as_ref().map(|n| reference(n.key(), n));
+    }
+    if let Some(n) = next {
+        n.previous = o.previous;
+    }
+    book.open_order_count = book
+        .open_order_count
+        .checked_sub(1)
+        .ok_or(multi::InvalidMultiOutcomeBook)?;
     Ok(())
 }

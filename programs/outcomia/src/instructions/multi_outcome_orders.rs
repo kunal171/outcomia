@@ -37,7 +37,8 @@ pub fn handle_initialize_multi_outcome_book(
     ctx.accounts.book.set_inner(MultiOutcomeBook {
         market: m.key(),
         authority: ctx.accounts.authority.key(),
-        orders: Vec::new(),
+        heads: [None; MULTI_OUTCOME_BOOK_SLOTS],
+        open_order_count: 0,
         next_order_id: 1,
         accrued_collateral_fees: 0,
         bump: ctx.bumps.book,
@@ -61,6 +62,10 @@ pub struct PlaceMultiOutcomeOrder<'info> {
     #[account(init,payer=owner,space=8+MultiOutcomeOrder::INIT_SPACE,seeds=[MULTI_OUTCOME_ORDER_SEED,book.key().as_ref(),&order_id.to_le_bytes()],bump)]
     pub order: Account<'info, MultiOutcomeOrder>,
     pub system_program: Program<'info, System>,
+    #[account(mut)]
+    pub previous: Option<Account<'info, MultiOutcomeOrder>>,
+    #[account(mut)]
+    pub next: Option<Account<'info, MultiOutcomeOrder>>,
 }
 /// Inputs: owner, canonical claims/book and next ID plus exact order units.
 /// Errors: closed book, crossing, capacity, bad grid, stale ID, insufficient
@@ -86,10 +91,6 @@ pub fn handle_place_multi_outcome_order(
         ctx.accounts.owner.key(),
         ctx.accounts.market.key(),
     )?;
-    require!(
-        ctx.accounts.book.orders.len() < MULTI_OUTCOME_MAX_ORDERS,
-        multi::MultiOutcomeBookFull
-    );
     require!(
         order_id == ctx.accounts.book.next_order_id && order_id > 0,
         order::InvalidOrderId
@@ -141,18 +142,61 @@ pub fn handle_place_multi_outcome_order(
         quantity,
         remaining_quantity: quantity,
         locked_amount: lock,
+        previous: ctx.accounts.previous.as_ref().map(|p| p.key()),
+        next: ctx.accounts.next.as_ref().map(|n| n.key()),
         status: OrderStatus::Open,
         bump: ctx.bumps.order,
     });
-    ctx.accounts.book.orders.push(MultiOutcomeOrderReference {
-        order: ctx.accounts.order.key(),
-        order_id,
-        outcome,
-        side,
-        price,
-    });
+    let o = &ctx.accounts.order;
+    if let Some(p) = ctx.accounts.previous.as_ref() {
+        rules::neighbor(
+            &ctx.accounts.book,
+            e,
+            ctx.accounts.market.key(),
+            p,
+            outcome,
+            side,
+        )?;
+        require!(
+            p.next == o.next && rules::precedes(p, o),
+            multi::InvalidMultiOutcomeBook
+        );
+    } else {
+        require!(
+            rules::best(&ctx.accounts.book, outcome, side).map(|r| r.order) == o.next,
+            multi::InvalidMultiOutcomeBook
+        );
+    }
+    if let Some(n) = ctx.accounts.next.as_ref() {
+        rules::neighbor(
+            &ctx.accounts.book,
+            e,
+            ctx.accounts.market.key(),
+            n,
+            outcome,
+            side,
+        )?;
+        require!(
+            n.previous == o.previous && rules::precedes(o, n),
+            multi::InvalidMultiOutcomeBook
+        );
+    }
+    if let Some(p) = ctx.accounts.previous.as_mut() {
+        p.next = Some(o.key());
+    } else {
+        ctx.accounts.book.heads[rules::slot(outcome, side)] = Some(rules::reference(o.key(), o));
+    }
+    if let Some(n) = ctx.accounts.next.as_mut() {
+        n.previous = Some(o.key());
+    }
     ctx.accounts.book.next_order_id = next;
-    ctx.accounts.market.open_order_count = ctx.accounts.book.orders.len() as u64;
+    ctx.accounts.book.open_order_count = ctx
+        .accounts
+        .book
+        .open_order_count
+        .checked_add(1)
+        .ok_or(multi::MultiOutcomeAccountingOverflow)?;
+    ctx.accounts.market.open_order_count = ctx.accounts.book.open_order_count;
     emit!(crate::MultiOutcomeOrderEvent {
         market: ctx.accounts.market.key(),
         owner: ctx.accounts.owner.key(),
@@ -179,6 +223,10 @@ pub struct CancelMultiOutcomeOrder<'info> {
     pub cash: Account<'info, AssetBalance>,
     #[account(mut,seeds=[MULTI_OUTCOME_POSITION_SEED,market.key().as_ref(),owner.key().as_ref()],bump=position.bump)]
     pub position: Account<'info, MultiOutcomePosition>,
+    #[account(mut)]
+    pub previous: Option<Account<'info, MultiOutcomeOrder>>,
+    #[account(mut)]
+    pub next: Option<Account<'info, MultiOutcomeOrder>>,
 }
 /// Inputs: order owner and canonical current book/claims. Errors: foreign or
 /// replayed order, invalid index/backing or overflow. Returns: only this order's
@@ -196,7 +244,7 @@ pub fn handle_cancel_multi_outcome_order(ctx: Context<CancelMultiOutcomeOrder>) 
         ctx.accounts.owner.key(),
         ctx.accounts.market.key(),
     )?;
-    let index = rules::order_index(
+    rules::order_index(
         &ctx.accounts.book,
         economics,
         ctx.accounts.order.key(),
@@ -224,8 +272,15 @@ pub fn handle_cancel_multi_outcome_order(ctx: Context<CancelMultiOutcomeOrder>) 
             .checked_add(o.locked_amount)
             .ok_or(balance::FreeBalanceOverflow)?;
     }
-    ctx.accounts.book.orders.remove(index);
-    ctx.accounts.market.open_order_count = ctx.accounts.book.orders.len() as u64;
+    rules::unlink(
+        &mut ctx.accounts.book,
+        economics,
+        o.key(),
+        o,
+        ctx.accounts.previous.as_mut(),
+        ctx.accounts.next.as_mut(),
+    )?;
+    ctx.accounts.market.open_order_count = ctx.accounts.book.open_order_count;
     let o = &mut ctx.accounts.order;
     o.remaining_quantity = 0;
     o.locked_amount = 0;

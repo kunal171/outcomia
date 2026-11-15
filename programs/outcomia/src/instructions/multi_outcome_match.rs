@@ -29,6 +29,8 @@ pub struct MatchMultiOutcomeOrder<'info> {
     pub taker_cash: Account<'info, AssetBalance>,
     #[account(mut,seeds=[MULTI_OUTCOME_POSITION_SEED,market.key().as_ref(),taker.key().as_ref()],bump=taker_position.bump)]
     pub taker_position: Account<'info, MultiOutcomePosition>,
+    #[account(mut)]
+    pub next: Option<Account<'info, MultiOutcomeOrder>>,
 }
 /// Inputs: taker, canonical best maker and both owners' claims, exact limit,
 /// quantity and expected fee bps. Errors: stale fees, priority, self/same-side,
@@ -51,7 +53,7 @@ pub fn handle_match_multi_outcome_order(
         multi::MultiOutcomeFeeQuoteChanged
     );
     let maker = &ctx.accounts.maker_order;
-    let index = rules::order_index(&ctx.accounts.book, e, maker.key(), maker)?;
+    rules::order_index(&ctx.accounts.book, e, maker.key(), maker)?;
     require!(
         maker.owner != ctx.accounts.taker.key(),
         matching::SelfTradeNotAllowed
@@ -145,6 +147,16 @@ pub fn handle_match_multi_outcome_order(
             .checked_add(proceeds)
             .ok_or(balance::FreeBalanceOverflow)?;
     }
+    if fill == ctx.accounts.maker_order.remaining_quantity {
+        rules::unlink(
+            &mut ctx.accounts.book,
+            e,
+            ctx.accounts.maker_order.key(),
+            &ctx.accounts.maker_order,
+            None,
+            ctx.accounts.next.as_mut(),
+        )?;
+    }
     let o = &mut ctx.accounts.maker_order;
     o.remaining_quantity = o
         .remaining_quantity
@@ -157,10 +169,11 @@ pub fn handle_match_multi_outcome_order(
     if o.remaining_quantity == 0 {
         require!(o.locked_amount == 0, multi::InvalidMultiOutcomeBook);
         o.status = OrderStatus::Filled;
-        ctx.accounts.book.orders.remove(index);
+        o.next = None;
+        o.previous = None;
     }
     ctx.accounts.book.accrued_collateral_fees = accrued;
-    ctx.accounts.market.open_order_count = ctx.accounts.book.orders.len() as u64;
+    ctx.accounts.market.open_order_count = ctx.accounts.book.open_order_count;
     emit!(crate::MultiOutcomeFillEvent {
         market: ctx.accounts.market.key(),
         maker: ctx.accounts.maker_order.owner,

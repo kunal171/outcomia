@@ -157,10 +157,10 @@ pub struct MultiOutcomePosition {
     pub bump: u8,
 }
 
-/// Initial bounded index: price/FIFO selection scans at most 64 references.
+/// Price-time ladder roots: one linked queue per outcome and side.
 /// This avoids changing the deployed binary linked-list books. Capacity is a
 /// product limit; higher-volume indexing needs a separately versioned layout.
-pub const MULTI_OUTCOME_MAX_ORDERS: usize = 64;
+pub const MULTI_OUTCOME_BOOK_SLOTS: usize = 16;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, InitSpace, Debug)]
 pub struct MultiOutcomeOrderReference {
@@ -178,8 +178,8 @@ pub struct MultiOutcomeOrderReference {
 pub struct MultiOutcomeBook {
     pub market: Pubkey,
     pub authority: Pubkey,
-    #[max_len(MULTI_OUTCOME_MAX_ORDERS)]
-    pub orders: Vec<MultiOutcomeOrderReference>,
+    pub heads: [Option<MultiOutcomeOrderReference>; MULTI_OUTCOME_BOOK_SLOTS],
+    pub open_order_count: u64,
     pub next_order_id: u64,
     pub accrued_collateral_fees: u64,
     pub bump: u8,
@@ -201,6 +201,8 @@ pub struct MultiOutcomeOrder {
     pub quantity: u64,
     pub remaining_quantity: u64,
     pub locked_amount: u64,
+    pub previous: Option<Pubkey>,
+    pub next: Option<Pubkey>,
     pub status: super::OrderStatus,
     pub bump: u8,
 }
