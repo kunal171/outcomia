@@ -11,6 +11,7 @@ pub mod fee;
 pub mod market;
 pub mod matching;
 pub mod metadata;
+pub mod multi_outcome;
 pub mod order;
 pub mod prediction;
 pub mod shared;

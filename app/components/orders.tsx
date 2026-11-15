@@ -1,4 +1,5 @@
 "use client";
+import { MultiWalletActivity } from "./multi-outcome/wallet-activity";
 import { useI18n } from "./preferences-provider";
 
 import { SharedOrders } from "./shared-orders";
@@ -54,6 +55,7 @@ export function Orders() {
         ) : SHARED_BALANCES_ENABLED ? (
           <>
             <SharedOrders />
+            <MultiWalletActivity key={identity} mode="orders" />
             <details
               className="orders-legacy"
               onToggle={(event) => setLegacyOpen(event.currentTarget.open)}

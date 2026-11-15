@@ -228,8 +228,16 @@ export function createRpcFetch(
       message.method === "isBlockhashValid" ||
       message.method === "simulateTransaction";
     const key = JSON.stringify([generation, message.method, message.params]);
+    // Owner/market-filtered account scans contain mutable orders and balances.
+    // Caching those alongside a fresh book root can manufacture broken queues.
+    const params = message.params as
+      | [unknown, { filters?: { memcmp?: { offset: number } }[] }]
+      | undefined;
+    const filteredAccounts =
+      message.method === "getProgramAccounts" &&
+      params?.[1]?.filters?.some((f) => (f.memcmp?.offset ?? 0) > 0);
     const ttl =
-      message.method === "getProgramAccounts" ||
+      (message.method === "getProgramAccounts" && !filteredAccounts) ||
       message.method === "getSignaturesForAddress"
         ? 3000
         : message.method === "getTransaction"

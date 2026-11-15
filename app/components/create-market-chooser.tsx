@@ -49,6 +49,12 @@ export function CreateMarketChooser() {
               {t("Set up prediction market")} <span aria-hidden="true">→</span>
             </span>
           </Link>
+          <Link className="market-type-choice market-type-prediction" href="/predictions/multi/new">
+            <span className="market-type-icon" aria-hidden="true">◈</span>
+            <h2>{t("Multi-outcome market")}</h2>
+            <p>{t("Set 2–8 named outcomes with exactly one winner.")}</p>
+            <span className="market-type-action">{t("Set up multi-outcome market")} <span aria-hidden="true">→</span></span>
+          </Link>
         </nav>
       </main>
     </div>

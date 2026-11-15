@@ -286,3 +286,119 @@ pub struct TestFaucetClosedEvent {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
 }
+
+/// Binary-compatible lifecycle tags shared by prediction events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub enum PredictionStatus {
+    Draft,
+    Open,
+    Frozen,
+    Proposed,
+    Resolved,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub enum OrderStatus {
+    Open,
+    Filled,
+    Canceled,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub enum MultiOutcomeResolution {
+    Winner(u8),
+    Invalid,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeMarketInitializedEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeMarketInitializedEvent {
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub collateral_vault: Pubkey,
+    pub outcome_count: u8,
+    pub payout_per_contract: u64,
+    pub quantity_lot: u64,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeMarketStatusEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeMarketStatusEvent {
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub status: PredictionStatus,
+}
+
+/// Wire mirror of the on-chain MultiOutcomePositionInitializedEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomePositionInitializedEvent {
+    pub market: Pubkey,
+    pub owner: Pubkey,
+    pub position: Pubkey,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeCompleteSetEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeCompleteSetEvent {
+    pub market: Pubkey,
+    pub owner: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub split: bool,
+    pub quantity: u64,
+    pub collateral_atoms: u64,
+    pub backing_reserve: u64,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeOrderEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeOrderEvent {
+    pub market: Pubkey,
+    pub owner: Pubkey,
+    pub order: Pubkey,
+    pub outcome: u8,
+    pub side: OrderSide,
+    pub price: u64,
+    pub quantity: u64,
+    pub status: OrderStatus,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeFillEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeFillEvent {
+    pub market: Pubkey,
+    pub maker: Pubkey,
+    pub taker: Pubkey,
+    pub order: Pubkey,
+    pub outcome: u8,
+    pub taker_side: OrderSide,
+    pub price: u64,
+    pub quantity: u64,
+    pub collateral_atoms: u64,
+    pub fee_atoms: u64,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeFeeWithdrawnEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeFeeWithdrawnEvent {
+    pub market: Pubkey,
+    pub authority: Pubkey,
+    pub amount: u64,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeResolutionEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeResolutionEvent {
+    pub market: Pubkey,
+    pub outcome: Option<MultiOutcomeResolution>,
+    pub status: PredictionStatus,
+}
+
+/// Wire mirror of the on-chain MultiOutcomeRedeemedEvent.
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, Serialize)]
+pub struct MultiOutcomeRedeemedEvent {
+    pub market: Pubkey,
+    pub owner: Pubkey,
+    pub outcome: MultiOutcomeResolution,
+    pub quantities: [u64; 8],
+    pub payout: u64,
+    pub backing_reserve: u64,
+}

@@ -9,13 +9,14 @@ without forcing the Anchor program and LiteSVM onto the same versions.
 
 ## Coverage
 
-The decoder supports the 21 event types in `src/decoder.rs`: governance, market
+The decoder supports the original 21 event types plus nine multi-outcome event types in `src/decoder.rs`: governance, market
 metadata, spot orders/fills, balances, fees and the test faucet. It accepts
 `Program data:` only while Outcomia is the active invocation.
 
-Prediction instructions currently emit no prediction-specific events. Shared
-metadata events can be decoded, and source transactions are retained, but this
-service does not reconstruct prediction positions, orders or fills. Adding
+Multi-outcome lifecycle, custody, orders, fills, fees, resolution and redemption
+events are decoded and retained. Binary prediction instructions have no dedicated
+event catalog here. This service does not reconstruct prediction positions,
+orders or fills into query projections. Adding
 prediction events requires updating the decoder catalog and its Borsh types.
 Unknown or malformed events stop processing rather than being silently skipped.
 

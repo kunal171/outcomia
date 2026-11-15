@@ -447,4 +447,35 @@ pub enum OutcomiaError {
     PredictionNotResolved = 154,
     #[msg("There are no selected free contracts to redeem")]
     NothingToRedeem = 155,
+
+    #[msg("Multi-outcome markets require two to eight outcomes")]
+    InvalidMultiOutcomeCount = 156,
+    #[msg("Outcome ID is outside this market's immutable outcome list")]
+    InvalidMultiOutcomeId = 157,
+    #[msg("Outcome labels must be distinct, trimmed, nonempty and bounded UTF-8")]
+    InvalidMultiOutcomeLabel = 158,
+    #[msg("Multi-outcome face payout must be positive")]
+    InvalidMultiOutcomePayout = 159,
+    #[msg("Multi-outcome price must be positive, below payout and tick aligned")]
+    InvalidMultiOutcomePrice = 160,
+    #[msg("Multi-outcome lot or quantity cannot support exact settlement")]
+    InvalidMultiOutcomeLot = 161,
+    #[msg("Multi-outcome accounting exceeds the supported collateral amount")]
+    MultiOutcomeAccountingOverflow = 162,
+    #[msg("Multi-outcome supplies are inconsistent with the lifecycle")]
+    MultiOutcomeSupplyMismatch = 163,
+    #[msg("Unused outcome slots must remain zero")]
+    MultiOutcomeInactiveSlot = 164,
+    #[msg("Multi-outcome position owner, market or quantities are inconsistent")]
+    InvalidMultiOutcomePosition = 165,
+    #[msg("Multi-outcome reserve accounting or physical backing is inconsistent")]
+    MultiOutcomeReserveMismatch = 166,
+    #[msg("Multi-outcome book has reached its resting order capacity")]
+    MultiOutcomeBookFull = 167,
+    #[msg("Multi-outcome book index, order or counters are inconsistent")]
+    InvalidMultiOutcomeBook = 168,
+    #[msg("The taker fee changed; refresh the quote before signing")]
+    MultiOutcomeFeeQuoteChanged = 169,
+    #[msg("Staged multi-outcome terms, offset, owner or content hash are invalid")]
+    InvalidMultiOutcomeTerms = 170,
 }

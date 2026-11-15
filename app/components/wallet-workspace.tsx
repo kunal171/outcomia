@@ -1,4 +1,5 @@
 "use client";
+import { MultiWalletActivity } from "./multi-outcome/wallet-activity";
 import { useI18n } from "./preferences-provider";
 
 import { LegacyBalanceTransfer } from "./legacy-balance-transfer";
@@ -117,8 +118,10 @@ export function WalletWorkspace() {
       ? assets.filter((row) => row.wallet?.gtn(0)).length
       : null;
   const marketCount =
-    data?.spot.data && data.predictions.data
-      ? data.spot.data.length + data.predictions.data.length
+    data?.spot.data && data.predictions.data && data.multi?.data !== null
+      ? data.spot.data.length +
+        data.predictions.data.length +
+        (data.multi?.data?.length ?? 0)
       : null;
   const depositsComplete =
     data &&
@@ -655,6 +658,7 @@ export function WalletWorkspace() {
                 </div>
               )}
             </section>
+            <MultiWalletActivity mode="positions" />
             <p className="wallet-footnote">
               {t("Balances use confirmed on-chain reads.")}
             </p>

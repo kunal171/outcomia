@@ -8284,6 +8284,2541 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "advance_multi_outcome",
+      "docs": [
+        "Permissionless freeze/fallback/finalize/timeout, bound to published clocks."
+      ],
+      "discriminator": [
+        24,
+        181,
+        164,
+        27,
+        96,
+        58,
+        200,
+        15
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "cancel_multi_outcome_order",
+      "docs": [
+        "Owner cancellation remains available after closure and resolution."
+      ],
+      "discriminator": [
+        29,
+        187,
+        244,
+        19,
+        240,
+        126,
+        179,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "book",
+            "order"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "order"
+          ]
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "account",
+                "path": "order.order_id",
+                "account": "MultiOutcomeOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cash",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "market.collateral_mint",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "previous",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_multi_outcome_terms",
+      "docs": [
+        "Recovers rent from an owner-authorized staging buffer."
+      ],
+      "discriminator": [
+        151,
+        199,
+        70,
+        138,
+        188,
+        82,
+        71,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "buffer"
+          ]
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  116,
+                  101,
+                  114,
+                  109,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "account",
+                "path": "buffer.market_id",
+                "account": "MultiOutcomeTermsBuffer"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_multi_outcome_trading",
+      "docs": [
+        "Stops new exposure. Inputs: active-admin creator. Errors: role/state.",
+        "Returns: Frozen while preserving owner merge/withdrawal rights."
+      ],
+      "discriminator": [
+        167,
+        94,
+        65,
+        102,
+        202,
+        137,
+        196,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "market",
+            "admin_record"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_multi_outcome_book",
+      "docs": [
+        "Initializes the creator's bounded price/FIFO book. Errors: role, duplicate or lifecycle."
+      ],
+      "discriminator": [
+        184,
+        64,
+        153,
+        146,
+        196,
+        247,
+        55,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record",
+            "market"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_multi_outcome_market",
+      "docs": [
+        "Creates an active-admin creator's immutable Draft and SPL reserve.",
+        "Inputs: ID, terms and display labels. Errors: role, terms, mint or PDAs.",
+        "Returns: zero-backed new market; no outcome issuance yet."
+      ],
+      "discriminator": [
+        129,
+        155,
+        52,
+        138,
+        35,
+        196,
+        78,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "market_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "MultiOutcomeTerms"
+            }
+          }
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        },
+        {
+          "name": "collateral_symbol",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize_multi_outcome_market_from_staged",
+      "docs": [
+        "Creates from a hash-bound owner buffer supplied as a read-only remaining account."
+      ],
+      "discriminator": [
+        245,
+        106,
+        66,
+        99,
+        223,
+        139,
+        242,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "admin_record"
+          ]
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "market_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_mint"
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "collateral_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_metadata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "terms_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "display_name",
+          "type": "string"
+        },
+        {
+          "name": "collateral_symbol",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "initialize_multi_outcome_position",
+      "docs": [
+        "Creates an owner's empty position. Inputs: owner/canonical market/PDA.",
+        "Errors: duplicates, seeds or rent. Returns: zero outcome balances."
+      ],
+      "discriminator": [
+        79,
+        175,
+        190,
+        173,
+        255,
+        108,
+        29,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "match_multi_outcome_order",
+      "docs": [
+        "Matches one best-price FIFO maker atomically; taker pays quoted global fees."
+      ],
+      "discriminator": [
+        57,
+        29,
+        133,
+        249,
+        78,
+        73,
+        140,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "book",
+            "maker_order"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "maker_order"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.order_id",
+                "account": "MultiOutcomeOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_cash",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.owner",
+                "account": "MultiOutcomeOrder"
+              },
+              {
+                "kind": "account",
+                "path": "market.collateral_mint",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "maker_order.owner",
+                "account": "MultiOutcomeOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_cash",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              },
+              {
+                "kind": "account",
+                "path": "market.collateral_mint",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "taker"
+              }
+            ]
+          }
+        },
+        {
+          "name": "next",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "OutcomeId"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "expected_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "multi_outcome_complete_set",
+      "docs": [
+        "Splits/merges complete sets. Inputs: owner, canonical shared custody,",
+        "positive lot quantity and split flag. Errors: funds, state, accounting or CPI.",
+        "Returns: equal physical reserve/cash movement and N backed outcome updates."
+      ],
+      "discriminator": [
+        82,
+        231,
+        156,
+        241,
+        149,
+        238,
+        190,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "split",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "open_multi_outcome_market",
+      "docs": [
+        "Opens the creator's Draft before cutoff. Inputs: active-admin creator.",
+        "Errors: role/state/time. Returns: Open without changing immutable terms."
+      ],
+      "discriminator": [
+        89,
+        121,
+        191,
+        8,
+        101,
+        239,
+        213,
+        213
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "market",
+            "admin_record"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "place_multi_outcome_order",
+      "docs": [
+        "Locks funded noncrossing maker claims. Inputs: outcome/side/price/quantity/ID.",
+        "Errors: closed/capacity/priority/funds/overflow. Returns: indexed resting order."
+      ],
+      "discriminator": [
+        206,
+        11,
+        100,
+        252,
+        76,
+        84,
+        10,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cash",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "market.collateral_mint",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "previous",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "OutcomeId"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose_multi_outcome",
+      "docs": [
+        "Proposes/corrects an evidence-backed result; only the active published resolver."
+      ],
+      "discriminator": [
+        189,
+        217,
+        28,
+        98,
+        40,
+        182,
+        205,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "resolver",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "resolver"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "MultiOutcomeResolution"
+            }
+          }
+        },
+        {
+          "name": "evidence_uri",
+          "type": "string"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "correction",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "redeem_multi_outcome",
+      "docs": [
+        "Burns selected free claims and pays exact winner/Invalid collateral once."
+      ],
+      "discriminator": [
+        106,
+        208,
+        2,
+        167,
+        28,
+        231,
+        255,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position",
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "asset_balance"
+          ]
+        },
+        {
+          "name": "asset_balance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  98,
+                  97,
+                  108,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "quantities",
+          "type": {
+            "array": [
+              "u64",
+              8
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw_multi_outcome_fees",
+      "docs": [
+        "Withdraws only earned fees to a super-admin-owned SPL destination."
+      ],
+      "discriminator": [
+        206,
+        49,
+        190,
+        70,
+        32,
+        93,
+        123,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          },
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "write_multi_outcome_terms",
+      "docs": [
+        "Uploads a contiguous chunk for a large market's immutable terms."
+      ],
+      "discriminator": [
+        87,
+        82,
+        14,
+        88,
+        175,
+        69,
+        154,
+        8
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  116,
+                  101,
+                  114,
+                  109,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              },
+              {
+                "kind": "arg",
+                "path": "market_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "market_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "offset",
+          "type": "u32"
+        },
+        {
+          "name": "bytes",
+          "type": "bytes"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -8519,6 +11054,71 @@
         164,
         211,
         22
+      ]
+    },
+    {
+      "name": "MultiOutcomeBook",
+      "discriminator": [
+        107,
+        177,
+        229,
+        213,
+        166,
+        244,
+        75,
+        147
+      ]
+    },
+    {
+      "name": "MultiOutcomeMarket",
+      "discriminator": [
+        100,
+        57,
+        12,
+        248,
+        116,
+        158,
+        48,
+        230
+      ]
+    },
+    {
+      "name": "MultiOutcomeOrder",
+      "discriminator": [
+        88,
+        154,
+        160,
+        62,
+        237,
+        115,
+        6,
+        132
+      ]
+    },
+    {
+      "name": "MultiOutcomePosition",
+      "discriminator": [
+        23,
+        106,
+        243,
+        188,
+        194,
+        75,
+        173,
+        117
+      ]
+    },
+    {
+      "name": "MultiOutcomeTermsBuffer",
+      "discriminator": [
+        116,
+        40,
+        97,
+        85,
+        180,
+        50,
+        78,
+        195
       ]
     }
   ],
@@ -8794,6 +11394,123 @@
         254,
         54,
         165
+      ]
+    },
+    {
+      "name": "MultiOutcomeCompleteSetEvent",
+      "discriminator": [
+        96,
+        185,
+        48,
+        251,
+        32,
+        75,
+        226,
+        46
+      ]
+    },
+    {
+      "name": "MultiOutcomeFeeWithdrawnEvent",
+      "discriminator": [
+        63,
+        148,
+        127,
+        50,
+        3,
+        76,
+        147,
+        148
+      ]
+    },
+    {
+      "name": "MultiOutcomeFillEvent",
+      "discriminator": [
+        101,
+        157,
+        68,
+        146,
+        152,
+        13,
+        48,
+        37
+      ]
+    },
+    {
+      "name": "MultiOutcomeMarketInitializedEvent",
+      "discriminator": [
+        41,
+        234,
+        246,
+        198,
+        212,
+        84,
+        206,
+        11
+      ]
+    },
+    {
+      "name": "MultiOutcomeMarketStatusEvent",
+      "discriminator": [
+        29,
+        246,
+        116,
+        93,
+        74,
+        22,
+        181,
+        143
+      ]
+    },
+    {
+      "name": "MultiOutcomeOrderEvent",
+      "discriminator": [
+        24,
+        13,
+        245,
+        26,
+        204,
+        181,
+        183,
+        253
+      ]
+    },
+    {
+      "name": "MultiOutcomePositionInitializedEvent",
+      "discriminator": [
+        5,
+        163,
+        186,
+        91,
+        74,
+        99,
+        130,
+        212
+      ]
+    },
+    {
+      "name": "MultiOutcomeRedeemedEvent",
+      "discriminator": [
+        44,
+        245,
+        73,
+        48,
+        146,
+        85,
+        170,
+        39
+      ]
+    },
+    {
+      "name": "MultiOutcomeResolutionEvent",
+      "discriminator": [
+        236,
+        211,
+        218,
+        224,
+        126,
+        182,
+        41,
+        242
       ]
     }
   ],
@@ -9577,6 +12294,81 @@
       "code": 6155,
       "name": "NothingToRedeem",
       "msg": "There are no selected free contracts to redeem"
+    },
+    {
+      "code": 6156,
+      "name": "InvalidMultiOutcomeCount",
+      "msg": "Multi-outcome markets require two to eight outcomes"
+    },
+    {
+      "code": 6157,
+      "name": "InvalidMultiOutcomeId",
+      "msg": "Outcome ID is outside this market's immutable outcome list"
+    },
+    {
+      "code": 6158,
+      "name": "InvalidMultiOutcomeLabel",
+      "msg": "Outcome labels must be distinct, trimmed, nonempty and bounded UTF-8"
+    },
+    {
+      "code": 6159,
+      "name": "InvalidMultiOutcomePayout",
+      "msg": "Multi-outcome face payout must be positive"
+    },
+    {
+      "code": 6160,
+      "name": "InvalidMultiOutcomePrice",
+      "msg": "Multi-outcome price must be positive, below payout and tick aligned"
+    },
+    {
+      "code": 6161,
+      "name": "InvalidMultiOutcomeLot",
+      "msg": "Multi-outcome lot or quantity cannot support exact settlement"
+    },
+    {
+      "code": 6162,
+      "name": "MultiOutcomeAccountingOverflow",
+      "msg": "Multi-outcome accounting exceeds the supported collateral amount"
+    },
+    {
+      "code": 6163,
+      "name": "MultiOutcomeSupplyMismatch",
+      "msg": "Multi-outcome supplies are inconsistent with the lifecycle"
+    },
+    {
+      "code": 6164,
+      "name": "MultiOutcomeInactiveSlot",
+      "msg": "Unused outcome slots must remain zero"
+    },
+    {
+      "code": 6165,
+      "name": "InvalidMultiOutcomePosition",
+      "msg": "Multi-outcome position owner, market or quantities are inconsistent"
+    },
+    {
+      "code": 6166,
+      "name": "MultiOutcomeReserveMismatch",
+      "msg": "Multi-outcome reserve accounting or physical backing is inconsistent"
+    },
+    {
+      "code": 6167,
+      "name": "MultiOutcomeBookFull",
+      "msg": "Multi-outcome book has reached its resting order capacity"
+    },
+    {
+      "code": 6168,
+      "name": "InvalidMultiOutcomeBook",
+      "msg": "Multi-outcome book index, order or counters are inconsistent"
+    },
+    {
+      "code": 6169,
+      "name": "MultiOutcomeFeeQuoteChanged",
+      "msg": "The taker fee changed; refresh the quote before signing"
+    },
+    {
+      "code": 6170,
+      "name": "InvalidMultiOutcomeTerms",
+      "msg": "Staged multi-outcome terms, offset, owner or content hash are invalid"
     }
   ],
   "types": [
@@ -12089,6 +14881,842 @@
           }
         ]
       }
+    },
+    {
+      "name": "MultiOutcomeBook",
+      "docs": [
+        "PDA [\"multi_book\", market]. No close/reinitialize path resets acceptance IDs.",
+        "Cash fees are backed by global collateral custody, separately from outcomes."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "heads",
+            "type": {
+              "array": [
+                {
+                  "option": {
+                    "defined": {
+                      "name": "MultiOutcomeOrderReference"
+                    }
+                  }
+                },
+                16
+              ]
+            }
+          },
+          {
+            "name": "open_order_count",
+            "type": "u64"
+          },
+          {
+            "name": "next_order_id",
+            "type": "u64"
+          },
+          {
+            "name": "accrued_collateral_fees",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeCompleteSetEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "split",
+            "type": "bool"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_atoms",
+            "type": "u64"
+          },
+          {
+            "name": "backing_reserve",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeFeeWithdrawnEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeFillEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "maker",
+            "type": "pubkey"
+          },
+          {
+            "name": "taker",
+            "type": "pubkey"
+          },
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "OutcomeId"
+              }
+            }
+          },
+          {
+            "name": "taker_side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_atoms",
+            "type": "u64"
+          },
+          {
+            "name": "fee_atoms",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeMarket",
+      "docs": [
+        "New layout, never decoded as a deployed binary PredictionMarket.",
+        "PDA: [\"multi_market\", market_id]. Creation initializes a zero-backed Draft.",
+        "The reserve vault will back outcome liabilities; shared AssetBalance accounts",
+        "remain the only ledger for a trader's free or order-locked collateral."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata",
+            "type": "pubkey"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "MultiOutcomeTerms"
+              }
+            }
+          },
+          {
+            "name": "resolution_phase",
+            "type": {
+              "defined": {
+                "name": "PredictionResolutionPhase"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PredictionStatus"
+              }
+            }
+          },
+          {
+            "name": "proposal",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "MultiOutcomeProposal"
+                }
+              }
+            }
+          },
+          {
+            "name": "final_outcome",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "MultiOutcomeResolution"
+                }
+              }
+            }
+          },
+          {
+            "name": "supplies",
+            "docs": [
+              "Outstanding contracts, including ask escrow; unused slots stay zero.",
+              "Before resolution all active supplies must equal the complete-set count."
+            ],
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "backing_reserve",
+            "type": "u64"
+          },
+          {
+            "name": "open_order_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeMarketInitializedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome_count",
+            "type": "u8"
+          },
+          {
+            "name": "payout_per_contract",
+            "type": "u64"
+          },
+          {
+            "name": "quantity_lot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeMarketStatusEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PredictionStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeOrder",
+      "docs": [
+        "PDA [\"multi_order\", book, order_id_le]. Filled/canceled history is retained.",
+        "A bid locks exactly remaining_quantity*price cash atoms; an ask locks exactly",
+        "remaining_quantity outcome contracts. Resting orders are makers and pay no fee."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "book",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "OutcomeId"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "locked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "previous",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "next",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeOrderEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "OutcomeId"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OrderStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeOrderReference",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": "u64"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "OutcomeId"
+              }
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "OrderSide"
+              }
+            }
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomePosition",
+      "docs": [
+        "New per-market owner position: [\"multi_position\", market, owner].",
+        "Quantities are whole contracts. Each active free/locked amount must follow",
+        "the market lot; unused outcome slots must stay zero. No collateral is stored",
+        "here, so another market can reuse the same shared per-asset wallet balance."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "free",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "locked",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomePositionInitializedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeProposal",
+      "docs": [
+        "Evidence for a pending result; correction replaces this entire record."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "MultiOutcomeResolution"
+              }
+            }
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "evidence_uri",
+            "type": "string"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeRedeemedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "MultiOutcomeResolution"
+              }
+            }
+          },
+          {
+            "name": "quantities",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "backing_reserve",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeResolution",
+      "docs": [
+        "Exactly one winner, or an Invalid result with the precommitted refund rule.",
+        "Invalid is never an additional tradable outcome. Variant order is wire ABI."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Winner",
+            "fields": [
+              {
+                "defined": {
+                  "name": "OutcomeId"
+                }
+              }
+            ]
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeResolutionEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "MultiOutcomeResolution"
+                }
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PredictionStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeTerms",
+      "docs": [
+        "Economic and resolution terms frozen at market creation. An initializer must",
+        "call `validate_multi_outcome_terms` and bind resolver to the active-admin",
+        "creator. Structural deserialization and InitSpace do not enforce these rules."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "fallback",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PredictionFallback"
+                }
+              }
+            }
+          },
+          {
+            "name": "outcome_labels",
+            "docs": [
+              "Order determines permanent OutcomeIds; edits/reordering are forbidden."
+            ],
+            "type": {
+              "vec": "string"
+            }
+          },
+          {
+            "name": "question_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rules_uri",
+            "type": "string"
+          },
+          {
+            "name": "close_ts",
+            "type": "i64"
+          },
+          {
+            "name": "earliest_resolution_ts",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "resolution_delay_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "payout_per_contract",
+            "docs": [
+              "Raw SPL collateral atoms per winning whole contract, not a display price."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "price_tick",
+            "type": "u64"
+          },
+          {
+            "name": "quantity_lot",
+            "docs": [
+              "All splits, fills, merges and claims must preserve this lot. For N=3,",
+              "P=1,000,000, L=3 permits exact Invalid refunds; L=1 does not."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeTermsBuffer",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "market_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bytes",
+            "type": "bytes"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OutcomeId",
+      "docs": [
+        "Zero-based identifier in a market's immutable outcome list.",
+        "",
+        "Borsh stores one byte. Deserialization is structural and can produce an ID",
+        "outside a market's list, so handlers must also call `is_valid_for` before",
+        "indexing an array or accepting an instruction-supplied ID."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          "u8"
+        ]
+      }
     }
   ],
   "constants": [
@@ -12301,6 +15929,32 @@
       ],
       "type": "bytes",
       "value": "[118, 97, 117, 108, 116]"
+    },
+    {
+      "name": "MULTI_OUTCOME_BOOK_SEED",
+      "type": "bytes",
+      "value": "[109, 117, 108, 116, 105, 95, 98, 111, 111, 107]"
+    },
+    {
+      "name": "MULTI_OUTCOME_MARKET_SEED",
+      "docs": [
+        "Single-winner multi-outcome namespace, separate from deployed binary markets."
+      ],
+      "type": "bytes",
+      "value": "[109, 117, 108, 116, 105, 95, 109, 97, 114, 107, 101, 116]"
+    },
+    {
+      "name": "MULTI_OUTCOME_ORDER_SEED",
+      "type": "bytes",
+      "value": "[109, 117, 108, 116, 105, 95, 111, 114, 100, 101, 114]"
+    },
+    {
+      "name": "MULTI_OUTCOME_POSITION_SEED",
+      "docs": [
+        "Outcome quantities only; shared per-asset balances remain independently reusable."
+      ],
+      "type": "bytes",
+      "value": "[109, 117, 108, 116, 105, 95, 112, 111, 115, 105, 116, 105, 111, 110]"
     }
   ]
 }
