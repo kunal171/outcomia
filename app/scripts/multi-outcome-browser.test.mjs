@@ -3,6 +3,9 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import {
+  setMarketMissing,
+  setAskLadder,
+  setLedgerNow,
   wallet,
   owner,
   mint,
@@ -27,16 +30,30 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--no-sandbox"],
 });
+let page;
 try {
-  const page = await browser.newPage({
-      viewport: { width: 1440, height: 1000 },
-    }),
-    errors = [];
+  page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const errors = [];
   page.on("pageerror", (e) => {
     errors.push(e.message);
     console.log("PAGE_ERROR", e.message);
   });
+  let rejectSignature = false,
+    signCalls = 0,
+    holdRules = false,
+    releaseRules;
+  let announceRules;
+  const rulesStarted = new Promise((resolve) => {
+    announceRules = resolve;
+  });
   await page.exposeFunction("fixtureSign", (encoded) => {
+    signCalls++;
+    if (rejectSignature) {
+      rejectSignature = false;
+      throw new Error("Fixture wallet rejected the transaction");
+    }
     const tx = Transaction.from(Buffer.from(encoded, "base64"));
     tx.partialSign(wallet);
     return tx.serialize().toString("base64");
@@ -124,108 +141,314 @@ try {
         }
       }
     }
-    if (url.href === "https://example.com/rules")
-      return route.fulfill({
-        body: "Published rules for the fixture.",
-        contentType: "text/plain",
-        headers: { "access-control-allow-origin": "*" },
-      });
+    if (url.href === "https://example.com/rules") {
+      if (holdRules) {
+        announceRules();
+        await new Promise((resolve) => {
+          releaseRules = resolve;
+        });
+      }
+      try {
+        return await route.fulfill({
+          body: "Published rules for the fixture.",
+          contentType: "text/plain",
+          headers: { "access-control-allow-origin": "*" },
+        });
+      } catch (error) {
+        if (!holdRules) throw error;
+        return;
+      }
+    }
     if (url.origin !== base.origin) return route.abort();
     return route.continue();
   });
-  await page.goto(new URL("/predictions/multi", base).href);
-  await page
-    .getByRole("link", { name: /Which colour wins/ })
-    .waitFor({ timeout: 120000 });
-  await page.getByRole("link", { name: /Which colour wins/ }).click();
-  await page
-    .getByRole("heading", { name: "Which colour wins?", exact: true })
-    .waitFor();
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Cancel", exact: true })
-    .waitFor({ state: "detached", timeout: 30000 });
-  await page.getByLabel(/Limit price/).fill("0.4");
-  await page.getByLabel(/Contracts \(multiples/).fill("3");
-  await page
-    .getByRole("button", { name: "Review in wallet", exact: true })
-    .click();
-  await page.waitForFunction(() =>
-    document.body.textContent.includes("Confirmed:"),
-  );
-  assert.ok(submissions.includes("matchMultiOutcomeOrder"));
-  marketState.status = { resolved: {} };
-  marketState.finalOutcome = { winner: [[0]] };
-  await account("multiOutcomeMarket", market, marketState);
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Redeem available contracts" })
-    .waitFor();
-  await page
-    .getByRole("button", { name: "Redeem available contracts" })
-    .click();
-  await page.waitForFunction(() =>
-    document.body.textContent.includes("Confirmed:"),
-  );
-  assert.ok(submissions.includes("redeemMultiOutcome"));
-  await page.goto(new URL("/predictions/multi/new", base).href);
-  await page
-    .getByRole("heading", { name: "Create a multi-outcome market" })
-    .waitFor();
-  await page.getByLabel("Question / name").fill("Who wins?");
-  await page.getByLabel(/Outcomes \(one per line/).fill("Red\nBlue\nGreen");
-  await page.getByLabel(/I reviewed/).check();
-  assert.equal(await page.getByLabel(/I reviewed/).isChecked(), true);
-  await page.getByLabel("Question / name").fill("Changed terms");
-  assert.equal(await page.getByLabel(/I reviewed/).isChecked(), false);
-  await page
-    .getByLabel("Collateral mint", { exact: true })
-    .fill(mint.toBase58());
-  await page.getByLabel("Collateral symbol", { exact: true }).fill("USDC");
-  await page.getByLabel(/Trading closes/).fill("2033-05-18T12:00");
-  await page
-    .getByLabel("Published rules URI", { exact: true })
-    .fill("https://example.com/rules");
-  await page
-    .getByLabel("Exact published rules document", { exact: true })
-    .fill("Published rules for the fixture.");
-  await page.getByLabel(/I reviewed/).check();
-  await page.waitForFunction(() =>
-    [...document.querySelectorAll("button")].some(
-      (b) => b.textContent.includes("Review creation in wallet") && !b.disabled,
-    ),
-  );
-  await page
-    .getByRole("button", { name: "Review creation in wallet", exact: true })
-    .click();
-  await page
-    .getByRole("link", { name: "Open created market →" })
-    .waitFor({ timeout: 30000 });
-  assert.ok(submissions.includes("initializeMultiOutcomeMarket"));
-  await page.getByText("Recover uploaded-term rent", { exact: true }).click();
-  await page
-    .getByRole("button", { name: "Close upload and recover rent" })
-    .click();
-  await page
-    .getByRole("button", { name: "Close upload and recover rent" })
-    .waitFor({ state: "detached", timeout: 30000 });
-  assert.ok(submissions.includes("closeMultiOutcomeTerms"));
-  mkdirSync("target/multi-browser-artifacts", { recursive: true });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({
-    path: "target/multi-browser-artifacts/creation-mobile.png",
-    fullPage: true,
-  });
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-  );
-  assert.deepEqual(errors, []);
-  console.log(
-    "PASS: discovery, wallet connection, cancellation, trading, redemption, creation with verified rules, upload rent recovery and mobile layout.",
-  );
+  if (process.env.MULTI_BROWSER_DISABLED === "true") {
+    await page.goto(new URL("/predictions/multi/new", base).href);
+    await page
+      .getByRole("heading", {
+        name: "Create a multi-outcome market",
+        exact: true,
+      })
+      .waitFor({ timeout: 120000 });
+    await page
+      .getByText(
+        "Creation is disabled until the matching program deployment is verified.",
+        { exact: true },
+      )
+      .waitFor();
+    await page.getByLabel(/I reviewed/).check();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Review creation in wallet", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(submissions.length, 0);
+    console.log(
+      "PASS: unverified deployment disables creation and submits no transactions.",
+    );
+  } else {
+    await page.goto(new URL("/wallet", base).href);
+    await page
+      .getByRole("heading", { name: "Multi-outcome positions", exact: true })
+      .waitFor({ timeout: 120000 });
+    await page
+      .getByRole("link", { name: "Manage positions in market →" })
+      .waitFor();
+    await page.goto(new URL("/orders", base).href);
+    await page
+      .getByRole("heading", { name: "Multi-outcome orders", exact: true })
+      .waitFor();
+    await page
+      .getByRole("link", { name: "Manage orders in market →" })
+      .waitFor();
+    await page.goto(new URL("/predictions/multi", base).href);
+    await page
+      .getByRole("link", { name: /Which colour wins/ })
+      .waitFor({ timeout: 120000 });
+    await page.getByRole("link", { name: /Which colour wins/ }).click();
+    await page
+      .getByRole("heading", { name: "Which colour wins?", exact: true })
+      .waitFor();
+    setMarketMissing(true);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page
+      .getByText("Multi-outcome market not found on this network.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Refresh", exact: true })
+        .isEnabled(),
+      true,
+    );
+    setMarketMissing(false);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "Which colour wins?", exact: true })
+      .waitFor();
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Cancel", exact: true })
+      .waitFor({ state: "detached", timeout: 30000 });
+    await page.getByLabel(/Limit price/).fill("0.4");
+    await page.getByLabel(/Contracts \(multiples/).fill("3");
+    rejectSignature = true;
+    await page
+      .getByRole("button", { name: "Review in wallet", exact: true })
+      .click();
+    await page
+      .getByRole("main")
+      .getByText("Fixture wallet rejected the transaction", { exact: true })
+      .waitFor();
+    assert.equal(
+      await page.getByLabel(/Contracts \(multiples/).inputValue(),
+      "3",
+    );
+    assert.equal(
+      submissions.filter((n) => n === "matchMultiOutcomeOrder").length,
+      0,
+    );
+
+    await page
+      .getByRole("button", { name: "Review in wallet", exact: true })
+      .click();
+    await page.waitForFunction(() =>
+      document.body.textContent.includes("Confirmed:"),
+    );
+    assert.ok(submissions.includes("matchMultiOutcomeOrder"));
+    await page.waitForFunction(
+      () => document.querySelector('input[inputmode="numeric"]')?.value === "",
+    );
+    await setAskLadder(4);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.getByLabel(/Contracts \(multiples/).fill("12");
+    await page
+      .getByRole("button", { name: "Review in wallet", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => document.querySelector('input[inputmode="numeric"]')?.value === "3",
+    );
+    assert.equal(
+      submissions.filter((n) => n === "matchMultiOutcomeOrder").length,
+      4,
+    );
+    assert.ok(
+      (await page.locator("body").innerText()).includes(
+        "3 contracts remain unsubmitted",
+      ),
+    );
+    await page
+      .getByRole("button", { name: "Review in wallet", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => document.querySelector('input[inputmode="numeric"]')?.value === "",
+    );
+    assert.equal(
+      submissions.filter((n) => n === "matchMultiOutcomeOrder").length,
+      5,
+    );
+    await page.getByText("Protocol fees", { exact: true }).click();
+    await page.getByLabel(/Fee withdrawal/).fill("0.01");
+    await page
+      .getByRole("button", { name: "Withdraw earned fees", exact: true })
+      .click();
+    await page.waitForFunction(() =>
+      document.body.textContent.includes("Confirmed:"),
+    );
+    assert.ok(submissions.includes("withdrawMultiOutcomeFees"));
+    await page.clock.setFixedTime(new Date(2000000005 * 1000));
+    setLedgerNow(2000000005);
+    await page
+      .getByRole("button", { name: "Freeze at cutoff", exact: true })
+      .click();
+    await page
+      .getByLabel("Evidence URI", { exact: true })
+      .fill("ar://evidence");
+    await page
+      .getByLabel("Evidence SHA-256", { exact: true })
+      .fill("12".repeat(32));
+    await page
+      .getByRole("form", { name: "Resolution proposal" })
+      .getByRole("combobox")
+      .selectOption("0");
+    await page
+      .getByRole("button", { name: "Review proposal in wallet", exact: true })
+      .click();
+    await page.getByRole("heading", { name: "Correct proposal" }).waitFor();
+    await page.clock.setFixedTime(new Date(2000000065 * 1000));
+    await page
+      .getByRole("button", { name: "Finalize outcome", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Redeem available contracts" })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "Redeem available contracts" })
+      .click();
+    await page.waitForFunction(() =>
+      document.body.textContent.includes("Confirmed:"),
+    );
+    assert.ok(submissions.includes("redeemMultiOutcome"));
+    await page.goto(new URL("/predictions/multi/new", base).href);
+    await page
+      .getByRole("heading", { name: "Create a multi-outcome market" })
+      .waitFor();
+    await page.getByLabel("Question / name").fill("Who wins?");
+    await page.getByLabel(/Outcomes \(one per line/).fill("Red\nBlue\nGreen");
+    await page.getByLabel(/I reviewed/).check();
+    assert.equal(await page.getByLabel(/I reviewed/).isChecked(), true);
+    await page.getByLabel("Question / name").fill("Changed terms");
+    assert.equal(await page.getByLabel(/I reviewed/).isChecked(), false);
+    await page
+      .getByLabel("Collateral mint", { exact: true })
+      .fill(mint.toBase58());
+    await page.getByLabel("Collateral symbol", { exact: true }).fill("USDC");
+    await page.getByLabel(/Trading closes/).fill("2033-05-18T12:00");
+    await page
+      .getByLabel("Published rules URI", { exact: true })
+      .fill("https://example.com/rules");
+    await page
+      .getByLabel("Exact published rules document", { exact: true })
+      .fill("Published rules for the fixture.");
+    await page.getByLabel(/I reviewed/).check();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("button")].some(
+        (b) =>
+          b.textContent.includes("Review creation in wallet") && !b.disabled,
+      ),
+    );
+    await page
+      .getByRole("button", { name: "Review creation in wallet", exact: true })
+      .click();
+    await page
+      .getByRole("link", { name: "Open created market →" })
+      .waitFor({ timeout: 30000 });
+    assert.ok(submissions.includes("initializeMultiOutcomeMarket"));
+    await page.getByText("Recover uploaded-term rent", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Close upload and recover rent" })
+      .click();
+    await page
+      .getByRole("button", { name: "Close upload and recover rent" })
+      .waitFor({ state: "detached", timeout: 30000 });
+    assert.ok(submissions.includes("closeMultiOutcomeTerms"));
+    mkdirSync("target/multi-browser-artifacts", { recursive: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+      path: "target/multi-browser-artifacts/creation-mobile.png",
+      fullPage: true,
+    });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      true,
+    );
+    assert.deepEqual(errors, []);
+    await page.goto(new URL("/predictions/multi/new", base).href);
+    await page.getByLabel("Question / name").fill("Canceled creation");
+    await page.getByLabel(/Outcomes \(one per line/).fill("Red\nBlue\nGreen");
+    await page
+      .getByLabel("Collateral mint", { exact: true })
+      .fill(mint.toBase58());
+    await page.getByLabel("Collateral symbol", { exact: true }).fill("USDC");
+    await page.getByLabel(/Trading closes/).fill("2040-05-18T12:00");
+    await page
+      .getByLabel("Published rules URI", { exact: true })
+      .fill("https://example.com/rules");
+    await page
+      .getByLabel("Exact published rules document", { exact: true })
+      .fill("Published rules for the fixture.");
+    await page.getByLabel(/I reviewed/).check();
+    holdRules = true;
+    await page
+      .getByRole("button", { name: "Review creation in wallet", exact: true })
+      .click();
+    await Promise.race([
+      rulesStarted,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Pending rules request was not started")),
+          15000,
+        ),
+      ),
+    ]);
+    const signedBeforeNavigation = signCalls,
+      submittedBeforeNavigation = submissions.length;
+    await page.goto(new URL("/predictions/multi", base).href);
+    releaseRules();
+    await page.waitForTimeout(250);
+    assert.equal(
+      signCalls,
+      signedBeforeNavigation,
+      "Navigating away must cancel a pending rules check before wallet approval",
+    );
+    assert.equal(submissions.length, submittedBeforeNavigation);
+    console.log(
+      "PASS: wallet/orders integration, rejected approvals, recovery, capped retries, fees, resolution, redemption, reviewed creation and mobile layout.",
+    );
+  }
+} catch (error) {
+  if (page) {
+    mkdirSync("target/multi-browser-artifacts", { recursive: true });
+    await page
+      .screenshot({
+        path: "target/multi-browser-artifacts/failure.png",
+        fullPage: true,
+      })
+      .catch(() => {});
+    console.error(
+      "FIXTURE_UI",
+      await page
+        .locator("main")
+        .innerText()
+        .catch(() => "No main view"),
+    );
+  }
+  throw error;
 } finally {
   await browser.close();
 }
