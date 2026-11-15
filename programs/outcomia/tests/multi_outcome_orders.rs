@@ -1689,3 +1689,6 @@ fn eight_outcome_budget_and_atomic_multi_maker_fills() {
         println!("MULTI_BUDGET {operation} outcomes=8 bytes={bytes} compute={compute}");
     }
 }
+
+#[path = "multi_outcome_orders/staging.rs"]
+mod staging;
