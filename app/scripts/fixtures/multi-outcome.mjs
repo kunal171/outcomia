@@ -190,6 +190,39 @@ await account("multiOutcomeTermsBuffer", abandonedBuffer, {
   bump: 0,
 });
 const submissions = [];
+let ledgerNow = 2000000005,
+  marketMissing = false;
+function setMarketMissing(value) {
+  marketMissing = value;
+}
+function setLedgerNow(now) {
+  ledgerNow = now;
+}
+async function setAskLadder(count) {
+  const keys = Array.from({ length: count }, (_, i) =>
+    m.multiOrderPda(bookKey, amount(i + 10)),
+  );
+  for (let i = 0; i < count; i++) {
+    const value = {
+      ...ask,
+      orderId: amount(i + 10),
+      remainingQuantity: amount(3),
+      lockedAmount: amount(3),
+      status: { open: {} },
+      previous: keys[i - 1] ?? null,
+      next: keys[i + 1] ?? null,
+    };
+    await account("multiOutcomeOrder", keys[i], value);
+  }
+  book.heads[1] = count
+    ? { order: keys[0], ...states.get(keys[0].toBase58()).value }
+    : null;
+  book.nextOrderId = amount(count + 10);
+  book.openOrderCount = amount(count);
+  marketState.openOrderCount = amount(count);
+  await account("multiOutcomeBook", bookKey, book);
+  await account("multiOutcomeMarket", market, marketState);
+}
 async function rpc(request) {
   const { method, params = [] } = request;
   const context = { slot: 100 };
@@ -197,6 +230,9 @@ async function rpc(request) {
     case "getGenesisHash":
       return "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
     case "getAccountInfo":
+      if (marketMissing && params[0] === market.toBase58()) {
+        return { context, value: null };
+      }
       return { context, value: records.get(params[0]) ?? null };
     case "getMultipleAccounts":
       return { context, value: params[0].map((k) => records.get(k) ?? null) };
@@ -218,6 +254,8 @@ async function rpc(request) {
           ),
         )
         .map(([pubkey, account]) => ({ pubkey, account }));
+    case "getTokenAccountsByOwner":
+      return { context, value: [] };
     case "getBalance":
       return { context, value: 1000000000 };
     case "getLatestBlockhash":
@@ -247,6 +285,7 @@ async function rpc(request) {
     case "sendTransaction": {
       const tx = Transaction.from(Buffer.from(params[0], "base64"));
       for (const ix of tx.instructions) {
+        if (!ix.programId.equals(program)) continue;
         const decoded = p.coder.instruction.decode(ix.data);
         submissions.push(decoded.name);
         if (decoded.name === "closeMultiOutcomeTerms") {
@@ -262,15 +301,57 @@ async function rpc(request) {
           await account("multiOutcomeOrder", bidKey, bid);
         }
         if (decoded.name === "matchMultiOutcomeOrder") {
-          ask.status = { filled: {} };
-          ask.remainingQuantity = zero();
-          ask.lockedAmount = zero();
-          book.heads[1] = null;
-          book.openOrderCount = zero();
-          marketState.openOrderCount = zero();
-          position.free[0] = amount(6);
-          await account("multiOutcomeOrder", askKey, ask);
+          const entry = states.get(ix.keys[4].pubkey.toBase58()),
+            o = entry.value;
+          const q = BN.min(decoded.data.quantity, o.remainingQuantity),
+            cost = o.price.mul(q),
+            fee = cost.muln(100).addn(9999).divn(10000);
+          o.remainingQuantity = o.remainingQuantity.sub(q);
+          o.lockedAmount = o.remainingQuantity;
+          book.accruedCollateralFees = book.accruedCollateralFees.add(fee);
+          if (o.remainingQuantity.isZero()) {
+            o.status = { filled: {} };
+            const next = o.next ? states.get(o.next.toBase58()) : null;
+            if (next) {
+              next.value.previous = null;
+              await account(next.name, o.next, next.value);
+            }
+            book.heads[1] = next ? { order: o.next, ...next.value } : null;
+            book.openOrderCount = book.openOrderCount.subn(1);
+            marketState.openOrderCount = book.openOrderCount;
+          }
+          position.free[0] = position.free[0].add(q);
+          await account(entry.name, ix.keys[4].pubkey, o);
         }
+        if (decoded.name === "proposeMultiOutcome") {
+          marketState.status = { proposed: {} };
+          marketState.proposal = {
+            outcome: decoded.data.outcome,
+            proposedAt: amount(ledgerNow),
+            evidenceUri: decoded.data.evidenceUri,
+            evidenceHash: [...decoded.data.evidenceHash],
+          };
+        }
+        if (decoded.name === "advanceMultiOutcome") {
+          const action = decoded.data.action;
+          if (action === 0) marketState.status = { frozen: {} };
+          if (action === 1) {
+            marketState.status = { frozen: {} };
+            marketState.resolutionPhase = { fallback: {} };
+          }
+          if (action === 2) {
+            marketState.status = { resolved: {} };
+            marketState.finalOutcome = marketState.proposal.outcome;
+          }
+          if (action === 3) {
+            marketState.status = { resolved: {} };
+            marketState.finalOutcome = { invalid: {} };
+          }
+        }
+        if (decoded.name === "withdrawMultiOutcomeFees")
+          book.accruedCollateralFees = book.accruedCollateralFees.sub(
+            decoded.data.amount,
+          );
         if (decoded.name === "redeemMultiOutcome") {
           position.free = Array.from({ length: 8 }, zero);
           marketState.backingReserve = zero();
@@ -286,4 +367,16 @@ async function rpc(request) {
   }
 }
 
-export { wallet, owner, mint, market, marketState, submissions, rpc, account };
+export {
+  setMarketMissing,
+  setAskLadder,
+  setLedgerNow,
+  wallet,
+  owner,
+  mint,
+  market,
+  marketState,
+  submissions,
+  rpc,
+  account,
+};
