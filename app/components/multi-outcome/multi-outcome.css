@@ -1,0 +1,74 @@
+.multi-outcome {
+  max-width: 1120px;
+}
+.multi-outcome .multi-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+.multi-outcome .multi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+.multi-outcome .multi-card {
+  padding: 1.2rem;
+  border: 1px solid var(--border, #80808066);
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+}
+.multi-outcome form {
+  display: grid;
+  gap: 1rem;
+  max-width: 680px;
+}
+.multi-outcome label {
+  display: grid;
+  gap: 0.35rem;
+}
+.multi-outcome input,
+.multi-outcome select,
+.multi-outcome textarea {
+  width: 100%;
+  padding: 0.65rem;
+  border: 1px solid var(--border, #80808066);
+  border-radius: 8px;
+  background: var(--surface, #ffffff);
+  color: var(--text, #161616);
+}
+.multi-outcome textarea {
+  min-height: 7rem;
+}
+.multi-outcome button {
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+}
+.multi-outcome button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.multi-outcome table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.multi-outcome th,
+.multi-outcome td {
+  padding: 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #80808044;
+}
+.multi-outcome .multi-scroll {
+  overflow-x: auto;
+}
+.multi-outcome section {
+  margin: 1.5rem 0;
+}
+.multi-outcome [role="alert"] {
+  color: var(--danger, #b42318);
+  white-space: pre-wrap;
+}
+.multi-outcome code {
+  overflow-wrap: anywhere;
+}

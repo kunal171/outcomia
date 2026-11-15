@@ -155,6 +155,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
             </p>
           </div>
         )}
+        {!address && <p><Link href="/predictions/multi">Explore multi-outcome markets →</Link></p>}
         {!address && (
           <label className="prediction-search">
             {t("Find a market")}
