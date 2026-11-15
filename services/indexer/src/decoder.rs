@@ -6,6 +6,7 @@
 //! catalog and its Borsh mirrors before ingestion can checkpoint past them.
 
 mod types;
+use types::*;
 
 use crate::events::RawEventLog;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -50,6 +51,16 @@ const TEST_FAUCET_INITIALIZED_DISCRIMINATOR: [u8; 8] = [247, 38, 39, 17, 66, 174
 const TEST_FAUCET_CLAIMED_DISCRIMINATOR: [u8; 8] = [149, 47, 203, 239, 92, 155, 247, 96];
 const TEST_FAUCET_CLOSED_DISCRIMINATOR: [u8; 8] = [169, 116, 71, 236, 191, 44, 241, 40];
 
+const MULTI_0: [u8; 8] = [41, 234, 246, 198, 212, 84, 206, 11];
+const MULTI_1: [u8; 8] = [29, 246, 116, 93, 74, 22, 181, 143];
+const MULTI_2: [u8; 8] = [5, 163, 186, 91, 74, 99, 130, 212];
+const MULTI_3: [u8; 8] = [96, 185, 48, 251, 32, 75, 226, 46];
+const MULTI_4: [u8; 8] = [24, 13, 245, 26, 204, 181, 183, 253];
+const MULTI_5: [u8; 8] = [101, 157, 68, 146, 152, 13, 48, 37];
+const MULTI_6: [u8; 8] = [63, 148, 127, 50, 3, 76, 147, 148];
+const MULTI_7: [u8; 8] = [236, 211, 218, 224, 126, 182, 41, 242];
+const MULTI_8: [u8; 8] = [44, 245, 73, 48, 146, 85, 170, 39];
+
 /// Valid Base64 split into its Anchor discriminator and still-untyped body.
 ///
 /// The raw Base64 and original log position remain attached so later storage
@@ -93,6 +104,20 @@ pub enum OutcomiaEvent {
     Balance(BalanceEvent),
     Fee(FeeEvent),
     Faucet(FaucetEvent),
+    MultiOutcome(MultiOutcomeEvent),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum MultiOutcomeEvent {
+    MarketInitialized(MultiOutcomeMarketInitializedEvent),
+    MarketStatus(MultiOutcomeMarketStatusEvent),
+    PositionInitialized(MultiOutcomePositionInitializedEvent),
+    CompleteSet(MultiOutcomeCompleteSetEvent),
+    Order(MultiOutcomeOrderEvent),
+    Fill(MultiOutcomeFillEvent),
+    FeeWithdrawn(MultiOutcomeFeeWithdrawnEvent),
+    Resolution(MultiOutcomeResolutionEvent),
+    Redeemed(MultiOutcomeRedeemedEvent),
 }
 
 /// Observable protocol and administrator governance transitions.
@@ -351,6 +376,41 @@ pub fn decode_event(raw_event: &RawEventLog) -> Result<DecodedEventLog, EventDec
             decode_body(&envelope.body, "TestFaucetClosedEvent")?,
         )),
 
+        MULTI_0 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::MarketInitialized(decode_body(
+            &envelope.body,
+            "MultiOutcomeMarketInitializedEvent",
+        )?)),
+        MULTI_1 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::MarketStatus(decode_body(
+            &envelope.body,
+            "MultiOutcomeMarketStatusEvent",
+        )?)),
+        MULTI_2 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::PositionInitialized(
+            decode_body(&envelope.body, "MultiOutcomePositionInitializedEvent")?,
+        )),
+        MULTI_3 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::CompleteSet(decode_body(
+            &envelope.body,
+            "MultiOutcomeCompleteSetEvent",
+        )?)),
+        MULTI_4 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::Order(decode_body(
+            &envelope.body,
+            "MultiOutcomeOrderEvent",
+        )?)),
+        MULTI_5 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::Fill(decode_body(
+            &envelope.body,
+            "MultiOutcomeFillEvent",
+        )?)),
+        MULTI_6 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::FeeWithdrawn(decode_body(
+            &envelope.body,
+            "MultiOutcomeFeeWithdrawnEvent",
+        )?)),
+        MULTI_7 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::Resolution(decode_body(
+            &envelope.body,
+            "MultiOutcomeResolutionEvent",
+        )?)),
+        MULTI_8 => OutcomiaEvent::MultiOutcome(MultiOutcomeEvent::Redeemed(decode_body(
+            &envelope.body,
+            "MultiOutcomeRedeemedEvent",
+        )?)),
         discriminator => {
             return Err(EventDecodeError::UnknownDiscriminator(discriminator));
         }
@@ -380,6 +440,17 @@ impl OutcomiaEvent {
     /// identity.
     pub fn event_type(&self) -> &'static str {
         match self {
+            Self::MultiOutcome(event) => match event {
+                MultiOutcomeEvent::MarketInitialized(_) => "MultiOutcomeMarketInitializedEvent",
+                MultiOutcomeEvent::MarketStatus(_) => "MultiOutcomeMarketStatusEvent",
+                MultiOutcomeEvent::PositionInitialized(_) => "MultiOutcomePositionInitializedEvent",
+                MultiOutcomeEvent::CompleteSet(_) => "MultiOutcomeCompleteSetEvent",
+                MultiOutcomeEvent::Order(_) => "MultiOutcomeOrderEvent",
+                MultiOutcomeEvent::Fill(_) => "MultiOutcomeFillEvent",
+                MultiOutcomeEvent::FeeWithdrawn(_) => "MultiOutcomeFeeWithdrawnEvent",
+                MultiOutcomeEvent::Resolution(_) => "MultiOutcomeResolutionEvent",
+                MultiOutcomeEvent::Redeemed(_) => "MultiOutcomeRedeemedEvent",
+            },
             Self::Governance(event) => match event {
                 GovernanceEvent::ProtocolInitialized(_) => "ProtocolInitializedEvent",
                 GovernanceEvent::AdminAdded(_) => "AdminAddedEvent",
@@ -1678,5 +1749,268 @@ mod tests {
                 }) if actual_event_name == event_name
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod multi_outcome_wire_tests {
+    use super::*;
+    #[test]
+    fn decodes_all_multi_outcome_events_and_rejects_bad_lengths() {
+        let body: Vec<u8> = vec![
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 64, 66, 15, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+            0,
+        ];
+        let mut bytes = MULTI_0.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeMarketInitializedEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 2,
+        ];
+        let mut bytes = MULTI_1.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 1,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeMarketStatusEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let mut bytes = MULTI_2.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 2,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomePositionInitializedEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+        ];
+        let mut bytes = MULTI_3.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 3,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeCompleteSetEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        ];
+        let mut bytes = MULTI_4.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 4,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeOrderEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let mut bytes = MULTI_5.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 5,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeFillEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let mut bytes = MULTI_6.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 6,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeFeeWithdrawnEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 1, 0, 7, 4,
+        ];
+        let mut bytes = MULTI_7.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 7,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeResolutionEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        let body: Vec<u8> = vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0,
+        ];
+        let mut bytes = MULTI_8.to_vec();
+        bytes.extend_from_slice(&body);
+        let raw = RawEventLog {
+            log_index: 8,
+            payload_base64: STANDARD.encode(&bytes),
+        };
+        assert_eq!(
+            decode_event(&raw).unwrap().event.event_type(),
+            "MultiOutcomeRedeemedEvent"
+        );
+        bytes.push(0);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+        bytes.truncate(8 + body.len() - 1);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
     }
 }

@@ -29,6 +29,7 @@ pub fn report_event(decoded: &DecodedEventLog) {
     );
 
     match &decoded.event {
+        OutcomiaEvent::MultiOutcome(event) => println!("    {event:?}"),
         OutcomiaEvent::Governance(event) => match event {
             GovernanceEvent::ProtocolInitialized(event) => {
                 println!(
