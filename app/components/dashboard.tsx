@@ -350,6 +350,14 @@ export function Dashboard() {
       <footer className="landing-footer">
         <span>Outcomia</span>
         <a
+          href="https://x.com/outcomia"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Outcomia on X"
+        >
+          X · @outcomia ↗
+        </a>
+        <a
           href="https://github.com/kunal171/outcomia"
           target="_blank"
           rel="noreferrer"
