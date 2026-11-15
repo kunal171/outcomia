@@ -1,8 +1,8 @@
 //! Deterministic decoding of Anchor event payloads emitted by Outcomia.
 //!
 //! This catalog supports the event definitions listed below, not every program
-//! account or instruction type. Prediction instructions currently emit no
-//! prediction-specific events. Adding such events requires matching this
+//! account or instruction type. Binary predictions have no dedicated event
+//! catalog here; all nine multi-outcome event types are decoded. Adding such events requires matching this
 //! catalog and its Borsh mirrors before ingestion can checkpoint past them.
 
 mod types;
@@ -2010,6 +2010,35 @@ mod multi_outcome_wire_tests {
         assert!(decode_event(&RawEventLog {
             log_index: 0,
             payload_base64: STANDARD.encode(&bytes)
+        })
+        .is_err());
+    }
+}
+
+#[cfg(test)]
+mod multi_resolution_tag_tests {
+    use super::*;
+    #[test]
+    fn decodes_absent_and_invalid_results_and_rejects_unknown_tags() {
+        for suffix in [vec![0, 4], vec![1, 1, 4]] {
+            let mut bytes = MULTI_7.to_vec();
+            bytes.extend_from_slice(&[0; 32]);
+            bytes.extend_from_slice(&suffix);
+            let raw = RawEventLog {
+                log_index: 0,
+                payload_base64: STANDARD.encode(bytes),
+            };
+            assert_eq!(
+                decode_event(&raw).unwrap().event.event_type(),
+                "MultiOutcomeResolutionEvent"
+            );
+        }
+        let mut bytes = MULTI_7.to_vec();
+        bytes.extend_from_slice(&[0; 32]);
+        bytes.extend_from_slice(&[1, 2, 4]);
+        assert!(decode_event(&RawEventLog {
+            log_index: 0,
+            payload_base64: STANDARD.encode(bytes)
         })
         .is_err());
     }
