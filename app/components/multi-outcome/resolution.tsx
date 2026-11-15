@@ -4,33 +4,29 @@ import { Transaction, SystemProgram } from "@solana/web3.js";
 import { deriveAdminRecordPda } from "../../lib/outcomia";
 import { multiBookPda } from "../../lib/multi-outcome";
 import { useProtocolRole } from "../protocol-role-provider";
+import { resolutionAvailability } from "../../lib/multi-outcome-lifecycle";
+import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 export function MultiResolution({ session: s }: { session: MultiSession }) {
   const [result, setResult] = useState("invalid"),
     [uri, setUri] = useState(""),
     [hash, setHash] = useState("");
+  const now = useMarketClock();
   const { role } = useProtocolRole(),
     d = s.data;
   if (!d) return null;
   const ready = !!s.wallet && !!s.signed && !s.busy && !s.loading,
     admin = role === "admin" || role === "super-admin";
   const creator = admin && !!s.wallet?.publicKey.equals(d.market.authority);
-  const now = Math.floor(Date.now() / 1000),
-    closed = now >= d.market.terms.closeTs.toNumber();
-  const fallback = d.market.terms.fallback;
-  const resolver =
-    admin &&
-    !!s.wallet?.publicKey.equals(
-      fallback && now >= fallback.availableTs.toNumber()
-        ? fallback.resolver
-        : d.market.terms.resolver,
-    );
+  const closed = now >= d.market.terms.closeTs.toNumber();
+  const availability = resolutionAvailability(
+    d.market,
+    s.wallet?.publicKey ?? null,
+    admin,
+    now,
+  );
   const proposed = d.market.proposal,
-    readyAt = proposed
-      ? proposed.proposedAt
-          .add(d.market.terms.resolutionDelaySeconds)
-          .toNumber()
-      : null;
+    readyAt = availability.matureAt?.toNumber() ?? null;
   const advance = (action: number) =>
     void s.send(async () => {
       if (!s.signed) throw new Error("Connect a wallet.");
@@ -107,40 +103,30 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
         </>
       )}
       <div className="multi-actions">
-        {"open" in d.market.status && (
-          <button disabled={!ready || !closed} onClick={() => advance(0)}>
+        {availability.canFreeze && (
+          <button disabled={!ready} onClick={() => advance(0)}>
             Freeze at cutoff
           </button>
         )}
-        {fallback && !("resolved" in d.market.status) && !proposed && (
-          <button
-            disabled={!ready || now < fallback.availableTs.toNumber()}
-            onClick={() => advance(1)}
-          >
+        {availability.canActivateFallback && (
+          <button disabled={!ready} onClick={() => advance(1)}>
             Activate fallback
           </button>
         )}
-        {proposed && !("resolved" in d.market.status) && (
-          <button
-            disabled={!ready || now < readyAt!}
-            onClick={() => advance(2)}
-          >
+        {availability.canFinalize && (
+          <button disabled={!ready} onClick={() => advance(2)}>
             Finalize outcome
           </button>
         )}
-        {fallback?.deadlineTs &&
-          !proposed &&
-          !("resolved" in d.market.status) && (
-            <button
-              disabled={!ready || now < fallback.deadlineTs.toNumber()}
-              onClick={() => advance(3)}
-            >
-              Finalize timeout as Invalid
-            </button>
-          )}
+        {availability.canTimeout && (
+          <button disabled={!ready} onClick={() => advance(3)}>
+            Finalize timeout as Invalid
+          </button>
+        )}
       </div>
-      {resolver && closed && !("resolved" in d.market.status) && (
+      {availability.canPropose && (
         <form
+          aria-label="Resolution proposal"
           onSubmit={(e) => {
             e.preventDefault();
             void s.send(async () => {
@@ -206,9 +192,7 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
             />
           </label>
           <p>Corrections restart the full review delay.</p>
-          <button disabled={!ready || (readyAt !== null && now >= readyAt)}>
-            Review proposal in wallet
-          </button>
+          <button disabled={!ready}>Review proposal in wallet</button>
         </form>
       )}
       {creator && (
