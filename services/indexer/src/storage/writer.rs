@@ -276,4 +276,45 @@ mod tests {
         assert_eq!(atomic_transaction_count, 0);
         assert_eq!(atomic_event_count, 0);
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires a PostgreSQL server supplied through DATABASE_URL"]
+    async fn multi_outcome_fill_decodes_persists_and_replays(pool: PgPool) {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        let mut bytes = vec![101, 157, 68, 146, 152, 13, 48, 37];
+        for byte in [1_u8, 2, 3, 4] {
+            bytes.extend_from_slice(&[byte; 32]);
+        }
+        bytes.extend_from_slice(&[7, 0]);
+        for amount in [400_000_u64, 8, 3_200_000, 32_000] {
+            bytes.extend_from_slice(&amount.to_le_bytes());
+        }
+        let event = crate::decoder::decode_event(&crate::events::RawEventLog {
+            log_index: 3,
+            payload_base64: STANDARD.encode(bytes),
+        })
+        .expect("decode on-chain wire fixture");
+        let source = transaction("multi-outcome-fill", 100);
+        for _ in 0..2 {
+            persist_transaction(&pool, &source, std::slice::from_ref(&event))
+                .await
+                .expect("idempotent persistence");
+        }
+        let (name, json): (String, serde_json::Value) =
+            sqlx::query_as("SELECT event_type, decoded_event FROM chain_events WHERE signature=$1")
+                .bind(&source.signature)
+                .fetch_one(&pool)
+                .await
+                .expect("stored multi-outcome event");
+        assert_eq!(name, "MultiOutcomeFillEvent");
+        let fill = &json["MultiOutcome"]["Fill"];
+        assert_eq!(fill["outcome"], 7);
+        assert_eq!(fill["collateral_atoms"], 3_200_000);
+        assert_eq!(fill["fee_atoms"], 32_000);
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM chain_events WHERE signature=$1")
+            .bind(&source.signature)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }
