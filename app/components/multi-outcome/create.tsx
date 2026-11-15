@@ -18,6 +18,7 @@ import {
   sha256,
   validateTerms,
 } from "../../lib/multi-outcome-creation";
+import { TermsRecovery } from "./terms-recovery";
 import "./multi-outcome.css";
 export function CreateMultiOutcome() {
   const { connection } = useConnection(),
@@ -47,6 +48,7 @@ export function CreateMultiOutcome() {
     [created, setCreated] = useState("");
   const identity = useRef(wallet?.publicKey.toBase58() ?? "");
   identity.current = wallet?.publicKey.toBase58() ?? "";
+  const [recoveryRevision, setRecoveryRevision] = useState(0);
   const lock = useRef(false),
     id = useRef<Uint8Array | null>(null);
   const admin = role === "admin" || role === "super-admin";
@@ -207,6 +209,7 @@ export function CreateMultiOutcome() {
               } finally {
                 lock.current = false;
                 setBusy(false);
+                setRecoveryRevision((v) => v + 1);
               }
             })();
           }}
@@ -357,6 +360,12 @@ export function CreateMultiOutcome() {
             {busy ? "Waiting for wallet…" : "Review creation in wallet"}
           </button>
         </form>
+        <TermsRecovery
+          program={p}
+          owner={wallet?.publicKey ?? null}
+          revision={recoveryRevision}
+          disabled={busy}
+        />
         {stage && <p role="status">{stage}</p>}
         {error && <p role="alert">{error}</p>}
         {created && (
