@@ -296,3 +296,8 @@ Run `npm run test:multi-outcome`; see the [full status and local browser fixture
 Smoke-test markets are hidden from discovery, while direct detail links and owner
 recovery actions remain available. The creation form supports chunked term upload
 when a legacy transaction exceeds 1,232 bytes and owner recovery of upload rent.
+
+The shared Wallet and Orders views also list multi-outcome positions/orders.
+Market detail provides earned-fee withdrawal for the super-admin, and mutable
+owner/market account scans bypass discovery caching. See the
+[local audit](../docs/multi-outcome-audit.md) for resolved gaps and verification.

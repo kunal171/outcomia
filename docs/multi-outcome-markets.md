@@ -86,9 +86,10 @@ backing, including contracts released by canceled sell orders.
 
 Do not extend or reorder `PredictionOutcome`, `PredictionResolution` or
 `SharedOutcome` to reinterpret deployed binary accounts. New multi-outcome
-layouts and PDA namespaces will be specified before their initializer is added.
+layouts and PDA namespaces are separate from existing binary accounts.
 Existing YES/NO markets and their clients continue using their current types.
-Nothing in this foundation requires a devnet upgrade.
+The new multi-outcome instructions require a separate deliberate program upgrade;
+that release step has not been performed.
 
 ## Account layouts and validation
 
@@ -123,8 +124,8 @@ to u128 before multiplication and narrows only after any exact division.
 These are pure checks, not authorization or proof of token custody. The initializer uses chain Clock, requires the active-admin creator as resolver,
 checks the legacy SPL mint and canonical vault accounts, and fixes the terms.
 Custody derives economics from the actual market, verifies ownership and compares
-liability with recorded and physical reserve backing. Future trading and claim
-handlers must preserve those relationships too.
+liability with recorded and physical reserve backing. Trading and claim
+handlers enforce those same accounting relationships.
 
 ## Implemented custody flow
 
@@ -203,14 +204,17 @@ published HTTPS/Arweave document bytes, and shows outcomes, collateral, lot,
 close time, review delay and optional fallback before the creator checks review.
 Editing a form field clears that approval. Splits/merges, open-order cancellation,
 resolution/correction/finalization and redemption are available on market detail.
-Collateral funding reuses the existing shared-wallet controls.
+Collateral funding reuses the existing shared-wallet controls. The shared Wallet
+and Orders routes include multi-outcome positions and orders, and the asset
+catalog includes collateral listed only by a multi-outcome market. Super-admins
+can withdraw only the current book's accrued fees from market detail.
 
 ## Local verification
 
 `anchor build`, `cargo test -p outcomia` and strict all-target Clippy pass locally.
 The full program suite has 379 tests, including 14 multi-outcome order/staging
-tests and 17 custody tests. Indexer tests pass 75 checks; seven PostgreSQL tests
-require a separately configured database and were not run. Client tests use the
+tests and 17 custody tests. Indexer tests pass 75 regular checks and eight
+PostgreSQL integration checks against an isolated local database. Client tests use the
 real IDL to check tuple OutcomeIds, exact fees, reciprocal links, self-trades,
 lots, safe remainders, maximum terms and signed packet sizing.
 
@@ -229,13 +233,20 @@ The eight-outcome budget fixture reports:
 | Staged creation, maximum labels/URI | 569 | 46,956 |
 
 Run `anchor build` before tests; LiteSVM embeds `target/deploy/outcomia.so`.
-Run `npm --prefix app run idl:sync` after building. IDL sync preserves existing
-entry documentation and order while adopting the generated ABI.
+Run `npm --prefix app run idl:sync` after building and `npm --prefix app run
+idl:check` to compare the compiled ABI. IDL sync preserves top-level entry order
+and documentation, while instruction accounts, fields and variants retain their
+generated wire order.
 
 `npm --prefix app run test:multi-outcome` checks the client. The local browser
 fixture uses an ephemeral wallet and mock RPC, blocks external requests, and
-exercises discovery, cancellation, trading, claims, creation with published-rule
-verification, review reset and mobile layout. It never reads the CLI keypair.
+exercises Wallet/Orders discovery, cancellation, rejected wallet approvals,
+capped matching and exact remainder retry, fees, proposal/finalization, claims,
+creation with published-rule verification, review reset, abandoned-upload recovery,
+navigation cancellation and mobile layout. It never reads the CLI keypair.
+The audit also runs this flow against a feature-enabled production build and a
+separate disabled production build that must submit no transactions. See the
+[audit record](multi-outcome-audit.md).
 
 ```bash
 # Terminal 1
