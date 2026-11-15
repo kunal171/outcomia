@@ -34,8 +34,15 @@ export function useMultiMarket(address: string) {
   const owner = wallet?.publicKey.toBase58() ?? "",
     generation = useRef(0),
     live = useRef(owner),
-    lock = useRef(false);
+    lock = useRef(false),
+    mounted = useRef(false);
   live.current = owner;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [data, setData] = useState<
     | (Awaited<ReturnType<typeof load>> & { identity: string; address: string })
     | null
@@ -111,10 +118,10 @@ export function useMultiMarket(address: string) {
     };
   }, [refresh]);
   const send = async (build: () => Promise<Transaction>) => {
-    if (lock.current) return;
+    if (lock.current) return false;
     if (!MULTI_OUTCOME_ENABLED || !wallet || !signed) {
       setError("Connect a wallet to a verified multi-outcome deployment.");
-      return;
+      return false;
     }
     lock.current = true;
     setBusy(true);
@@ -124,21 +131,24 @@ export function useMultiMarket(address: string) {
     try {
       const tx = await build();
       transactionBytes(tx, wallet.publicKey);
-      if (live.current !== expected)
+      if (!mounted.current || live.current !== expected)
         throw new Error("Wallet changed. Refresh before signing.");
       const result = await (signed.provider as AnchorProvider).sendAndConfirm(
         tx,
       );
-      if (live.current === expected) {
+      if (mounted.current && live.current === expected) {
         setSignature(result);
         await refresh();
+        return mounted.current && live.current === expected;
       }
+      return false;
     } catch (e) {
-      if (live.current === expected)
+      if (mounted.current && live.current === expected)
         setError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       lock.current = false;
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
   return {

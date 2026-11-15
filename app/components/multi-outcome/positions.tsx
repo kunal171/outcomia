@@ -2,9 +2,11 @@
 import { useState } from "react";
 import { Transaction } from "@solana/web3.js";
 import { custody, whole } from "../../lib/multi-outcome";
+import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 export function MultiPositions({ session: s }: { session: MultiSession }) {
   const [quantity, setQuantity] = useState("");
+  const now = useMarketClock();
   const d = s.data;
   if (!d) return null;
   const ready =
@@ -15,9 +17,7 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
     !s.busy &&
     !s.loading;
   const resolved = "resolved" in d.market.status,
-    open =
-      "open" in d.market.status &&
-      Date.now() < d.market.terms.closeTs.toNumber() * 1000;
+    open = "open" in d.market.status && now < d.market.terms.closeTs.toNumber();
   const winner = d.market.finalOutcome?.winner?.[0][0];
   return (
     <section aria-labelledby="multi-positions">

@@ -14,6 +14,7 @@ import {
   whole,
   type Side,
 } from "../../lib/multi-outcome";
+import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 export function MultiTrading({ session: s }: { session: MultiSession }) {
   const [outcome, setOutcome] = useState(0),
@@ -21,12 +22,12 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
     [price, setPrice] = useState(""),
     [quantity, setQuantity] = useState(""),
     [left, setLeft] = useState("");
+  const now = useMarketClock();
   const d = s.data;
   if (!d) return null;
   const ready = !!s.signed && !!s.wallet && !s.busy && !s.loading;
   const trading =
-    "open" in d.market.status &&
-    Date.now() < d.market.terms.closeTs.toNumber() * 1000;
+    "open" in d.market.status && now < d.market.terms.closeTs.toNumber();
   const rows =
     d.book?.rows.filter((r) => r.account.outcome[0] === outcome) ?? [];
   const sorted = [...rows].sort(
@@ -41,6 +42,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       <label>
         Outcome
         <select
+          disabled={s.busy}
           value={outcome}
           onChange={(e) => setOutcome(Number(e.target.value))}
         >
@@ -81,34 +83,44 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void s.send(async () => {
-                if (!s.signed || !s.wallet || !d.book)
-                  throw new Error("Initialize the market book first.");
-                const plan = await buildMultiTrade(
-                  s.signed,
-                  d.key,
-                  d.market,
-                  d.book.book,
-                  d.book.rows,
-                  s.wallet.publicKey,
-                  outcome,
-                  side,
-                  parseTokenAmount(price, d.decimals, "Price"),
-                  whole(quantity),
-                  d.feeBps,
-                );
-                setLeft(
-                  plan.remaining.isZero()
+              void (async () => {
+                let unsubmitted: string | null = null;
+                const confirmed = await s.send(async () => {
+                  if (!s.signed || !s.wallet || !d.book)
+                    throw new Error("Initialize the market book first.");
+                  const plan = await buildMultiTrade(
+                    s.signed,
+                    d.key,
+                    d.market,
+                    d.book.book,
+                    d.book.rows,
+                    s.wallet.publicKey,
+                    outcome,
+                    side,
+                    parseTokenAmount(price, d.decimals, "Price"),
+                    whole(quantity),
+                    d.feeBps,
+                  );
+                  unsubmitted = plan.remaining.isZero()
                     ? ""
-                    : `${plan.remaining.toString()} contracts remain unsubmitted. Refresh and explicitly retry.`,
-                );
-                return plan.transaction;
-              });
+                    : plan.remaining.toString();
+                  return plan.transaction;
+                });
+                if (confirmed && unsubmitted !== null) {
+                  setQuantity(unsubmitted);
+                  setLeft(
+                    unsubmitted
+                      ? `${unsubmitted} contracts remain unsubmitted. Refresh and explicitly retry.`
+                      : "",
+                  );
+                }
+              })();
             }}
           >
             <label>
               Side
               <select
+                disabled={s.busy}
                 value={side}
                 onChange={(e) => setSide(e.target.value as Side)}
               >
@@ -121,6 +133,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               <input
                 required
                 inputMode="decimal"
+                disabled={s.busy}
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
               />
@@ -130,6 +143,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               <input
                 required
                 inputMode="numeric"
+                disabled={s.busy}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
               />
