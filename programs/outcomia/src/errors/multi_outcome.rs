@@ -2,7 +2,7 @@
 pub use super::OutcomiaError::{
     InvalidMultiOutcomeBook, InvalidMultiOutcomeCount, InvalidMultiOutcomeId,
     InvalidMultiOutcomeLabel, InvalidMultiOutcomeLot, InvalidMultiOutcomePayout,
-    InvalidMultiOutcomePosition, InvalidMultiOutcomePrice, MultiOutcomeAccountingOverflow,
-    MultiOutcomeBookFull, MultiOutcomeFeeQuoteChanged, MultiOutcomeInactiveSlot,
-    MultiOutcomeReserveMismatch, MultiOutcomeSupplyMismatch,
+    InvalidMultiOutcomePosition, InvalidMultiOutcomePrice, InvalidMultiOutcomeTerms,
+    MultiOutcomeAccountingOverflow, MultiOutcomeBookFull, MultiOutcomeFeeQuoteChanged,
+    MultiOutcomeInactiveSlot, MultiOutcomeReserveMismatch, MultiOutcomeSupplyMismatch,
 };

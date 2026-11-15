@@ -1938,6 +1938,7 @@ dependencies = [
  "solana-keypair",
  "solana-loader-v3-interface 8.0.1",
  "solana-message",
+ "solana-sha256-hasher",
  "solana-signer",
  "solana-transaction",
  "wincode",

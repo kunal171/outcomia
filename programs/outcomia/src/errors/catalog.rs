@@ -476,4 +476,6 @@ pub enum OutcomiaError {
     InvalidMultiOutcomeBook = 168,
     #[msg("The taker fee changed; refresh the quote before signing")]
     MultiOutcomeFeeQuoteChanged = 169,
+    #[msg("Staged multi-outcome terms, offset, owner or content hash are invalid")]
+    InvalidMultiOutcomeTerms = 170,
 }

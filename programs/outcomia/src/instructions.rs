@@ -89,3 +89,6 @@ pub use multi_outcome_fees::*;
 
 pub mod multi_outcome_resolution;
 pub use multi_outcome_resolution::*;
+
+pub mod multi_outcome_staging;
+pub use multi_outcome_staging::*;

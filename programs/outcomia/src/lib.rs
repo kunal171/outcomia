@@ -43,6 +43,36 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod outcomia {
     use super::*;
 
+    /// Uploads a contiguous chunk for a large market's immutable terms.
+    pub fn write_multi_outcome_terms(
+        ctx: Context<WriteMultiOutcomeTerms>,
+        market_id: [u8; 32],
+        offset: u32,
+        bytes: Vec<u8>,
+    ) -> Result<()> {
+        instructions::multi_outcome_staging::write(ctx, market_id, offset, bytes)
+    }
+    /// Creates from a hash-bound owner buffer supplied as a read-only remaining account.
+    pub fn initialize_multi_outcome_market_from_staged(
+        ctx: Context<InitializeMultiOutcomeMarket>,
+        market_id: [u8; 32],
+        terms_hash: [u8; 32],
+        display_name: String,
+        collateral_symbol: String,
+    ) -> Result<()> {
+        instructions::multi_outcome_staging::create(
+            ctx,
+            market_id,
+            terms_hash,
+            display_name,
+            collateral_symbol,
+        )
+    }
+    /// Recovers rent from an owner-authorized staging buffer.
+    pub fn close_multi_outcome_terms(_ctx: Context<CloseMultiOutcomeTerms>) -> Result<()> {
+        Ok(())
+    }
+
     /// Proposes/corrects an evidence-backed result; only the active published resolver.
     pub fn propose_multi_outcome(
         ctx: Context<ResolveMultiOutcome>,
