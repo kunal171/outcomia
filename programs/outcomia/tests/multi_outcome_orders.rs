@@ -1683,6 +1683,38 @@ fn eight_outcome_budget_and_atomic_multi_maker_fills() {
     measurements.push(("two-maker", bytes, meta.compute_units_consumed));
     assert_eq!(f.position(&taker).free[7], 16);
     assert_eq!(f.book().open_order_count, 0);
+    let mut clock = f.svm.get_sysvar::<Clock>();
+    clock.unix_timestamp = 205;
+    f.svm.set_sysvar(&clock);
+    let proposal = f.propose(
+        &admin,
+        MultiOutcomeResolution::Winner(outcome),
+        "ar://budget-evidence".into(),
+        [9; 32],
+        false,
+    );
+    let bytes = wincode::serialize(&f.transaction(proposal.clone()))
+        .unwrap()
+        .len();
+    let meta = f.send(proposal).unwrap();
+    measurements.push(("propose", bytes, meta.compute_units_consumed));
+    clock.unix_timestamp = 216;
+    f.svm.set_sysvar(&clock);
+    let finalize = f.advance(2);
+    let bytes = wincode::serialize(&f.transaction(finalize.clone()))
+        .unwrap()
+        .len();
+    let meta = f.send(finalize).unwrap();
+    measurements.push(("finalize", bytes, meta.compute_units_consumed));
+    let mut quantities = [0; 8];
+    quantities[7] = 16;
+    let redeem = f.redeem(&taker, quantities);
+    let bytes = wincode::serialize(&f.transaction(redeem.clone()))
+        .unwrap()
+        .len();
+    let meta = f.send(redeem).unwrap();
+    measurements.push(("redeem", bytes, meta.compute_units_consumed));
+    assert_eq!(f.market().backing_reserve, 0);
     for (operation, bytes, compute) in measurements {
         assert!(bytes <= 1232);
         assert!(compute < 200_000, "{operation}: {compute}");
