@@ -21,7 +21,8 @@
     "test:canton:browser": "node scripts/canton-browser.test.mjs",
     "test:multi-outcome": "node scripts/multi-outcome.test.mjs",
     "idl:sync": "node scripts/sync-idl.mjs",
-    "test:multi-outcome:browser": "node scripts/multi-outcome-browser.test.mjs"
+    "test:multi-outcome:browser": "node scripts/multi-outcome-browser.test.mjs",
+    "idl:check": "node scripts/sync-idl.mjs --check"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

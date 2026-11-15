@@ -1,68 +1,21 @@
-// Preserve existing documentation and entry order while syncing the generated ABI.
+// Preserve documentation and top-level entry order while syncing the generated ABI.
 import { readFileSync, writeFileSync } from "node:fs";
+import { mergeIdl, canonicalIdl } from "./support/idl-sync.mjs";
 const source = new URL("../../target/idl/outcomia.json", import.meta.url);
 const target = new URL("../idl/outcomia.json", import.meta.url);
-function abi(value) {
-  if (Array.isArray(value)) return value.map(abi);
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.keys(value)
-        .filter((k) => k !== "docs")
-        .sort()
-        .map((k) => [k, abi(value[k])]),
+const old = JSON.parse(readFileSync(target)),
+  generated = JSON.parse(readFileSync(source));
+if (process.argv.includes("--check")) {
+  if (
+    JSON.stringify(canonicalIdl(old)) !==
+    JSON.stringify(canonicalIdl(generated))
+  )
+    throw new Error(
+      "App IDL differs from the generated program ABI. Rebuild and run npm run idl:sync.",
     );
-  return value;
-}
-function merge(old, next, top = false) {
-  if (old && JSON.stringify(abi(old)) === JSON.stringify(abi(next))) return old;
-  if (Array.isArray(next)) {
-    if (
-      top &&
-      next.every(
-        (v) => v && typeof v === "object" && typeof v.name === "string",
-      ) &&
-      Array.isArray(old)
-    ) {
-      const byName = new Map(next.map((v) => [v.name, v]));
-      return [
-        ...old
-          .filter((v) => byName.has(v.name))
-          .map((v) => merge(v, byName.get(v.name))),
-        ...next.filter((v) => !old.some((o) => o.name === v.name)),
-      ];
-    }
-    return next;
-  }
-  if (next && typeof next === "object") {
-    const out = {};
-    for (const key of new Set([
-      ...Object.keys(old ?? {}),
-      ...Object.keys(next),
-    ])) {
-      if (key === "docs" && !(key in next) && old?.docs) out.docs = old.docs;
-      else if (key in next)
-        out[key] = merge(
-          old?.[key],
-          next[key],
-          [
-            "instructions",
-            "accounts",
-            "types",
-            "events",
-            "errors",
-            "constants",
-          ].includes(key),
-        );
-    }
-    return out;
-  }
-  return next;
-}
-writeFileSync(
-  target,
-  JSON.stringify(
-    merge(JSON.parse(readFileSync(target)), JSON.parse(readFileSync(source))),
-    null,
-    2,
-  ) + "\n",
-);
+  console.log("App IDL matches the generated program ABI.");
+} else
+  writeFileSync(
+    target,
+    JSON.stringify(mergeIdl(old, generated), null, 2) + "\n",
+  );
