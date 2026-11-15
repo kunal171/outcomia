@@ -505,6 +505,7 @@ impl Fixture {
         quantity: u64,
         order_id: u64,
     ) -> Instruction {
+        let (previous, next) = self.insertion(outcome, side, price, order_id);
         Instruction::new_with_bytes(
             outcomia::ID,
             &outcomia::instruction::PlaceMultiOutcomeOrder {
@@ -523,6 +524,8 @@ impl Fixture {
                 position: self.position_key(user),
                 order: self.order_key(order_id),
                 system_program: system_program::ID,
+                previous,
+                next,
             }
             .to_account_metas(None),
         )
@@ -530,6 +533,7 @@ impl Fixture {
 
     /// Builds the `CancelMultiOutcomeOrder` instruction to cancel an existing resting order.
     fn cancel_order(&self, user: &Pubkey, order_id: u64) -> Instruction {
+        let o = self.order(order_id);
         Instruction::new_with_bytes(
             outcomia::ID,
             &outcomia::instruction::CancelMultiOutcomeOrder {}.data(),
@@ -540,6 +544,8 @@ impl Fixture {
                 order: self.order_key(order_id),
                 cash: self.balance_key(user),
                 position: self.position_key(user),
+                previous: o.previous,
+                next: o.next,
             }
             .to_account_metas(None),
         )
@@ -577,6 +583,7 @@ impl Fixture {
                 maker_position: self.position_key(maker),
                 taker_cash: self.balance_key(taker),
                 taker_position: self.position_key(taker),
+                next: self.order(maker_order_id).next,
             }
             .to_account_metas(None),
         )
@@ -668,12 +675,21 @@ impl Fixture {
 
     /// Constructs and signs a VersionedTransaction matching the instruction's signer requirements.
     fn transaction(&self, ix: Instruction) -> VersionedTransaction {
-        let payer = if let Some(first_signer) = ix.accounts.iter().find(|m| m.is_signer) {
+        self.transaction_many(&[ix])
+    }
+
+    fn transaction_many(&self, instructions: &[Instruction]) -> VersionedTransaction {
+        let payer = if let Some(first_signer) = instructions
+            .iter()
+            .flat_map(|ix| &ix.accounts)
+            .find(|m| m.is_signer)
+        {
             first_signer.pubkey
         } else {
             self.admin.pubkey()
         };
-        let msg = Message::new_with_blockhash(&[ix], Some(&payer), &self.svm.latest_blockhash());
+        let msg =
+            Message::new_with_blockhash(instructions, Some(&payer), &self.svm.latest_blockhash());
         let keys = &msg.account_keys[..usize::from(msg.header.num_required_signatures)];
         let signers: Vec<_> = [
             &self.admin,
@@ -709,6 +725,35 @@ impl Fixture {
     /// Reads the current state of the order book account.
     fn book(&self) -> MultiOutcomeBook {
         self.read(self.book_key())
+    }
+
+    fn insertion(
+        &self,
+        outcome: OutcomeId,
+        side: OrderSide,
+        price: u64,
+        id: u64,
+    ) -> (Option<Pubkey>, Option<Pubkey>) {
+        let book = self.book();
+        let slot = outcomia::multi_outcome_trading::slot(outcome, side);
+        let mut next = book.heads[slot].map(|r| r.order);
+        let mut previous = None;
+        while let Some(key) = next {
+            let o: MultiOutcomeOrder = self.read(key);
+            let before = if price == o.price {
+                id < o.order_id
+            } else if side == OrderSide::Bid {
+                price > o.price
+            } else {
+                price < o.price
+            };
+            if before {
+                break;
+            }
+            previous = Some(key);
+            next = o.next;
+        }
+        (previous, next)
     }
 
     /// Reads the current state of a resting order account.
@@ -826,7 +871,7 @@ fn multi_outcome_book_initialization_and_access_control() {
     assert_eq!(book.authority, f.admin.pubkey());
     assert_eq!(book.next_order_id, 1);
     assert_eq!(book.accrued_collateral_fees, 0);
-    assert!(book.orders.is_empty());
+    assert!(book.open_order_count == 0);
 
     // 4. Duplicate book initialization cannot overwrite or reset existing counters
     f.reject(f.init_book(&admin_key), None);
@@ -885,9 +930,9 @@ fn place_bid_and_ask_orders_and_verify_locks() {
     // Verify book summary reference and sequential order ID increment
     let book = f.book();
     assert_eq!(book.next_order_id, 2);
-    assert_eq!(book.orders.len(), 1);
-    assert_eq!(book.orders[0].order_id, 1);
-    assert_eq!(book.orders[0].price, price_bid);
+    assert_eq!(book.open_order_count, 1);
+    assert_eq!(book.heads[0].unwrap().order_id, 1);
+    assert_eq!(book.heads[0].unwrap().price, price_bid);
 
     // 2. Counterparty (taker) splits 6 complete sets to acquire outcome tokens
     f.send(f.complete(&taker_key, 6, true))
@@ -925,7 +970,7 @@ fn place_bid_and_ask_orders_and_verify_locks() {
 
     let book = f.book();
     assert_eq!(book.next_order_id, 3);
-    assert_eq!(book.orders.len(), 2);
+    assert_eq!(book.open_order_count, 2);
 }
 
 /// Tests validation constraints on resting order placement:
@@ -1031,7 +1076,7 @@ fn cancel_bid_and_ask_orders_refunds_escrow_correctly() {
     assert_eq!(order.status, OrderStatus::Canceled);
     assert_eq!(order.remaining_quantity, 0);
     assert_eq!(order.locked_amount, 0);
-    assert!(f.book().orders.is_empty());
+    assert!(f.book().open_order_count == 0);
 
     // 4. Replay of cancellation fails
     f.reject(
@@ -1131,7 +1176,7 @@ fn match_bid_taker_against_resting_ask_maker_with_fee_accrual() {
     assert_eq!(order.status, OrderStatus::Filled);
     assert_eq!(order.remaining_quantity, 0);
     assert_eq!(order.locked_amount, 0);
-    assert!(f.book().orders.is_empty());
+    assert!(f.book().open_order_count == 0);
 
     // 6. Fee accumulator in book records fee revenue
     assert_eq!(f.book().accrued_collateral_fees, 24_000);
@@ -1191,7 +1236,7 @@ fn match_ask_taker_against_resting_bid_maker_partial_fill() {
     assert_eq!(order.locked_amount, 1_500_000);
 
     let book = f.book();
-    assert_eq!(book.orders.len(), 1);
+    assert_eq!(book.open_order_count, 1);
     assert_eq!(book.accrued_collateral_fees, 15_000);
 }
 
@@ -1553,4 +1598,94 @@ fn resolution_timeout_to_invalid_and_exact_refund_redemption() {
     // 5. Invariant check: all contracts burned and exactly 100% of collateral reserve drained (zero dust)
     assert_eq!(f.market().backing_reserve, 0);
     assert_eq!(f.tokens(f.reserve()), 0);
+}
+
+#[test]
+fn ladder_exceeds_64_orders_and_rejects_stale_neighbors_atomically() {
+    let mut f = Fixture::new();
+    f.setup_active_market(3);
+    let owner = f.owner.pubkey();
+    let outcome = OutcomeId::new(0, 3).unwrap();
+    for id in 1..=70 {
+        f.send(f.place_order(&owner, outcome, OrderSide::Bid, 10_000, 3, id))
+            .unwrap();
+    }
+    assert_eq!(f.book().open_order_count, 70);
+    let mut bad = f.cancel_order(&owner, 35);
+    // Supply an unrelated previous node; all balances and links must roll back.
+    let previous = bad.accounts.len() - 2;
+    bad.accounts[previous].pubkey = f.order_key(1);
+    let before = f.balance(&owner).free;
+    assert!(f.send(bad).is_err());
+    assert_eq!(f.balance(&owner).free, before);
+    assert_eq!(f.order(34).next, Some(f.order_key(35)));
+    f.send(f.cancel_order(&owner, 35)).unwrap();
+    assert_eq!(f.order(34).next, Some(f.order_key(36)));
+    assert_eq!(f.order(36).previous, Some(f.order_key(34)));
+    f.send(f.cancel_order(&owner, 1)).unwrap();
+    assert_eq!(f.book().heads[0].unwrap().order, f.order_key(2));
+    f.send(f.cancel_order(&owner, 70)).unwrap();
+    assert_eq!(f.order(69).next, None);
+}
+
+#[test]
+fn eight_outcome_budget_and_atomic_multi_maker_fills() {
+    let mut f = Fixture::new();
+    let mut measurements = Vec::new();
+    let creation = f.creation(f.terms(8));
+    let bytes = wincode::serialize(&f.transaction(creation.clone()))
+        .unwrap()
+        .len();
+    let meta = f.send(creation).unwrap();
+    measurements.push(("create", bytes, meta.compute_units_consumed));
+    let admin = f.admin.pubkey();
+    let owner = f.owner.pubkey();
+    let taker = f.taker.pubkey();
+    f.send(f.init_book(&admin)).unwrap();
+    f.send(f.manage(true)).unwrap();
+    for user in [owner, taker] {
+        f.send(f.position_init(&user)).unwrap();
+        f.send(f.balance_init(&user)).unwrap();
+        let wallet = if user == owner {
+            f.wallet_owner
+        } else {
+            f.wallet_taker
+        };
+        f.send(f.asset_transfer(&user, wallet, 20_000_000, false))
+            .unwrap();
+    }
+    let split = f.complete(&owner, 16, true);
+    let bytes = wincode::serialize(&f.transaction(split.clone()))
+        .unwrap()
+        .len();
+    let meta = f.send(split).unwrap();
+    measurements.push(("split", bytes, meta.compute_units_consumed));
+    let outcome = OutcomeId::new(7, 8).unwrap();
+    for id in 1..=2 {
+        let ix = f.place_order(&owner, outcome, OrderSide::Ask, 100_000, 8, id);
+        let bytes = wincode::serialize(&f.transaction(ix.clone()))
+            .unwrap()
+            .len();
+        let meta = f.send(ix).unwrap();
+        measurements.push(("place", bytes, meta.compute_units_consumed));
+    }
+    let first = f.match_order(&taker, &owner, 1, outcome, OrderSide::Bid, 100_000, 8, 100);
+    let second = f.match_order(&taker, &owner, 2, outcome, OrderSide::Bid, 100_000, 8, 100);
+    let stale = f.match_order(&taker, &owner, 2, outcome, OrderSide::Bid, 100_000, 8, 0);
+    let rejected = f.transaction_many(&[first.clone(), stale]);
+    assert!(f.svm.send_transaction(rejected).is_err());
+    assert_eq!(f.position(&taker).free[7], 0);
+    assert_eq!(f.order(1).remaining_quantity, 8);
+    let tx = f.transaction_many(&[first.clone(), second.clone()]);
+    let bytes = wincode::serialize(&tx).unwrap().len();
+    assert!(bytes <= 1232);
+    let meta = f.svm.send_transaction(tx).unwrap();
+    measurements.push(("two-maker", bytes, meta.compute_units_consumed));
+    assert_eq!(f.position(&taker).free[7], 16);
+    assert_eq!(f.book().open_order_count, 0);
+    for (operation, bytes, compute) in measurements {
+        assert!(bytes <= 1232);
+        assert!(compute < 200_000, "{operation}: {compute}");
+        println!("MULTI_BUDGET {operation} outcomes=8 bytes={bytes} compute={compute}");
+    }
 }
