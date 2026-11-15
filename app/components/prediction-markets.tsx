@@ -1,5 +1,6 @@
 "use client";
 import { useI18n } from "./preferences-provider";
+import { visiblePredictionMarket } from "../lib/market-visibility";
 
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 import { PredictionDetailLayout } from "./prediction-detail-layout";
@@ -122,9 +123,9 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const visibleRecords = records.filter(
     (row) =>
       address ||
-      `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
+      (visiblePredictionMarket(row.address.toBase58(), row.metadata?.displayName) && `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
         .toLowerCase()
-        .includes(query.trim().toLowerCase()),
+        .includes(query.trim().toLowerCase())),
   );
   return (
     <div className="app-shell">
