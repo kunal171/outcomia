@@ -960,5 +960,8 @@
   "Wallet parties": "Identificadores das carteiras",
   "Withdraw": "Sacar",
   "Yes": "YES",
-  "YesWins": "YES vence"
+  "YesWins": "YES vence",
+  "Multi-outcome market": "Mercado de múltiplos resultados",
+  "Set 2–8 named outcomes with exactly one winner.": "Defina de 2 a 8 resultados com um único vencedor.",
+  "Set up multi-outcome market": "Criar mercado de múltiplos resultados"
 }
