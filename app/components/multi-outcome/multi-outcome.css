@@ -15,7 +15,7 @@
 }
 .multi-outcome .multi-card {
   padding: 1.2rem;
-  border: 1px solid var(--border, #80808066);
+  border: 1px solid var(--line);
   border-radius: 14px;
   overflow-wrap: anywhere;
 }
@@ -33,10 +33,10 @@
 .multi-outcome textarea {
   width: 100%;
   padding: 0.65rem;
-  border: 1px solid var(--border, #80808066);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface, #ffffff);
-  color: var(--text, #161616);
+  background: var(--panel);
+  color: var(--ink);
 }
 .multi-outcome textarea {
   min-height: 7rem;
@@ -71,4 +71,14 @@
 }
 .multi-outcome code {
   overflow-wrap: anywhere;
+}
+
+.multi-outcome label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+.multi-outcome input[type="checkbox"] {
+  width: auto;
+  margin-top: 0.2rem;
 }
