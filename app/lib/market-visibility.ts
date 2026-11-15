@@ -5,5 +5,8 @@ const smokeMarkets = new Set([
 ]);
 
 export function visiblePredictionMarket(address: string, displayName = "") {
-  return !smokeMarkets.has(address) && !/\bsmoke(?:[\s-]+(?:only|test))?\b/i.test(displayName);
+  return (
+    !smokeMarkets.has(address) &&
+    !/^smoke(?:[\s-]+(?:only|test))?\b/i.test(displayName)
+  );
 }

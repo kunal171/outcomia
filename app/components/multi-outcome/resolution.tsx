@@ -146,8 +146,8 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
             void s.send(async () => {
               if (!s.signed || !s.wallet) throw new Error("Connect a wallet.");
               const url = new URL(uri);
-              if (!["https:", "ar:", "ipfs:"].includes(url.protocol))
-                throw new Error("Use an HTTPS, Arweave or IPFS evidence URI.");
+              if (!["https:", "ar:"].includes(url.protocol))
+                throw new Error("Use an HTTPS or Arweave evidence URI.");
               if (!/^[a-fA-F0-9]{64}$/.test(hash) || /^0+$/.test(hash))
                 throw new Error(
                   "Enter the SHA-256 of the exact published evidence bytes.",

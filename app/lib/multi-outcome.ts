@@ -1,7 +1,12 @@
 import { BN, type Program } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
-import { assetBalancePda, assetVaultPda, assetAuthorityPda } from "./shared";
+import {
+  SHARED_BALANCES_ENABLED,
+  assetBalancePda,
+  assetVaultPda,
+  assetAuthorityPda,
+} from "./shared";
 import {
   TOKEN_PROGRAM_ID,
   deriveVaultAuthorityPda,
@@ -9,6 +14,7 @@ import {
   deriveProtocolConfigPda,
 } from "./outcomia";
 export const MULTI_OUTCOME_ENABLED =
+  SHARED_BALANCES_ENABLED &&
   process.env.NEXT_PUBLIC_MULTI_OUTCOME_ENABLED === "true";
 export type Side = "bid" | "ask";
 export type Resolution = { winner?: [[number]]; invalid?: object };
@@ -100,6 +106,10 @@ interface Reader<T> {
 }
 export const multiAccounts = (p: Program) =>
   p.account as unknown as {
+    multiOutcomeTermsBuffer: Reader<{
+      authority: PublicKey;
+      marketId: number[];
+    }>;
     multiOutcomeMarket: Reader<MultiMarket>;
     multiOutcomePosition: Reader<Position>;
     multiOutcomeBook: Reader<Book>;

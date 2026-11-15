@@ -65,7 +65,9 @@ export function validateTerms(t: Terms, now = Math.floor(Date.now() / 1000)) {
     );
   if (
     t.fallback &&
-    (t.fallback.availableTs.lt(t.earliestResolutionTs ?? t.closeTs) ||
+    (t.fallback.availableTs.lte(t.earliestResolutionTs ?? t.closeTs) ||
+      t.fallback.resolver.equals(PublicKey.default) ||
+      t.fallback.resolver.equals(t.resolver) ||
       t.fallback.deadlineTs?.lte(t.fallback.availableTs))
   )
     throw new Error(

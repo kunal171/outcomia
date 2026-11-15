@@ -111,10 +111,11 @@ export function useMultiMarket(address: string) {
     };
   }, [refresh]);
   const send = async (build: () => Promise<Transaction>) => {
-    if (!MULTI_OUTCOME_ENABLED || !wallet || !signed || lock.current)
-      throw new Error(
-        "Connect a wallet to a verified multi-outcome deployment.",
-      );
+    if (lock.current) return;
+    if (!MULTI_OUTCOME_ENABLED || !wallet || !signed) {
+      setError("Connect a wallet to a verified multi-outcome deployment.");
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setError("");

@@ -188,4 +188,11 @@ test("smoke discovery filters preserve normal market questions", () => {
     visibility.visiblePredictionMarket("other", "Will candidate A win?"),
     true,
   );
+  assert.equal(
+    visibility.visiblePredictionMarket(
+      "other",
+      "Will wildfire smoke clear tomorrow?",
+    ),
+    true,
+  );
 });
