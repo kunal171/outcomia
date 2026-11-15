@@ -41,7 +41,12 @@ function load(file) {
       AbortController,
       setTimeout,
       clearTimeout,
-      process: { env: { NEXT_PUBLIC_SHARED_BALANCES_ENABLED: "true" } },
+      process: {
+        env: {
+          NEXT_PUBLIC_SHARED_BALANCES_ENABLED: "true",
+          NEXT_PUBLIC_MULTI_OUTCOME_ENABLED: "true",
+        },
+      },
       require: (name) => {
         if (name === "./solana") return { PROGRAM_ID: programId };
         if (name.startsWith(".")) {
@@ -68,7 +73,8 @@ const owner = key(9),
   quote = key(21),
   base2 = key(22),
   extraListed = key(23),
-  unrelated = key(24);
+  unrelated = key(24),
+  multiMint = key(26);
 const market = derive("market", base.toBuffer(), quote.toBuffer());
 const market2 = derive("market", base2.toBuffer(), quote.toBuffer());
 const listedMarket = derive("market", extraListed.toBuffer(), quote.toBuffer());
@@ -129,6 +135,7 @@ const connection = {
         token(quote, "10000000", 6),
         token(quote, "20000000", 6, "frozen"),
         token(extraListed, "5000000", 6),
+        token(multiMint, "10000000", 6),
         token(unrelated, "18446744073709551615", 9),
       ],
     };
@@ -210,6 +217,45 @@ const connection = {
       kind: { spot: {} },
       bump: 255,
     });
+  const multiId = Buffer.alloc(32, 8),
+    multiMarket = derive("multi_market", multiId);
+  await put(multiMarket, "multiOutcomeMarket", {
+    marketId: [...multiId],
+    authority: owner,
+    collateralMint: multiMint,
+    collateralVault: key(27),
+    metadata: metadata(multiMarket),
+    terms: {
+      resolver: owner,
+      fallback: null,
+      outcomeLabels: ["Red", "Blue"],
+      questionHash: [...Buffer.alloc(32, 1)],
+      rulesHash: [...Buffer.alloc(32, 2)],
+      rulesUri: "ar://multi",
+      closeTs: bn(2000000000),
+      earliestResolutionTs: null,
+      resolutionDelaySeconds: bn(60),
+      payoutPerContract: bn(1000000),
+      priceTick: bn(10000),
+      quantityLot: bn(1),
+    },
+    resolutionPhase: { primary: {} },
+    status: { open: {} },
+    proposal: null,
+    finalOutcome: null,
+    supplies: Array.from({ length: 8 }, () => bn(0)),
+    backingReserve: bn(0),
+    openOrderCount: bn(0),
+    bump: 255,
+  });
+  await put(metadata(multiMarket), "marketMetadata", {
+    market: multiMarket,
+    baseSymbol: "OUTCOMES",
+    quoteSymbol: "ONLYMULTI",
+    displayName: "Multi-only collateral",
+    kind: { prediction: {} },
+    bump: 255,
+  });
   await put(pred, "predictionMarket", {
     marketId: [...Buffer.alloc(32, 7)],
     authority: owner,
@@ -315,6 +361,11 @@ const connection = {
     rows.some((r) => r.mint.equals(unrelated)),
     false,
     "Unrelated wallet tokens excluded",
+  );
+  assert.equal(
+    rows.find((r) => r.mint.equals(multiMint)).symbol,
+    "ONLYMULTI",
+    "Held collateral listed only by a multi-outcome market is discoverable before deposit",
   );
   const usd = rows.find((r) => r.mint.equals(quote));
   assert.equal(usd.wallet.toString(), "30000000");
