@@ -1,3 +1,12 @@
+import {
+  loadMultiWallet,
+  type MultiWalletMarket,
+} from "./multi-outcome-wallet";
+import {
+  MULTI_OUTCOME_ENABLED,
+  multiAccounts,
+  multiMarketPda,
+} from "./multi-outcome";
 import { unpackMint } from "@solana/spl-token";
 import {
   sharedAccounts,
@@ -49,7 +58,8 @@ export interface SpotHolding extends MarketContext<MarketAccount> {
   address: PublicKey;
   balance: TraderBalanceAccount;
 }
-export interface PredictionHolding extends MarketContext<PredictionMarketAccount> {
+export interface PredictionHolding
+  extends MarketContext<PredictionMarketAccount> {
   address: PublicKey;
   balance: PredictionPositionAccount;
 }
@@ -66,6 +76,7 @@ export interface WalletOverview {
   catalog: ReadResult<ListedAsset[]>;
   spot: ReadResult<SpotHolding[]>;
   predictions: ReadResult<PredictionHolding[]>;
+  multi?: ReadResult<MultiWalletMarket[]>;
   shared?: ReadResult<Array<{ balance: AssetBalance; decimals: number }>>;
 }
 
@@ -321,10 +332,13 @@ async function readShared(
  */
 async function readCatalog(program: Program): Promise<ListedAsset[]> {
   const accounts = getOutcomiaAccounts(program);
-  const [spots, predictions, labels] = await Promise.all([
+  const [spots, predictions, labels, multi] = await Promise.all([
     accounts.market.all(),
     accounts.predictionMarket.all(),
     read(() => accounts.marketMetadata.all()),
+    MULTI_OUTCOME_ENABLED
+      ? multiAccounts(program).multiOutcomeMarket.all()
+      : Promise.resolve([]),
   ]);
   const metadata = new Map(
     (labels.data ?? [])
@@ -369,6 +383,18 @@ async function readCatalog(program: Program): Promise<ListedAsset[]> {
       symbol: metadata.get(publicKey.toBase58())?.quoteSymbol,
     });
   }
+  for (const { publicKey, account: market } of multi) {
+    if (
+      !multiMarketPda(Uint8Array.from(market.marketId)).equals(publicKey) ||
+      !/^10*$/.test(market.terms.payoutPerContract.toString())
+    )
+      throw new Error("Invalid multi-outcome market listing");
+    assets.push({
+      mint: market.collateralMint,
+      decimals: market.terms.payoutPerContract.toString().length - 1,
+      symbol: metadata.get(publicKey.toBase58())?.quoteSymbol,
+    });
+  }
   return assets;
 }
 
@@ -378,7 +404,7 @@ export async function loadWalletOverview(
   owner: PublicKey,
 ): Promise<WalletOverview> {
   const program = getOutcomiaReadProgram(connection);
-  const [sol, tokens, catalog, spot, predictions] = await Promise.all([
+  const [sol, tokens, catalog, spot, predictions, multi] = await Promise.all([
     read(async () => {
       const lamports = await connection.getBalance(owner, "confirmed");
       if (!Number.isSafeInteger(lamports) || lamports < 0)
@@ -389,6 +415,9 @@ export async function loadWalletOverview(
     read(() => readCatalog(program)),
     read(() => readSpot(connection, program, owner)),
     read(() => readPredictions(connection, program, owner)),
+    MULTI_OUTCOME_ENABLED
+      ? read(() => loadMultiWallet(program, owner, "positions"))
+      : Promise.resolve(undefined),
   ]);
   const shared = SHARED_BALANCES_ENABLED
     ? await read(() => readShared(connection, program, owner))
@@ -402,6 +431,7 @@ export async function loadWalletOverview(
     catalog,
     spot,
     predictions,
+    multi,
   };
 }
 
