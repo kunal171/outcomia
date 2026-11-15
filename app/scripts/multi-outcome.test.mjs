@@ -196,3 +196,202 @@ test("smoke discovery filters preserve normal market questions", () => {
     true,
   );
 });
+
+test("resolution follows stored phase, earliest time, review maturity and exclusive fallback deadline", () => {
+  const { resolutionAvailability: available } = loadTypeScript(
+    new URL("../lib/multi-outcome-lifecycle.ts", import.meta.url),
+  );
+  const state = {
+    terms: {
+      ...terms,
+      closeTs: new BN(100),
+      earliestResolutionTs: new BN(110),
+      resolutionDelaySeconds: new BN(20),
+      fallback: {
+        resolver: maker,
+        availableTs: new BN(130),
+        deadlineTs: new BN(180),
+      },
+    },
+    status: { open: {} },
+    resolutionPhase: { primary: {} },
+    proposal: null,
+    finalOutcome: null,
+  };
+  assert.equal(available(state, owner, true, 105).canPropose, false);
+  assert.equal(available(state, owner, true, 110).canPropose, true);
+  assert.equal(available(state, maker, true, 130).canPropose, false);
+  assert.equal(available(state, owner, true, 130).canPropose, false);
+  assert.equal(available(state, maker, false, 130).canActivateFallback, true);
+  const activated = {
+    ...state,
+    status: { frozen: {} },
+    resolutionPhase: { fallback: {} },
+  };
+  assert.equal(available(activated, maker, true, 130).canPropose, true);
+  assert.equal(available(activated, maker, false, 130).canPropose, false);
+  assert.equal(
+    available(activated, maker, true, 130).canActivateFallback,
+    false,
+  );
+  assert.equal(available(activated, maker, true, 180).canPropose, false);
+  assert.equal(available(activated, maker, true, 180).canTimeout, true);
+  const primaryProposal = {
+    ...state,
+    status: { proposed: {} },
+    proposal: {
+      proposedAt: new BN(120),
+      outcome: { winner: [[0]] },
+      evidenceUri: "ar://proof",
+      evidenceHash: Array(32).fill(1),
+    },
+  };
+  assert.equal(available(primaryProposal, maker, true, 131).canPropose, false);
+  assert.equal(available(primaryProposal, owner, true, 131).canPropose, false);
+  assert.equal(available(primaryProposal, maker, false, 140).canFinalize, true);
+  assert.equal(
+    available(primaryProposal, maker, false, 140).canActivateFallback,
+    false,
+  );
+  assert.equal(available(primaryProposal, maker, false, 180).canTimeout, false);
+});
+
+test("mutable owner/market account scans bypass discovery cache", async () => {
+  const { createRpcFetch } = loadTypeScript(
+    new URL("../lib/rpc-transport.ts", import.meta.url),
+  );
+  let scans = 0;
+  const transport = createRpcFetch(
+    ["https://rpc.fixture.invalid"],
+    async (_url, init) => {
+      const request = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: request.id,
+          result:
+            request.method === "getGenesisHash"
+              ? "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+              : ++scans,
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
+    },
+  );
+  const read = async (filters) =>
+    (
+      await transport("https://rpc.fixture.invalid", {
+        method: "POST",
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "getProgramAccounts",
+          params: [market.toBase58(), { filters }],
+        }),
+      })
+    ).json();
+  const filtered = [{ memcmp: { offset: 40, bytes: owner.toBase58() } }];
+  assert.equal((await read(filtered)).result, 1);
+  assert.equal((await read(filtered)).result, 2);
+  const discovery = [{ memcmp: { offset: 0, bytes: "aDiscriminator" } }];
+  assert.equal((await read(discovery)).result, 3);
+  assert.equal((await read(discovery)).result, 3);
+});
+
+test("wallet activity filters owners and verifies canonical positions and markets", async () => {
+  const { loadMultiWallet } = loadTypeScript(
+    new URL("../lib/multi-outcome-wallet.ts", import.meta.url),
+  );
+  const id = Buffer.alloc(32, 7),
+    key = m.multiMarketPda(id);
+  let position = {
+    owner,
+    market: key,
+    free: Array.from({ length: 8 }, () => new BN(3)),
+    locked: Array.from({ length: 8 }, () => new BN(0)),
+  };
+  const reader = {
+    account: {
+      multiOutcomePosition: {
+        all: async (filters) => {
+          assert.equal(filters[0].memcmp.offset, 40);
+          return [
+            { publicKey: m.multiPositionPda(key, owner), account: position },
+          ];
+        },
+      },
+      multiOutcomeMarket: {
+        fetchNullable: async () => ({
+          marketId: [...id],
+          terms,
+          collateralMint: mint,
+        }),
+      },
+      marketMetadata: {
+        fetchNullable: async () => ({
+          market: key,
+          displayName: "Three-way",
+          quoteSymbol: "USDC",
+        }),
+      },
+    },
+  };
+  const result = await loadMultiWallet(reader, owner, "positions");
+  assert.equal(result.length, 1);
+  assert.equal(result[0].name, "Three-way");
+  assert.equal(result[0].decimals, 6);
+  position = { ...position, owner: maker };
+  await assert.rejects(
+    loadMultiWallet(reader, owner, "positions"),
+    /position identity/,
+  );
+});
+
+test("IDL sync preserves compiled account and field order when signatures change", async () => {
+  const { mergeIdl } = await import("./support/idl-sync.mjs");
+  const before = {
+    instructions: [
+      {
+        name: "trade",
+        accounts: [{ name: "maker" }, { name: "taker" }],
+        docs: ["Existing docs"],
+      },
+    ],
+    types: [
+      {
+        name: "Balance",
+        type: {
+          kind: "struct",
+          fields: [
+            { name: "free", type: "u64" },
+            { name: "locked", type: "u64" },
+          ],
+        },
+      },
+    ],
+  };
+  const after = {
+    instructions: [
+      { name: "trade", accounts: [{ name: "taker" }, { name: "maker" }] },
+    ],
+    types: [
+      {
+        name: "Balance",
+        type: {
+          kind: "struct",
+          fields: [
+            { name: "locked", type: "u64" },
+            { name: "free", type: "u64" },
+          ],
+        },
+      },
+    ],
+  };
+  const merged = mergeIdl(before, after);
+  assert.deepEqual(
+    merged.instructions[0].accounts,
+    after.instructions[0].accounts,
+  );
+  assert.deepEqual(merged.types[0].type.fields, after.types[0].type.fields);
+  assert.deepEqual(merged.instructions[0].docs, ["Existing docs"]);
+});
