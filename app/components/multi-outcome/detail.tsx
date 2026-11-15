@@ -8,6 +8,7 @@ import { useMultiMarket } from "./use-market";
 import { SharedAssetFunds } from "../shared-wallet";
 import { MultiTrading } from "./trading";
 import { MultiPositions } from "./positions";
+import { MultiFees } from "./fees";
 import { MultiResolution } from "./resolution";
 import "./multi-outcome.css";
 export function MultiOutcomeDetail({ address }: { address: string }) {
@@ -24,6 +25,12 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
             Multi-outcome trading is awaiting deployment verification on devnet.
           </p>
         )}
+        <button
+          onClick={() => void s.refresh()}
+          disabled={!MULTI_OUTCOME_ENABLED || s.busy || s.loading}
+        >
+          Refresh
+        </button>
         {s.loading && <p role="status">Refreshing market…</p>}
         {s.error && <p role="alert">{s.error}</p>}
         {s.signature && (
@@ -46,12 +53,6 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
               {d.metadata?.quoteSymbol} · Minimum{" "}
               {d.market.terms.quantityLot.toString()} contracts
             </p>
-            <button
-              onClick={() => void s.refresh()}
-              disabled={s.busy || s.loading}
-            >
-              Refresh
-            </button>
             <MultiTrading session={s} />
             <details>
               <summary>Deposit or withdraw collateral</summary>
@@ -64,6 +65,7 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
             </details>
             <MultiPositions session={s} />
             <MultiResolution session={s} />
+            <MultiFees session={s} />
             <details>
               <summary>Market details</summary>
               <p>
