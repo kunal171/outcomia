@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnchorProvider, type Program } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import {
@@ -25,6 +25,16 @@ export function TermsRecovery({
     [busy, setBusy] = useState(false),
     [refresh, setRefresh] = useState(0);
   const identity = owner?.toBase58() ?? "";
+  const live = useRef(identity),
+    mounted = useRef(false),
+    lock = useRef(false);
+  live.current = identity;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     setBuffers([]);
@@ -71,7 +81,9 @@ export function TermsRecovery({
           <button
             disabled={disabled || busy}
             onClick={() => {
-              if (!program || !owner || busy) return;
+              if (!program || !owner || lock.current) return;
+              lock.current = true;
+              const expected = identity;
               setBusy(true);
               setError("");
               void (async () => {
@@ -83,12 +95,17 @@ export function TermsRecovery({
                       .instruction(),
                   );
                   transactionBytes(tx, owner);
+                  if (!mounted.current || live.current !== expected)
+                    throw new Error("Wallet changed. Refresh before signing.");
                   await (program.provider as AnchorProvider).sendAndConfirm(tx);
-                  setRefresh((v) => v + 1);
+                  if (mounted.current && live.current === expected)
+                    setRefresh((v) => v + 1);
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : String(e));
+                  if (mounted.current && live.current === expected)
+                    setError(e instanceof Error ? e.message : String(e));
                 } finally {
-                  setBusy(false);
+                  lock.current = false;
+                  if (mounted.current) setBusy(false);
                 }
               })();
             }}

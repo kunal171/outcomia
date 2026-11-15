@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -51,6 +51,15 @@ export function CreateMultiOutcome() {
   const [recoveryRevision, setRecoveryRevision] = useState(0);
   const lock = useRef(false),
     id = useRef<Uint8Array | null>(null);
+  const mounted = useRef(false),
+    request = useRef<AbortController | null>(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      request.current?.abort();
+    };
+  }, []);
   const admin = role === "admin" || role === "super-admin";
   return (
     <div className="app-shell">
@@ -81,6 +90,8 @@ export function CreateMultiOutcome() {
             )
               return;
             lock.current = true;
+            const controller = new AbortController();
+            request.current = controller;
             setBusy(true);
             setError("");
             const owner = wallet.publicKey,
@@ -141,7 +152,10 @@ export function CreateMultiOutcome() {
                   : uri;
                 const response = await fetch(target, {
                   cache: "no-store",
-                  signal: AbortSignal.timeout(15000),
+                  signal: AbortSignal.any([
+                    controller.signal,
+                    AbortSignal.timeout(15000),
+                  ]),
                   redirect: "error",
                 });
                 if (!response.ok || !response.body)
@@ -184,7 +198,7 @@ export function CreateMultiOutcome() {
                   tx: Parameters<typeof transactionBytes>[0],
                   label: string,
                 ) => {
-                  if (identity.current !== expected)
+                  if (!mounted.current || identity.current !== expected)
                     throw new Error(
                       "Wallet changed. Reconnect before continuing.",
                     );
@@ -198,18 +212,23 @@ export function CreateMultiOutcome() {
                     `Approve terms upload ${i + 1} of ${plan.uploads.length}`,
                   );
                 await send(plan.create, "Approve market creation");
-                setCreated(plan.market.toBase58());
+                if (mounted.current && identity.current === expected)
+                  setCreated(plan.market.toBase58());
                 if (plan.cleanup)
                   await send(plan.cleanup, "Recover terms buffer rent");
                 setStage(
                   "Market created as a draft. Initialize its book, then open trading.",
                 );
               } catch (e) {
-                setError(e instanceof Error ? e.message : String(e));
+                if (mounted.current)
+                  setError(e instanceof Error ? e.message : String(e));
               } finally {
                 lock.current = false;
-                setBusy(false);
-                setRecoveryRevision((v) => v + 1);
+                request.current = null;
+                if (mounted.current) {
+                  setBusy(false);
+                  setRecoveryRevision((v) => v + 1);
+                }
               }
             })();
           }}
