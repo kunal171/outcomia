@@ -14,11 +14,17 @@ const base = new URL(
 if (!["localhost", "127.0.0.1"].includes(base.hostname))
   throw new Error("Local fixture only");
 // The backend wallet ingestion worker talks to this bounded fake upstream.
+let transportResets = 0;
 const upstream = createServer(async (request, response) => {
   let input = "";
   for await (const part of request) input += part;
   try {
     const body = JSON.parse(input);
+    if (body.method === "getBalance" && transportResets === 0) {
+      transportResets++;
+      request.socket.destroy();
+      return;
+    }
     response.setHeader("content-type", "application/json");
     response.end(
       JSON.stringify({ jsonrpc: "2.0", id: body.id, result: await rpc(body) }),
@@ -28,9 +34,7 @@ const upstream = createServer(async (request, response) => {
     response.end();
   }
 });
-// Holdings refresh every 20 seconds. Keep fixture sockets alive across that
-// interval so Node's 5-second default does not manufacture transport outages.
-upstream.keepAliveTimeout = 60000;
+// Keep Node's short idle timeout: the reader must recover a closed connection.
 await new Promise((resolve) => upstream.listen(8085, "127.0.0.1", resolve));
 const browser = await chromium.launch({
   executablePath:
@@ -297,6 +301,7 @@ try {
     ),
   );
   assert.equal(session, null);
+  assert.equal(transportResets, 1, "Holdings ingestion recovered a real connection reset");
   console.log(
     "PASS: connected-wallet access during auth outage without a signature, explicit verified sign-in after recovery, real API/DB session reuse, four chart types, empty intervals, live revisions, preserved trade draft, wallet holdings, mobile layout, zero healthy-mode browser RPC reads, automatic outage/stale fallback and automatic GraphQL recovery.",
   );
