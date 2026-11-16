@@ -194,8 +194,15 @@ Transaction sends still happen once. When receipts are unavailable, the guarded
 signing provider checks the existing signature through RPC. Only confirmed or
 finalized success clears the pending receipt; processed, missing and failed RPC
 reads never authorize a duplicate send. Reload protection remains in session
-storage. A previously pending receipt that completes requires review before
-another send.
+storage. The guarded provider saves the signed identifier before broadcast, so a
+lost RPC reply or confirmation timeout remains protected after a reload. A
+confirmation retry reuses the existing broadcast result. Definitive preflight
+rejection releases an unsent attempt. An absent signature can be released after
+its known recent-blockhash expiry is passed at finalized commitment and a second
+status read remains absent; processed-only failures and unknown expiry never
+clear the guard. A previously pending receipt that completes or expires requires
+review before another send. The RPC holdings worker independently retries a
+transient connection/read failure once, without retrying RPC rejections or writes.
 
 Historical OHLCV and shared-fill replay cannot be reconstructed from current
 account snapshots. Those charts/history queries show an indexer error until

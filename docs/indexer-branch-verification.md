@@ -29,6 +29,33 @@ unverified user record and start tracking, without creating a session or writing
 balances. Later signature verification upgrades the same profile ID. Recovery
 checks existing sessions only and does not automatically open a wallet prompt.
 
+## Latest careful review
+
+A further review found and fixed two additional gaps:
+
+- Broadcast/confirmation failures could occur before the old receipt guard saved
+  a signature. The guarded provider now records the signed transaction before
+  broadcast, persists its known blockhash expiry, checks the RPC-returned
+  signature and reuses one broadcast result during confirmation retries. Legacy,
+  versioned and sequential batch sends have regression coverage.
+- A closed idle RPC connection could repeatedly fail the first holdings read.
+  Holdings ingestion now retries a transport read once. It does not retry RPC
+  rejections, schema errors or transaction writes. The browser fixture injects
+  a real connection reset and retains a short HTTP idle timeout.
+
+Processed-only transaction errors do not clear pending sends. An absent signature
+can expire only after its known last-valid block height is passed at finalized
+commitment and a second status read remains absent without moving backwards in
+context. Unknown expiry stays guarded. Definitive preflight rejection releases
+an unsent attempt; all other ambiguous results keep the original signature.
+
+Current checks pass: 84 ordinary Rust tests, 17 PostgreSQL integration tests
+including the real browser/API/database flow, 23 frontend indexer/receipt/auth
+regressions, strict Clippy, frontend type checks, IDL agreement and the existing
+frontend regression scripts. Enabled and disabled production builds also pass.
+These are local fixture checks, not a program upgrade or live deployment test.
+The broader-design open items below remain open.
+
 ## Implemented and checked locally
 
 - Modular Rust ingestion, processing, storage and GraphQL resolvers; frontend
