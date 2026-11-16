@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SharedWalletButton } from "./network-wallet-provider";
+import { WalletSessionStatus } from "./wallet-session-provider";
 import { DisplayPreferences } from "./display-preferences";
 import { BrandMark, OutcomiaBrand } from "./workspace-brand";
 export { OutcomiaBrand } from "./workspace-brand";
@@ -254,6 +255,7 @@ export function AppHeader() {
             {NETWORK}
           </span>
           <DisplayPreferences />
+          <WalletSessionStatus />
           <SharedWalletButton />
         </div>
       </header>

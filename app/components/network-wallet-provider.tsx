@@ -12,6 +12,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useCantonWallet } from "./canton-wallet-provider";
 import { useI18n } from "./preferences-provider";
+import { INDEXER_ENABLED } from "../lib/graphql/client";
 import { walletError } from "../lib/console-wallet";
 
 type Chain = "solana" | "canton";
@@ -126,7 +127,16 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
     remember(null);
     setPendingName(null);
     try {
-      if (solana.connected) await solana.disconnect();
+      if (solana.connected) {
+        if (INDEXER_ENABLED)
+          await fetch("/api/indexer/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+            keepalive: true,
+          }).catch(() => {});
+        await solana.disconnect();
+      }
       solana.select(null);
       if (canton.requiresDisconnect) await canton.disconnect();
     } catch (cause) {
@@ -147,7 +157,16 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
     try {
       // Revocation completes before attempting the other wallet. If it fails,
       // stay locally disconnected and show the diagnostic instead of proceeding.
-      if (solana.connected) await solana.disconnect();
+      if (solana.connected) {
+        if (INDEXER_ENABLED)
+          await fetch("/api/indexer/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+            keepalive: true,
+          }).catch(() => {});
+        await solana.disconnect();
+      }
       if (chain === "canton") solana.select(null);
       if (canton.requiresDisconnect) await canton.disconnect();
       if (chain === "canton") {

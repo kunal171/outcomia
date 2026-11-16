@@ -6,6 +6,7 @@ import { OutcomiaBrand } from "./workspace-brand";
 import { DisplayPreferences } from "./display-preferences";
 import { useI18n } from "./preferences-provider";
 import { SolanaWorkspaceProvider } from "./solana-provider";
+import { WalletSessionProvider } from "./wallet-session-provider";
 import { ProtocolRoleProvider } from "./protocol-role-provider";
 import {
   SharedWalletButton,
@@ -61,7 +62,9 @@ export function NetworkBoundary({ children }: { children: ReactNode }) {
   if (chain === "solana")
     return (
       <SolanaWorkspaceProvider>
-        <ProtocolRoleProvider>{children}</ProtocolRoleProvider>
+        <WalletSessionProvider>
+          <ProtocolRoleProvider>{children}</ProtocolRoleProvider>
+        </WalletSessionProvider>
       </SolanaWorkspaceProvider>
     );
   return <>{children}</>;
