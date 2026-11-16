@@ -14,6 +14,21 @@ mod reporter;
 mod shutdown;
 mod storage;
 
+use ingestion::accounts as account_ingest;
+use ingestion::backfill;
+use ingestion::live;
+use ingestion::rpc;
+use ingestion::subscription;
+use ingestion::transactions as processor;
+use ingestion::wallets as wallet_ingest;
+use processing::account_codec as account_data;
+use processing::account_projection as account_store;
+use processing::charts;
+use processing::decoder;
+use processing::events;
+use processing::executions;
+use processing::mints;
+
 use std::{
     error::Error,
     io,
@@ -92,13 +107,16 @@ async fn recover_and_report(
 /// Normal completion on shutdown or a bounded historical run that needs another launch; healthy
 /// live mode keeps running.
 async fn main() -> Result<(), BoxError> {
+    if std::env::args().any(|arg| arg == "--schema") {
+        println!("{}", api::schema_sdl());
+        return Ok(());
+    }
     let config = Config::from_env()?;
     let program_id = Pubkey::from_str(&config.program_id)?;
     let pool = connect(&config.database_url).await?;
 
     println!("Outcomia indexer");
-    println!("RPC endpoint: {}", config.rpc_url);
-    println!("WebSocket endpoint: {}", config.websocket_url);
+    println!("RPC and WebSocket endpoints configured for devnet");
     println!("Program: {program_id}");
     println!("PostgreSQL connected; pool size={}", pool.size());
 
@@ -116,6 +134,7 @@ async fn main() -> Result<(), BoxError> {
         CommitmentConfig::finalized(),
     ));
 
+    account_ingest::verify_identity(&pool, Arc::clone(&client), program_id).await?;
     let auth = auth::state(pool.clone(), &config.app_origin).map_err(io::Error::other)?;
     let api_listener = TcpListener::bind(&config.api_address).await?;
     let router = api::router(pool.clone(), auth);
@@ -135,125 +154,143 @@ async fn main() -> Result<(), BoxError> {
     let mut wallet_worker = tokio::spawn(wallet_ingest::run(pool.clone(), Arc::clone(&client)));
     let history = async {
         loop {
-            let backfill_outcome = run_backfill(
-                client.as_ref(),
-                &pool,
-                &program_id,
-                BackfillConfig {
-                    signature_page_limit: SIGNATURE_PAGE_LIMIT,
-                    max_pages_per_run: MAX_PAGES_PER_RUN,
-                },
-            )
-            .await?;
-            if backfill_outcome != BackfillOutcome::PageLimitReached {
-                break;
-            }
-            tokio::select! {
-                _=tokio::time::sleep(Duration::from_secs(2))=>{},
-                signal=shutdown::wait_for_shutdown()=>{signal?;return Ok(());}
-            }
-        }
-
-        let live_config = LiveGapConfig {
-            signature_page_limit: SIGNATURE_PAGE_LIMIT,
-            max_pages: MAX_PAGES_PER_RUN,
-        };
-        let mut backoff = ReconnectBackoff::new(INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY)?;
-
-        loop {
-            health_state.mark_not_ready();
-
-            let observed_wakeup = Arc::new(AtomicBool::new(false));
-            let wakeup_progress = Arc::clone(&observed_wakeup);
-
-            // Subscribe before catch-up. The PubSub client buffers notifications
-            // while the ready callback closes the HTTP gap, preventing a startup
-            // transaction from landing between those two operations.
-            let subscription = run_log_subscription(
-                &config.websocket_url,
-                &program_id,
-                || {
-                    let client = Arc::clone(&client);
-                    let pool = pool.clone();
-                    let program_id = program_id.to_owned();
-                    let health_state = health_state.clone();
-
-                    async move {
-                        recover_and_report(
-                            client.as_ref(),
-                            &pool,
-                            &program_id,
-                            live_config,
-                            "subscription-ready",
-                        )
-                        .await?;
-
-                        health_state.mark_ready();
-
-                        Ok(())
+            let attempt = async {
+                loop {
+                    let backfill_outcome = run_backfill(
+                        client.as_ref(),
+                        &pool,
+                        &program_id,
+                        BackfillConfig {
+                            signature_page_limit: SIGNATURE_PAGE_LIMIT,
+                            max_pages_per_run: MAX_PAGES_PER_RUN,
+                        },
+                    )
+                    .await?;
+                    if backfill_outcome != BackfillOutcome::PageLimitReached {
+                        break;
                     }
-                },
-                |wakeup| {
-                    let client = Arc::clone(&client);
-                    let pool = pool.clone();
-                    let program_id = program_id.to_owned();
-                    let wakeup_progress = Arc::clone(&wakeup_progress);
-
-                    async move {
-                        println!(
-                            "Finalized log wake-up: slot={} signature={}",
-                            wakeup.slot, wakeup.signature
-                        );
-
-                        recover_and_report(
-                            client.as_ref(),
-                            &pool,
-                            &program_id,
-                            live_config,
-                            "log-wakeup",
-                        )
-                        .await?;
-                        wakeup_progress.store(true, Ordering::Relaxed);
-
-                        Ok(())
-                    }
-                },
-            );
-
-            let subscription_error = tokio::select! {
-                result = subscription => {
-                    match result {
-                        Ok(()) => io::Error::new(
-                            io::ErrorKind::UnexpectedEof,
-                            "Solana log subscription ended without an error",
-                        ).into(),
-                        Err(error) => error,
+                    tokio::select! {
+                        _=tokio::time::sleep(Duration::from_secs(2))=>{},
+                        signal=shutdown::wait_for_shutdown()=>{signal?;return Ok(());}
                     }
                 }
-                signal = shutdown::wait_for_shutdown() => {
-                    let signal = signal?;
-                    println!("{signal} received; indexer stopped cleanly.");
-                    return Ok(());
+
+                let live_config = LiveGapConfig {
+                    signature_page_limit: SIGNATURE_PAGE_LIMIT,
+                    max_pages: MAX_PAGES_PER_RUN,
+                };
+                let mut backoff =
+                    ReconnectBackoff::new(INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY)?;
+
+                loop {
+                    health_state.mark_not_ready();
+
+                    let observed_wakeup = Arc::new(AtomicBool::new(false));
+                    let wakeup_progress = Arc::clone(&observed_wakeup);
+
+                    // Subscribe before catch-up. The PubSub client buffers notifications
+                    // while the ready callback closes the HTTP gap, preventing a startup
+                    // transaction from landing between those two operations.
+                    let subscription = run_log_subscription(
+                        &config.websocket_url,
+                        &program_id,
+                        || {
+                            let client = Arc::clone(&client);
+                            let pool = pool.clone();
+                            let program_id = program_id.to_owned();
+                            let health_state = health_state.clone();
+
+                            async move {
+                                recover_and_report(
+                                    client.as_ref(),
+                                    &pool,
+                                    &program_id,
+                                    live_config,
+                                    "subscription-ready",
+                                )
+                                .await?;
+
+                                health_state.mark_ready();
+
+                                Ok(())
+                            }
+                        },
+                        |wakeup| {
+                            let client = Arc::clone(&client);
+                            let pool = pool.clone();
+                            let program_id = program_id.to_owned();
+                            let wakeup_progress = Arc::clone(&wakeup_progress);
+
+                            async move {
+                                println!(
+                                    "Finalized log wake-up: slot={} signature={}",
+                                    wakeup.slot, wakeup.signature
+                                );
+
+                                recover_and_report(
+                                    client.as_ref(),
+                                    &pool,
+                                    &program_id,
+                                    live_config,
+                                    "log-wakeup",
+                                )
+                                .await?;
+                                wakeup_progress.store(true, Ordering::Relaxed);
+
+                                Ok(())
+                            }
+                        },
+                    );
+
+                    let subscription_error = tokio::select! {
+                        _=tokio::time::sleep(Duration::from_secs(30))=>io::Error::other("periodic finalized reconciliation").into(),
+                        result = subscription => {
+                            match result {
+                                Ok(()) => io::Error::new(
+                                    io::ErrorKind::UnexpectedEof,
+                                    "Solana log subscription ended without an error",
+                                ).into(),
+                                Err(error) => error,
+                            }
+                        }
+                        signal = shutdown::wait_for_shutdown() => {
+                            let signal = signal?;
+                            println!("{signal} received; indexer stopped cleanly.");
+                            return Ok(());
+                        }
+                    };
+
+                    if observed_wakeup.load(Ordering::Relaxed) {
+                        backoff.reset();
+                    }
+
+                    let delay = backoff.next_delay();
+                    eprintln!(
+                        "Live subscription stopped: {subscription_error}; retrying in {}s",
+                        delay.as_secs()
+                    );
+
+                    tokio::select! {
+                        () = tokio::time::sleep(delay) => {}
+                        signal = shutdown::wait_for_shutdown() => {
+                            let signal = signal?;
+                            println!("{signal} received during reconnect delay.");
+                            return Ok(());
+                        }
+                    }
                 }
             };
-
-            if observed_wakeup.load(Ordering::Relaxed) {
-                backoff.reset();
-            }
-
-            let delay = backoff.next_delay();
-            eprintln!(
-                "Live subscription stopped: {subscription_error}; retrying in {}s",
-                delay.as_secs()
-            );
-
-            tokio::select! {
-                () = tokio::time::sleep(delay) => {}
-                signal = shutdown::wait_for_shutdown() => {
-                    let signal = signal?;
-                    println!("{signal} received during reconnect delay.");
-                    return Ok(());
+            let result: Result<(), BoxError> = attempt.await;
+            match result {
+                Ok(()) => return Ok(()),
+                Err(error) => {
+                    health_state.mark_not_ready();
+                    eprintln!("Historical ingestion paused: {error}");
                 }
+            }
+            tokio::select! {
+              _=tokio::time::sleep(Duration::from_secs(5))=>{},
+              signal=shutdown::wait_for_shutdown()=>{signal?;return Ok(());}
             }
         }
     };
@@ -266,12 +303,3 @@ async fn main() -> Result<(), BoxError> {
         _=&mut chart_worker=>Err(io::Error::other("chart projection worker stopped").into()),
     }
 }
-
-use processing::account_codec as account_data;
-use processing::account_projection as account_store;
-use processing::{charts, decoder, events, executions, mints};
-
-use ingestion::accounts as account_ingest;
-use ingestion::wallets as wallet_ingest;
-use ingestion::transactions as processor;
-use ingestion::{backfill, live, rpc, subscription};
