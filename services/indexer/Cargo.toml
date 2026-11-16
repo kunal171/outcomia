@@ -40,3 +40,11 @@ serde_json = "=1.0.154"
 solana-pubsub-client = "=4.3.0"
 futures-util = "=0.3.34"
 axum = "=0.8.9"
+
+# Read API and wallet message authentication; chain dependencies remain isolated.
+async-graphql = { version = "=7.2.1", default-features = false, features = ["graphiql"] }
+ed25519-dalek = "=2.2.0"
+rand = "=0.8.8"
+sha2 = "=0.10.9"
+bs58 = "=0.5.1"
+tower = { version = "=0.5.3", features = ["util"] }
