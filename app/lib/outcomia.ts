@@ -1,4 +1,4 @@
-import { sendWithIndexedReceipt } from "./graphql/receipts";
+import { createGuardedProvider } from "./transactions/provider";
 import { getLatestTrade as indexedLatestTrade } from "./graphql/markets";
 import { indexedAccounts, indexedReader, usesIndexer } from "./indexed-accounts";
 import { readWithRpcFallback } from "./read-source";
@@ -241,14 +241,7 @@ export function getOutcomiaProgram(
   connection: Connection,
   wallet: BrowserWallet,
 ) {
-  const provider = new AnchorProvider(connection, wallet, {
-    commitment: "confirmed",
-    preflightCommitment: "confirmed",
-  });
-
-  const send = provider.sendAndConfirm.bind(provider);
-  provider.sendAndConfirm = (...args) =>
-    sendWithIndexedReceipt(wallet.publicKey, () => send(...args), connection);
+  const provider = createGuardedProvider(connection, wallet);
   return new Program(outcomiaIdl as Idl, provider);
 }
 

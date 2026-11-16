@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 const require = createRequire(import.meta.url);
-const { Program, BN, AnchorProvider } = require("@anchor-lang/core"), { PublicKey } = require("@solana/web3.js");
+const { Program, BN, AnchorProvider, utils } = require("@anchor-lang/core"), { PublicKey, Keypair, Transaction, SystemProgram, VersionedTransaction, TransactionMessage, SendTransactionError } = require("@solana/web3.js");
 const idl = JSON.parse(readFileSync(new URL("../idl/outcomia.json", import.meta.url)));
 const fixtures = JSON.parse(readFileSync(new URL("../../services/indexer/tests/fixtures/account-wire.json", import.meta.url)));
 function load(respond = () => { throw new Error("Unexpected HTTP"); }, session = new Map(), enabled = true) {
@@ -119,9 +119,10 @@ test("wallet sends share one receipt guard across forms and retain timed-out sig
 test("all signing programs apply the receipt guard and disabled rollout preserves direct sending", async () => {
   const original = AnchorProvider.prototype.sendAndConfirm;
   let sends = 0;
+  const sentTransaction = {};
   AnchorProvider.prototype.sendAndConfirm = async function (transaction) {
     assert.ok(this instanceof AnchorProvider);
-    assert.equal(transaction, "transaction");
+    assert.equal(transaction, sentTransaction);
     sends++;
     return "provider-signature";
   };
@@ -129,11 +130,11 @@ test("all signing programs apply the receipt guard and disabled rollout preserve
     const owner = new PublicKey(Buffer.alloc(32, 13));
     const client = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }));
     const program = client.getOutcomiaProgram({}, { publicKey: owner });
-    await assert.rejects(program.provider.sendAndConfirm("transaction"), /Do not resubmit/);
-    await assert.rejects(program.provider.sendAndConfirm("transaction"), /Do not resubmit/);
+    await assert.rejects(program.provider.sendAndConfirm(sentTransaction), /Do not resubmit/);
+    await assert.rejects(program.provider.sendAndConfirm(sentTransaction), /Do not resubmit/);
     assert.equal(sends, 1);
     const disabled = load(undefined, new Map(), false).getOutcomiaProgram({}, { publicKey: owner });
-    assert.equal(await disabled.provider.sendAndConfirm("transaction"), "provider-signature");
+    assert.equal(await disabled.provider.sendAndConfirm(sentTransaction), "provider-signature");
     assert.equal(sends, 2);
   } finally {
     AnchorProvider.prototype.sendAndConfirm = original;
@@ -235,6 +236,8 @@ test("receipt outages use confirmed RPC status; missing/processed status never c
   await assert.rejects(client.sendWithIndexedReceipt(owner, async () => { sends++; return "rpc-receipt"; }, connection), /Do not resubmit/);
   await assert.rejects(client.sendWithIndexedReceipt(owner, async () => { sends++; }, connection), /Do not resubmit/);
   assert.equal(sends, 1);
+  status = { err: { InstructionError: [0, "Custom"] }, confirmationStatus: "processed" };
+  await assert.rejects(client.checkPendingTransaction(owner, connection), /Do not resubmit/);
   status = null;
   await assert.rejects(client.checkPendingTransaction(owner, connection), /Do not resubmit/);
   status = { err: null, confirmationStatus: "confirmed" };
@@ -289,4 +292,148 @@ test("unavailable wallet authentication is distinguishable from rejection and ne
     !(error instanceof rejected.IndexerUnavailableError) && /Signature rejected/.test(error.message));
   const recovered = load(() => ({ id: "id", wallet: "wallet" }));
   assert.equal((await recovered.callWalletAuth("me")).id, "id");
+});
+
+function realSigningFixture(client, sendRaw, overrides = {}) {
+  const payer = Keypair.fromSeed(Buffer.alloc(32, 30));
+  const blockhash = new PublicKey(Buffer.alloc(32, 31)).toBase58();
+  let signs = 0;
+  const connection = {
+    getLatestBlockhash: async () => ({ blockhash, lastValidBlockHeight: 100 }),
+    getSignatureStatuses: async () => ({ context: { slot: 100 }, value: [null] }),
+    getBlockHeight: async () => 50,
+    sendRawTransaction: sendRaw,
+    confirmTransaction: async () => ({ context: { slot: 100 }, value: { err: null } }),
+    ...overrides,
+  };
+  const wallet = { publicKey: payer.publicKey, signTransaction: async tx => { signs++; if (tx instanceof VersionedTransaction) tx.sign([payer]); else tx.partialSign(payer); return tx; } };
+  const program = client.getOutcomiaProgram(connection, wallet);
+  const transaction = () => new Transaction().add(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: new PublicKey(Buffer.alloc(32, 32)), lamports: 1 }));
+  return { owner: payer.publicKey, program, transaction, connection, signs: () => signs };
+}
+
+test("broadcast reply loss and confirmation timeout persist the signed signature before another send", async () => {
+  for (const stage of ["broadcast", "confirmation"]) {
+    const storage = new Map();
+    const client = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }), storage);
+    let sends = 0, signature;
+    const fixture = realSigningFixture(client, async raw => {
+      sends++;
+      signature = utils.bytes.bs58.encode(VersionedTransaction.deserialize(raw).signatures[0]);
+      if (stage === "broadcast") throw new Error("Network reply lost");
+      return signature;
+    }, { confirmTransaction: async () => { throw new Error("Confirmation timed out"); } });
+    await assert.rejects(fixture.program.provider.sendAndConfirm(fixture.transaction()), /Do not resubmit/);
+    const saved = JSON.parse([...storage.values()][0]);
+    assert.equal(saved.signature, signature); assert.equal(saved.lastValidBlockHeight, 100);
+    assert.equal(sends, 1); assert.equal(fixture.signs(), 1);
+    const reloaded = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }), storage);
+    const second = realSigningFixture(reloaded, async () => { sends++; });
+    await assert.rejects(second.program.provider.sendAndConfirm(second.transaction()), /Do not resubmit/);
+    assert.equal(sends, 1); assert.equal(second.signs(), 0);
+  }
+});
+
+test("only an absent signature past its known finalized expiry can release an ambiguous send", async () => {
+  const storage = new Map();
+  const client = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }), storage);
+  let height = 50, status = null;
+  const fixture = realSigningFixture(client, async () => { throw new Error("Unknown broadcast result"); }, {
+    getBlockHeight: async () => height,
+    getSignatureStatuses: async () => ({ context: { slot: 100 }, value: [status] }),
+  });
+  await assert.rejects(fixture.program.provider.sendAndConfirm(fixture.transaction()), /Do not resubmit/);
+  await assert.rejects(client.checkPendingTransaction(fixture.owner, fixture.connection), /Do not resubmit/);
+  height = 101;
+  status = { err: null, confirmationStatus: "processed" };
+  await assert.rejects(client.checkPendingTransaction(fixture.owner, fixture.connection), /Do not resubmit/);
+  fixture.connection.getSignatureStatuses = async () => ({ context: { slot: 100 }, value: [] });
+  await assert.rejects(client.checkPendingTransaction(fixture.owner, fixture.connection), /Do not resubmit/);
+  fixture.connection.getSignatureStatuses = async () => ({ context: { slot: 100 }, value: [null] });
+  await assert.rejects(client.checkPendingTransaction(fixture.owner, fixture.connection), /expired without confirmation.*Refresh and review/);
+  assert.equal(storage.size, 0);
+});
+
+test("preflight rejection releases the guard and confirmation retry never rebroadcasts", async () => {
+  const storage = new Map();
+  const rejected = load(() => ({ data: { transaction: { status: "CONFIRMED_INDEXED" } } }), storage);
+  const preflight = realSigningFixture(rejected, async () => { throw new SendTransactionError({ action: "simulate", signature: "", transactionMessage: "Insufficient funds" }); });
+  await assert.rejects(preflight.program.provider.sendAndConfirm(preflight.transaction()), /Simulation failed/);
+  assert.equal(storage.size, 0);
+  let sends = 0, confirmations = 0;
+  const successful = realSigningFixture(rejected, async raw => {
+    sends++; return utils.bytes.bs58.encode(VersionedTransaction.deserialize(raw).signatures[0]);
+  }, { confirmTransaction: async () => {
+    confirmations++;
+    if (confirmations === 1) { const error = new Error("Temporary timeout"); error.name = "TimeoutError"; throw error; }
+    return { context: { slot: 100 }, value: { err: null } };
+  } });
+  await successful.program.provider.sendAndConfirm(successful.transaction());
+  assert.equal(sends, 1); assert.equal(confirmations, 2); assert.equal(storage.size, 0);
+});
+
+test("an RPC signature mismatch retains the actual signed transaction", async () => {
+  const storage = new Map();
+  const client = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }), storage);
+  let signed;
+  const fixture = realSigningFixture(client, async raw => {
+    signed = utils.bytes.bs58.encode(VersionedTransaction.deserialize(raw).signatures[0]);
+    return "different-signature";
+  });
+  await assert.rejects(fixture.program.provider.sendAndConfirm(fixture.transaction()), /Do not resubmit/);
+  assert.equal(JSON.parse([...storage.values()][0]).signature, signed);
+});
+
+test("unknown blockhash expiry stays guarded and batch sends retain the same protection", async () => {
+  const storage = new Map();
+  const client = load(() => ({ data: { transaction: { status: "PENDING_INDEXING" } } }), storage);
+  const fixture = realSigningFixture(client, async () => { throw new Error("Broadcast response lost"); }, { getBlockHeight: async () => 100000 });
+  const prepared = fixture.transaction();
+  prepared.recentBlockhash = new PublicKey(Buffer.alloc(32, 33)).toBase58();
+  await assert.rejects(fixture.program.provider.sendAndConfirm(prepared), /Do not resubmit/);
+  assert.equal(JSON.parse([...storage.values()][0]).lastValidBlockHeight, undefined);
+  await assert.rejects(client.checkPendingTransaction(fixture.owner, fixture.connection), /Do not resubmit/);
+
+  const healthy = load(() => ({ data: { transaction: { status: "FINALIZED_INDEXED" } } }));
+  let sends = 0;
+  const batch = realSigningFixture(healthy, async raw => {
+    sends++; return utils.bytes.bs58.encode(VersionedTransaction.deserialize(raw).signatures[0]);
+  });
+  const tx1 = batch.transaction(), tx2 = batch.transaction();
+  tx2.add(SystemProgram.transfer({ fromPubkey: batch.owner, toPubkey: new PublicKey(Buffer.alloc(32, 34)), lamports: 2 }));
+  const signatures = await batch.program.provider.sendAll([{ tx: tx1 }, { tx: tx2 }]);
+  assert.equal(signatures.length, 2); assert.equal(sends, 2);
+});
+
+test("versioned transactions keep their signed identity and wallet rejection creates no pending send", async () => {
+  const storage = new Map();
+  const client = load(() => ({ data: { transaction: { status: "FINALIZED_INDEXED" } } }), storage);
+  let sends = 0;
+  const fixture = realSigningFixture(client, async raw => {
+    sends++; return utils.bytes.bs58.encode(VersionedTransaction.deserialize(raw).signatures[0]);
+  });
+  const blockhash = new PublicKey(Buffer.alloc(32, 35)).toBase58();
+  const message = new TransactionMessage({
+    payerKey: fixture.owner, recentBlockhash: blockhash,
+    instructions: fixture.transaction().instructions,
+  }).compileToV0Message();
+  await fixture.program.provider.sendAndConfirm(new VersionedTransaction(message), [], {
+    commitment: "confirmed", preflightCommitment: "confirmed",
+    blockhash: { blockhash, lastValidBlockHeight: 100 },
+  });
+  assert.equal(sends, 1); assert.equal(storage.size, 0);
+  fixture.program.provider.wallet.signTransaction = async () => { throw new Error("Rejected by wallet"); };
+  await assert.rejects(fixture.program.provider.sendAndConfirm(fixture.transaction()), /Rejected by wallet/);
+  assert.equal(sends, 1); assert.equal(storage.size, 0);
+});
+
+test("pending signatures saved by the earlier client keep their retry protection", async () => {
+  const owner = new PublicKey(Buffer.alloc(32, 36));
+  const storage = new Map([[`outcomia:pending-indexed-transaction:${owner}`, "legacy-signature"]]);
+  let status = "PENDING_INDEXING";
+  const client = load(() => ({ data: { transaction: { status } } }), storage);
+  await assert.rejects(client.checkPendingTransaction(owner), /Do not resubmit/);
+  status = "FINALIZED_INDEXED";
+  await assert.rejects(client.checkPendingTransaction(owner), /Refresh and review/);
+  assert.equal(storage.size, 0);
 });
