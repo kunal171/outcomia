@@ -1,6 +1,16 @@
 /** Shared HTTP transport and in-flight deduplication. Resolvers stay on the indexer. */
 export const INDEXER_ENABLED =
   process.env.NEXT_PUBLIC_INDEXER_ENABLED === "true";
+// A navigation cancellation is not an indexer outage. Abort reads with the page.
+let pageLifetime: AbortController | undefined;
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  pageLifetime = new AbortController();
+  window.addEventListener("pagehide", () => pageLifetime?.abort());
+  window.addEventListener("pageshow", () => {
+    if (pageLifetime?.signal.aborted) pageLifetime = new AbortController();
+  });
+}
+
 /** Availability failures allow read adapters to use their existing RPC reader. */
 export class IndexerUnavailableError extends Error {
   constructor(message: string) {
@@ -14,6 +24,10 @@ export async function graphql<T>(
   variables: Record<string, unknown> = {},
   signal?: AbortSignal,
 ): Promise<T> {
+  const lifetime = pageLifetime?.signal;
+  const signals = [AbortSignal.timeout(5000), ...(signal ? [signal] : []), ...(lifetime ? [lifetime] : [])];
+  const cancelled = (error: unknown) => signal?.aborted || lifetime?.aborted ||
+    (error instanceof Error && error.name === "AbortError");
   let response: Response;
   try {
     response = await fetch("/api/indexer/graphql", {
@@ -21,12 +35,12 @@ export async function graphql<T>(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),
       cache: "no-store",
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(5000)])
-        : AbortSignal.timeout(5000),
+      signal: AbortSignal.any(signals),
     });
+    signal?.throwIfAborted();
+    lifetime?.throwIfAborted();
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (cancelled(error)) throw error;
     throw new IndexerUnavailableError("Indexed data service is unreachable");
   }
   if ([408, 429].includes(response.status) || response.status >= 500)
@@ -35,7 +49,7 @@ export async function graphql<T>(
   try {
     result = await response.json();
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (cancelled(error)) throw error;
     throw new IndexerUnavailableError("Invalid response from indexed data service");
   }
   if (!result || typeof result !== "object" ||
