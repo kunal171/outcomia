@@ -2,7 +2,7 @@
 use serde_json::{json, Map, Value};
 use std::{io, sync::OnceLock};
 
-pub const IDL_BYTES: &str = include_str!("../../../app/idl/outcomia.json");
+pub const IDL_BYTES: &str = include_str!("../../../../app/idl/outcomia.json");
 pub fn idl() -> &'static Value {
     static IDL: OnceLock<Value> = OnceLock::new();
     IDL.get_or_init(|| serde_json::from_str(IDL_BYTES).expect("checked-in IDL"))
@@ -216,6 +216,38 @@ pub fn decode_instruction(bytes: &[u8]) -> io::Result<(String, Value)> {
     Ok((definition["name"].as_str().unwrap().to_owned(), args))
 }
 
+/// Common public-key filters use projection indexes; other memcmp filters retain
+/// byte-exact semantics. Dynamic fields stop fixed-offset discovery.
+pub fn indexed_filter_field(account_type: &str, offset: i32, length: usize) -> Option<String> {
+    if length != 32 {
+        return None;
+    }
+    let definition = idl()["types"]
+        .as_array()?
+        .iter()
+        .find(|d| d["name"] == account_type)?;
+    let mut position = 8_i32;
+    for field in definition["type"]["fields"].as_array()? {
+        let ty = &field["type"];
+        if position == offset && ty == "pubkey" {
+            let name = camel(field["name"].as_str()?);
+            return ["owner", "market", "book", "mint", "authority"]
+                .contains(&name.as_str())
+                .then_some(name);
+        }
+        let width = match ty.as_str() {
+            Some("pubkey") => 32,
+            Some("u64" | "i64") => 8,
+            Some("u32" | "i32") => 4,
+            Some("u16" | "i16") => 2,
+            Some("u8" | "i8" | "bool") => 1,
+            _ => return None,
+        };
+        position += width;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,7 +255,7 @@ mod tests {
     fn agrees_with_anchor_for_every_account_layout() {
         use base64::{engine::general_purpose::STANDARD, Engine};
         let fixtures: Value =
-            serde_json::from_str(include_str!("../tests/fixtures/account-wire.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/fixtures/account-wire.json")).unwrap();
         assert_eq!(
             fixtures.as_array().unwrap().len(),
             idl()["accounts"].as_array().unwrap().len()
@@ -272,5 +304,14 @@ mod tests {
         assert!(decode(&json!({"option":"u8"}), &mut &[2][..], 0).is_err());
         assert!(decode(&json!("bool"), &mut &[2][..], 0).is_err());
         assert_eq!(camel("yes_best_bid"), "yesBestBid");
+        assert_eq!(
+            indexed_filter_field("SharedOrder", 72, 32).as_deref(),
+            Some("book")
+        );
+        assert_eq!(
+            indexed_filter_field("PredictionPosition", 40, 32).as_deref(),
+            Some("owner")
+        );
+        assert!(indexed_filter_field("AssetBalance", 8, 31).is_none());
     }
 }

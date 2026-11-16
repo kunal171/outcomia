@@ -4,21 +4,15 @@
 //! live recovery, reconnect policy, and shutdown. Decoding, persistence, and
 //! the individual ingestion state machines remain in focused modules.
 
-mod account_data;
 mod account_ingest;
-mod account_store;
 mod api;
 mod auth;
 mod backfill;
-mod charts;
 mod config;
-mod decoder;
-mod events;
-mod executions;
 mod health;
 mod live;
-mod mints;
 mod processor;
+mod processing;
 mod reporter;
 mod rpc;
 mod shutdown;
@@ -278,3 +272,7 @@ async fn main() -> Result<(), BoxError> {
         _=&mut chart_worker=>Err(io::Error::other("chart projection worker stopped").into()),
     }
 }
+
+use processing::account_codec as account_data;
+use processing::account_projection as account_store;
+use processing::{charts, decoder, events, executions, mints};
