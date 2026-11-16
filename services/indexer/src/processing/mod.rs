@@ -6,3 +6,4 @@ pub mod decoder;
 pub mod events;
 pub mod executions;
 pub mod mints;
+pub mod wallet_registry;

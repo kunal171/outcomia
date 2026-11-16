@@ -123,6 +123,10 @@ async fn refresh(pool: &PgPool, client: Arc<RpcClient>, owner: &str, level: &str
 }
 pub async fn run(pool: PgPool, client: Arc<RpcClient>) {
     loop {
+        // Recovery works even for wallets that deposited while login was unavailable.
+        if let Err(error) = crate::processing::wallet_registry::discover(&pool).await {
+            eprintln!("Wallet discovery unavailable: {error}");
+        }
         // A rotating two-wallet batch bounds upstream work even under many logins.
         let wallets:std::result::Result<Vec<String>,_>=sqlx::query_scalar("SELECT w.owner FROM tracked_wallets w LEFT JOIN wallet_sync s ON s.owner=w.owner AND s.commitment='confirmed' WHERE w.requested_at>NOW()-INTERVAL '30 minutes' AND (s.observed_at IS NULL OR s.observed_at<NOW()-INTERVAL '20 seconds') ORDER BY s.observed_at NULLS FIRST LIMIT 2").fetch_all(&pool).await;
         if let Ok(wallets) = wallets {
