@@ -1,4 +1,5 @@
 "use client";
+import { hasRpcFallback, subscribeReadSource } from "../lib/read-source";
 import { openRevisionStream } from "../lib/graphql/subscriptions";
 import { useEffect, useRef } from "react";
 import { INDEXER_ENABLED } from "../lib/graphql/client";
@@ -26,6 +27,16 @@ export function useIndexerStream(owner: string) {
     const controller = new AbortController();
     const notify = () =>
       window.dispatchEvent(new CustomEvent("outcomia:indexed-update"));
+    let fallback = hasRpcFallback(owner);
+    const stopWatching = subscribeReadSource(() => {
+      const next = hasRpcFallback(owner);
+      if (fallback && !next) notify();
+      fallback = next;
+    });
+    // The stream may be unavailable too. Keep current RPC reads live and retry GraphQL.
+    const polling = setInterval(() => {
+      if (hasRpcFallback(owner)) notify();
+    }, 15000);
     void (async () => {
       let delay = 1000;
       while (!controller.signal.aborted) {
@@ -57,7 +68,8 @@ export function useIndexerStream(owner: string) {
             await reader.cancel().catch(() => {});
           }
         } catch {
-          /* Reconnect and obtain a complete committed revision. */
+          // Detect an outage even before a user manually refreshes the screen.
+          if (!controller.signal.aborted && !hasRpcFallback(owner)) notify();
         }
         if (!controller.signal.aborted)
           await new Promise<void>((resolve) => {
@@ -72,6 +84,10 @@ export function useIndexerStream(owner: string) {
         delay = Math.min(delay * 2, 30000);
       }
     })();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      clearInterval(polling);
+      stopWatching();
+    };
   }, [owner]);
 }

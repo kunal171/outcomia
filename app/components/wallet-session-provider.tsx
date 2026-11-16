@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { ReadSourceStatus } from "./read-source-status";
 import { useIndexerStream } from "./use-indexer-updates";
 import { INDEXER_ENABLED } from "../lib/graphql/client";
 type User = { id: string; wallet: string };
@@ -170,12 +171,7 @@ export function WalletSessionStatus() {
           {session.busy ? "Signing in…" : "Sign in"}
         </button>
       )}
-      <small
-        className="indexed-commitment"
-        title="Book and balance updates await finalization. Charts show finalized executions."
-      >
-        Confirmed live data
-      </small>
+      <ReadSourceStatus />
       {session.error && (
         <details>
           <summary>Sign-in status</summary>
