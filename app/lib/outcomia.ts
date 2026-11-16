@@ -1,3 +1,4 @@
+import { indexedAccounts, indexedReader } from "./indexer-client";
 import {
   AnchorProvider,
   BN,
@@ -245,11 +246,11 @@ export function getOutcomiaProgram(
 }
 
 export function getOutcomiaReadProgram(connection: Connection) {
-  return new Program(outcomiaIdl as Idl, { connection });
+  return indexedReader(new Program(outcomiaIdl as Idl, { connection }));
 }
 
 export function getOutcomiaAccounts(program: Program): OutcomiaAccounts {
-  return program.account as unknown as OutcomiaAccounts;
+  return indexedAccounts(program) as unknown as OutcomiaAccounts;
 }
 
 export function deriveProtocolConfigPda() {

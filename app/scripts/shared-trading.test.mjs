@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { loadTypeScript } from "./support/typescript.mjs";
+const indexed = loadTypeScript(new URL("../lib/indexer-client.ts", import.meta.url));
 const require = createRequire(import.meta.url),
   { BN, Program } = require("@anchor-lang/core"),
   { PublicKey, Connection, Transaction } = require("@solana/web3.js");
@@ -32,7 +34,7 @@ runInNewContext(
     Buffer,
     process: { env: {} },
     require: (name) =>
-      name === "./solana"
+      name === "./indexer-client" ? indexed : name === "./solana"
         ? { PROGRAM_ID: programId }
         : name === "./outcomia"
           ? { deriveProtocolConfigPda: () => derive("protocol_config") }

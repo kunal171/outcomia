@@ -1,3 +1,4 @@
+import { indexedAccounts } from "./indexer-client";
 /** Shared custody uses mint/owner PDAs; orders and YES/NO remain tied to one book.
  * Keep this rollout disabled until the program and generated IDL are deployed together. */
 import { BN, type Program } from "@anchor-lang/core";
@@ -77,7 +78,7 @@ interface Reader<T> {
   ): Promise<{ publicKey: PublicKey; account: T }[]>;
 }
 export function sharedAccounts(p: Program) {
-  return p.account as unknown as {
+  return indexedAccounts(p) as unknown as {
     assetBalance: Reader<AssetBalance>;
     sharedBook: Reader<SharedBook>;
     sharedOrder: Reader<SharedOrder>;

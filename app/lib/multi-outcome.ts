@@ -1,3 +1,4 @@
+import { indexedAccounts } from "./indexer-client";
 import { BN, type Program } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
@@ -105,7 +106,7 @@ interface Reader<T> {
   ): Promise<{ publicKey: PublicKey; account: T }[]>;
 }
 export const multiAccounts = (p: Program) =>
-  p.account as unknown as {
+  indexedAccounts(p) as unknown as {
     multiOutcomeTermsBuffer: Reader<{
       authority: PublicKey;
       marketId: number[];
