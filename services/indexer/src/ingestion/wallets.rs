@@ -1,7 +1,10 @@
 //! Bounded, shared discovery of external assets for authenticated tracked wallets.
 use serde_json::{json, Value};
 use solana_rpc_client::rpc_client::RpcClient;
-use solana_rpc_client_api::request::RpcRequest;
+use solana_rpc_client_api::{
+    client_error::{Error as ClientError, ErrorKind},
+    request::RpcRequest,
+};
 use sqlx::PgPool;
 use std::{collections::BTreeMap, error::Error, sync::Arc, time::Duration};
 const TOKEN: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -87,18 +90,52 @@ fn parse(owner: &str, balance: Value, tokens: Value) -> Result<Vec<Holding>> {
     });
     Ok(values)
 }
+// A closed idle HTTP connection can fail the first read while the next one
+// succeeds. Retry reads once; never retry schema errors, RPC errors or writes.
+fn read_retry_once<T>(
+    mut read: impl FnMut() -> std::result::Result<T, ClientError>,
+) -> std::result::Result<T, ClientError> {
+    let result = read();
+    let retry = match &result {
+        Err(error) => match error.kind() {
+            ErrorKind::Io(error) => matches!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::UnexpectedEof
+                    | std::io::ErrorKind::TimedOut
+            ),
+            ErrorKind::Reqwest(error) => {
+                error.is_connect() || error.is_timeout() || error.is_request() || error.is_body()
+            }
+            _ => false,
+        },
+        Ok(_) => false,
+    };
+    if retry {
+        read()
+    } else {
+        result
+    }
+}
+
 async fn refresh(pool: &PgPool, client: Arc<RpcClient>, owner: &str, level: &str) -> Result<()> {
     let wallet = owner.to_owned();
     let commitment = level.to_owned();
     let (sol, tokens) = tokio::task::spawn_blocking(move || {
-        let sol: Value = client.send(
-            RpcRequest::GetBalance,
-            json!([wallet,{"commitment":commitment}]),
-        )?;
-        let tokens: Value = client.send(
+        let sol: Value = read_retry_once(|| {
+            client.send(
+                RpcRequest::GetBalance,
+                json!([wallet,{"commitment":commitment}]),
+            )
+        })?;
+        let tokens: Value = read_retry_once(|| {
+            client.send(
             RpcRequest::GetTokenAccountsByOwner,
             json!([wallet,{"programId":TOKEN},{"commitment":commitment,"encoding":"jsonParsed"}]),
-        )?;
+        )
+        })?;
         Ok::<_, Box<dyn Error + Send + Sync>>((sol, tokens))
     })
     .await??;
@@ -154,5 +191,40 @@ mod tests {
         assert_eq!(values[0].frozen, 9007199254740993);
         assert_eq!(values[0].count, 2);
         assert_eq!(values[1].mint, "NATIVE_SOL");
+    }
+    #[test]
+    fn retry_is_bounded_and_only_for_transport_reads() {
+        let mut calls = 0;
+        let recovered = read_retry_once(|| {
+            calls += 1;
+            if calls == 1 {
+                Err(ClientError::from(std::io::Error::from(
+                    std::io::ErrorKind::ConnectionReset,
+                )))
+            } else {
+                Ok(42)
+            }
+        })
+        .unwrap();
+        assert_eq!(recovered, 42);
+        assert_eq!(calls, 2);
+        calls = 0;
+        let unavailable: std::result::Result<(), _> = read_retry_once(|| {
+            calls += 1;
+            Err(ClientError::from(std::io::Error::from(
+                std::io::ErrorKind::ConnectionReset,
+            )))
+        });
+        assert!(unavailable.is_err());
+        assert_eq!(calls, 2);
+        calls = 0;
+        let rejected: std::result::Result<(), _> = read_retry_once(|| {
+            calls += 1;
+            Err(ClientError::from(ErrorKind::Custom(
+                "RPC parameters rejected".into(),
+            )))
+        });
+        assert!(rejected.is_err());
+        assert_eq!(calls, 1);
     }
 }
