@@ -38,7 +38,10 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 let messages = 0,
-  rpcReads = 0;
+  rpcReads = 0,
+  fallbackReads = 0,
+  indexerMode = "healthy";
+const fallbackMethods = new Set();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const privateKey = createPrivateKey({
@@ -108,14 +111,29 @@ await page.addInitScript(
   },
   { address: owner.toBase58(), publicKey: [...owner.toBytes()] },
 );
-await page.route("**/*", (route) => {
+await page.route("**/*", async (route) => {
   const request = route.request(),
     url = new URL(request.url());
+  if (request.method() === "POST" && url.pathname === "/api/indexer/graphql" && indexerMode !== "healthy") {
+    return route.fulfill(indexerMode === "down"
+      ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: "Fixture indexer unavailable" }) }
+      : { status: 200, contentType: "application/json", body: JSON.stringify({ errors: [{ message: "Account index is warming or stale" }] }) });
+  }
   if (request.method() === "POST") {
     try {
       if (request.postDataJSON()?.jsonrpc) {
-        rpcReads++;
-        return route.abort();
+        if (indexerMode === "healthy" && fallbackReads === 0) {
+          rpcReads++;
+          console.log("Unexpected healthy RPC read:", request.postDataJSON().method, page.url());
+          return route.abort();
+        }
+        fallbackReads++;
+        const body = request.postDataJSON();
+        fallbackMethods.add(body.method);
+        return route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ jsonrpc: "2.0", id: body.id, result: await rpc(body) }),
+        });
       }
     } catch {}
   }
@@ -153,6 +171,23 @@ try {
     "12",
     "Live data refresh must preserve the trade draft",
   );
+  // First login starts wallet tracking asynchronously; wait for a healthy fixture
+  // before measuring the steady-state GraphQL-only path.
+  let walletReady = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const response = await fetch("http://127.0.0.1:8084/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "query($owner:String!){walletAssets(owner:$owner)}", variables: { owner: owner.toBase58() } }),
+    });
+    const result = await response.json();
+    if (result.data?.walletAssets?.some(asset => asset.mint === "NATIVE_SOL")) {
+      walletReady = true;
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  assert.ok(walletReady, "Backend wallet holdings are ready before the steady-state check");
   await page.goto(new URL("/wallet", base).href);
   await page.getByText("Signed in", { exact: true }).waitFor();
   await page.waitForFunction(
@@ -188,6 +223,36 @@ try {
   );
   assert.equal(rpcReads, 0, "Indexed page rendering must not call Solana RPC");
   assert.deepEqual(errors, []);
+  // Exercise an outage and recovery with actual browser RPC reads, not a remount toggle.
+  indexerMode = "down";
+  await page.goto(new URL("/wallet", base).href);
+  await page.getByText("RPC fallback · confirmed", { exact: true }).waitFor({ timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector(".wallet-summary article strong")?.textContent.trim() === "1 SOL");
+  assert.ok(fallbackReads > 0);
+  assert.ok(fallbackMethods.has("getBalance"));
+  assert.ok(fallbackMethods.has("getTokenAccountsByOwner"));
+  indexerMode = "healthy";
+  await page.getByText("GraphQL live · confirmed", { exact: true }).waitFor({ timeout: 45000 });
+
+  await page.goto(new URL(`/predictions/multi/${market}`, base).href);
+  await page.getByText(/^Available collateral:\s*77\./).waitFor();
+  await page.getByLabel(/Contracts \(multiples/).fill("12");
+  indexerMode = "stale";
+  await page.getByRole("button", { name: "Refresh", exact: true }).first().click();
+  await page.getByText("RPC fallback · confirmed", { exact: true }).waitFor();
+  await page.getByText(/^Available collateral:\s*10\./).waitFor();
+  indexerMode = "healthy";
+  await page.getByText("GraphQL live · confirmed", { exact: true }).waitFor({ timeout: 45000 });
+  await page.getByText(/^Available collateral:\s*77\./).waitFor();
+  assert.equal(await page.getByLabel(/Contracts \(multiples/).inputValue(), "12");
+  const recoveredReads = fallbackReads;
+  const [refresh] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith("/api/indexer/graphql")),
+    page.getByRole("button", { name: "Refresh", exact: true }).first().click(),
+  ]);
+  assert.equal(refresh.status(), 200);
+  assert.equal(fallbackReads, recoveredReads, "Recovered live reads return to GraphQL");
+  assert.deepEqual(errors, []);
   const [logout] = await Promise.all([
     page.waitForResponse((response) =>
       response.url().endsWith("/api/indexer/auth/logout"),
@@ -202,7 +267,7 @@ try {
   );
   assert.equal(session, null);
   console.log(
-    "PASS: real API/DB login and session reuse, four chart types, empty intervals, live revisions, preserved trade draft, wallet holdings, mobile layout and zero browser RPC reads.",
+    "PASS: real API/DB login and session reuse, four chart types, empty intervals, live revisions, preserved trade draft, wallet holdings, mobile layout, zero healthy-mode browser RPC reads, automatic outage/stale fallback and automatic GraphQL recovery.",
   );
 } catch (error) {
   mkdirSync("target/indexer-browser-artifacts", { recursive: true });
