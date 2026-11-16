@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 
 import {
   createContext,
@@ -15,7 +16,7 @@ import {
   deriveAdminRecordPda,
   deriveProtocolConfigPda,
   getOutcomiaAccounts,
-  getOutcomiaProgram,
+  getOutcomiaReadProgram,
   type ProtocolRole,
 } from "../lib/outcomia";
 
@@ -26,7 +27,9 @@ interface ProtocolRoleContextValue {
   refresh: () => Promise<void>;
 }
 
-const ProtocolRoleContext = createContext<ProtocolRoleContextValue | null>(null);
+const ProtocolRoleContext = createContext<ProtocolRoleContextValue | null>(
+  null,
+);
 
 export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
   const { connection } = useConnection();
@@ -46,7 +49,7 @@ export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const program = getOutcomiaProgram(connection, wallet);
+      const program = getOutcomiaReadProgram(connection);
       const accounts = getOutcomiaAccounts(program);
       const protocolConfig = await accounts.protocolConfig.fetchNullable(
         deriveProtocolConfigPda(),
@@ -78,13 +81,15 @@ export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
       );
     } catch (cause) {
       setRole("user");
-      const message = cause instanceof Error ? cause.message : "Unknown RPC error";
+      const message =
+        cause instanceof Error ? cause.message : "Unknown RPC error";
       setError(`Unable to read protocol role: ${message}`);
     } finally {
       setLoading(false);
     }
   }, [connection, wallet]);
 
+  useIndexerUpdates(() => void refresh());
   useEffect(() => {
     void refresh();
   }, [refresh]);

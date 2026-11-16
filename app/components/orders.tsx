@@ -1,5 +1,7 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { MultiWalletActivity } from "./multi-outcome/wallet-activity";
+import { accountInfos } from "../lib/indexed-accounts";
 import { useI18n } from "./preferences-provider";
 
 import { SharedOrders } from "./shared-orders";
@@ -17,6 +19,7 @@ import {
   deriveMarketMetadataPda,
   getOutcomiaAccounts,
   getOutcomiaProgram,
+  getOutcomiaReadProgram,
   transactionExplorerUrl,
   type OrderView,
   type MarketAccount,
@@ -106,7 +109,9 @@ function LegacyOrders() {
     setError(null);
 
     try {
-      const records = await getOutcomiaAccounts(program).order.all([
+      const records = await getOutcomiaAccounts(
+        getOutcomiaReadProgram(connection),
+      ).order.all([
         {
           memcmp: {
             offset: 8,
@@ -139,10 +144,10 @@ function LegacyOrders() {
       >();
       for (let start = 0; start < keys.length; start += 50) {
         const batch = keys.slice(start, start + 50);
-        const infos = await connection.getMultipleAccountsInfo(
-          [...batch, ...batch.map(deriveMarketMetadataPda)],
-          "confirmed",
-        );
+        const infos = await accountInfos(connection, [
+          ...batch,
+          ...batch.map(deriveMarketMetadataPda),
+        ]);
         batch.forEach((key, index) => {
           const info = infos[index];
           if (!info || !info.owner.equals(program.programId)) return;
@@ -179,6 +184,7 @@ function LegacyOrders() {
     }
   }, [program, wallet, connection]);
 
+  useIndexerUpdates(() => void loadOrders());
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);

@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 import { useCallback, useEffect, useState } from "react";
@@ -46,6 +47,7 @@ export function PredictionOrders({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  useIndexerUpdates(() => setRefresh((v) => v + 1));
   useEffect(() => {
     let canceled = false;
     setLoading(true);

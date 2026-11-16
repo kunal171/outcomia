@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "../use-indexer-updates";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -26,6 +27,7 @@ export function MultiWalletActivity({
     [revision, setRevision] = useState(0),
     [loading, setLoading] = useState(false),
     [history, setHistory] = useState(false);
+  useIndexerUpdates(() => setRevision((v) => v + 1));
   useEffect(() => {
     let active = true;
     setResult(null);

@@ -7,6 +7,7 @@ import {
   multiAccounts,
   transactionBytes,
 } from "../../lib/multi-outcome";
+import { getOutcomiaReadProgram } from "../../lib/outcomia";
 import { termsBufferPda } from "../../lib/multi-outcome-creation";
 /** Discover abandoned uploads on-ledger, so reloads and storage loss cannot hide rent recovery. */
 export function TermsRecovery({
@@ -40,7 +41,7 @@ export function TermsRecovery({
     setBuffers([]);
     setError("");
     if (!MULTI_OUTCOME_ENABLED || !program || !owner) return;
-    void multiAccounts(program)
+    void multiAccounts(getOutcomiaReadProgram(program.provider.connection))
       .multiOutcomeTermsBuffer.all([
         { memcmp: { offset: 8, bytes: owner.toBase58() } },
       ])
