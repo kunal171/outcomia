@@ -40,6 +40,8 @@ live deployment records.
 
 ## Operations and diagrams
 
+- [Indexer data requirements](indexer-data-requirements.md): frontend datasets,
+  ingestion gaps, freshness and proposed GraphQL contracts; planning only.
 - [Indexer](../services/indexer/README.md): finalized logs, PostgreSQL,
   checkpoints, event coverage and recovery.
 - [Local Kubernetes](../services/indexer/infra/kubernetes/README.md): Kind,
