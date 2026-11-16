@@ -30,9 +30,10 @@ can change on a fork; finalized state cannot regress.
 One confirmed program subscription coalesces account refreshes, with periodic
 confirmed/finalized reconciliation. Independent workers cache mint precision and
 refresh tracked wallets' SOL/SPL holdings. Wallet tracking follows verified login;
-profiles never accept financial balances from clients. Stale/warming reads fail
-visibly rather than returning an apparently empty book or silently falling back
-to browser RPC.
+profiles never accept financial balances from clients. The API rejects stale/warming
+reads. The frontend automatically falls back to confirmed RPC for live accounts,
+books and holdings, and visibly labels the source. Unavailable data never becomes
+an apparently empty book or a fabricated zero balance.
 
 Finalized logs and retained transaction bodies support ordered execution replay.
 Spot/multi-outcome fill events and legacy/shared spot/binary instruction replay
@@ -146,6 +147,35 @@ proxy forwards cookies without exposing session credentials to JavaScript.
 Signing programs retain direct account checks, transaction sending and chain
 confirmation. Indexed readers serve normal screen rendering; no secret key is
 required by the indexer or login.
+
+## Automatic frontend fallback
+
+With indexed reads enabled, live reads prefer GraphQL. Network failures, a
+five-second request timeout, HTTP 408/429/5xx, malformed responses and explicit
+warming/stale errors use the existing confirmed RPC readers. Database failures
+return HTTP 503. Invalid filters, account schema/type errors and cancelled
+requests remain errors rather than triggering fallback.
+
+Fallback is scoped to accounts or an owner's holdings dataset. A failing wallet
+view does not force unrelated markets onto RPC. During a fallback, queries skip
+the failing indexed dataset for 15 seconds; the active workspace refreshes every
+15 seconds and retries GraphQL automatically. One recovery probe runs per scope;
+successful recovery refreshes panels and changes the source badge back to
+`GraphQL live`. Pagination failure discards the partial indexed page sequence
+before reading the complete RPC result.
+
+Transaction sends still happen once. When receipts are unavailable, the guarded
+signing provider checks the existing signature through RPC. Only confirmed or
+finalized success clears the pending receipt; processed, missing and failed RPC
+reads never authorize a duplicate send. Reload protection remains in session
+storage. A previously pending receipt that completes requires review before
+another send.
+
+Historical OHLCV and shared-fill replay cannot be reconstructed from current
+account snapshots. Those charts/history queries show an indexer error until
+recovery; they never manufacture candles or substitute legacy fills for shared
+fills. Wallet authentication also still requires the indexer. Normal public
+reads and signed chain actions can continue through RPC without a new login.
 
 ## Processing flow
 

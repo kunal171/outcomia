@@ -5,6 +5,21 @@ Checked: 2026-11-16
 Verdict: the implemented local foundation passes its checks; the full proposed
 indexer/API roadmap is **not** complete and deployment readiness is unproven.
 
+## Automatic fallback follow-up
+
+Automatic fallback and recovery have since been added for current account/book
+reads, raw account batches and wallet holdings. Scoped cooldowns prevent repeated
+requests to an unhealthy indexed dataset. Navigation aborts remain cancellations.
+Guarded transaction receipts may use RPC confirmation of the existing signature;
+no transaction is resent. Source labels and refreshes automatically return to
+GraphQL after recovery. Historical charts and login retain their indexer dependency.
+The original audit evidence below describes the preceding verification pass;
+current fallback behavior is documented in the indexer README. The follow-up
+checks pass: 15 frontend indexer/receipt/fallback regressions, 83 ordinary Rust
+tests, strict Clippy and the real browser/API/database flow. The browser verifies
+HTTP 503 and stale-data fallback, actual RPC wallet/book reads, automatic
+GraphQL recovery, zero healthy-mode RPC reads and preserved trade quantity.
+
 ## Implemented and checked locally
 
 - Modular Rust ingestion, processing, storage and GraphQL resolvers; frontend

@@ -87,6 +87,14 @@ Frontend GraphQL operations live together in `lib/graphql/`: `accounts.ts`,
 and HttpOnly cookies. `lib/indexed-accounts.ts` hydrates exact indexed values into
 existing Anchor account types. Signing clients retain targeted RPC checks.
 
+Unavailable or stale indexed live reads automatically use confirmed RPC, with a
+visible `RPC fallback` badge. A 15-second cooldown and refresh loop automatically
+return reads to GraphQL after recovery. Account/holding failures are scoped so
+one warming wallet does not disable unrelated markets. Invalid requests and page
+navigation cancellation do not trigger fallback. The pending-transaction guard
+can confirm the existing signature through RPC without sending it again.
+Historical charts and message-login still require the indexed service.
+
 Connected wallets are asked to sign an expiring login message once, then reuse
 a valid session. Profiles link to independently indexed balances; login never
 changes balances. Confirmed book/balance revisions refresh panels while

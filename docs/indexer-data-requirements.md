@@ -20,6 +20,16 @@ behind a build-time flag. No live deployment or program upgrade is implied.
 Historical coverage depends on available source data and is exposed explicitly.
 Provisional candles, depth charts, P&L and USD valuation remain later work.
 
+## Availability follow-up
+
+Automatic frontend fallback is now authorized: current-state accounts, books and
+holdings use confirmed RPC when indexed data is unavailable or stale. The UI
+labels fallback and retries GraphQL automatically. This does not change the rule
+that GraphQL resolvers only read projections. Historical execution charts and
+wallet login still require the indexer; signing and receipt fallback never retry
+a transaction send. See the [indexer README](../services/indexer/README.md) for
+failure classification and recovery behavior.
+
 ## Scope
 
 First cover Solana devnet: spot, binary prediction and multi-outcome markets,
