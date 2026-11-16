@@ -1,7 +1,7 @@
 # Indexer and GraphQL data requirements
 
-Status: requirements and proposed contracts; no ingestion, API or frontend
-implementation is added by this document. Repository audit: 2026-11-16.
+Status: requirements and implementation contract. Implementation progress is
+tracked in the indexer README and focused feature commits. Repository audit: 2026-11-16.
 
 The objective is to serve application reads from indexed data, sharing ingestion
 across users instead of repeating program scans, book traversal and transaction
@@ -249,3 +249,26 @@ post-transaction convergence, restart/backfill recovery and projection rebuilds.
 Measure RPC call counts and API/read-to-render latency before/after migration.
 This requirements pass does not alter the running indexer, database, deployment
 flags, chain program or frontend data source.
+
+
+## Charts and wallet user accounts (agreed extension)
+
+Trading charts support candlesticks, OHLC bars, line and area views, with an
+optional volume pane. All views share one bounded OHLCV query, with market,
+engine, outcome, time range and interval (1m, 5m, 15m, 1h, 4h, 1d) filters.
+Confirmed executions may form a visibly provisional live candle; finalized
+executions form durable historical candles. Empty intervals remain gaps rather
+than invented trades. Depth charts use current book levels, a distinct dataset.
+
+Wallet sign-in verifies a server-issued, expiring, single-use challenge with the
+connected Solana wallet's message signature. Bind the message to the configured
+site origin, network and address. Store users and hashed session credentials in
+PostgreSQL; use an HttpOnly session cookie, replay protection and bounded login
+requests. Disconnect/account changes clear the browser's authenticated identity.
+Never request the wallet secret key or use a login signature to authorize a trade.
+
+The user row owns profile/session and wallet-tracking relationships. Balance
+rows remain indexed chain projections, joined by verified wallet address. Login
+must not create or overwrite financial balances with client-supplied amounts.
+Public discovery/books remain readable without signing in. Existing users reuse
+valid sessions; a rejected sign-in has an explicit retry instead of a prompt loop.
