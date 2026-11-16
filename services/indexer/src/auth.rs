@@ -204,7 +204,7 @@ async fn verify(
         .execute(&mut *tx)
         .await?;
     let token = random();
-    sqlx::query("INSERT INTO user_sessions(token_hash,user_id,expires_at) VALUES($1,$2::uuid,NOW()+INTERVAL '7 days')").bind(hash(&token)).bind(&id).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO user_sessions(token_hash,user_id,expires_at,challenge_hash) VALUES($1,$2::uuid,NOW()+INTERVAL '7 days',$3)").bind(hash(&token)).bind(&id).bind(hash(&input.nonce)).execute(&mut *tx).await?;
     sqlx::query("INSERT INTO tracked_wallets(owner) VALUES($1) ON CONFLICT(owner) DO UPDATE SET requested_at=NOW()").bind(&input.wallet).execute(&mut *tx).await?;
     tx.commit().await?;
     let mut response = Json(User {
@@ -231,20 +231,33 @@ pub async fn current(pool: &PgPool, headers: &HeaderMap) -> Result<Option<User>>
     }
     let row=sqlx::query("SELECT u.id::text,u.wallet_address FROM users u JOIN user_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW()")
         .bind(hash(&token)).fetch_optional(pool).await?;
-    Ok(row.map(|r| User {
+    let user = row.map(|r| User {
         id: r.get("id"),
         wallet: r.get("wallet_address"),
-    }))
+    });
+    if let Some(user) = &user {
+        sqlx::query("UPDATE tracked_wallets SET requested_at=NOW() WHERE owner=$1 AND requested_at<NOW()-INTERVAL '1 minute'").bind(&user.wallet).execute(pool).await?;
+    }
+    Ok(user)
 }
 async fn me(State(state): State<AuthState>, headers: HeaderMap) -> Result<Json<Option<User>>> {
-    let user = current(&state.pool, &headers).await?;
-    if let Some(user) = &user {
-        sqlx::query("UPDATE tracked_wallets SET requested_at=NOW() WHERE owner=$1 AND requested_at<NOW()-INTERVAL '1 minute'").bind(&user.wallet).execute(&state.pool).await?;
-    }
-    Ok(Json(user))
+    Ok(Json(current(&state.pool, &headers).await?))
 }
+
 async fn logout(State(state): State<AuthState>, headers: HeaderMap) -> Result<Response> {
     check_origin(&state, &headers)?;
+    if let Some(nonce) = cookie(&headers, CHALLENGE) {
+        let mut tx = state.pool.begin().await?;
+        sqlx::query("UPDATE login_challenges SET consumed_at=NOW() WHERE challenge_hash=$1")
+            .bind(hash(&nonce))
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM user_sessions WHERE challenge_hash=$1")
+            .bind(hash(&nonce))
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+    }
     if let Some(token) = cookie(&headers, SESSION) {
         sqlx::query("DELETE FROM user_sessions WHERE token_hash=$1")
             .bind(hash(&token))
@@ -388,7 +401,7 @@ mod tests {
             .oneshot(request(
                 "/auth/logout",
                 serde_json::json!({}),
-                &session,
+                &binding,
                 "http://localhost:3000",
             ))
             .await
