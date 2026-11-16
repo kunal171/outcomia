@@ -7,6 +7,10 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { webcrypto, createHash } from "node:crypto";
 import ts from "typescript";
+import { loadTypeScript } from "./support/typescript.mjs";
+const draftRules = loadTypeScript(
+  new URL("../lib/prediction-rules-draft.ts", import.meta.url),
+);
 
 const require = createRequire(import.meta.url);
 const { PublicKey } = require("@solana/web3.js");
@@ -30,7 +34,11 @@ runInNewContext(code, {
   crypto: webcrypto,
   process: { env: {} },
   require: (name) =>
-    name === "./solana" ? { PROGRAM_ID: PublicKey.default } : require(name),
+    name === "./solana"
+      ? { PROGRAM_ID: PublicKey.default }
+      : name === "./prediction-rules-draft"
+        ? draftRules
+        : require(name),
 });
 const {
   parsePredictionRules,
@@ -1470,7 +1478,9 @@ test("turning off order entry or funding never turns off deployed cancellation",
       require: (specifier) =>
         specifier === "./solana"
           ? { PROGRAM_ID: PublicKey.default }
-          : require(specifier),
+          : specifier === "./prediction-rules-draft"
+            ? draftRules
+            : require(specifier),
     });
     return loaded.exports;
   }
@@ -2413,4 +2423,60 @@ test("book account IDL round-trips four empty/populated heads and full-width IDs
         book[field]?.toString() ?? null,
       );
   }
+});
+
+test("multi-outcome rules bind ordered labels, criteria, policy and exact bytes", async () => {
+  const draft = draftRules.initialPredictionRulesDraft();
+  Object.assign(draft, {
+    question: "Who wins?",
+    resolutionSource: "Official results",
+    closeTime: "2035-01-01T00:00",
+    earliestResolutionTime: "2035-01-02T00:00",
+  });
+  const outcomes = ["Red", "Blue", "Green"].map((label) => ({
+    label,
+    criteria: `${label} is declared winner.`,
+  }));
+  const content = draftRules.serializePredictionRulesDraft(
+    draft,
+    rules().primaryResolver,
+    outcomes,
+  );
+  const doc = JSON.parse(content);
+  assert.equal(doc.resolutionRules.yesCriteria, undefined);
+  const parsed = await mod.exports.parseMultiOutcomeRules(
+    new TextEncoder().encode(content).buffer,
+    outcomes.map((o) => o.label),
+  );
+  assert.equal(
+    Buffer.from(parsed.rulesHash).toString("hex"),
+    createHash("sha256").update(content).digest("hex"),
+  );
+  assert.equal(
+    Buffer.from(parsed.questionHash).toString("hex"),
+    createHash("sha256").update(draft.question).digest("hex"),
+  );
+  assert.ok(parsed.earliestResolutionTs.gt(parsed.closeTs));
+  await assert.rejects(
+    mod.exports.parseMultiOutcomeRules(bytes(doc), ["Blue", "Red", "Green"]),
+    /labels differ/,
+  );
+  doc.resolutionRules.outcomes[0].criteria = "";
+  await assert.rejects(
+    mod.exports.parseMultiOutcomeRules(
+      bytes(doc),
+      outcomes.map((o) => o.label),
+    ),
+    /criteria/,
+  );
+  doc.resolutionRules.outcomes[0].criteria = "Winner";
+  doc.resolutionRules.invalidRefund = "Winner takes everything";
+  await assert.rejects(
+    mod.exports.parseMultiOutcomeRules(
+      bytes(doc),
+      outcomes.map((o) => o.label),
+    ),
+    /refund policy/,
+  );
+  await assert.rejects(parsePredictionRules(bytes(doc)), /yesCriteria/);
 });

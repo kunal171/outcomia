@@ -42,6 +42,7 @@ function load(file, overrides) {
   return module.exports;
 }
 const prediction = load("../lib/prediction.ts", {
+  "./prediction-rules-draft": load("../lib/prediction-rules-draft.ts", {}),
   "./solana": { PROGRAM_ID: programId },
 });
 const derive = (seed, ...keys) =>

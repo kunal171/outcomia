@@ -1,9 +1,11 @@
 "use client";
+import type { ReactNode } from "react";
 import { useI18n } from "./preferences-provider";
 
 import { type PredictionRulesDraft } from "../lib/prediction-rules-draft";
 
 interface Props {
+  outcomeCriteria?: ReactNode;
   value: PredictionRulesDraft;
   creator: string;
   disabled: boolean;
@@ -15,6 +17,7 @@ interface Props {
 /** Named core fields keep the schema stable; custom key/value rules extend it. */
 export function PredictionRulesEditor({
   value,
+  outcomeCriteria,
   creator,
   disabled,
   json,
@@ -78,10 +81,15 @@ export function PredictionRulesEditor({
           placeholder={t("Source name and URL")}
         />
       </label>
+      {outcomeCriteria}
       {(
         [
-          ["yesCriteria", "YES criteria"],
-          ["noCriteria", "NO criteria"],
+          ...(!outcomeCriteria
+            ? ([
+                ["yesCriteria", "YES criteria"],
+                ["noCriteria", "NO criteria"],
+              ] as const)
+            : []),
           ["invalidCriteria", "Invalid outcome criteria"],
           ["evidenceRequirements", "Evidence requirements"],
           ["conflictingEvidencePolicy", "Conflicting evidence policy"],

@@ -26,6 +26,14 @@ export interface PredictionRulesDraft {
   additionalRules: ExtraRule[];
 }
 
+export interface OutcomeRule {
+  label: string;
+  criteria: string;
+}
+
+export const MULTI_INVALID_REFUND =
+  "Each outcome contract refunds an equal share of one collateral token on Invalid; contract quantities must use the configured exact refund lot.";
+
 export const MAX_RULES_UPLOAD_BYTES = 64 * 1024;
 
 /** These are starting terms, not a substitute for the creator's review. */
@@ -74,6 +82,7 @@ function unixSeconds(localTime: string, label: string): number | null {
 export function serializePredictionRulesDraft(
   draft: PredictionRulesDraft,
   creator: string,
+  outcomes?: OutcomeRule[],
 ): string {
   if (
     !/^\d+$/.test(draft.resolutionDelaySeconds) ||
@@ -123,8 +132,9 @@ export function serializePredictionRulesDraft(
     description: draft.description,
     resolutionSource: draft.resolutionSource,
     resolutionRules: {
-      yesCriteria: draft.yesCriteria,
-      noCriteria: draft.noCriteria,
+      ...(outcomes
+        ? { outcomes, invalidRefund: MULTI_INVALID_REFUND }
+        : { yesCriteria: draft.yesCriteria, noCriteria: draft.noCriteria }),
       invalidCriteria: draft.invalidCriteria,
       evidenceRequirements: draft.evidenceRequirements,
       conflictingEvidencePolicy: draft.conflictingEvidencePolicy,

@@ -1,3 +1,4 @@
+import { MULTI_INVALID_REFUND } from "./prediction-rules-draft";
 /** Prediction accounts, exact addresses, rule validation and resting-order preflight. */
 import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
@@ -461,7 +462,9 @@ export interface PredictionInsertTarget {
 }
 
 export type PredictionPlacementTarget =
-  PredictionAppendTarget | PredictionInsertTarget | { kind: "place" };
+  | PredictionAppendTarget
+  | PredictionInsertTarget
+  | { kind: "place" };
 
 /** Advisory checks mirror the on-chain splice without traversing the list. */
 function validatePredictionNeighbors(
@@ -1041,6 +1044,18 @@ function timestamp(value: unknown, label: string): BN {
 
 /** Hash original uploaded bytes; parsing/reformatting JSON would change its hash. */
 export async function parsePredictionRules(bytes: ArrayBuffer) {
+  return parseRules(bytes);
+}
+
+/** Multi-outcome rules bind the ordered outcome labels to the reviewed document. */
+export async function parseMultiOutcomeRules(
+  bytes: ArrayBuffer,
+  labels: string[],
+) {
+  return parseRules(bytes, labels);
+}
+
+async function parseRules(bytes: ArrayBuffer, labels?: string[]) {
   if (bytes.byteLength > 128 * 1024)
     throw new Error("Rules file exceeds 128 KiB");
   const rules = object(
@@ -1051,9 +1066,27 @@ export async function parsePredictionRules(bytes: ArrayBuffer) {
   const question = text(rules.question, "Question");
   text(rules.resolutionSource, "Resolution source");
   const criteria = object(rules.resolutionRules, "Resolution rules");
+  if (labels) {
+    const outcomes = criteria.outcomes;
+    if (
+      labels.length < 2 ||
+      labels.length > 8 ||
+      new Set(labels).size !== labels.length ||
+      !Array.isArray(outcomes) ||
+      outcomes.length !== labels.length
+    )
+      throw new Error("Rules must describe every outcome in market order");
+    outcomes.forEach((entry: unknown, index: number) => {
+      const outcome = object(entry, "Outcome");
+      if (text(outcome.label, "Outcome label") !== labels[index])
+        throw new Error("Rules outcome labels differ from the market");
+      text(outcome.criteria, `Outcome ${index + 1} criteria`);
+    });
+    if (criteria.invalidRefund !== MULTI_INVALID_REFUND)
+      throw new Error("Invalid refund policy does not match the program");
+  }
   for (const key of [
-    "yesCriteria",
-    "noCriteria",
+    ...(!labels ? ["yesCriteria", "noCriteria"] : []),
     "invalidCriteria",
     "evidenceRequirements",
     "conflictingEvidencePolicy",
