@@ -196,6 +196,37 @@ impl Query {
             end_cursor,
         })
     }
+    async fn raw_accounts(
+        &self,
+        ctx: &Context<'_>,
+        addresses: Vec<String>,
+    ) -> async_graphql::Result<GqlJson<Value>> {
+        if addresses.len() > 100 || addresses.iter().any(|k| k.len() > 64) {
+            return Err("Too many account addresses".into());
+        }
+        let state = ctx.data::<ApiState>()?;
+        let mut tx = state.pool.begin().await?;
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+            .execute(&mut *tx)
+            .await?;
+        if !sync(&mut tx, "confirmed").await?.ready {
+            return Err("Account index is warming or stale".into());
+        }
+        let program: Option<String> =
+            sqlx::query_scalar("SELECT program_id FROM indexer_identity WHERE singleton")
+                .fetch_optional(&mut *tx)
+                .await?;
+        let rows=sqlx::query("SELECT address,raw_base64,lamports::text AS lamports,$2::text AS owner FROM indexed_accounts WHERE commitment='confirmed' AND NOT deleted AND address=ANY($1) UNION ALL SELECT address,raw_base64,'0',owner FROM mint_cache WHERE address=ANY($1)").bind(&addresses).bind(program.unwrap_or_default()).fetch_all(&mut *tx).await?;
+        let mapped:std::collections::HashMap<String,Value>=rows.into_iter().map(|r| (r.get("address"),serde_json::json!({"rawBase64":r.get::<String,_>("raw_base64"),"lamports":r.get::<String,_>("lamports"),"owner":r.get::<String,_>("owner")}))).collect();
+        tx.commit().await?;
+        Ok(GqlJson(Value::Array(
+            addresses
+                .iter()
+                .map(|a| mapped.get(a).cloned().unwrap_or(Value::Null))
+                .collect(),
+        )))
+    }
+
     async fn me(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<GqlJson<Value>>> {
         Ok(ctx
             .data::<Option<auth::User>>()?

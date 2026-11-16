@@ -28,13 +28,11 @@ async fn scan(
     commitment: &str,
 ) -> Result<()> {
     let level = commitment.to_owned();
+    let mint_client = Arc::clone(&client);
     let response:Value=tokio::task::spawn_blocking(move || client.send(RpcRequest::GetProgramAccounts,json!([program.to_string(),{"encoding":"base64","commitment":level,"withContext":true}]))).await??;
-    account_store::apply(
-        pool,
-        commitment,
-        account_store::parse_snapshot(response, &program.to_string())?,
-    )
-    .await?;
+    let snapshot = account_store::parse_snapshot(response, &program.to_string())?;
+    crate::mints::observe(pool, Arc::clone(&mint_client), &snapshot).await?;
+    account_store::apply(pool, commitment, snapshot).await?;
     Ok(())
 }
 async fn watch(ws: String, program: Pubkey, dirty: Arc<AtomicBool>) {

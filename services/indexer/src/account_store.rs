@@ -125,7 +125,10 @@ pub async fn apply(pool: &PgPool, commitment: &str, snapshot: Snapshot) -> Resul
 pub async fn failed(pool: &PgPool, commitment: &str, message: &str) {
     let _ = sqlx::query("UPDATE account_sync SET ready=FALSE,last_error=$2 WHERE commitment=$1")
         .bind(commitment)
-        .bind(message.chars().take(500).collect::<String>())
+        .bind({
+            let _ = message;
+            "Account ingestion is unavailable; reconnecting"
+        })
         .execute(pool)
         .await;
 }

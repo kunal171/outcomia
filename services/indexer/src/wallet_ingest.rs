@@ -2,7 +2,7 @@
 use serde_json::{json, Value};
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_rpc_client_api::request::RpcRequest;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use std::{collections::BTreeMap, error::Error, sync::Arc, time::Duration};
 const TOKEN: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;

@@ -14,8 +14,10 @@ mod charts;
 mod config;
 mod decoder;
 mod events;
+mod executions;
 mod health;
 mod live;
+mod mints;
 mod processor;
 mod reporter;
 mod rpc;
@@ -137,6 +139,11 @@ async fn main() -> Result<(), BoxError> {
         config.websocket_url.clone(),
     ));
     let mut chart_worker = tokio::spawn(charts::run(pool.clone()));
+    let mut execution_worker = tokio::spawn(executions::run(
+        pool.clone(),
+        Arc::clone(&client),
+        program_id,
+    ));
     let mut wallet_worker = tokio::spawn(wallet_ingest::run(pool.clone(), Arc::clone(&client)));
     let history = async {
         loop {
@@ -266,6 +273,7 @@ async fn main() -> Result<(), BoxError> {
         result=history=>result,
         result=&mut account_worker=>result?,
         result=&mut api_server=>{result??;Err(io::Error::other("API server stopped").into())},
+        _=&mut execution_worker=>Err(io::Error::other("execution replay worker stopped").into()),
         _=&mut wallet_worker=>Err(io::Error::other("wallet ingestion worker stopped").into()),
         _=&mut chart_worker=>Err(io::Error::other("chart projection worker stopped").into()),
     }
