@@ -50,7 +50,10 @@ pub async fn query(
     if from < 0 || to <= from || to > 253402300799 || (to - from) / i64::from(interval) > 2000 {
         return Err("Chart range exceeds 2000 intervals".into());
     }
-    if !matches!(engine, "LEGACY_SPOT" | "MULTI_OUTCOME") {
+    if !matches!(
+        engine,
+        "LEGACY_SPOT" | "LEGACY_BINARY" | "SHARED_SPOT" | "SHARED_BINARY" | "MULTI_OUTCOME"
+    ) {
         return Ok(CandleSeries {
             supported: false,
             coverage: "UNSUPPORTED".into(),
@@ -58,6 +61,22 @@ pub async fn query(
             error: Some("Execution ingestion is not available for this book engine".into()),
             candles: vec![],
         });
+    }
+    if matches!(engine, "LEGACY_BINARY" | "SHARED_SPOT" | "SHARED_BINARY") {
+        let replayed: bool = sqlx::query_scalar(
+            "SELECT ready AND last_error IS NULL FROM execution_replay_state WHERE singleton",
+        )
+        .fetch_one(pool)
+        .await?;
+        if !replayed {
+            return Ok(CandleSeries {
+                supported: true,
+                coverage: "INCOMPLETE".into(),
+                commitment: "finalized".into(),
+                error: Some("Execution history is being reconciled".into()),
+                candles: vec![],
+            });
+        }
     }
     let ordered:bool=sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM indexed_trades WHERE market=$1 AND engine=$2 AND outcome=$3 AND (block_time IS NULL OR transaction_index IS NULL))").bind(market).bind(engine).bind(outcome).fetch_one(pool).await?;
     if !ordered {
@@ -185,7 +204,7 @@ mod tests {
         assert_eq!(candle.quantity, "6");
         assert_eq!(candle.quote_volume, "20");
         assert!(
-            !query(&pool, "market", "SHARED_SPOT", "spot", 60, "0", "240")
+            !query(&pool, "market", "UNKNOWN", "spot", 60, "0", "240")
                 .await
                 .unwrap()
                 .supported
