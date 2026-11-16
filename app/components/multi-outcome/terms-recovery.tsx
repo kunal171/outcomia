@@ -68,7 +68,7 @@ export function TermsRecovery({
   }, [program, identity, revision, refresh]);
   if (!buffers.length && !error) return null;
   return (
-    <details>
+    <details className="access-card inline-explainer">
       <summary>Recover uploaded-term rent</summary>
       <p>
         Closing a buffer discards only uploaded draft terms. A created market
@@ -77,8 +77,9 @@ export function TermsRecovery({
       {error && <p role="alert">{error}</p>}
       {buffers.map((buffer) => (
         <p key={buffer.toBase58()}>
-          <code>{buffer.toBase58()}</code>{" "}
+          <code style={{ overflowWrap: "anywhere" }}>{buffer.toBase58()}</code>{" "}
           <button
+            className="admin-action-button"
             disabled={disabled || busy}
             onClick={() => {
               if (!program || !owner || lock.current) return;

@@ -59,7 +59,11 @@ export function PredictionRulesEditor({
           aria-label={t("Full question")}
           value={value.question}
           onChange={(e) => set("question", e.target.value)}
-          placeholder={t("Will the named event occur by the cutoff?")}
+          placeholder={
+            outcomeCriteria
+              ? t("Which outcome will occur by the cutoff?")
+              : t("Will the named event occur by the cutoff?")
+          }
           rows={2}
         />
       </label>

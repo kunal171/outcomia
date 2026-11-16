@@ -199,10 +199,18 @@ finds abandoned buffers on-ledger for recovery after a reload. Terms become
 immutable only in the created market. Each upload/creation requires its own
 wallet approval; no staged submission is retried automatically.
 
-The app hashes the entered question and exact rules document, verifies the
-published HTTPS/Arweave document bytes, and shows outcomes, collateral, lot,
-close time, review delay and optional fallback before the creator checks review.
-Editing a form field clears that approval. Splits/merges, open-order cancellation,
+Creation follows the binary prediction-market layout: Market details, a shared
+structured Market rules editor, JSON preview/download, and explicit review.
+Each named outcome has its own winning criteria; common evidence, Invalid,
+timing and fallback policies use the same editor as binary markets. The full
+question and exact generated JSON bytes are hashed, with the ordered labels
+and Invalid refund policy checked before upload. The default flow publishes
+rules through the existing Arweave/Turbo message-signing path, verifies the
+returned bytes, and saves a reusable upload receipt. An advanced option accepts
+an existing HTTPS/Arweave document only when its bytes match the generated JSON.
+Contract lot overrides are under Advanced trading settings; leaving the field
+blank chooses the smallest exact Invalid refund lot. Editing a form field or
+changing the creator wallet clears review approval. Splits/merges, open-order cancellation,
 resolution/correction/finalization and redemption are available on market detail.
 Collateral funding reuses the existing shared-wallet controls. The shared Wallet
 and Orders routes include multi-outcome positions and orders, and the asset
@@ -250,9 +258,9 @@ separate disabled production build that must submit no transactions. See the
 
 ```bash
 # Terminal 1
-OUTCOMIA_BUILD_DIR=target/multi-browser NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true \
+OUTCOMIA_BUILD_DIR=.next-multi-browser NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true \
 NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true npm --prefix app run dev -- \
-  --webpack --hostname 127.0.0.1 --port 3017
+  --hostname 127.0.0.1 --port 3017
 # Terminal 2 (provide locally installed Playwright/Chromium paths if needed)
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
 MULTI_BROWSER_EXECUTABLE=/path/to/chromium \
