@@ -113,7 +113,7 @@ async fn recover_and_report(
 /// live mode keeps running.
 async fn main() -> Result<(), BoxError> {
     if std::env::args().any(|arg| arg == "--schema") {
-        println!("{}", api::schema_sdl());
+        println!("{}", api::schema_sdl().trim_end());
         return Ok(());
     }
     let config = Config::from_env()?;

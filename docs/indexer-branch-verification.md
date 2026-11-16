@@ -1,7 +1,7 @@
 # Indexer branch verification
 
-Branch: `feature/indexer-ui-improvements`  
-Checked: 2026-11-16  
+Branch: `feature/indexer-ui-improvements`
+Checked: 2026-11-16
 Verdict: the implemented local foundation passes its checks; the full proposed
 indexer/API roadmap is **not** complete and deployment readiness is unproven.
 

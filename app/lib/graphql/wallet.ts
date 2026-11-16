@@ -21,4 +21,3 @@ export function walletAssets(owner: PublicKey) {
     ).then((r) => r.walletAssets),
   );
 }
-

@@ -87,4 +87,3 @@ schema {
 	query: Query
 	subscription: Changes
 }
-
