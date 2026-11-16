@@ -191,7 +191,7 @@ async fn verify(
         .bind(hash(&input.nonce))
         .execute(&mut *tx)
         .await?;
-    let id:String=sqlx::query_scalar("INSERT INTO users(wallet_address) VALUES($1) ON CONFLICT(wallet_address) DO UPDATE SET last_login_at=NOW() RETURNING id::text")
+    let id:String=sqlx::query_scalar("INSERT INTO users(wallet_address,last_login_at,verified_at) VALUES($1,NOW(),NOW()) ON CONFLICT(wallet_address) DO UPDATE SET last_login_at=NOW(),verified_at=COALESCE(users.verified_at,NOW()) RETURNING id::text")
         .bind(&input.wallet).fetch_one(&mut *tx).await?;
     // Rotate the browser's previous credential; store only the new token digest.
     if let Some(old) = cookie(&headers, SESSION) {
@@ -229,7 +229,7 @@ pub async fn current(pool: &PgPool, headers: &HeaderMap) -> Result<Option<User>>
     if token.len() > 64 {
         return Ok(None);
     }
-    let row=sqlx::query("SELECT u.id::text,u.wallet_address FROM users u JOIN user_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW()")
+    let row=sqlx::query("SELECT u.id::text,u.wallet_address FROM users u JOIN user_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.verified_at IS NOT NULL")
         .bind(hash(&token)).fetch_optional(pool).await?;
     let user = row.map(|r| User {
         id: r.get("id"),
@@ -298,6 +298,9 @@ mod tests {
         let app = router(state);
         let key = SigningKey::from_bytes(&[8; 32]);
         let wallet = bs58::encode(key.verifying_key().to_bytes()).into_string();
+        // A deposit-discovered profile is upgraded, preserving its original ID.
+        let discovered_id: String = sqlx::query_scalar("INSERT INTO users(wallet_address,registration_source,first_observed_slot) VALUES($1,'chain',50) RETURNING id::text")
+            .bind(&wallet).fetch_one(&pool).await.unwrap();
         let request = |path: &str, body: serde_json::Value, cookie: &str, origin: &str| {
             Request::builder()
                 .uri(path)
@@ -397,6 +400,11 @@ mod tests {
                 .unwrap(),
             1
         );
+        let profile = sqlx::query("SELECT id::text,verified_at IS NOT NULL AS verified,last_login_at IS NOT NULL AS signed_in FROM users WHERE wallet_address=$1")
+            .bind(&wallet).fetch_one(&pool).await.unwrap();
+        assert_eq!(profile.get::<String, _>("id"), discovered_id);
+        assert!(profile.get::<bool, _>("verified"));
+        assert!(profile.get::<bool, _>("signed_in"));
         let logout = app
             .oneshot(request(
                 "/auth/logout",
