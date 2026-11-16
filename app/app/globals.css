@@ -2066,3 +2066,123 @@ body:has(.prediction-guide[open]) {
 .market-detail-layout.shared-layout {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* Execution charts share one dataset across price and volume views. */
+.trading-chart {
+  margin-block: 24px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  min-width: 0;
+}
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.chart-heading span,
+.chart-time {
+  color: var(--muted);
+  font-size: 11px;
+}
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 12px;
+}
+.chart-controls label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.chart-controls select {
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.chart-controls .chart-volume-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-volume-toggle input {
+  width: auto;
+}
+.chart-plot {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+.chart-grid line {
+  stroke: var(--line);
+}
+.chart-grid text,
+.chart-time {
+  fill: var(--muted);
+  font-size: 10px;
+  stroke: none;
+}
+.chart-rise {
+  fill: #159570;
+  stroke: #159570;
+}
+.chart-fall {
+  fill: #d34c6f;
+  stroke: #d34c6f;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.chart-area,
+.chart-volume {
+  fill: var(--accent);
+  opacity: 0.18;
+}
+.chart-plot circle {
+  fill: var(--accent);
+}
+.chart-table-scroll {
+  overflow-x: auto;
+}
+.chart-data table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.chart-data td,
+.chart-data th {
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+.wallet-session-status {
+  position: relative;
+  font-size: 12px;
+}
+.wallet-session-status details {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: min(290px, 80vw);
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.indexed-commitment {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}

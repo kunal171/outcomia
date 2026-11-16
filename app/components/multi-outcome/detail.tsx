@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { TradingChart } from "../trading-chart";
 import { AppHeader } from "../app-header";
 import { transactionExplorerUrl } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
@@ -53,6 +54,13 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
               {d.metadata?.quoteSymbol} · Minimum{" "}
               {d.market.terms.quantityLot.toString()} contracts
             </p>
+            <TradingChart
+              market={address}
+              engine="MULTI_OUTCOME"
+              priceDecimals={d.decimals}
+              symbol={d.metadata?.quoteSymbol ?? "collateral"}
+              outcomes={d.market.terms.outcomeLabels}
+            />
             <MultiTrading session={s} />
             <details>
               <summary>Deposit or withdraw collateral</summary>
