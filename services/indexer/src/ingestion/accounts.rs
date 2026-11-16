@@ -8,7 +8,10 @@ use solana_pubkey::Pubkey;
 use solana_pubsub_client::nonblocking::pubsub_client::PubsubClient;
 use solana_rpc_client::rpc_client::RpcClient;
 use solana_rpc_client_api::{
-    config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
+    config::{
+        RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTransactionLogsConfig,
+        RpcTransactionLogsFilter,
+    },
     request::RpcRequest,
 };
 use sqlx::PgPool;
@@ -35,7 +38,7 @@ async fn scan(
     account_store::apply(pool, commitment, snapshot).await?;
     Ok(())
 }
-async fn watch(ws: String, program: Pubkey, dirty: Arc<AtomicBool>) {
+async fn watch(ws: String, program: Pubkey, dirty: Arc<AtomicBool>, pool: PgPool) {
     loop {
         let result = async {
             let client = PubsubClient::new(&ws).await?;
@@ -52,9 +55,19 @@ async fn watch(ws: String, program: Pubkey, dirty: Arc<AtomicBool>) {
                     }),
                 )
                 .await?;
+            let (mut logs,_unsubscribe_logs)=client.logs_subscribe(RpcTransactionLogsFilter::Mentions(vec![program.to_string()]),RpcTransactionLogsConfig {commitment:Some(CommitmentConfig::confirmed())}).await?;
             dirty.store(true, Ordering::Release);
-            while stream.next().await.is_some() {
-                dirty.store(true, Ordering::Release);
+            loop {
+                tokio::select! {
+                    value=stream.next()=>{if value.is_none(){break;}dirty.store(true,Ordering::Release);}
+                    value=logs.next()=>{
+                        let Some(log)=value else {break};
+                        sqlx::query("INSERT INTO confirmed_receipts(signature,slot,failed) VALUES($1,$2,$3) ON CONFLICT(signature) DO UPDATE SET slot=EXCLUDED.slot,failed=EXCLUDED.failed,observed_at=NOW()")
+                            .bind(&log.value.signature).bind(i64::try_from(log.context.slot)?).bind(log.value.err.is_some()).execute(&pool).await?;
+                        sqlx::query("DELETE FROM confirmed_receipts WHERE observed_at<NOW()-INTERVAL '1 day'").execute(&pool).await?;
+                        dirty.store(true,Ordering::Release);
+                    }
+                }
             }
             Ok::<_, Box<dyn Error + Send + Sync>>(())
         }
@@ -66,16 +79,19 @@ async fn watch(ws: String, program: Pubkey, dirty: Arc<AtomicBool>) {
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
-pub async fn run(pool: PgPool, client: Arc<RpcClient>, program: Pubkey, ws: String) -> Result<()> {
+pub async fn verify_identity(pool: &PgPool, client: Arc<RpcClient>, program: Pubkey) -> Result<()> {
     let rpc = Arc::clone(&client);
     let genesis = tokio::task::spawn_blocking(move || rpc.get_genesis_hash()).await??;
     // A provider for another cluster must not populate this devnet database.
     if genesis.to_string() != "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG" {
         return Err("RPC is not Solana devnet".into());
     }
-    account_store::bind_identity(&pool, &genesis.to_string(), &program.to_string()).await?;
+    account_store::bind_identity(pool, &genesis.to_string(), &program.to_string()).await?;
+    Ok(())
+}
+pub async fn run(pool: PgPool, client: Arc<RpcClient>, program: Pubkey, ws: String) -> Result<()> {
     let dirty = Arc::new(AtomicBool::new(true));
-    let subscription = tokio::spawn(watch(ws, program, Arc::clone(&dirty)));
+    let subscription = tokio::spawn(watch(ws, program, Arc::clone(&dirty), pool.clone()));
     let mut timer = tokio::time::interval(Duration::from_secs(2));
     timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut ticks = 0_u64;

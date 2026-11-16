@@ -292,6 +292,48 @@ fn normalize_logs(
     })
 }
 
+/// Resolve same-slot execution order from the finalized block's signature list.
+pub fn transaction_position(
+    client: &RpcClient,
+    signature: &str,
+    slot: u64,
+) -> Result<u32, Box<dyn Error + Send + Sync>> {
+    use std::{
+        collections::BTreeMap,
+        sync::{Mutex, OnceLock},
+    };
+    static BLOCKS: OnceLock<Mutex<BTreeMap<u64, Vec<String>>>> = OnceLock::new();
+    let cache = BLOCKS.get_or_init(|| Mutex::new(BTreeMap::new()));
+    if let Some(signatures) = cache.lock().map_err(|_| "block cache poisoned")?.get(&slot) {
+        return signatures
+            .iter()
+            .position(|s| s == signature)
+            .map(|i| i as u32)
+            .ok_or_else(|| "transaction missing from finalized block".into());
+    }
+    let block:serde_json::Value=client.send(solana_rpc_client_api::request::RpcRequest::GetBlock,serde_json::json!([slot,{"commitment":"finalized","transactionDetails":"signatures","rewards":false}]))?;
+    let signatures: Vec<String> = block["signatures"]
+        .as_array()
+        .ok_or("missing finalized block signatures")?
+        .iter()
+        .map(|v| {
+            v.as_str()
+                .map(str::to_owned)
+                .ok_or("invalid block signature")
+        })
+        .collect::<Result<_, _>>()?;
+    let index = signatures
+        .iter()
+        .position(|s| s == signature)
+        .ok_or("transaction missing from finalized block")?;
+    let mut cache = cache.lock().map_err(|_| "block cache poisoned")?;
+    cache.insert(slot, signatures);
+    if cache.len() > 128 {
+        cache.pop_first();
+    }
+    Ok(u32::try_from(index)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,46 +468,4 @@ mod tests {
 
         assert_eq!(normalized, Some(Vec::new()));
     }
-}
-
-/// Resolve same-slot execution order from the finalized block's signature list.
-pub fn transaction_position(
-    client: &RpcClient,
-    signature: &str,
-    slot: u64,
-) -> Result<u32, Box<dyn Error + Send + Sync>> {
-    use std::{
-        collections::BTreeMap,
-        sync::{Mutex, OnceLock},
-    };
-    static BLOCKS: OnceLock<Mutex<BTreeMap<u64, Vec<String>>>> = OnceLock::new();
-    let cache = BLOCKS.get_or_init(|| Mutex::new(BTreeMap::new()));
-    if let Some(signatures) = cache.lock().map_err(|_| "block cache poisoned")?.get(&slot) {
-        return signatures
-            .iter()
-            .position(|s| s == signature)
-            .map(|i| i as u32)
-            .ok_or_else(|| "transaction missing from finalized block".into());
-    }
-    let block:serde_json::Value=client.send(solana_rpc_client_api::request::RpcRequest::GetBlock,serde_json::json!([slot,{"commitment":"finalized","transactionDetails":"signatures","rewards":false}]))?;
-    let signatures: Vec<String> = block["signatures"]
-        .as_array()
-        .ok_or("missing finalized block signatures")?
-        .iter()
-        .map(|v| {
-            v.as_str()
-                .map(str::to_owned)
-                .ok_or("invalid block signature")
-        })
-        .collect::<Result<_, _>>()?;
-    let index = signatures
-        .iter()
-        .position(|s| s == signature)
-        .ok_or("transaction missing from finalized block")?;
-    let mut cache = cache.lock().map_err(|_| "block cache poisoned")?;
-    cache.insert(slot, signatures);
-    if cache.len() > 128 {
-        cache.pop_first();
-    }
-    Ok(u32::try_from(index)?)
 }

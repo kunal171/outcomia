@@ -4,21 +4,15 @@
 //! live recovery, reconnect policy, and shutdown. Decoding, persistence, and
 //! the individual ingestion state machines remain in focused modules.
 
-mod account_ingest;
 mod api;
 mod auth;
-mod backfill;
 mod config;
 mod health;
-mod live;
-mod processor;
+mod ingestion;
 mod processing;
 mod reporter;
-mod rpc;
 mod shutdown;
 mod storage;
-mod subscription;
-mod wallet_ingest;
 
 use std::{
     error::Error,
@@ -276,3 +270,8 @@ async fn main() -> Result<(), BoxError> {
 use processing::account_codec as account_data;
 use processing::account_projection as account_store;
 use processing::{charts, decoder, events, executions, mints};
+
+use ingestion::accounts as account_ingest;
+use ingestion::wallets as wallet_ingest;
+use ingestion::transactions as processor;
+use ingestion::{backfill, live, rpc, subscription};
