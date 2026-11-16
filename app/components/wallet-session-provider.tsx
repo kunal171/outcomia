@@ -11,34 +11,16 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ReadSourceStatus } from "./read-source-status";
 import { useIndexerStream } from "./use-indexer-updates";
-import { INDEXER_ENABLED } from "../lib/graphql/client";
-type User = { id: string; wallet: string };
+import { INDEXER_ENABLED, IndexerUnavailableError } from "../lib/graphql/client";
+import { callWalletAuth as call, type WalletUser as User } from "../lib/auth/client";
 type Session = {
   user: User | null;
   busy: boolean;
   error: string | null;
+  deferred: boolean;
   signIn: () => Promise<void>;
 };
 const Context = createContext<Session | null>(null);
-async function call<T>(
-  path: string,
-  body?: unknown,
-  signal?: AbortSignal,
-): Promise<T> {
-  const response = await fetch(`/api/indexer/auth/${path}`, {
-    method: body === undefined ? "GET" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: "same-origin",
-    cache: "no-store",
-    signal,
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error ?? "Wallet sign-in is unavailable");
-  }
-  return response.status === 204 ? (undefined as T) : response.json();
-}
 /** A wallet connection permits reads/trades; the login signature owns a profile. */
 export function WalletSessionProvider({ children }: { children: ReactNode }) {
   const { publicKey, signMessage } = useWallet();
@@ -53,6 +35,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   const signer = useRef(signMessage);
   signer.current = signMessage;
   const [user, setUser] = useState<User | null>(null),
+    [deferred, setDeferred] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   const signIn = useCallback(async () => {
@@ -70,6 +53,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
         throw new Error("Wallet changed during sign-in");
     };
     setBusy(true);
+    setDeferred(false);
     setError(null);
     try {
       await logout.current;
@@ -114,16 +98,21 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
         !request.signal.aborted &&
         live.current === address &&
         generation.current === current
-      )
-        setError(
-          cause instanceof Error ? cause.message : "Wallet sign-in failed",
-        );
+      ) {
+        if (cause instanceof IndexerUnavailableError) {
+          setDeferred(true);
+          setError("Your wallet is connected. You can deposit and trade; profile verification can wait. Finalized on-chain activity will register your wallet when the indexer recovers.");
+        } else {
+          setError(cause instanceof Error ? cause.message : "Wallet sign-in failed");
+        }
+      }
     } finally {
       if (generation.current === current) setBusy(false);
     }
   }, [address]);
   useEffect(() => {
     setUser(null);
+    setDeferred(false);
     setError(null);
     setBusy(false);
     if (!INDEXER_ENABLED) return;
@@ -142,12 +131,35 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
       controller.current?.abort();
     };
   }, [address, signIn]);
+  useEffect(() => {
+    if (!INDEXER_ENABLED || !address || !deferred) return;
+    const recovery = new AbortController();
+    let checking = false;
+    const timer = setInterval(() => {
+      if (checking) return;
+      checking = true;
+      void call<User | null>("me", undefined, recovery.signal)
+        .then((session) => {
+          if (recovery.signal.aborted || live.current !== address) return;
+          if (session?.wallet === address) setUser(session);
+          setDeferred(false);
+          setError(null);
+        })
+        .catch(() => { /* Connected-wallet access remains available during recovery. */ })
+        .finally(() => { checking = false; });
+    }, 15000);
+    return () => {
+      recovery.abort();
+      clearInterval(timer);
+    };
+  }, [address, deferred]);
   return (
     <Context.Provider
       value={{
         user: user?.wallet === address ? user : null,
         busy,
         error,
+        deferred,
         signIn,
       }}
     >
@@ -163,19 +175,24 @@ export function WalletSessionStatus() {
       {session.user ? (
         <span title="Wallet ownership verified">Signed in</span>
       ) : (
-        <button
-          className="admin-action-button"
-          disabled={session.busy}
-          onClick={() => void session.signIn()}
-        >
-          {session.busy ? "Signing in…" : "Sign in"}
-        </button>
+        <>
+          <span title="Your wallet can deposit and trade without a website session">
+            Wallet connected
+          </span>
+          <button
+            className="admin-action-button"
+            disabled={session.busy}
+            onClick={() => void session.signIn()}
+          >
+            {session.busy ? "Signing in…" : session.deferred ? "Retry sign-in" : "Sign in"}
+          </button>
+        </>
       )}
       <ReadSourceStatus />
       {session.error && (
         <details>
           <summary>Sign-in status</summary>
-          <p role="alert">{session.error}</p>
+          <p role={session.deferred ? "status" : "alert"}>{session.error}</p>
         </details>
       )}
     </div>
