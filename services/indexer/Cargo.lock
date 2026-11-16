@@ -1965,6 +1965,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "solana-account-decoder-client-types",
  "solana-commitment-config",
  "solana-pubkey 4.4.0",
  "solana-pubsub-client",
