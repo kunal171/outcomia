@@ -235,6 +235,8 @@ test("receipt outages use confirmed RPC status; missing/processed status never c
   await assert.rejects(client.sendWithIndexedReceipt(owner, async () => { sends++; return "rpc-receipt"; }, connection), /Do not resubmit/);
   await assert.rejects(client.sendWithIndexedReceipt(owner, async () => { sends++; }, connection), /Do not resubmit/);
   assert.equal(sends, 1);
+  status = null;
+  await assert.rejects(client.checkPendingTransaction(owner, connection), /Do not resubmit/);
   status = { err: null, confirmationStatus: "confirmed" };
   await assert.rejects(client.checkPendingTransaction(owner, connection), /Refresh and review/);
   assert.equal(await client.sendWithIndexedReceipt(owner, async () => { sends++; return "next-rpc-receipt"; }, connection), "next-rpc-receipt");
