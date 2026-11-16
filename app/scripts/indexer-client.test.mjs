@@ -29,13 +29,13 @@ function load(respond = () => { throw new Error("Unexpected HTTP"); }, session =
       process: { env: { NEXT_PUBLIC_INDEXER_ENABLED: String(enabled), NEXT_PUBLIC_OUTCOMIA_PROGRAM_ID: idl.address } },
       require: name => name.startsWith(".") ? loadFile(new URL(name.endsWith(".json") ? name : `${name}.ts`, url)) : require(name),
       fetch: async (_url, options) => {
-        const result = await respond(JSON.parse(options.body));
+        const result = await respond(options.body ? JSON.parse(options.body) : {}, _url);
         return result instanceof Response ? result : new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
       },
     });
     return module.exports;
   };
-  return { pageHide: () => events.get("pagehide")?.(), pageShow: () => events.get("pageshow")?.(), advanceClock: ms => { time += ms; }, ...loadFile(new URL("../lib/read-source.ts", import.meta.url)), ...loadFile(new URL("../lib/outcomia.ts", import.meta.url)), ...loadFile(new URL("../lib/graphql/client.ts", import.meta.url)), ...loadFile(new URL("../lib/indexed-accounts.ts", import.meta.url)), ...loadFile(new URL("../lib/graphql/receipts.ts", import.meta.url)) };
+  return { pageHide: () => events.get("pagehide")?.(), pageShow: () => events.get("pageshow")?.(), advanceClock: ms => { time += ms; }, ...loadFile(new URL("../lib/auth/client.ts", import.meta.url)), ...loadFile(new URL("../lib/read-source.ts", import.meta.url)), ...loadFile(new URL("../lib/outcomia.ts", import.meta.url)), ...loadFile(new URL("../lib/graphql/client.ts", import.meta.url)), ...loadFile(new URL("../lib/indexed-accounts.ts", import.meta.url)), ...loadFile(new URL("../lib/graphql/receipts.ts", import.meta.url)) };
 }
 
 function exact(value) {
@@ -279,4 +279,14 @@ test("page navigation aborts reads without falling back and page restoration res
   assert.equal(rpc, 0); assert.equal(client.hasRpcFallback(), false);
   client.pageShow();
   assert.equal((await client.graphql("{}")).ok, true);
+});
+
+test("unavailable wallet authentication is distinguishable from rejection and never returns a user", async () => {
+  const unavailable = load(() => new Response("down", { status: 503 }));
+  await assert.rejects(unavailable.callWalletAuth("me"), error => error instanceof unavailable.IndexerUnavailableError);
+  const rejected = load(() => new Response(JSON.stringify({ error: "Signature rejected" }), { status: 401 }));
+  await assert.rejects(rejected.callWalletAuth("verify", {}), error =>
+    !(error instanceof rejected.IndexerUnavailableError) && /Signature rejected/.test(error.message));
+  const recovered = load(() => ({ id: "id", wallet: "wallet" }));
+  assert.equal((await recovered.callWalletAuth("me")).id, "id");
 });

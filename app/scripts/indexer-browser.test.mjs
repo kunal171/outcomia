@@ -28,6 +28,9 @@ const upstream = createServer(async (request, response) => {
     response.end();
   }
 });
+// Holdings refresh every 20 seconds. Keep fixture sockets alive across that
+// interval so Node's 5-second default does not manufacture transport outages.
+upstream.keepAliveTimeout = 60000;
 await new Promise((resolve) => upstream.listen(8085, "127.0.0.1", resolve));
 const browser = await chromium.launch({
   executablePath:
@@ -40,10 +43,18 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 let messages = 0,
   rpcReads = 0,
   fallbackReads = 0,
-  indexerMode = "healthy";
+  indexerMode = "healthy",
+  authUnavailable = true;
 const fallbackMethods = new Set();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+page.on("response", async response => {
+  if (indexerMode === "healthy" && response.url().endsWith("/api/indexer/graphql")) {
+    const body = await response.json().catch(() => null);
+    if (body?.errors || response.status() >= 500)
+      console.log("Healthy-mode query failed:", response.status(), JSON.stringify(body), response.request().postData());
+  }
+});
 const privateKey = createPrivateKey({
   key: Buffer.concat([
     Buffer.from("302e020100300506032b657004220420", "hex"),
@@ -114,6 +125,9 @@ await page.addInitScript(
 await page.route("**/*", async (route) => {
   const request = route.request(),
     url = new URL(request.url());
+  if (authUnavailable && url.pathname.startsWith("/api/indexer/auth/")) {
+    return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Fixture auth service unavailable" }) });
+  }
   if (request.method() === "POST" && url.pathname === "/api/indexer/graphql" && indexerMode !== "healthy") {
     return route.fulfill(indexerMode === "down"
       ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: "Fixture indexer unavailable" }) }
@@ -141,6 +155,15 @@ await page.route("**/*", async (route) => {
 });
 try {
   await page.goto(new URL(`/predictions/multi/${market}`, base).href);
+  await page.getByText("Wallet connected", { exact: true }).waitFor({ timeout: 30000 });
+  await page.getByRole("button", { name: "Retry sign-in", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Which colour wins?", exact: true }).waitFor();
+  await page.getByLabel(/^Limit price/).fill("0.30");
+  await page.getByLabel(/Contracts \(multiples/).fill("12");
+  assert.equal(await page.getByRole("button", { name: "Review in wallet", exact: true }).isEnabled(), true);
+  assert.equal(messages, 0, "Auth downtime must not block wallet access or queue a signature");
+  authUnavailable = false;
+  await page.getByRole("button", { name: "Retry sign-in", exact: true }).click();
   await page
     .getByText("Signed in", { exact: true })
     .waitFor({ timeout: 60000 });
@@ -149,6 +172,14 @@ try {
     .waitFor();
   await page.getByRole("img", { name: /Candlestick chart/ }).waitFor();
   assert.equal(messages, 1, "First login signs exactly one challenge");
+  // Existing sessions recover with a background check, never a new wallet prompt.
+  authUnavailable = true;
+  await page.reload();
+  await page.getByRole("button", { name: "Retry sign-in", exact: true }).waitFor();
+  assert.equal(messages, 1);
+  authUnavailable = false;
+  await page.getByText("Signed in", { exact: true }).waitFor({ timeout: 30000 });
+  assert.equal(messages, 1, "Auth recovery must reuse the session without signing again");
   const quantity = page.getByLabel(/Contracts \(multiples/);
   await quantity.fill("12");
   for (const kind of ["OHLC bars", "Line", "Area", "Candlestick"]) {
@@ -267,9 +298,14 @@ try {
   );
   assert.equal(session, null);
   console.log(
-    "PASS: real API/DB login and session reuse, four chart types, empty intervals, live revisions, preserved trade draft, wallet holdings, mobile layout, zero healthy-mode browser RPC reads, automatic outage/stale fallback and automatic GraphQL recovery.",
+    "PASS: connected-wallet access during auth outage without a signature, explicit verified sign-in after recovery, real API/DB session reuse, four chart types, empty intervals, live revisions, preserved trade draft, wallet holdings, mobile layout, zero healthy-mode browser RPC reads, automatic outage/stale fallback and automatic GraphQL recovery.",
   );
 } catch (error) {
+  const diagnostic = await fetch("http://127.0.0.1:8084/graphql", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: "query($owner:String!){syncStatus{ready slot error}walletAssets(owner:$owner)}", variables: { owner: owner.toBase58() } }),
+  }).then(response => response.json()).catch(String);
+  console.log("Fixture recovery diagnostic:", JSON.stringify(diagnostic));
   mkdirSync("target/indexer-browser-artifacts", { recursive: true });
   await page
     .screenshot({
