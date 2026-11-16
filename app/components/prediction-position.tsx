@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 import {
@@ -32,6 +33,7 @@ import {
   formatAtomicAmount,
   getOutcomiaAccounts,
   getOutcomiaProgram,
+  getOutcomiaReadProgram,
   getOwnedTokenBalance,
   findOwnedTokenAccount,
   deriveVaultAuthorityPda,
@@ -154,6 +156,7 @@ function ConnectedPosition({
     useState<PredictionMarketAccount | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [refresh, setRefresh] = useState(0);
+  useIndexerUpdates(() => setRefresh((v) => v + 1));
 
   useEffect(() => {
     const timer = setInterval(
@@ -169,7 +172,9 @@ function ConnectedPosition({
     setError(null);
     async function load() {
       try {
-        const accounts = getOutcomiaAccounts(program);
+        const accounts = getOutcomiaAccounts(
+          getOutcomiaReadProgram(connection),
+        );
         const [ledger, terms] = await Promise.all([
           accounts.predictionPosition.fetchNullable(positionAddress),
           accounts.predictionMarket.fetchNullable(market),

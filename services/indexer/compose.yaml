@@ -4,16 +4,19 @@ services:
   indexer:
     image: outcomia-indexer:dev
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/indexer/Dockerfile
     environment:
       DATABASE_URL: postgres://outcomia:outcomia_dev@postgres:5432/outcomia_indexer
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
       SOLANA_WS_URL: ${SOLANA_WS_URL:-wss://api.devnet.solana.com}
       OUTCOMIA_PROGRAM_ID: ${OUTCOMIA_PROGRAM_ID:-AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL}
       HEALTH_ADDRESS: 0.0.0.0:8080
+      API_ADDRESS: 0.0.0.0:8081
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
     depends_on:
       postgres:
         condition: service_healthy

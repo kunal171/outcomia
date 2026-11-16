@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 import {
@@ -116,6 +117,7 @@ export function Markets() {
     }
   }, [program]);
 
+  useIndexerUpdates(() => void loadMarkets());
   useEffect(() => {
     void loadMarkets();
   }, [loadMarkets]);

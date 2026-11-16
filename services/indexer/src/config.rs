@@ -25,6 +25,9 @@ pub struct Config {
 
     /// Address used by container liveness and readiness probes.
     pub health_address: String,
+
+    pub api_address: String,
+    pub app_origin: String,
 }
 
 impl Config {
@@ -51,6 +54,8 @@ impl Config {
             database_url: env::var("DATABASE_URL").map_err(ConfigError::DatabaseUrl)?,
             websocket_url: env::var("SOLANA_WS_URL")
                 .unwrap_or_else(|_| DEFAULT_WEBSOCKET_URL.to_owned()),
+            api_address: env::var("API_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8081".into()),
+            app_origin: env::var("APP_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".into()),
             health_address: env::var("HEALTH_ADDRESS")
                 .unwrap_or_else(|_| DEFAULT_HEALTH_ADDRESS.to_owned()),
         })

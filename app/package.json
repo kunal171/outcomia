@@ -10,7 +10,7 @@
     "devnet:multi-maker": "node scripts/devnet-multi-maker-smoke.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test:prediction": "node scripts/prediction-rules.test.mjs && node scripts/prediction-matching-plan.test.mjs",
+    "test:prediction": "node scripts/prediction-rules.test.mjs && node scripts/prediction-matching-plan.test.mjs && node scripts/arweave-rules.test.mjs",
     "test:wallet": "node scripts/wallet-overview.test.mjs",
     "test:shared": "node scripts/shared-trading.test.mjs",
     "devnet:shared-smoke": "node scripts/devnet-shared-smoke.mjs",
@@ -22,7 +22,8 @@
     "test:multi-outcome": "node scripts/multi-outcome.test.mjs",
     "idl:sync": "node scripts/sync-idl.mjs",
     "test:multi-outcome:browser": "node scripts/multi-outcome-browser.test.mjs",
-    "idl:check": "node scripts/sync-idl.mjs --check"
+    "idl:check": "node scripts/sync-idl.mjs --check",
+    "test:indexer": "node scripts/generate-indexer-fixtures.mjs && node scripts/indexer-client.test.mjs"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

@@ -79,14 +79,14 @@ pub async fn persist_transaction(
         )
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (signature) DO UPDATE
-        SET signature = EXCLUDED.signature
+        SET signature = EXCLUDED.signature, transaction_index = COALESCE(chain_transactions.transaction_index, EXCLUDED.transaction_index)
         WHERE chain_transactions.slot = EXCLUDED.slot
           AND chain_transactions.block_time
               IS NOT DISTINCT FROM EXCLUDED.block_time
           AND chain_transactions.raw_logs = EXCLUDED.raw_logs
           AND chain_transactions.schema_version = EXCLUDED.schema_version
-          AND chain_transactions.transaction_index
-            IS NOT DISTINCT FROM EXCLUDED.transaction_index
+          AND (chain_transactions.transaction_index IS NULL OR EXCLUDED.transaction_index IS NULL
+            OR chain_transactions.transaction_index = EXCLUDED.transaction_index)
         "#,
     )
     .bind(&transaction_insert.signature)
@@ -145,6 +145,15 @@ pub async fn persist_transaction(
         }
     }
 
+    if let Some(body) = &transaction.execution {
+        let inserted=sqlx::query("INSERT INTO transaction_execution(signature,body) VALUES($1,$2) ON CONFLICT(signature) DO UPDATE SET signature=EXCLUDED.signature WHERE transaction_execution.body=EXCLUDED.body")
+            .bind(&transaction.signature).bind(sqlx::types::Json(body)).execute(&mut *database_transaction).await?;
+        if inserted.rows_affected() != 1 {
+            return Err(StorageError::TransactionConflict {
+                signature: transaction.signature.clone(),
+            });
+        }
+    }
     database_transaction.commit().await?;
 
     Ok(())
@@ -158,6 +167,7 @@ mod tests {
 
     fn transaction(signature: &str, slot: u64) -> TransactionRecord {
         TransactionRecord {
+            execution: None,
             signature: signature.to_owned(),
             slot,
             block_time: Some(1_700_000_000),

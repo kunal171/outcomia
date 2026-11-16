@@ -190,6 +190,7 @@ await account("multiOutcomeTermsBuffer", abandonedBuffer, {
   bump: 0,
 });
 const submissions = [];
+const creations = [];
 let ledgerNow = 2000000005,
   marketMissing = false;
 function setMarketMissing(value) {
@@ -288,6 +289,8 @@ async function rpc(request) {
         if (!ix.programId.equals(program)) continue;
         const decoded = p.coder.instruction.decode(ix.data);
         submissions.push(decoded.name);
+        if (decoded.name === "initializeMultiOutcomeMarket")
+          creations.push(decoded.data);
         if (decoded.name === "closeMultiOutcomeTerms") {
           records.delete(abandonedBuffer.toBase58());
         }
@@ -377,6 +380,7 @@ export {
   market,
   marketState,
   submissions,
+  creations,
   rpc,
   account,
 };

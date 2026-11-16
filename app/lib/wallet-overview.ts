@@ -1,3 +1,6 @@
+import { readWithRpcFallback } from "./read-source";
+import { accountInfos } from "./indexed-accounts";
+import { walletAssets } from "./graphql/wallet";
 import {
   loadMultiWallet,
   type MultiWalletMarket,
@@ -169,10 +172,10 @@ async function readContexts<T>(
   for (let offset = 0; offset < unique.length; offset += 50) {
     const batch = unique.slice(offset, offset + 50);
     try {
-      const infos = await connection.getMultipleAccountsInfo(
-        [...batch, ...batch.map(deriveMarketMetadataPda)],
-        "confirmed",
-      );
+      const infos = await accountInfos(connection, [
+        ...batch,
+        ...batch.map(deriveMarketMetadataPda),
+      ]);
       batch.forEach((address, index) => {
         const fallback: MarketContext<T> = {
           market: null,
@@ -308,9 +311,9 @@ async function readShared(
   const result: Array<{ balance: AssetBalance; decimals: number }> = [];
   for (let start = 0; start < records.length; start += 100) {
     const batch = records.slice(start, start + 100),
-      infos = await connection.getMultipleAccountsInfo(
+      infos = await accountInfos(
+        connection,
         batch.map((r) => r.account.mint),
-        "confirmed",
       );
     for (let n = 0; n < batch.length; n++) {
       const { publicKey, account } = batch[n];
@@ -405,13 +408,36 @@ export async function loadWalletOverview(
 ): Promise<WalletOverview> {
   const program = getOutcomiaReadProgram(connection);
   const [sol, tokens, catalog, spot, predictions, multi] = await Promise.all([
-    read(async () => {
-      const lamports = await connection.getBalance(owner, "confirmed");
-      if (!Number.isSafeInteger(lamports) || lamports < 0)
-        throw new Error("SOL balance exceeds the safe RPC number range");
-      return new BN(String(lamports));
-    }),
-    read(() => readTokens(connection, owner, TOKEN_PROGRAM_ID)),
+    read(() => readWithRpcFallback(
+      `wallet:${owner}:sol`,
+      async () => {
+        const assets = await walletAssets(owner);
+        const sol = assets.find((asset) => asset.mint === "NATIVE_SOL");
+        if (!sol) throw new Error("SOL holdings are not indexed");
+        return new BN(sol.amount);
+      },
+      async () => {
+        const lamports = await connection.getBalance(owner, "confirmed");
+        if (!Number.isSafeInteger(lamports) || lamports < 0)
+          throw new Error("SOL balance exceeds the safe RPC number range");
+        return new BN(String(lamports));
+      },
+    )),
+    read(() => readWithRpcFallback(
+      `wallet:${owner}:tokens`,
+      async () => {
+        const assets = await walletAssets(owner);
+        return assets.filter((asset) => asset.mint !== "NATIVE_SOL").map((asset) => ({
+          mint: new PublicKey(asset.mint),
+          tokenProgram: new PublicKey(asset.tokenProgram),
+          decimals: asset.decimals,
+          amount: new BN(asset.amount),
+          frozen: new BN(asset.frozen),
+          accountCount: asset.accountCount,
+        }));
+      },
+      () => readTokens(connection, owner, TOKEN_PROGRAM_ID),
+    )),
     read(() => readCatalog(program)),
     read(() => readSpot(connection, program, owner)),
     read(() => readPredictions(connection, program, owner)),

@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Owner history includes all shared books; cancellation refreshes its exact queue first. */
@@ -51,6 +52,7 @@ function OwnerOrders() {
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
     [filter, setFilter] = useState<"open" | "history" | "all">("open");
+  useIndexerUpdates(() => setRevision((v) => v + 1));
   useEffect(() => {
     let dead = false;
     setPending(true);

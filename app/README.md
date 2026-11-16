@@ -74,6 +74,41 @@ changing networks. Devnet and testnet have separate accounts and balances.
 Solana remains on devnet. The network setting is public and must be rebuilt into
 the client; changing it only at runtime cannot update an existing browser bundle.
 
+## Indexed data and wallet sign-in
+
+Set `NEXT_PUBLIC_INDEXER_ENABLED=true` at build time and the server-only
+`INDEXER_API_URL` to your running indexer's API (default `http://127.0.0.1:8081`).
+Its `APP_ORIGIN` must match the frontend origin exactly. The flag defaults to
+false; it requires a running migrated indexer before enabling a deployment.
+
+Frontend GraphQL operations live together in `lib/graphql/`: `accounts.ts`,
+`markets.ts`, `wallet.ts`, `charts.ts`, `receipts.ts` and `subscriptions.ts`.
+`client.ts` shares transport/deduplication; `proxy.ts` forwards server-side requests
+and HttpOnly cookies. `lib/indexed-accounts.ts` hydrates exact indexed values into
+existing Anchor account types. Signing clients retain targeted RPC checks.
+
+Unavailable or stale indexed live reads automatically use confirmed RPC, with a
+visible `RPC fallback` badge. A 15-second cooldown and refresh loop automatically
+return reads to GraphQL after recovery. Account/holding failures are scoped so
+one warming wallet does not disable unrelated markets. Invalid requests and page
+navigation cancellation do not trigger fallback. The pending-transaction guard
+can confirm the existing signature through RPC without sending it again.
+Historical charts and verified message-login still require the indexed service.
+A sign-in outage does not block connected-wallet deposits or trading. The UI
+shows `Wallet connected` with an optional retry, and no registration signature
+is queued. When the indexer returns, finalized balances and backfilled deposit
+history create an unverified user record and start tracking. A later verified
+sign-in reuses that profile. Recovery can restore an existing session without
+opening a new wallet message prompt.
+
+Connected wallets are asked to sign an expiring login message once, then reuse
+a valid session. Profiles link to independently indexed balances; login never
+changes balances. Confirmed book/balance revisions refresh panels while
+preserving trade drafts. Charts use finalized execution history and offer
+candlestick, OHLC bar, line and area views with optional volume. Incomplete
+history and empty intervals remain visible. See the
+[indexer README](../services/indexer/README.md) for setup and integration checks.
+
 ## RPC and program settings
 
 Use the current devnet program and your own Helius endpoint:

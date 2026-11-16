@@ -37,13 +37,20 @@ pub async fn process_signature(
     program_id: &Pubkey,
     signature: &SignatureRecord,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let transaction = fetch_transaction(client, signature)?.ok_or_else(|| {
+    let mut transaction = fetch_transaction(client, signature)?.ok_or_else(|| {
         io::Error::other(format!(
             "finalized transaction {} returned unusable metadata",
             signature.signature
         ))
     })?;
 
+    if transaction.transaction_index.is_none() {
+        transaction.transaction_index = Some(crate::rpc::transaction_position(
+            client,
+            &transaction.signature,
+            transaction.slot,
+        )?);
+    }
     let raw_events = extract_program_data(&transaction.logs, program_id);
 
     println!(

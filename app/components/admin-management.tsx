@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,6 +12,7 @@ import {
   deriveProtocolConfigPda,
   getOutcomiaAccounts,
   getOutcomiaProgram,
+  getOutcomiaReadProgram,
   transactionExplorerUrl,
   type AdminRecordView,
 } from "../lib/outcomia";
@@ -61,7 +63,7 @@ export function AdminManagement() {
     setError(null);
 
     try {
-      const accounts = getOutcomiaAccounts(program);
+      const accounts = getOutcomiaAccounts(getOutcomiaReadProgram(connection));
       const [records, protocolConfig] = await Promise.all([
         accounts.adminRecord.all(),
         accounts.protocolConfig.fetchNullable(deriveProtocolConfigPda()),
@@ -90,6 +92,7 @@ export function AdminManagement() {
     }
   }, [program, role]);
 
+  useIndexerUpdates(() => void loadAdmins());
   useEffect(() => {
     void loadAdmins();
   }, [loadAdmins]);

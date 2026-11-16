@@ -1,4 +1,6 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
+import { TradingChart } from "./trading-chart";
 import { useI18n } from "./preferences-provider";
 
 import { SharedMarket } from "./shared-market";
@@ -300,6 +302,10 @@ export function MarketDetail({ address }: { address: string }) {
     }
   }, [connection, market, readProgram, traderBalanceAddress, wallet]);
 
+  useIndexerUpdates(() => {
+    void loadMarket();
+    void loadBalances();
+  });
   useEffect(() => {
     void loadBalances();
   }, [loadBalances]);
@@ -584,9 +590,9 @@ export function MarketDetail({ address }: { address: string }) {
       const opposingBest = side === "bid" ? market.bestAsk : market.bestBid;
       const crossesBest = Boolean(
         opposingBest &&
-        (side === "bid"
-          ? rawPrice.gte(opposingBest)
-          : rawPrice.lte(opposingBest)),
+          (side === "bid"
+            ? rawPrice.gte(opposingBest)
+            : rawPrice.lte(opposingBest)),
       );
 
       if (crossesBest && opposingBest) {
@@ -1118,6 +1124,12 @@ export function MarketDetail({ address }: { address: string }) {
                 </details>
               </section>
             )}
+            <TradingChart
+              market={address}
+              engine={SHARED_BALANCES_ENABLED ? "SHARED_SPOT" : "LEGACY_SPOT"}
+              priceDecimals={market.quoteDecimals}
+              symbol={labels.quote}
+            />
             <div
               className={`market-detail-layout ${SHARED_BALANCES_ENABLED ? "shared-layout" : ""}`}
             >

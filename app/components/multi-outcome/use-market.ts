@@ -1,9 +1,11 @@
 "use client";
+import { useIndexerUpdates } from "../use-indexer-updates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { getMint } from "@solana/spl-token";
+import { unpackMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { accountInfos } from "../../lib/indexed-accounts";
 import {
   getOutcomiaAccounts,
   getOutcomiaProgram,
@@ -62,7 +64,9 @@ export function useMultiMarket(address: string) {
     const [metadata, book, mint, position, cash, config] = await Promise.all([
       getOutcomiaAccounts(reader).marketMetadata.fetchNullable(market.metadata),
       readMultiBook(reader, key),
-      getMint(connection, market.collateralMint),
+      accountInfos(connection, [market.collateralMint]).then((infos) =>
+        unpackMint(market.collateralMint, infos[0], TOKEN_PROGRAM_ID),
+      ),
       wallet
         ? a.multiOutcomePosition.fetchNullable(
             multiPositionPda(key, wallet.publicKey),
@@ -151,6 +155,9 @@ export function useMultiMarket(address: string) {
       if (mounted.current) setBusy(false);
     }
   };
+  useIndexerUpdates(() => {
+    if (!lock.current) void refresh();
+  });
   return {
     data: data?.identity === owner && data.address === address ? data : null,
     reader,

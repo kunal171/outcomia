@@ -1,4 +1,7 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
+import { TradingChart } from "./trading-chart";
+import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
 import { visiblePredictionMarket } from "../lib/market-visibility";
 
@@ -52,6 +55,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
   const lastConnection = useRef(connection);
+  useIndexerUpdates(() => setRefresh((v) => v + 1));
 
   useEffect(() => {
     let canceled = false;
@@ -123,9 +127,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const visibleRecords = records.filter(
     (row) =>
       address ||
-      (visiblePredictionMarket(row.address.toBase58(), row.metadata?.displayName) && `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase())),
+      (visiblePredictionMarket(
+        row.address.toBase58(),
+        row.metadata?.displayName,
+      ) &&
+        `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase())),
   );
   return (
     <div className="app-shell">
@@ -155,7 +163,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
             </p>
           </div>
         )}
-        {!address && <p><Link href="/predictions/multi">Explore multi-outcome markets →</Link></p>}
+        {!address && (
+          <p>
+            <Link href="/predictions/multi">
+              Explore multi-outcome markets →
+            </Link>
+          </p>
+        )}
         {!address && (
           <label className="prediction-search">
             {t("Find a market")}
@@ -271,19 +285,32 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     loading={loading}
                     onRefresh={() => setRefresh((v) => v + 1)}
                     trade={(tradingOpen) => (
-                      <SharedMarket
-                        market={key}
-                        kind="prediction"
-                        refreshKey={refresh}
-                        view="trade"
-                        onChanged={() => setRefresh((v) => v + 1)}
-                        entryDisabled={loading || !!error}
-                        tradingOpen={tradingOpen}
-                        authority={market.authority}
-                        quoteMint={market.collateralMint}
-                        quoteDecimals={decimals}
-                        quoteSymbol={metadata?.quoteSymbol ?? "collateral"}
-                      />
+                      <>
+                        <TradingChart
+                          market={key.toBase58()}
+                          engine={
+                            SHARED_BALANCES_ENABLED
+                              ? "SHARED_BINARY"
+                              : "LEGACY_BINARY"
+                          }
+                          priceDecimals={decimals}
+                          symbol={metadata?.quoteSymbol ?? "collateral"}
+                          outcomes={["YES", "NO"]}
+                        />
+                        <SharedMarket
+                          market={key}
+                          kind="prediction"
+                          refreshKey={refresh}
+                          view="trade"
+                          onChanged={() => setRefresh((v) => v + 1)}
+                          entryDisabled={loading || !!error}
+                          tradingOpen={tradingOpen}
+                          authority={market.authority}
+                          quoteMint={market.collateralMint}
+                          quoteDecimals={decimals}
+                          quoteSymbol={metadata?.quoteSymbol ?? "collateral"}
+                        />
+                      </>
                     )}
                     position={
                       <>

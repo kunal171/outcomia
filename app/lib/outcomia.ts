@@ -1,3 +1,8 @@
+import { createGuardedProvider } from "./transactions/provider";
+import { getLatestTrade as indexedLatestTrade } from "./graphql/markets";
+import { indexedAccounts, indexedReader, usesIndexer } from "./indexed-accounts";
+import { readWithRpcFallback } from "./read-source";
+import { walletAssets } from "./graphql/wallet";
 import {
   AnchorProvider,
   BN,
@@ -236,20 +241,16 @@ export function getOutcomiaProgram(
   connection: Connection,
   wallet: BrowserWallet,
 ) {
-  const provider = new AnchorProvider(connection, wallet, {
-    commitment: "confirmed",
-    preflightCommitment: "confirmed",
-  });
-
+  const provider = createGuardedProvider(connection, wallet);
   return new Program(outcomiaIdl as Idl, provider);
 }
 
 export function getOutcomiaReadProgram(connection: Connection) {
-  return new Program(outcomiaIdl as Idl, { connection });
+  return indexedReader(new Program(outcomiaIdl as Idl, { connection }));
 }
 
 export function getOutcomiaAccounts(program: Program): OutcomiaAccounts {
-  return program.account as unknown as OutcomiaAccounts;
+  return indexedAccounts(program) as unknown as OutcomiaAccounts;
 }
 
 export function deriveProtocolConfigPda() {
@@ -385,6 +386,24 @@ export async function fetchLatestTrade(
   market: PublicKey,
   signatureLimit = 8,
 ): Promise<LastTradeView | null> {
+  if (usesIndexer(program)) {
+    const engine = process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED === "true"
+      ? "SHARED_SPOT" : "LEGACY_SPOT";
+    const indexed = async (): Promise<LastTradeView | null> => {
+      const result = await indexedLatestTrade(market.toBase58(), engine);
+      return result ? {
+        price: new BN(result.price),
+        signature: result.signature,
+        blockTime: result.blockTime === null ? null : Number(result.blockTime),
+      } : null;
+    };
+    if (engine === "SHARED_SPOT") return indexed();
+    return readWithRpcFallback(
+      `latest:${market}`,
+      indexed,
+      () => fetchLatestTrade(connection, new Program(outcomiaIdl as Idl, { connection }), market, signatureLimit),
+    );
+  }
   const signatures = await connection.getSignaturesForAddress(market, {
     limit: signatureLimit,
   });
@@ -558,17 +577,26 @@ export async function getOwnedTokenBalance(
   owner: PublicKey,
   mint: PublicKey,
 ) {
-  const response = await connection.getParsedTokenAccountsByOwner(
-    owner,
-    { mint },
-    "confirmed",
-  );
+  return readWithRpcFallback(
+    `wallet:${owner}:tokens`,
+    async () => {
+      const assets = await walletAssets(owner);
+      return new BN(assets.find((asset) => asset.mint === mint.toBase58())?.amount ?? "0");
+    },
+    async () => {
+      const response = await connection.getParsedTokenAccountsByOwner(
+        owner,
+        { mint },
+        "confirmed",
+      );
 
-  return response.value.reduce((total, { account }) => {
-    if (!("parsed" in account.data)) return total;
-    const amount = account.data.parsed?.info?.tokenAmount?.amount;
-    return typeof amount === "string" ? total.add(new BN(amount, 10)) : total;
-  }, new BN(0));
+      return response.value.reduce((total, { account }) => {
+        if (!("parsed" in account.data)) return total;
+        const amount = account.data.parsed?.info?.tokenAmount?.amount;
+        return typeof amount === "string" ? total.add(new BN(amount, 10)) : total;
+      }, new BN(0));
+    },
+  );
 }
 
 /**

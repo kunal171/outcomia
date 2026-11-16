@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { MultiWalletActivity } from "./multi-outcome/wallet-activity";
 import { useI18n } from "./preferences-provider";
 
@@ -61,6 +62,7 @@ export function WalletWorkspace() {
   const [snapshot, setSnapshot] = useState<WalletOverview | null>(null);
   const [pending, setPending] = useState(false);
   const [revision, setRevision] = useState(0);
+  useIndexerUpdates(() => setRevision((v) => v + 1));
   const [fatal, setFatal] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hideEmpty, setHideEmpty] = useState(true);

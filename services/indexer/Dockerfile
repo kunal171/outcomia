@@ -2,12 +2,13 @@
 
 FROM rust:1.97.1-bookworm AS builder
 
-WORKDIR /build
+WORKDIR /build/services/indexer
 
 # Copy the independent indexer workspace, including migrations embedded by SQLx.
-COPY Cargo.toml Cargo.lock ./
-COPY migrations ./migrations
-COPY src ./src
+COPY services/indexer/Cargo.toml services/indexer/Cargo.lock ./
+COPY services/indexer/migrations ./migrations
+COPY services/indexer/src ./src
+COPY app/idl/outcomia.json /build/app/idl/outcomia.json
 
 RUN cargo build --locked --release
 
@@ -25,12 +26,14 @@ RUN apt-get update \
         outcomia
 
 COPY --from=builder \
-    /build/target/release/outcomia-indexer \
+    /build/services/indexer/target/release/outcomia-indexer \
     /usr/local/bin/outcomia-indexer
 
 ENV HEALTH_ADDRESS=0.0.0.0:8080
 
-EXPOSE 8080
+ENV API_ADDRESS=0.0.0.0:8081
+
+EXPOSE 8080 8081
 
 USER 10001
 

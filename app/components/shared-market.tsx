@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Public shared order book and signed owner actions. Old queues are separate recovery paths. */
@@ -98,6 +99,7 @@ function Market(props: Props) {
     [price, setPrice] = useState(""),
     [quantity, setQuantity] = useState("");
   const [fundingOpen, setFundingOpen] = useState(false);
+  useIndexerUpdates(() => setRevision((v) => v + 1));
   useEffect(() => {
     let dead = false;
     setLoaded(false);
@@ -252,7 +254,8 @@ function Market(props: Props) {
         }
       }
       assertSharedTransactionFits(tx, wallet.publicKey);
-      setSignature(await (p.provider as AnchorProvider).sendAndConfirm(tx));
+      const confirmed = await (p.provider as AnchorProvider).sendAndConfirm(tx);
+      setSignature(confirmed);
       setRevision((v) => v + 1);
       props.onChanged?.();
       if (action === "trade") {

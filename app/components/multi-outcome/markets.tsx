@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "../use-indexer-updates";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -26,6 +27,7 @@ export function MultiOutcomeMarkets() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(MULTI_OUTCOME_ENABLED);
   const [revision, setRevision] = useState(0);
+  useIndexerUpdates(() => setRevision((v) => v + 1));
   useEffect(() => {
     if (!MULTI_OUTCOME_ENABLED) return;
     let active = true;
