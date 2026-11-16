@@ -1,4 +1,4 @@
-import { indexedAccounts } from "./indexer-client";
+import { indexedAccounts } from "./indexed-accounts";
 /** Shared custody uses mint/owner PDAs; orders and YES/NO remain tied to one book.
  * Keep this rollout disabled until the program and generated IDL are deployed together. */
 import { BN, type Program } from "@anchor-lang/core";

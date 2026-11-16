@@ -1,4 +1,7 @@
-import { indexedAccounts, indexedReader } from "./indexer-client";
+import { getLatestTrade as indexedLatestTrade } from "./graphql/markets";
+import { indexedAccounts, indexedReader, usesIndexer } from "./indexed-accounts";
+import { INDEXER_ENABLED } from "./graphql/client";
+import { walletAssets } from "./graphql/wallet";
 import {
   AnchorProvider,
   BN,
@@ -386,6 +389,10 @@ export async function fetchLatestTrade(
   market: PublicKey,
   signatureLimit = 8,
 ): Promise<LastTradeView | null> {
+  if (usesIndexer(program)) {
+    const result=await indexedLatestTrade(market.toBase58(),process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED==="true"?"SHARED_SPOT":"LEGACY_SPOT");
+    return result?{price:new BN(result.price),signature:result.signature,blockTime:result.blockTime===null?null:Number(result.blockTime)}:null;
+  }
   const signatures = await connection.getSignaturesForAddress(market, {
     limit: signatureLimit,
   });
@@ -559,6 +566,12 @@ export async function getOwnedTokenBalance(
   owner: PublicKey,
   mint: PublicKey,
 ) {
+  if (INDEXER_ENABLED) {
+    const assets = await walletAssets(owner);
+    return new BN(
+      assets.find((asset) => asset.mint === mint.toBase58())?.amount ?? "0",
+    );
+  }
   const response = await connection.getParsedTokenAccountsByOwner(
     owner,
     { mint },

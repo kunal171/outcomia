@@ -1,4 +1,4 @@
-import { indexedAccounts } from "./indexer-client";
+import { indexedAccounts } from "./indexed-accounts";
 import { BN, type Program } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
