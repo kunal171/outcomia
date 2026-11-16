@@ -4,6 +4,7 @@
 //! live recovery, reconnect policy, and shutdown. Decoding, persistence, and
 //! the individual ingestion state machines remain in focused modules.
 
+mod account_data;
 mod backfill;
 mod config;
 mod decoder;
