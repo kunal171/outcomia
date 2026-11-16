@@ -17,6 +17,7 @@ export const RULES_GATEWAY = "https://turbo-gateway.com/raw/";
  */
 export async function verifyArweaveRules(
   upload: ArweaveRulesUpload,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (!/^[A-Za-z0-9_-]{43}$/.test(upload.id))
     throw new Error("Invalid Arweave upload ID");
@@ -26,7 +27,9 @@ export async function verifyArweaveRules(
   for (let attempt = 0; attempt < 3; attempt++) {
     const response = await fetch(`${RULES_GATEWAY}${upload.id}`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(12000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(12000)])
+        : AbortSignal.timeout(12000),
     });
     if (response.status === 404 && attempt < 2) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
