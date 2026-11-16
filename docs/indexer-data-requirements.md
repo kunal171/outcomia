@@ -9,6 +9,17 @@ history fetches in each browser. RPC remains the indexer's upstream and the path
 for signed transactions, confirmation and any necessary pre-signing checks.
 GraphQL resolvers must read projections, not run the old RPC queries per request.
 
+## Implementation status
+
+The initial audit below records the starting point. Current account projections,
+execution replay, modular GraphQL queries/subscriptions, wallet sign-in, tracked
+holdings and frontend charts are implemented locally. See the
+[indexer README](../services/indexer/README.md) for source layout, setup,
+verification and remaining production validation. Frontend indexed reads are
+behind a build-time flag. No live deployment or program upgrade is implied.
+Historical coverage depends on available source data and is exposed explicitly.
+Provisional candles, depth charts, P&L and USD valuation remain later work.
+
 ## Scope
 
 First cover Solana devnet: spot, binary prediction and multi-outcome markets,
@@ -18,14 +29,14 @@ Canton needs its own ingestion adapter and is outside this first Solana design.
 Cross-outcome matching, clubs/private markets and permissionless creation stay
 deferred. Existing public read data needs no wallet connection.
 
-## What exists and what is missing
+## Initial audit (before implementation)
 
 | Area | Repository evidence | Consequence |
 | --- | --- | --- |
-| Durable ingestion | `services/indexer/src/{backfill,live,processor}.rs` | Reuse finalized history, reconnect gap recovery, replay checks and checkpoints. |
+| Durable ingestion | `services/indexer/src/ingestion/{backfill,live,transactions}.rs` | Reuse finalized history, reconnect gap recovery, replay checks and checkpoints. |
 | Raw storage | `services/indexer/migrations/20261031064356_create_source_records.sql` | Stores signatures, slots, optional time, logs and decoded events; not complete transaction messages, instructions or token balance changes. |
-| Ordering | `services/indexer/src/rpc.rs` and the transaction-index migration | Transaction index is nullable. Backfill is oldest-first within each page, not across all pages. A projection must not apply these pages in arrival order. |
-| Events | `programs/outcomia/src/events/` and `services/indexer/src/decoder{,/types}.rs` | Decoder covers 21 original events and nine multi-outcome events. Binary prediction and shared-wallet operations lack dedicated events in the audited implementation. |
+| Ordering | `services/indexer/src/ingestion/rpc.rs` and the transaction-index migration | Transaction index is nullable. Backfill is oldest-first within each page, not across all pages. A projection must not apply these pages in arrival order. |
+| Events | `programs/outcomia/src/events/` and `services/indexer/src/processing/decoder/{mod,types}.rs` | Decoder covers 21 original events and nine multi-outcome events. Binary prediction and shared-wallet operations lack dedicated events in the audited implementation. |
 | Event completeness | `programs/outcomia/src/events/multi_outcome.rs` | Multi-outcome events are useful history but omit parts of terms, proposals, balances and queue linkage. Events alone are insufficient for the full frontend. |
 | Query service | `services/indexer/src/health.rs` | Health endpoints exist. No GraphQL API, account snapshots, read projections or subscriptions exist yet. Readiness does not measure time-based lag. |
 | Browser reads | Components and libraries listed below | Several panels independently fetch overlapping market, metadata, book, mint and wallet data. Most refreshes are mount/manual/post-transaction reads; one-second local clocks are not themselves RPC polling. |

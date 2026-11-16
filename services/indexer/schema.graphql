@@ -1,0 +1,90 @@
+type AccountPage {
+	nodes: [IndexedAccount!]!
+	sync: SyncInfo!
+	hasNextPage: Boolean!
+	endCursor: String
+}
+
+type Candle {
+	time: String!
+	open: String!
+	high: String!
+	low: String!
+	close: String!
+	quantity: String!
+	quoteVolume: String!
+	trades: Int!
+}
+
+type CandleSeries {
+	supported: Boolean!
+	coverage: String!
+	commitment: String!
+	error: String
+	candles: [Candle!]!
+}
+
+type Changes {
+	revisions(commitment: String, owner: String): Revision!
+}
+
+type IndexedAccount {
+	address: String!
+	accountType: String!
+	data: JSON!
+	rawBase64: String!
+	lamports: String!
+	slot: String!
+	revision: String!
+}
+
+"""
+A scalar that can represent any JSON value.
+"""
+scalar JSON
+
+input Memcmp {
+	offset: Int!
+	bytes: String!
+}
+
+type Query {
+	syncStatus(commitment: String): SyncInfo!
+	account(address: String!, commitment: String): IndexedAccount
+	accounts(accountType: String!, filters: [Memcmp!], after: String, first: Int, commitment: String, revision: String): AccountPage!
+	rawAccounts(addresses: [String!]!): JSON!
+	latestTrade(market: String!, engine: String!): JSON
+	me: JSON
+	walletAssets(owner: String!, commitment: String): JSON!
+	candles(market: String!, engine: String!, outcome: String!, interval: Int!, from: String!, to: String!): CandleSeries!
+	transaction(signature: String!): JSON!
+}
+
+type Revision {
+	commitment: String!
+	revision: String!
+	resync: Boolean!
+}
+
+type SyncInfo {
+	commitment: String!
+	slot: String!
+	revision: String!
+	ready: Boolean!
+	observedAt: String
+	error: String
+}
+
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
+directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
+directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+schema {
+	query: Query
+	subscription: Changes
+}
+
