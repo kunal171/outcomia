@@ -5,7 +5,7 @@
 //! catalog here; all nine multi-outcome event types are decoded. Adding such events requires matching this
 //! catalog and its Borsh mirrors before ingestion can checkpoint past them.
 
-mod types;
+pub(crate) mod types;
 use types::*;
 
 use crate::events::RawEventLog;
