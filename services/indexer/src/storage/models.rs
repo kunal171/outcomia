@@ -134,6 +134,7 @@ mod tests {
 
     fn transaction(slot: u64) -> TransactionRecord {
         TransactionRecord {
+            execution: None,
             signature: "test-signature".to_owned(),
             slot,
             block_time: Some(1_700_000_000),
