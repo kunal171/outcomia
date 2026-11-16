@@ -34,7 +34,7 @@ kubectl --context kind-outcomia get nodes
 Build and load the image:
 
 ```bash
-docker build --tag outcomia-indexer:dev services/indexer
+docker build --tag outcomia-indexer:dev --file services/indexer/Dockerfile .
 kind load docker-image outcomia-indexer:dev --name outcomia
 ```
 
