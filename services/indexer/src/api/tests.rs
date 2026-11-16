@@ -265,3 +265,20 @@ mod receipt_tests {
         assert_eq!(status().await, "FINALIZED_INDEXED");
     }
 }
+
+#[test]
+fn database_failures_are_unavailable_but_invalid_queries_remain_visible() {
+    let error = async_graphql::Error::from(sqlx::Error::PoolClosed)
+        .into_server_error(async_graphql::Pos::default());
+    let (status, Json(response)) =
+        graphql_response(async_graphql::Response::from_errors(vec![error]));
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response.errors[0].message,
+        "Indexed data service is unavailable"
+    );
+    let (status, _) = graphql_response(async_graphql::Response::from_errors(vec![
+        async_graphql::ServerError::new("Invalid account filter", None),
+    ]));
+    assert_eq!(status, StatusCode::OK);
+}

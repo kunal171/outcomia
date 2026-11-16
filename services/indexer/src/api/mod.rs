@@ -32,9 +32,36 @@ async fn execute(
     State(state): State<HttpState>,
     headers: HeaderMap,
     Json(request): Json<async_graphql::Request>,
-) -> Json<async_graphql::Response> {
-    let user = auth::current(&state.pool, &headers).await.unwrap_or(None);
-    Json(state.schema.execute(request.data(user)).await)
+) -> (StatusCode, Json<async_graphql::Response>) {
+    let user = match auth::current(&state.pool, &headers).await {
+        Ok(user) => user,
+        Err(_) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(async_graphql::Response::from_errors(vec![
+                    async_graphql::ServerError::new("Indexed data service is unavailable", None),
+                ])),
+            )
+        }
+    };
+    graphql_response(state.schema.execute(request.data(user)).await)
+}
+
+fn graphql_response(
+    mut response: async_graphql::Response,
+) -> (StatusCode, Json<async_graphql::Response>) {
+    let mut status = StatusCode::OK;
+    for error in &mut response.errors {
+        if error
+            .source
+            .as_ref()
+            .is_some_and(|source| source.is::<sqlx::Error>())
+        {
+            status = StatusCode::SERVICE_UNAVAILABLE;
+            error.message = "Indexed data service is unavailable".into();
+        }
+    }
+    (status, Json(response))
 }
 async fn stream(
     State(state): State<HttpState>,
