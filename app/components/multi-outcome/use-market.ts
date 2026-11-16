@@ -5,7 +5,6 @@ import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@anchor-lang/core";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { unpackMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { checkPendingTransaction, waitForIndexedTransaction } from "../../lib/graphql/receipts";
 import { accountInfos } from "../../lib/indexed-accounts";
 import {
   getOutcomiaAccounts,
@@ -134,7 +133,6 @@ export function useMultiMarket(address: string) {
     setSignature("");
     const expected = owner;
     try {
-      await checkPendingTransaction(wallet.publicKey);
       const tx = await build();
       transactionBytes(tx, wallet.publicKey);
       if (!mounted.current || live.current !== expected)
@@ -144,8 +142,6 @@ export function useMultiMarket(address: string) {
       );
       if (mounted.current && live.current === expected) {
         setSignature(result);
-        await waitForIndexedTransaction(wallet.publicKey, result);
-        if (!mounted.current || live.current !== expected) return false;
         await refresh();
         return mounted.current && live.current === expected;
       }

@@ -1,5 +1,4 @@
 "use client";
-import { checkPendingTransaction, waitForIndexedTransaction } from "../lib/graphql/receipts";
 import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
@@ -255,10 +254,8 @@ function Market(props: Props) {
         }
       }
       assertSharedTransactionFits(tx, wallet.publicKey);
-      await checkPendingTransaction(wallet.publicKey);
       const confirmed = await (p.provider as AnchorProvider).sendAndConfirm(tx);
       setSignature(confirmed);
-      await waitForIndexedTransaction(wallet.publicKey, confirmed);
       setRevision((v) => v + 1);
       props.onChanged?.();
       if (action === "trade") {

@@ -1,3 +1,4 @@
+import { sendWithIndexedReceipt } from "./graphql/receipts";
 import { getLatestTrade as indexedLatestTrade } from "./graphql/markets";
 import { indexedAccounts, indexedReader, usesIndexer } from "./indexed-accounts";
 import { INDEXER_ENABLED } from "./graphql/client";
@@ -245,6 +246,9 @@ export function getOutcomiaProgram(
     preflightCommitment: "confirmed",
   });
 
+  const send = provider.sendAndConfirm.bind(provider);
+  provider.sendAndConfirm = (...args) =>
+    sendWithIndexedReceipt(wallet.publicKey, () => send(...args));
   return new Program(outcomiaIdl as Idl, provider);
 }
 
