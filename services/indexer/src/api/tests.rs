@@ -166,12 +166,31 @@ mod browser_fixture {
         let server = tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
-        let wallet_worker = tokio::spawn(crate::wallet_ingest::run(
-            pool.clone(),
-            std::sync::Arc::new(solana_rpc_client::rpc_client::RpcClient::new(
-                "http://127.0.0.1:8085",
-            )),
-        ));
+        let wallet_pool = pool.clone();
+        let wallet_worker = tokio::spawn(async move {
+            // The Node child owns the local RPC fixture; discovery now starts
+            // tracking wallets before login, so wait for its listener first.
+            tokio::time::timeout(Duration::from_secs(10), async {
+                loop {
+                    if tokio::net::TcpStream::connect("127.0.0.1:8085")
+                        .await
+                        .is_ok()
+                    {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            })
+            .await
+            .expect("local RPC fixture must start");
+            crate::wallet_ingest::run(
+                wallet_pool,
+                std::sync::Arc::new(solana_rpc_client::rpc_client::RpcClient::new(
+                    "http://127.0.0.1:8085",
+                )),
+            )
+            .await;
+        });
         let output = tokio::process::Command::new("node")
             .arg("scripts/indexer-browser.test.mjs")
             .current_dir("../../app")
@@ -281,4 +300,54 @@ fn database_failures_are_unavailable_but_invalid_queries_remain_visible() {
         async_graphql::ServerError::new("Invalid account filter", None),
     ]));
     assert_eq!(status, StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+#[ignore = "requires isolated PostgreSQL"]
+async fn known_chain_wallet_reads_resume_tracking_without_a_session(pool: PgPool) {
+    let owner = bs58::encode([6_u8; 32]).into_string();
+    sqlx::query("INSERT INTO users(wallet_address,registration_source,first_observed_slot) VALUES($1,'chain',10)")
+        .bind(&owner).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO tracked_wallets(owner,requested_at) VALUES($1,NOW()-INTERVAL '40 minutes')",
+    )
+    .bind(&owner)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (revisions, _) = broadcast::channel(4);
+    let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+        .data(ApiState {
+            pool: pool.clone(),
+            revisions,
+        })
+        .finish();
+    let response = schema
+        .execute(format!("{{walletAssets(owner:\"{owner}\")}} "))
+        .await;
+    assert!(
+        !response.errors.is_empty(),
+        "holdings stay warming until the shared worker refreshes them"
+    );
+    assert!(sqlx::query_scalar::<_, bool>(
+        "SELECT requested_at>NOW()-INTERVAL '1 minute' FROM tracked_wallets WHERE owner=$1"
+    )
+    .bind(&owner)
+    .fetch_one(&pool)
+    .await
+    .unwrap());
+    assert!(sqlx::query_scalar::<_, bool>(
+        "SELECT verified_at IS NULL AND last_login_at IS NULL FROM users WHERE wallet_address=$1"
+    )
+    .bind(&owner)
+    .fetch_one(&pool)
+    .await
+    .unwrap());
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM user_sessions")
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        0
+    );
 }
