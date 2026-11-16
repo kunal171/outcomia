@@ -191,9 +191,51 @@ pub fn decode_account(bytes: &[u8]) -> io::Result<(String, Value)> {
     Ok((name.to_owned(), value))
 }
 
+pub fn decode_instruction(bytes: &[u8]) -> io::Result<(String, Value)> {
+    if bytes.len() < 8 || bytes.len() > 131072 {
+        return Err(invalid("invalid instruction length"));
+    }
+    let definition = idl()["instructions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| {
+            a["discriminator"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .enumerate()
+                .all(|(i, n)| n.as_u64() == Some(bytes[i] as u64))
+        })
+        .ok_or_else(|| invalid("unknown instruction discriminator"))?;
+    let mut body = &bytes[8..];
+    let args = fields(definition["args"].as_array().unwrap(), &mut body, 0)?;
+    if !body.is_empty() {
+        return Err(invalid("trailing instruction bytes"));
+    }
+    Ok((definition["name"].as_str().unwrap().to_owned(), args))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn agrees_with_anchor_for_every_account_layout() {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+        let fixtures: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/account-wire.json")).unwrap();
+        assert_eq!(
+            fixtures.as_array().unwrap().len(),
+            idl()["accounts"].as_array().unwrap().len()
+        );
+        for fixture in fixtures.as_array().unwrap() {
+            let (name, data) =
+                decode_account(&STANDARD.decode(fixture["bytes"].as_str().unwrap()).unwrap())
+                    .unwrap();
+            assert_eq!(name, fixture["name"].as_str().unwrap());
+            assert_eq!(data, fixture["expected"], "{name}");
+        }
+    }
     #[test]
     fn exact_balances_and_tuple_enum_wire_shapes() {
         let mut bytes = vec![2; 64];
