@@ -1,29 +1,10 @@
-//! Bounded GraphQL reads over PostgreSQL. Resolvers never call Solana RPC.
-use crate::{account_data, auth, charts};
-use async_graphql::{
-    Context, EmptyMutation, InputObject, Json as GqlJson, Object, Schema, SimpleObject,
-    Subscription,
-};
-use axum::{
-    extract::{DefaultBodyLimit, State},
-    http::{HeaderMap, StatusCode},
-    response::{
-        sse::{Event, KeepAlive},
-        Sse,
-    },
-    routing::{get, post},
-    Json, Router,
-};
-use futures_util::{Stream, StreamExt};
+use crate::account_data;
+use crate::api::ApiState;
+use async_graphql::{Context, Json as GqlJson, Object};
+use async_graphql::{InputObject, SimpleObject};
 use serde_json::Value;
-use sqlx::{postgres::PgListener, PgPool, Postgres, QueryBuilder, Row};
-use std::{convert::Infallible, time::Duration};
-use tokio::sync::broadcast;
-#[derive(Clone)]
-pub struct ApiState {
-    pub pool: PgPool,
-    pub revisions: broadcast::Sender<String>,
-}
+use sqlx::Row;
+use sqlx::{Postgres, QueryBuilder};
 #[derive(SimpleObject)]
 pub struct SyncInfo {
     pub commitment: String,
@@ -55,7 +36,7 @@ pub struct Memcmp {
     pub offset: i32,
     pub bytes: String,
 }
-fn commitment(value: Option<String>) -> async_graphql::Result<String> {
+pub(super) fn commitment(value: Option<String>) -> async_graphql::Result<String> {
     let value = value.unwrap_or_else(|| "confirmed".into());
     if !matches!(value.as_str(), "confirmed" | "finalized") {
         return Err("Use confirmed or finalized commitment".into());
@@ -84,9 +65,11 @@ fn account(row: sqlx::postgres::PgRow) -> IndexedAccount {
         revision: row.get::<i64, _>("revision").to_string(),
     }
 }
-pub struct Query;
+
+#[derive(Default)]
+pub struct AccountsQuery;
 #[Object]
-impl Query {
+impl AccountsQuery {
     async fn sync_status(
         &self,
         ctx: &Context<'_>,
@@ -96,6 +79,7 @@ impl Query {
         let mut conn = state.pool.acquire().await?;
         sync(&mut conn, &self::commitment(commitment)?).await
     }
+
     async fn account(
         &self,
         ctx: &Context<'_>,
@@ -118,6 +102,9 @@ impl Query {
         tx.commit().await?;
         Ok(row.map(account))
     }
+
+    // Independent GraphQL filters are part of the public query contract.
+    #[allow(clippy::too_many_arguments)]
     #[graphql(complexity = "500")]
     async fn accounts(
         &self,
@@ -161,7 +148,7 @@ impl Query {
         let mut sql=QueryBuilder::<Postgres>::new("SELECT *,lamports::text AS atoms FROM indexed_accounts WHERE NOT deleted AND commitment=");
         sql.push_bind(level)
             .push(" AND account_type=")
-            .push_bind(account_type);
+            .push_bind(account_type.clone());
         if let Some(after) = after {
             sql.push(" AND address>").push_bind(after);
         }
@@ -174,6 +161,13 @@ impl Query {
                 .map_err(|_| async_graphql::Error::new("Invalid filter encoding"))?;
             if bytes.is_empty() || bytes.len() > 128 {
                 return Err("Invalid account filter length".into());
+            }
+            if let Some(field) =
+                account_data::indexed_filter_field(&account_type, filter.offset, bytes.len())
+            {
+                sql.push(format!(" AND data->>'{field}'="))
+                    .push_bind(bs58::encode(bytes).into_string());
+                continue;
             }
             sql.push(" AND substring(decode(raw_base64,'base64') FROM ")
                 .push_bind(filter.offset + 1)
@@ -196,6 +190,7 @@ impl Query {
             end_cursor,
         })
     }
+
     async fn raw_accounts(
         &self,
         ctx: &Context<'_>,
@@ -226,161 +221,4 @@ impl Query {
                 .collect(),
         )))
     }
-
-    async fn me(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<GqlJson<Value>>> {
-        Ok(ctx
-            .data::<Option<auth::User>>()?
-            .as_ref()
-            .map(|user| GqlJson(serde_json::to_value(user).expect("user serializes"))))
-    }
-    async fn wallet_assets(
-        &self,
-        ctx: &Context<'_>,
-        owner: String,
-        commitment: Option<String>,
-    ) -> async_graphql::Result<GqlJson<Value>> {
-        let state = ctx.data::<ApiState>()?;
-        let level = self::commitment(commitment)?;
-        let status:Option<(bool,Option<String>)>=sqlx::query_as("SELECT ready AND observed_at>NOW()-INTERVAL '90 seconds',last_error FROM wallet_sync WHERE owner=$1 AND commitment=$2").bind(&owner).bind(&level).fetch_optional(&state.pool).await?;
-        let Some((true, _)) = status else {
-            return Err(
-                "Wallet holdings are warming or stale; sign in to track this wallet".into(),
-            );
-        };
-        let rows=sqlx::query("SELECT mint,token_program,amount::text,frozen::text,decimals,account_count,slot FROM wallet_assets WHERE owner=$1 AND commitment=$2 ORDER BY mint,token_program").bind(owner).bind(level).fetch_all(&state.pool).await?;
-        Ok(GqlJson(Value::Array(rows.into_iter().map(|r|serde_json::json!({"mint":r.get::<String,_>("mint"),"tokenProgram":r.get::<String,_>("token_program"),"amount":r.get::<String,_>("amount"),"frozen":r.get::<String,_>("frozen"),"decimals":r.get::<i16,_>("decimals"),"accountCount":r.get::<i32,_>("account_count"),"slot":r.get::<i64,_>("slot").to_string()})).collect())))
-    }
-    #[graphql(complexity = "500")]
-    async fn candles(
-        &self,
-        ctx: &Context<'_>,
-        market: String,
-        engine: String,
-        outcome: String,
-        interval: i32,
-        from: String,
-        to: String,
-    ) -> async_graphql::Result<charts::CandleSeries> {
-        charts::query(
-            &ctx.data::<ApiState>()?.pool,
-            &market,
-            &engine,
-            &outcome,
-            interval,
-            &from,
-            &to,
-        )
-        .await
-    }
-}
-#[derive(SimpleObject)]
-pub struct Revision {
-    pub commitment: String,
-    pub revision: String,
-    pub resync: bool,
-}
-pub struct Changes;
-#[Subscription]
-impl Changes {
-    async fn revisions(
-        &self,
-        ctx: &Context<'_>,
-        commitment: Option<String>,
-    ) -> impl Stream<Item = Revision> {
-        let rx = ctx.data_unchecked::<ApiState>().revisions.subscribe();
-        let level = commitment.unwrap_or_else(|| "confirmed".into());
-        futures_util::stream::unfold((rx, level), |(mut rx, level)| async move {
-            loop {
-                match rx.recv().await {
-                    Ok(value) => {
-                        if let Some((kind, revision)) = value.split_once(':') {
-                            if kind == level {
-                                let item = Revision {
-                                    commitment: level.clone(),
-                                    revision: revision.into(),
-                                    resync: false,
-                                };
-                                return Some((item, (rx, level)));
-                            }
-                        }
-                    }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        return Some((
-                            Revision {
-                                commitment: level.clone(),
-                                revision: "0".into(),
-                                resync: true,
-                            },
-                            (rx, level),
-                        ))
-                    }
-                    Err(_) => return None,
-                }
-            }
-        })
-    }
-}
-type AppSchema = Schema<Query, EmptyMutation, Changes>;
-#[derive(Clone)]
-struct HttpState {
-    schema: AppSchema,
-    pool: PgPool,
-}
-async fn execute(
-    State(state): State<HttpState>,
-    headers: HeaderMap,
-    Json(request): Json<async_graphql::Request>,
-) -> Json<async_graphql::Response> {
-    let user = auth::current(&state.pool, &headers).await.unwrap_or(None);
-    Json(state.schema.execute(request.data(user)).await)
-}
-async fn stream(
-    State(state): State<HttpState>,
-    Json(request): Json<async_graphql::Request>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
-    let stream = state.schema.execute_stream(request).map(|response| {
-        Ok(Event::default()
-            .json_data(response)
-            .expect("GraphQL response"))
-    });
-    Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
-}
-pub fn router(pool: PgPool, auth: auth::AuthState) -> Router {
-    let (revisions, _) = broadcast::channel(64);
-    let state = ApiState {
-        pool: pool.clone(),
-        revisions: revisions.clone(),
-    };
-    let schema = Schema::build(Query, EmptyMutation, Changes)
-        .data(state)
-        .limit_depth(8)
-        .limit_complexity(2500)
-        .finish();
-    tokio::spawn(async move {
-        loop {
-            let result = async {
-                let mut listener = PgListener::connect_with(&pool).await?;
-                listener.listen("outcomia_revisions").await?;
-                while let Ok(message) = listener.recv().await {
-                    let _ = revisions.send(message.payload().to_owned());
-                }
-                Ok::<_, sqlx::Error>(())
-            }
-            .await;
-            if result.is_err() {
-                let _ = revisions.send("confirmed:0".into());
-            }
-            tokio::time::sleep(Duration::from_secs(2)).await;
-        }
-    });
-    Router::new()
-        .route("/graphql", post(execute))
-        .route("/graphql/stream", post(stream))
-        .route("/health/live", get(|| async { StatusCode::OK }))
-        .with_state(HttpState {
-            schema,
-            pool: auth.pool.clone(),
-        })
-        .merge(auth::router(auth))
-        .layer(DefaultBodyLimit::max(32768))
 }

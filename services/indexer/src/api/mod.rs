@@ -1,0 +1,106 @@
+//! HTTP transport and service wiring; query logic is grouped in graphql/.
+mod graphql;
+use crate::auth;
+use async_graphql::{EmptyMutation, Schema};
+use axum::{
+    extract::{DefaultBodyLimit, State},
+    http::{HeaderMap, StatusCode},
+    response::{
+        sse::{Event, KeepAlive},
+        Sse,
+    },
+    routing::{get, post},
+    Json, Router,
+};
+use futures_util::{Stream, StreamExt};
+use graphql::{Changes, Query};
+use sqlx::{postgres::PgListener, PgPool};
+use std::{convert::Infallible, time::Duration};
+use tokio::sync::broadcast;
+#[derive(Clone)]
+pub struct ApiState {
+    pub pool: PgPool,
+    pub revisions: broadcast::Sender<String>,
+}
+type AppSchema = Schema<Query, EmptyMutation, Changes>;
+#[derive(Clone)]
+struct HttpState {
+    schema: AppSchema,
+    pool: PgPool,
+}
+async fn execute(
+    State(state): State<HttpState>,
+    headers: HeaderMap,
+    Json(request): Json<async_graphql::Request>,
+) -> Json<async_graphql::Response> {
+    let user = auth::current(&state.pool, &headers).await.unwrap_or(None);
+    Json(state.schema.execute(request.data(user)).await)
+}
+async fn stream(
+    State(state): State<HttpState>,
+    Json(request): Json<async_graphql::Request>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = state.schema.execute_stream(request).map(|response| {
+        Ok(Event::default()
+            .json_data(response)
+            .expect("GraphQL response"))
+    });
+    Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15)))
+}
+pub fn router(pool: PgPool, auth: auth::AuthState) -> Router {
+    let (revisions, _) = broadcast::channel(64);
+    let state = ApiState {
+        pool: pool.clone(),
+        revisions: revisions.clone(),
+    };
+    let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+        .data(state)
+        .limit_depth(8)
+        .limit_complexity(2500)
+        .finish();
+    tokio::spawn(async move {
+        loop {
+            let result = async {
+                let mut listener = PgListener::connect_with(&pool).await?;
+                listener.listen("outcomia_revisions").await?;
+                while let Ok(message) = listener.recv().await {
+                    let _ = revisions.send(message.payload().to_owned());
+                }
+                Ok::<_, sqlx::Error>(())
+            }
+            .await;
+            if result.is_err() {
+                let _ = revisions.send("confirmed:0".into());
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+    Router::new()
+        .route("/graphql", post(execute))
+        .route("/graphql/stream", post(stream))
+        .route("/health/live", get(|| async { StatusCode::OK }))
+        .with_state(HttpState {
+            schema,
+            pool: auth.pool.clone(),
+        })
+        .merge(auth::router(auth))
+        .layer(DefaultBodyLimit::max(32768))
+        .layer(axum::middleware::map_response(
+            |mut response: axum::response::Response| async move {
+                response.headers_mut().insert(
+                    axum::http::header::CACHE_CONTROL,
+                    axum::http::HeaderValue::from_static("no-store"),
+                );
+                response
+            },
+        ))
+}
+
+pub fn schema_sdl() -> String {
+    Schema::build(Query::default(), EmptyMutation, Changes)
+        .finish()
+        .sdl()
+}
+
+#[cfg(test)]
+mod tests;
