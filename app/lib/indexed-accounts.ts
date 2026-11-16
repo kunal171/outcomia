@@ -1,5 +1,6 @@
 /** Anchor compatibility belongs here; GraphQL operations stay in lib/graphql. */
-import { BN, type Program } from "@anchor-lang/core";
+import { readWithRpcFallback } from "./read-source";
+import { BN, type Program, type AccountClient } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import idl from "../idl/outcomia.json";
 import { INDEXER_ENABLED, dedupe } from "./graphql/client";
@@ -93,6 +94,7 @@ export function indexedAccounts(program: Program) {
     get(_target, key: string) {
       const name = idl.accounts.find((account) => camel(account.name) === key)?.name;
       if (!name) throw new Error(`Unsupported indexed account ${key}`);
+      const rpcAccount = (program.account as unknown as Record<string, AccountClient>)[key];
       const convert = (row: AccountRecord) => {
         if (row.accountType !== name)
           throw new Error("Indexed account type mismatch");
@@ -100,32 +102,46 @@ export function indexedAccounts(program: Program) {
       };
       return {
         fetchNullable: (address: PublicKey) =>
-          getAccount(address.toBase58()).then((row) => row ? convert(row) : null),
-        fetch: async (address: PublicKey) => {
-          const row = await getAccount(address.toBase58());
-          if (!row) throw new Error("Indexed account was not found");
-          return convert(row);
-        },
+          readWithRpcFallback(
+            "accounts",
+            () => getAccount(address.toBase58()).then((row) => row ? convert(row) : null),
+            () => dedupe(`rpc:nullable:${program.programId}:${key}:${address}`, () =>
+              rpcAccount.fetchNullable(address, "confirmed")),
+          ),
+        fetch: (address: PublicKey) => readWithRpcFallback(
+          "accounts",
+          async () => {
+            const row = await getAccount(address.toBase58());
+            if (!row) throw new Error("Indexed account was not found");
+            return convert(row);
+          },
+          () => dedupe(`rpc:account:${program.programId}:${key}:${address}`, () =>
+            rpcAccount.fetch(address, "confirmed")),
+        ),
         all: (filters?: { memcmp: AccountFilter }[]) =>
-          dedupe(`all:${name}:${JSON.stringify(filters)}`, async () => {
-            const output: { publicKey: PublicKey; account: unknown }[] = [];
-            let after: string | null = null;
-            let revision: string | null = null;
-            const getPage = MARKET_ACCOUNT_TYPES.includes(name) ? getMarkets : getAccounts;
-            for (let count = 0; count < 100; count++) {
-              const page = await getPage(name, filters?.map((filter) => filter.memcmp), after, revision);
-              revision ??= page.sync.revision;
-              output.push(...page.nodes.map((row) => ({
-                publicKey: new PublicKey(row.address),
-                account: convert(row),
-              })));
-              if (!page.hasNextPage) return output;
-              if (!page.endCursor || page.endCursor === after)
-                throw new Error("Indexed pagination did not advance");
-              after = page.endCursor;
-            }
-            throw new Error("Indexed account result limit exceeded");
-          }),
+          dedupe(`all:${name}:${JSON.stringify(filters)}`, () => readWithRpcFallback(
+            "accounts",
+            async () => {
+              const output: { publicKey: PublicKey; account: unknown }[] = [];
+              let after: string | null = null;
+              let revision: string | null = null;
+              const getPage = MARKET_ACCOUNT_TYPES.includes(name) ? getMarkets : getAccounts;
+              for (let count = 0; count < 100; count++) {
+                const page = await getPage(name, filters?.map((filter) => filter.memcmp), after, revision);
+                revision ??= page.sync.revision;
+                output.push(...page.nodes.map((row) => ({
+                  publicKey: new PublicKey(row.address),
+                  account: convert(row),
+                })));
+                if (!page.hasNextPage) return output;
+                if (!page.endCursor || page.endCursor === after)
+                  throw new Error("Indexed pagination did not advance");
+                after = page.endCursor;
+              }
+              throw new Error("Indexed account result limit exceeded");
+            },
+            () => rpcAccount.all(filters),
+          )),
       };
     },
   });
@@ -134,22 +150,26 @@ export async function accountInfos(
   connection: import("@solana/web3.js").Connection,
   keys: PublicKey[],
 ) {
-  if (!INDEXER_ENABLED)
-    return connection.getMultipleAccountsInfo(keys, "confirmed");
-  const rows = await getRawAccounts(keys.map((key) => key.toBase58()));
-  if (rows.length !== keys.length)
-    throw new Error("Incomplete indexed account response");
-  return rows.map((row) => {
-    if (!row) return null;
-    const lamports = Number(row.lamports);
-    if (!Number.isSafeInteger(lamports))
-      throw new Error("Account rent exceeds safe client range");
-    return {
-      data: Buffer.from(row.rawBase64, "base64"),
-      owner: new PublicKey(row.owner),
-      lamports,
-      executable: false,
-      rentEpoch: 0,
-    };
-  });
+  return readWithRpcFallback(
+    "accounts",
+    async () => {
+      const rows = await getRawAccounts(keys.map((key) => key.toBase58()));
+      if (rows.length !== keys.length)
+        throw new Error("Incomplete indexed account response");
+      return rows.map((row) => {
+        if (!row) return null;
+        const lamports = Number(row.lamports);
+        if (!Number.isSafeInteger(lamports))
+          throw new Error("Account rent exceeds safe client range");
+        return {
+          data: Buffer.from(row.rawBase64, "base64"),
+          owner: new PublicKey(row.owner),
+          lamports,
+          executable: false,
+          rentEpoch: 0,
+        };
+      });
+    },
+    () => connection.getMultipleAccountsInfo(keys, "confirmed"),
+  );
 }

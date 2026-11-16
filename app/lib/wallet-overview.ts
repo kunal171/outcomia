@@ -1,4 +1,4 @@
-import { INDEXER_ENABLED } from "./graphql/client";
+import { readWithRpcFallback } from "./read-source";
 import { accountInfos } from "./indexed-accounts";
 import { walletAssets } from "./graphql/wallet";
 import {
@@ -407,40 +407,37 @@ export async function loadWalletOverview(
   owner: PublicKey,
 ): Promise<WalletOverview> {
   const program = getOutcomiaReadProgram(connection);
-  const external = INDEXER_ENABLED ? read(() => walletAssets(owner)) : null;
   const [sol, tokens, catalog, spot, predictions, multi] = await Promise.all([
-    INDEXER_ENABLED
-      ? read(async () => {
-          const result = await external!;
-          if (!result.data)
-            throw new Error(result.error ?? "Indexed holdings unavailable");
-          const sol = result.data.find((a) => a.mint === "NATIVE_SOL");
-          if (!sol) throw new Error("SOL holdings are not indexed");
-          return new BN(sol.amount);
-        })
-      : read(async () => {
-          const lamports = await connection.getBalance(owner, "confirmed");
-          if (!Number.isSafeInteger(lamports) || lamports < 0)
-            throw new Error("SOL balance exceeds the safe RPC number range");
-          return new BN(String(lamports));
-        }),
-    INDEXER_ENABLED
-      ? read(async () => {
-          const result = await external!;
-          if (!result.data)
-            throw new Error(result.error ?? "Indexed holdings unavailable");
-          return result.data
-            .filter((a) => a.mint !== "NATIVE_SOL")
-            .map((a) => ({
-              mint: new PublicKey(a.mint),
-              tokenProgram: new PublicKey(a.tokenProgram),
-              decimals: a.decimals,
-              amount: new BN(a.amount),
-              frozen: new BN(a.frozen),
-              accountCount: a.accountCount,
-            }));
-        })
-      : read(() => readTokens(connection, owner, TOKEN_PROGRAM_ID)),
+    read(() => readWithRpcFallback(
+      `wallet:${owner}:sol`,
+      async () => {
+        const assets = await walletAssets(owner);
+        const sol = assets.find((asset) => asset.mint === "NATIVE_SOL");
+        if (!sol) throw new Error("SOL holdings are not indexed");
+        return new BN(sol.amount);
+      },
+      async () => {
+        const lamports = await connection.getBalance(owner, "confirmed");
+        if (!Number.isSafeInteger(lamports) || lamports < 0)
+          throw new Error("SOL balance exceeds the safe RPC number range");
+        return new BN(String(lamports));
+      },
+    )),
+    read(() => readWithRpcFallback(
+      `wallet:${owner}:tokens`,
+      async () => {
+        const assets = await walletAssets(owner);
+        return assets.filter((asset) => asset.mint !== "NATIVE_SOL").map((asset) => ({
+          mint: new PublicKey(asset.mint),
+          tokenProgram: new PublicKey(asset.tokenProgram),
+          decimals: asset.decimals,
+          amount: new BN(asset.amount),
+          frozen: new BN(asset.frozen),
+          accountCount: asset.accountCount,
+        }));
+      },
+      () => readTokens(connection, owner, TOKEN_PROGRAM_ID),
+    )),
     read(() => readCatalog(program)),
     read(() => readSpot(connection, program, owner)),
     read(() => readPredictions(connection, program, owner)),
