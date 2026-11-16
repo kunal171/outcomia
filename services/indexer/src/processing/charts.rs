@@ -47,7 +47,11 @@ pub async fn query(
     let to = to
         .parse::<i64>()
         .map_err(|_| async_graphql::Error::new("Invalid chart end"))?;
-    if from < 0 || to <= from || to > 253402300799 || (to - from) / i64::from(interval) > 2000 {
+    if from < 0
+        || to <= from
+        || to > 253402300799
+        || (to - 1) / i64::from(interval) - from / i64::from(interval) + 1 > 2000
+    {
         return Err("Chart range exceeds 2000 intervals".into());
     }
     if !matches!(
@@ -64,7 +68,7 @@ pub async fn query(
     }
     if matches!(engine, "LEGACY_BINARY" | "SHARED_SPOT" | "SHARED_BINARY") {
         let replayed: bool = sqlx::query_scalar(
-            "SELECT ready AND last_error IS NULL FROM execution_replay_state WHERE singleton",
+            "SELECT ready AND last_error IS NULL AND NOT EXISTS(SELECT 1 FROM decoded_instructions WHERE NOT replayed) AND NOT EXISTS(SELECT 1 FROM chain_transactions t LEFT JOIN instruction_decode_state d USING(signature) WHERE d.signature IS NULL OR t.transaction_index IS NULL) FROM execution_replay_state WHERE singleton",
         )
         .fetch_one(pool)
         .await?;
@@ -88,7 +92,7 @@ pub async fn query(
             candles: vec![],
         });
     }
-    let complete:bool=sqlx::query_scalar("SELECT (EXISTS(SELECT 1 FROM chain_events WHERE event_type='ProtocolInitializedEvent') OR EXISTS(SELECT 1 FROM decoded_instructions WHERE instruction_name='initialize_protocol')) AND EXISTS(SELECT 1 FROM backfill_checkpoints WHERE completed) AND EXISTS(SELECT 1 FROM trade_projection_checkpoint WHERE last_error IS NULL AND updated_at>NOW()-INTERVAL '90 seconds') AND NOT EXISTS(SELECT 1 FROM chain_events e WHERE event_type IN ('FillEvent','MultiOutcomeFillEvent') AND NOT EXISTS(SELECT 1 FROM indexed_trades t WHERE t.execution_id=e.signature||':'||e.log_index::text))").fetch_one(pool).await?;
+    let complete:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM history_sync WHERE ready AND observed_at>NOW()-INTERVAL '90 seconds') AND (EXISTS(SELECT 1 FROM chain_events WHERE event_type='ProtocolInitializedEvent') OR EXISTS(SELECT 1 FROM decoded_instructions WHERE instruction_name='initialize_protocol')) AND EXISTS(SELECT 1 FROM backfill_checkpoints WHERE completed) AND EXISTS(SELECT 1 FROM trade_projection_checkpoint WHERE last_error IS NULL AND updated_at>NOW()-INTERVAL '90 seconds') AND NOT EXISTS(SELECT 1 FROM chain_events e WHERE event_type IN ('FillEvent','MultiOutcomeFillEvent') AND NOT EXISTS(SELECT 1 FROM indexed_trades t WHERE t.execution_id=e.signature||':'||e.log_index::text))").fetch_one(pool).await?;
     let rows=sqlx::query("SELECT (block_time/$4::bigint)*$4::bigint AS bucket,(array_agg(price ORDER BY slot,transaction_index,execution_index))[1]::text AS open,MAX(price)::text AS high,MIN(price)::text AS low,(array_agg(price ORDER BY slot DESC,transaction_index DESC,execution_index DESC))[1]::text AS close,SUM(quantity)::text AS quantity,SUM(quote_atoms)::text AS volume,COUNT(*) AS trades FROM indexed_trades WHERE market=$1 AND engine=$2 AND outcome=$3 AND block_time>=$5 AND block_time<$6 GROUP BY bucket ORDER BY bucket LIMIT 2000")
         .bind(market).bind(engine).bind(outcome).bind(interval).bind(from).bind(to).fetch_all(pool).await?;
     let candles = rows
@@ -115,6 +119,10 @@ pub async fn query(
     })
 }
 pub async fn project(pool: &PgPool) -> Result<usize> {
+    // Previously stored events can gain a canonical position during enrichment.
+    sqlx::query(
+        "UPDATE indexed_trades p SET transaction_index=COALESCE(p.transaction_index,t.transaction_index), block_time=COALESCE(p.block_time,t.block_time) FROM chain_transactions t WHERE p.signature=t.signature AND ((p.transaction_index IS NULL AND t.transaction_index IS NOT NULL) OR (p.block_time IS NULL AND t.block_time IS NOT NULL))",
+    ).execute(pool).await?;
     let rows=sqlx::query("SELECT e.signature,e.log_index,e.payload_base64,t.slot,t.transaction_index,t.block_time FROM chain_events e JOIN chain_transactions t USING(signature) WHERE e.event_type IN ('FillEvent','MultiOutcomeFillEvent') AND NOT EXISTS(SELECT 1 FROM indexed_trades p WHERE p.execution_id=e.signature||':'||e.log_index::text) ORDER BY t.slot,t.transaction_index NULLS LAST,e.log_index LIMIT 500").fetch_all(pool).await?;
     let count = rows.len();
     let mut tx = pool.begin().await?;
@@ -213,6 +221,72 @@ mod tests {
             query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "999999999")
                 .await
                 .is_err()
+        );
+
+        // An unaligned range intersects 2001 buckets even though its duration is 2000 intervals.
+        assert!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "1", "120001")
+                .await
+                .is_err()
+        );
+        assert!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "60", "120060")
+                .await
+                .is_ok()
+        );
+        sqlx::query("UPDATE indexed_trades SET transaction_index=NULL WHERE signature='earlier'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
+                .await
+                .unwrap()
+                .coverage,
+            "INCOMPLETE"
+        );
+        project(&pool).await.unwrap();
+        assert_eq!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
+                .await
+                .unwrap()
+                .candles[0]
+                .open,
+            "9007199254740993"
+        );
+        sqlx::query("INSERT INTO transaction_execution VALUES('earlier','{}')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES('earlier',0,'initialize_protocol','{}','{}')")
+            .execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO backfill_checkpoints(program_id,completed) VALUES('program',TRUE)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE history_sync SET ready=TRUE,observed_at=NOW()")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
+                .await
+                .unwrap()
+                .coverage,
+            "COMPLETE"
+        );
+        sqlx::query("UPDATE history_sync SET ready=FALSE")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
+                .await
+                .unwrap()
+                .coverage,
+            "PARTIAL"
         );
     }
 }
