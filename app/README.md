@@ -93,7 +93,13 @@ return reads to GraphQL after recovery. Account/holding failures are scoped so
 one warming wallet does not disable unrelated markets. Invalid requests and page
 navigation cancellation do not trigger fallback. The pending-transaction guard
 can confirm the existing signature through RPC without sending it again.
-Historical charts and message-login still require the indexed service.
+Historical charts and verified message-login still require the indexed service.
+A sign-in outage does not block connected-wallet deposits or trading. The UI
+shows `Wallet connected` with an optional retry, and no registration signature
+is queued. When the indexer returns, finalized balances and backfilled deposit
+history create an unverified user record and start tracking. A later verified
+sign-in reuses that profile. Recovery can restore an existing session without
+opening a new wallet message prompt.
 
 Connected wallets are asked to sign an expiring login message once, then reuse
 a valid session. Profiles link to independently indexed balances; login never

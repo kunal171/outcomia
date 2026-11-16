@@ -20,6 +20,15 @@ tests, strict Clippy and the real browser/API/database flow. The browser verifie
 HTTP 503 and stale-data fallback, actual RPC wallet/book reads, automatic
 GraphQL recovery, zero healthy-mode RPC reads and preserved trade quantity.
 
+## Deposit-based onboarding follow-up
+
+Connected-wallet access now stays available during authentication outages. No
+message signature is requested or queued while auth is unavailable. Finalized
+balance/position sources and available backfilled deposit history create an
+unverified user record and start tracking, without creating a session or writing
+balances. Later signature verification upgrades the same profile ID. Recovery
+checks existing sessions only and does not automatically open a wallet prompt.
+
 ## Implemented and checked locally
 
 - Modular Rust ingestion, processing, storage and GraphQL resolvers; frontend

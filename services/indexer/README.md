@@ -29,7 +29,8 @@ can change on a fork; finalized state cannot regress.
 
 One confirmed program subscription coalesces account refreshes, with periodic
 confirmed/finalized reconciliation. Independent workers cache mint precision and
-refresh tracked wallets' SOL/SPL holdings. Wallet tracking follows verified login;
+refresh tracked wallets' SOL/SPL holdings. Wallet tracking follows verified login
+or finalized chain discovery;
 profiles never accept financial balances from clients. The API rejects stale/warming
 reads. The frontend automatically falls back to confirmed RPC for live accounts,
 books and holdings, and visibly labels the source. Unavailable data never becomes
@@ -141,12 +142,37 @@ financial credit.
 message. `POST /auth/verify` verifies its Ed25519 signature before creating a user
 and an HttpOnly, SameSite=Strict session. Only credential hashes are stored.
 `GET /auth/me` reuses the session; `POST /auth/logout` revokes it, including an
-in-flight challenge. Challenge issuance is rate limited. The Next same-origin
+in-flight challenge. Only signature-verified profiles can have authenticated
+sessions; a chain-discovered profile alone never grants a session. Challenge issuance is rate limited. The Next same-origin
 proxy forwards cookies without exposing session credentials to JavaScript.
 
 Signing programs retain direct account checks, transaction sending and chain
 confirmation. Indexed readers serve normal screen rendering; no secret key is
 required by the indexer or login.
+
+## Connecting during a sign-in outage
+
+A connected wallet can read, deposit, trade and settle without a website session.
+If the auth API is unavailable, the frontend shows `Wallet connected` and an
+optional `Retry sign-in`. It does not collect or queue a registration signature.
+On recovery it only checks for an existing session; it never opens a wallet
+message prompt automatically. New verification remains an explicit user action.
+
+`processing/wallet_registry.rs` recovers user records in bounded batches from
+finalized balance/position accounts (including tombstones), retained legacy
+deposit/initialization events and decoded deposit/initialization instructions.
+This covers wallets that funded the protocol while the backend was offline,
+including closed accounts found through available backfill history. Event
+normalization has a durable source-key marker and replay is idempotent.
+
+Discovered users have `registration_source=chain`, an observed slot, null
+`last_login_at` and null `verified_at`. Discovery starts wallet tracking but
+creates no cookie/session and writes no financial balances. Public holdings reads
+refresh tracking for an existing wallet at most once per minute, so an active
+chain-discovered user does not need a website session to stay tracked. Unknown
+addresses cannot use that read to register a new wallet. Later successful
+message verification preserves the profile ID and fills verification/login
+metadata. Existing verified users retain their identity through migration.
 
 ## Automatic frontend fallback
 

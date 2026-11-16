@@ -281,6 +281,13 @@ Confirmed executions may form a visibly provisional live candle; finalized
 executions form durable historical candles. Empty intervals remain gaps rather
 than invented trades. Depth charts use current book levels, a distinct dataset.
 
+Connected-wallet access does not require a website session. During auth outages,
+users may deposit and trade through RPC; registration is recovered later from
+finalized balances and available deposit history. Chain-discovered users remain
+unverified and receive no authenticated session. A later verified login upgrades
+the same user ID; registration never credits funds from client-supplied values.
+No registration message is collected or queued during an outage.
+
 Wallet sign-in verifies a server-issued, expiring, single-use challenge with the
 connected Solana wallet's message signature. Bind the message to the configured
 site origin, network and address. Store users and hashed session credentials in
