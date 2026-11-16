@@ -154,11 +154,18 @@ separate, explicitly scoped upgrade. No program deployment is part of this plan.
 
 ## Freshness and consistency
 
-Proposed default: confirmed live state for responsive books/balances, plus a
-separate finalized durable history. The user preference between this and a
-finalized-only first version is pending. Confirmed data must be labeled and
-rollback-capable; do not mix confirmed balances with finalized locks in one
-purported snapshot or finalize history from an unrooted notification.
+Agreed freshness policy (2026-11-16): confirmed live updates plus finalized
+history. Trading screens show confirmed books, orders, positions and balances
+promptly, labeled as awaiting finalization. Durable execution/activity history
+and historical aggregates use finalized sources.
+
+Maintain a finalized baseline and a separate, replaceable confirmed view. On a
+fork, dropped confirmation or reconnect, invalidate affected confirmed revisions
+and reconcile before publishing a replacement. Notify subscribers to resync;
+do not leave reverted balances or orders visible as current. Promote data only
+when its canonical finalized source is verified, not because a later slot was
+observed. Do not mix confirmed balances with finalized locks in one purported
+snapshot or finalize history from an unrooted notification.
 
 Every query returns dataset-level synchronization information:
 
@@ -177,7 +184,11 @@ chain commitment before promising a numeric service level. Finalized-only reads
 will inherently appear later than confirmed wallet receipts.
 
 After submitting a transaction, the frontend keeps its signature/pending state
-until the chosen indexed view reports that transaction as applied. Do not clear
+until the chosen indexed view reports that transaction as applied. Once the
+confirmed projection applies it, render the update while retaining an awaiting-
+finalization label. Mark it final only after canonical finalized ingestion;
+failed or reverted transactions must not remain successful ledger effects.
+Do not clear
 an order form or subtract balances optimistically as if indexing were complete.
 Use a bounded targeted refresh/reconciliation path on delay, not a full-program
 scan from every client. Local deadline clocks remain local between state updates.
@@ -215,8 +226,8 @@ units explicitly; formatted/localized labels belong in the frontend.
 
 ## Build order and completion gates
 
-1. Agree dataset scope and freshness/commitment policy. Resolve required history
-   coverage for shared/binary trading before promising trade charts or P&L.
+1. Use the agreed confirmed-live/finalized-history policy above. Resolve required
+   history coverage for shared/binary trading before promising trade charts or P&L.
 2. Add raw account/execution ingestion, bootstrap boundaries and reconciliation.
    Demonstrate reconnect recovery, validated closures and unchanged RPC work
    when multiple clients request the same already-tracked data.
