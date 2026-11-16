@@ -1,4 +1,5 @@
 "use client";
+import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Shared funds are reusable across markets. Never count contract backing as spendable cash. */
@@ -67,6 +68,7 @@ function Funds({
     [issue, setIssue] = useState<string | null>(null),
     [signature, setSignature] = useState<string | null>(null),
     [revision, setRevision] = useState(0);
+  useIndexerUpdates(() => setRevision((value) => value + 1));
   const program = useMemo(
     () => getOutcomiaReadProgram(connection),
     [connection],
