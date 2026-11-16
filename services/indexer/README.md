@@ -162,6 +162,15 @@ failures retry independently of the API and current-state workers. The database
 is bound to the devnet genesis, configured program and IDL hash before workers
 start. Run one indexer per program/database configuration.
 
+## Verification status
+
+See the [branch audit](../../docs/indexer-branch-verification.md) for completed
+checks, fixes found during review and open items from the broader design.
+Current account/chart freshness is separate from history-ingestion freshness;
+complete chart coverage requires healthy finalized source recovery. If older
+instructions arrive behind the replay cursor, instruction-derived history is
+rebuilt deterministically before it is considered ready again.
+
 ## Health and checks
 
 `/health/live` reports process liveness. `/health/ready` also requires successful
