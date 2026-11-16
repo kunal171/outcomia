@@ -196,8 +196,38 @@ fn outcome(value: &Value) -> Result<&str> {
 async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
     let complete:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM backfill_checkpoints WHERE completed) AND NOT EXISTS(SELECT 1 FROM chain_transactions t LEFT JOIN instruction_decode_state d USING(signature) WHERE d.signature IS NULL OR t.transaction_index IS NULL)").fetch_one(pool).await?;
     if !complete {
+        sqlx::query("UPDATE execution_replay_state SET ready=FALSE WHERE singleton")
+            .execute(pool)
+            .await?;
         return Ok(());
     }
+    // Reconnect/archive recovery may introduce a transaction behind the cursor.
+    // Rebuild only instruction-derived projections; event-derived fills stay intact.
+    let mut reset = pool.begin().await?;
+    sqlx::query("SELECT singleton FROM execution_replay_state WHERE singleton FOR UPDATE")
+        .execute(&mut *reset)
+        .await?;
+    let late: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM decoded_instructions i JOIN chain_transactions t USING(signature), execution_replay_state s WHERE NOT i.replayed AND (t.slot,t.transaction_index,i.execution_index)<=(s.slot,s.transaction_index,s.execution_index))",
+    )
+    .fetch_one(&mut *reset)
+    .await?;
+    if late {
+        sqlx::query("DELETE FROM indexed_trades WHERE engine IN ('SHARED_SPOT','SHARED_BINARY','LEGACY_BINARY')")
+            .execute(&mut *reset).await?;
+        sqlx::query("DELETE FROM execution_orders")
+            .execute(&mut *reset)
+            .await?;
+        sqlx::query("DELETE FROM execution_market_info")
+            .execute(&mut *reset)
+            .await?;
+        sqlx::query("UPDATE decoded_instructions SET replayed=FALSE WHERE replayed")
+            .execute(&mut *reset)
+            .await?;
+        sqlx::query("UPDATE execution_replay_state SET slot=0,transaction_index=-1,execution_index=-1,fee_bps=0,fee_known=FALSE,ready=FALSE,last_error=NULL WHERE singleton")
+            .execute(&mut *reset).await?;
+    }
+    reset.commit().await?;
     let state = sqlx::query("SELECT * FROM execution_replay_state WHERE singleton")
         .fetch_one(pool)
         .await?;
@@ -325,6 +355,11 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
             }
             _ => {}
         }
+        sqlx::query("UPDATE decoded_instructions SET replayed=TRUE WHERE signature=$1 AND execution_index=$2")
+            .bind(row.get::<String, _>("signature"))
+            .bind(row.get::<i32, _>("execution_index"))
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("UPDATE execution_replay_state SET slot=$1,transaction_index=$2,execution_index=$3,ready=FALSE,last_error=NULL WHERE singleton").bind(slot).bind(row.get::<i32,_>("transaction_index")).bind(row.get::<i32,_>("execution_index")).execute(&mut *tx).await?;
         tx.commit().await?;
     }
@@ -438,7 +473,7 @@ mod tests {
         // Insert backwards: replay must honor block order, never arrival order.
         for (index, (name, args, accounts)) in rows.into_iter().enumerate().rev() {
             let signature = format!("signature-{index}");
-            sqlx::query("INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES($1,100,$2,120,'[]')").bind(&signature).bind(index as i32).execute(&pool).await.unwrap();
+            sqlx::query("INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES($1,100,$2,120,'[]')").bind(&signature).bind(index as i32 * 2).execute(&pool).await.unwrap();
             sqlx::query("INSERT INTO transaction_execution VALUES($1,'{}')")
                 .bind(&signature)
                 .execute(&pool)
@@ -449,7 +484,7 @@ mod tests {
                 .execute(&pool)
                 .await
                 .unwrap();
-            sqlx::query("INSERT INTO decoded_instructions VALUES($1,0,$2,$3,$4)")
+            sqlx::query("INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES($1,0,$2,$3,$4)")
                 .bind(&signature)
                 .bind(name)
                 .bind(Json(args))
@@ -460,7 +495,7 @@ mod tests {
         }
         let client = Arc::new(RpcClient::new("http://127.0.0.1:1"));
         replay(&pool, Arc::clone(&client)).await.unwrap();
-        replay(&pool, client).await.unwrap();
+        replay(&pool, Arc::clone(&client)).await.unwrap();
         assert_eq!(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM indexed_trades")
                 .fetch_one(&pool)
@@ -485,6 +520,36 @@ mod tests {
             .await
             .unwrap(),
             "0"
+        );
+
+        // A fee update recovered later belongs between the old fee and the fills.
+        sqlx::query("INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES('late-fee',100,3,120,'[]')")
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO transaction_execution VALUES('late-fee','{}')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO instruction_decode_state(signature) VALUES('late-fee')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(r#"INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES('late-fee',0,'set_taker_fee','{"takerFeeBps":50}','{}')"#)
+            .execute(&pool).await.unwrap();
+        replay(&pool, Arc::clone(&client)).await.unwrap();
+        replay(&pool, client).await.unwrap();
+        let fees: Vec<String> = sqlx::query_scalar(
+            "SELECT fee_atoms::text FROM indexed_trades ORDER BY transaction_index",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(fees, vec!["6000", "12000", "2000"]);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM indexed_trades")
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            3
         );
     }
 }

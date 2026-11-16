@@ -80,8 +80,13 @@ async fn recover_and_report(
     config: LiveGapConfig,
     reason: &str,
 ) -> Result<(), BoxError> {
+    sqlx::query("UPDATE history_sync SET ready=FALSE WHERE singleton")
+        .execute(pool)
+        .await?;
     match recover_live_gap(client, pool, program_id, config).await? {
         LiveCatchupOutcome::CaughtUp { processed } => {
+            sqlx::query("UPDATE history_sync SET ready=TRUE,observed_at=NOW() WHERE singleton")
+                .execute(pool).await?;
             println!("Live recovery completed; reason={reason} processed={processed}");
             Ok(())
         }
@@ -135,6 +140,9 @@ async fn main() -> Result<(), BoxError> {
     ));
 
     account_ingest::verify_identity(&pool, Arc::clone(&client), program_id).await?;
+    sqlx::query("UPDATE history_sync SET ready=FALSE WHERE singleton")
+        .execute(&pool)
+        .await?;
     let auth = auth::state(pool.clone(), &config.app_origin).map_err(io::Error::other)?;
     let api_listener = TcpListener::bind(&config.api_address).await?;
     let router = api::router(pool.clone(), auth);

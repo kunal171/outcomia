@@ -108,7 +108,11 @@ mod browser_fixture {
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::query("INSERT INTO decoded_instructions VALUES('fixture-origin',0,'initialize_protocol','{}','{}')").execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES('fixture-origin',0,'initialize_protocol','{}','{}')").execute(&pool).await.unwrap();
+        sqlx::query("UPDATE history_sync SET ready=TRUE,observed_at=NOW()")
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO trade_projection_checkpoint(singleton) VALUES(TRUE)")
             .execute(&pool)
             .await
