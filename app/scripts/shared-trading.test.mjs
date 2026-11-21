@@ -456,3 +456,15 @@ test("spot books ignore the complement path", async () => {
   const r = await s.buildSharedTrade(p, f, owner, "spot", "bid", bn(90), bn(1));
   assert.deepEqual(Array.from(r.instructions, name), ["placeSharedOrder"]);
 });
+
+test("best buy price includes the other outcome's bids", () => {
+  const f = fixture(true);
+  assert.equal(s.bestBuyPrice(f.book, "yes"), null);
+  f.book.bestPrices = [null, bn(620_000), bn(400_000), null];
+  // YES: min(direct 0.62, 1 - NO bid 0.40 = 0.60); NO: 1 - YES bid (none) and no NO ask.
+  assert(s.bestBuyPrice(f.book, "yes").eqn(600_000));
+  assert.equal(s.bestBuyPrice(f.book, "no"), null);
+  f.book.bestPrices = [bn(550_000), null, null, bn(500_000)];
+  assert(s.bestBuyPrice(f.book, "no").eqn(450_000));
+  assert(s.bestBuyPrice(f.book, "yes") === null);
+});

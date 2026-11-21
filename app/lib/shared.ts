@@ -215,6 +215,20 @@ export async function cancelShared(
     )
     .instruction();
 }
+/** Lowest price at which `outcome` can currently be bought on a binary book:
+ * its own best ask, or payout minus the other outcome's best bid (bought
+ * through a complete-set mint), whichever is lower. Null when neither exists.
+ * Slots: YES bid 0, YES ask 1, NO bid 2, NO ask 3. */
+export function bestBuyPrice(book: SharedBook, outcome: "yes" | "no") {
+  const direct = book.bestPrices[outcome === "yes" ? 1 : 3];
+  const otherBid = book.bestPrices[outcome === "yes" ? 2 : 0];
+  const implied =
+    otherBid && otherBid.lt(book.payoutPerContract)
+      ? book.payoutPerContract.sub(otherBid)
+      : null;
+  if (direct && implied) return BN.min(direct, implied);
+  return direct ?? implied;
+}
 /** Whether a legacy transaction with these instructions fits one packet.
  * The placeholder blockhash has the same encoded size as a real one. */
 function fitsPacket(instructions: TransactionInstruction[], owner: PublicKey) {
