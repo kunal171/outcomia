@@ -7,9 +7,55 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    errors::{matching, order},
+    errors::{market, matching, order},
     state::OrderSide,
 };
+
+/// Rejects spot increments that could leave a resting order impossible to fill.
+///
+/// A fill whose quote value floors to zero is rejected, and only the FIFO head
+/// at the best price can be matched. If a partial fill leaves such a remainder
+/// at the head, its whole price level and every worse level freeze until the
+/// maker cancels.
+///
+/// Every executable fill uses an on-tick price of at least `tick` and a
+/// lot-multiple quantity of at least `lot`. Requiring
+/// `tick * lot >= 10^base_decimals` therefore guarantees
+/// `floor(price * quantity / 10^base_decimals) >= 1` for every possible fill.
+///
+/// Example: with 9 base decimals, tick 1 and lot 1, a one-atom remainder at
+/// price 1000 is worth floor(1000 / 1e9) = 0 quote atoms and is rejected here.
+/// Tick 10,000 and lot 100,000 (product 1e9) is accepted.
+///
+/// # Inputs
+/// Base-mint decimals and raw tick/lot increments.
+///
+/// # Errors
+/// `InvalidPriceTickSize`/`InvalidQuantityLotSize` for zero increments, or
+/// `SpotIncrementsTooFine` when the product is below one whole base token or the
+/// decimal scale is unrepresentable.
+///
+/// # Returns
+/// `Ok(())` when every possible fill moves at least one quote atom.
+pub fn validate_spot_increments(
+    base_decimals: u8,
+    price_tick: u64,
+    quantity_lot: u64,
+) -> Result<()> {
+    require!(price_tick > 0, market::InvalidPriceTickSize);
+    require!(quantity_lot > 0, market::InvalidQuantityLotSize);
+
+    let scale = 10_u128
+        .checked_pow(u32::from(base_decimals))
+        .ok_or(market::SpotIncrementsTooFine)?;
+
+    // u64 * u64 always fits in u128.
+    require!(
+        u128::from(price_tick) * u128::from(quantity_lot) >= scale,
+        market::SpotIncrementsTooFine
+    );
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FillCalculation {
@@ -205,6 +251,59 @@ mod tests {
 
     const BASE_DECIMALS: u8 = 6;
     const MAKER_PRICE: u64 = 25_000_000;
+
+    #[test]
+    fn spot_increments_must_cover_one_whole_base_token() {
+        // Exactly one whole base token is the boundary and is accepted.
+        assert!(validate_spot_increments(9, 10_000, 100_000).is_ok());
+        assert!(validate_spot_increments(6, 1, 1_000_000).is_ok());
+        assert!(validate_spot_increments(0, 1, 1).is_ok());
+        // One unit below the boundary is rejected.
+        assert!(validate_spot_increments(9, 1, 1).is_err());
+        assert!(validate_spot_increments(9, 10_000, 99_999).is_err());
+        assert!(validate_spot_increments(6, 1, 999_999).is_err());
+    }
+
+    #[test]
+    fn zero_spot_increments_are_rejected() {
+        assert!(validate_spot_increments(6, 0, 1_000_000).is_err());
+        assert!(validate_spot_increments(6, 1_000_000, 0).is_err());
+    }
+
+    #[test]
+    fn unrepresentable_decimal_scale_is_rejected() {
+        assert!(validate_spot_increments(u8::MAX, u64::MAX, u64::MAX).is_err());
+    }
+
+    #[test]
+    fn largest_increments_do_not_overflow() {
+        assert!(validate_spot_increments(19, u64::MAX, u64::MAX).is_ok());
+    }
+
+    #[test]
+    fn accepted_increments_never_produce_a_zero_value_fill() {
+        // Exhaustively check small on-tick prices and lot-multiple fills for
+        // boundary configurations: every fill must move at least one quote atom.
+        for (decimals, tick, lot) in [(9_u8, 10_000_u64, 100_000_u64), (6, 3, 333_334), (2, 7, 15)]
+        {
+            validate_spot_increments(decimals, tick, lot).unwrap();
+            for price_steps in 1..=20 {
+                for lot_steps in 1..=20 {
+                    let quantity = lot * lot_steps;
+                    let fill = calculate_fill(tick * price_steps, quantity, quantity, decimals)
+                        .expect("accepted increments must price every fill");
+                    assert!(fill.quote_quantity > 0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rejected_increments_admit_a_zero_value_fill() {
+        // The configuration from the original report: one atom at a tiny price.
+        assert!(validate_spot_increments(9, 1, 1).is_err());
+        assert!(calculate_fill(1_000, 1, 1, 9).is_err());
+    }
 
     #[test]
     fn bid_crosses_equal_or_lower_ask_price() {

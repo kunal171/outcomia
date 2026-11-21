@@ -15,7 +15,7 @@ import {
   statusOf,
   type MultiMarket,
 } from "../../lib/multi-outcome";
-import { visiblePredictionMarket } from "../../lib/market-visibility";
+import { visibleMarket } from "../../lib/market-visibility";
 import "./multi-outcome.css";
 
 export function MultiOutcomeMarkets() {
@@ -58,7 +58,7 @@ export function MultiOutcomeMarkets() {
         );
         if (active)
           setRows(
-            result.filter((r) => visiblePredictionMarket(r.address, r.name)),
+            result.filter((r) => visibleMarket(r.address, r.name)),
           );
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : String(e));

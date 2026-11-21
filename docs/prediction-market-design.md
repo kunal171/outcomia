@@ -959,8 +959,10 @@ The settlement flow is:
 4. Every proposal waits `resolution_delay_seconds`. Only the resolver for the
    active phase, still an active admin, may correct it during that delay; each correction records new
    evidence and restarts the full delay. Corrections must also occur before
-   that resolver's proposal deadline when configured. Super-admin has no separate outcome
-   override.
+   that resolver's proposal deadline when configured, and before the phase's
+   correction deadline: phase start (earliest resolution time, or fallback
+   availability) plus two review delays. This stops a resolver from postponing
+   finalization indefinitely. Super-admin has no separate outcome override.
 5. Anyone may finalize after the delay, including a winning trader. This only
    accepts the already proposed outcome; the caller cannot choose YES or NO.
    Admin revocation after a valid proposal must not block finalization or claims.

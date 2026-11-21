@@ -10,6 +10,7 @@ use crate::{
     constants::{ADMIN_SEED, MARKET_FEES_SEED, MARKET_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     errors::{admin, market},
     events::MarketInitializedEvent,
+    matching::validate_spot_increments,
     state::{AdminRecord, AdminStatus, Market, MarketFees, MarketStatus},
 };
 
@@ -120,7 +121,7 @@ pub struct InitializeMarket<'info> {
 /// `quantity_lot_size`.
 ///
 /// # Errors
-/// Zero tick/lot, identical/invalid mints, inactive admin, duplicate/PDA/allocation or
+/// Zero tick/lot, tick * lot below one whole base token, identical/invalid mints, inactive admin, duplicate/PDA/allocation or
 /// token-account creation failures.
 ///
 /// # Returns
@@ -130,9 +131,14 @@ pub fn handle_initialize_market(
     price_tick_size: u64,
     quantity_lot_size: u64,
 ) -> Result<()> {
-    // Validate configuration before relying on it in order modulo checks.
-    require!(price_tick_size > 0, market::InvalidPriceTickSize);
-    require!(quantity_lot_size > 0, market::InvalidQuantityLotSize);
+    // Validate configuration before relying on it in order modulo checks. The
+    // increments must also guarantee that every fill moves at least one quote
+    // atom, or a partial fill can leave an unfillable FIFO head.
+    validate_spot_increments(
+        ctx.accounts.base_mint.decimals,
+        price_tick_size,
+        quantity_lot_size,
+    )?;
 
     // Anchor has already created the market and both token vaults at this
     // point. Any later failure rolls the entire instruction back atomically.

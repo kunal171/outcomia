@@ -6,6 +6,8 @@ import Link from "next/link";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { getMint } from "@solana/spl-token";
+import { spotIncrementsError } from "../lib/spot-increments";
 import {
   deriveAdminRecordPda,
   deriveMarketFeesPda,
@@ -84,6 +86,22 @@ export function CreateMarket() {
       }
       const tickSize = parsePositiveU64(priceTickSize, "Price tick size");
       const lotSize = parsePositiveU64(quantityLotSize, "Quantity lot size");
+      // Mirror the program's increment rule so a too-fine market is explained
+      // before the wallet signs; the program still enforces it.
+      const baseMintAccount = await getMint(
+        connection,
+        base,
+        "confirmed",
+        TOKEN_PROGRAM_ID,
+      );
+      const incrementError = spotIncrementsError(
+        baseMintAccount.decimals,
+        BigInt(tickSize.toString(10)),
+        BigInt(lotSize.toString(10)),
+      );
+      if (incrementError) {
+        throw new Error(incrementError);
+      }
       const normalizedBaseSymbol = baseSymbol.trim();
       const normalizedQuoteSymbol = quoteSymbol.trim();
       const normalizedDisplayName = displayName.trim();

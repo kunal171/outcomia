@@ -171,29 +171,37 @@ test("smoke discovery filters preserve normal market questions", () => {
     new URL("../lib/market-visibility.ts", import.meta.url),
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
+    visibility.visibleMarket(
       "4AhXYjfYy5kVBTyWbmrxFJ7KmydghcaktprU74aVv5kC",
       "Anything",
     ),
     false,
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
-      "other",
-      "SMOKE ONLY - shared wallet settlement",
-    ),
+    visibility.visibleMarket("other", "SMOKE ONLY - shared wallet settlement"),
     false,
   );
   assert.equal(
-    visibility.visiblePredictionMarket("other", "Will candidate A win?"),
+    visibility.visibleMarket("other", "Will candidate A win?"),
     true,
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
-      "other",
-      "Will wildfire smoke clear tomorrow?",
-    ),
+    visibility.visibleMarket("other", "Will wildfire smoke clear tomorrow?"),
     true,
+  ); // Names used by this release's deployment smoke test, for every market kind.
+  for (const name of [
+    "Smoke test - multi-outcome lifecycle",
+    "Smoke test - binary corrections",
+    "Smoke test",
+    "smoke-test spot",
+  ])
+    assert.equal(visibility.visibleMarket("other", name), false, name);
+  // Unnamed markets (metadata unavailable) stay visible unless listed.
+  assert.equal(visibility.visibleMarket("other"), true);
+  // The release smoke market stays hidden even without its metadata name.
+  assert.equal(
+    visibility.visibleMarket("Ey5p8bBin49gfiaCuE7qHPdy8LdomzZX2tQEASbdo8ar"),
+    false,
   );
 });
 
@@ -254,6 +262,39 @@ test("resolution follows stored phase, earliest time, review maturity and exclus
     false,
   );
   assert.equal(available(primaryProposal, maker, false, 180).canTimeout, false);
+});
+
+test("primary corrections stop at earliest resolution plus two review delays", () => {
+  const { resolutionAvailability: available } = loadTypeScript(
+    new URL("../lib/multi-outcome-lifecycle.ts", import.meta.url),
+  );
+  // No fallback: earliest 110 + 2 * 20 gives a correction deadline of 150.
+  const proposed = {
+    terms: {
+      ...terms,
+      closeTs: new BN(100),
+      earliestResolutionTs: new BN(110),
+      resolutionDelaySeconds: new BN(20),
+      fallback: null,
+    },
+    status: { proposed: {} },
+    resolutionPhase: { primary: {} },
+    proposal: {
+      proposedAt: new BN(140),
+      outcome: { winner: [[0]] },
+      evidenceUri: "ar://proof",
+      evidenceHash: Array(32).fill(1),
+    },
+    finalOutcome: null,
+  };
+  assert.equal(
+    available(proposed, owner, true, 149).correctionDeadline.toNumber(),
+    150,
+  );
+  assert.equal(available(proposed, owner, true, 149).canPropose, true);
+  // Still before maturity (160), but the correction window has closed.
+  assert.equal(available(proposed, owner, true, 150).canPropose, false);
+  assert.equal(available(proposed, owner, false, 160).canFinalize, true);
 });
 
 test("mutable owner/market account scans bypass discovery cache", async () => {

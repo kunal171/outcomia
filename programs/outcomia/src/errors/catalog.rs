@@ -478,4 +478,8 @@ pub enum OutcomiaError {
     MultiOutcomeFeeQuoteChanged = 169,
     #[msg("Staged multi-outcome terms, offset, owner or content hash are invalid")]
     InvalidMultiOutcomeTerms = 170,
+    #[msg("Price tick times quantity lot must be at least one whole base token")]
+    SpotIncrementsTooFine = 171,
+    #[msg("The correction window for this resolver phase has closed")]
+    PredictionCorrectionWindowClosed = 172,
 }

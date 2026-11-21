@@ -55,3 +55,7 @@ A deliberate program upgrade, matching IDL/configuration, deployed indexer
 compatibility and real wallet/ledger smoke test are still required before live
 multi-outcome trading is enabled. Those actions were explicitly excluded from
 this work.
+
+Update, 21 November 2026: the program upgrade, IDL sync and live two-wallet
+smoke test are complete; see [deployment](deployment.md). Deployed indexer
+compatibility and enabling the UI flag remain outstanding.

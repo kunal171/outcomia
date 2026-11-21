@@ -65,6 +65,15 @@ The fixed creator/primary resolver proposes YES, NO or Invalid while an active
 admin, after trading closes and the earliest resolution time. Corrections
 restart the review delay and must respect the same proposal window.
 
+Corrections are also bounded by a correction deadline: the start of the
+current resolver's phase (earliest resolution time for the primary, fallback
+availability for the fallback) plus two review delays. Without it, a resolver
+could re-correct just before every maturity and block finalization forever.
+The deadline is derived from immutable terms, so no account layout changed,
+and every proposal matures by the deadline plus one delay. For example, close
+100 with delay 10 allows primary corrections until 120 (exclusive); a
+proposal made at 118 still finalizes at 128.
+
 The configured fallback handles resolver silence. Activation and finalization
 are permissionless; proposing/correcting still requires the configured resolver
 and an active admin record. A timely primary proposal cannot be replaced by
@@ -111,7 +120,7 @@ source ingestion must be extended before new event types are emitted publicly.
 `advance_prediction` actions: 0 freezes at the published cutoff; 1 activates
 fallback; 2 finalizes a mature proposal; 3 applies Invalid after a configured
 fallback deadline with no proposal. A correction is allowed strictly before
-maturity and restarts the full delay. Earliest proposal time and fallback
+maturity and before the phase's correction deadline, and restarts the full delay. Earliest proposal time and fallback
 windows use inclusive starts and exclusive proposal/correction deadlines.
 Finalization never depends on the resolver still being an admin.
 

@@ -1,0 +1,177 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "startedAt": "2026-11-21T09:57:55.094Z",
+  "steps": [
+    {
+      "label": "fund temporary trader",
+      "signature": "5zz3fduUE2yRebKaba4v8LxspFuHBUVT18bazwBkZkWoLFxk23YRwQifxTvPuQdhMt1cCwTB3HgEtRZarPoqDrLu"
+    },
+    {
+      "label": "spot market with tick 1 x lot 1 at 9 decimals",
+      "simulated": "rejected",
+      "error": "SpotIncrementsTooFine"
+    },
+    {
+      "label": "spot market at tick x lot = 10^9",
+      "simulated": "accepted"
+    },
+    {
+      "label": "shared cash for creator",
+      "signature": "CRzAAiPoZXNjCqJeVQ34c4QTmm3UWEY3NFEFUmpFneLxvKLMtYT2WXm3JpEkq6oHaw5iPsNSKBmNvWXAewCAMMX"
+    },
+    {
+      "label": "shared cash for trader",
+      "signature": "gT6qCnm4sWB35cuw1rphi1wGebjJYWKoCWmTUK2Nme7VyDL9QWvr2c9DLfFK6kvBbjDDPKyaWtrEydpiVWBhWZm"
+    },
+    {
+      "label": "create multi-outcome market",
+      "signature": "23tp9WL8fU1mQYJWcMELaTRowrahj83eKw3pvNbB6fTh2cEFxs92nBQvsy6CTTSsURDmtTrFdcVmXeBFq8GWdViz"
+    },
+    {
+      "label": "open market and initialize book",
+      "signature": "3B9XmML2ShvSuUq2CZj3LukVjKL69KaByrEPWhuV7obQKHJpx5x9GsqAeqpnKdrV9mUqn4uGW7vXaLxwyT3nWkNg"
+    },
+    {
+      "label": "position for creator",
+      "signature": "4ngYVVZNsFfim296LGm8Exrzk6tnS7iJu8c3sEqjN9eW4VPTH6mFaKAE1uF2kAP7SQG6sZrx8Y4sX19BpEbcLmay"
+    },
+    {
+      "label": "position for trader",
+      "signature": "5Zv37hbpWxncahfRqj4PYJM9g7XRXTuMESWa51GZhvnunsLEUchMAgp8AYuuDn9j4v3RycZ3V7cJthbBD5Ca8njn"
+    },
+    {
+      "label": "creator splits 6 complete sets",
+      "signature": "3ddFR2ysfvD71uq2EYyYfZzPs4zTr1bvWjEvrjsTktfAeDHpF2C39qpQDGiL1hwzQ9KJcaqqRWh3sPuz4uwSCSTV"
+    },
+    {
+      "label": "conservation: after split",
+      "reserve": "6000000"
+    },
+    {
+      "label": "creator rests sell 3 Alpha at 0.40",
+      "signature": "3CXyGSnTYT2tR3B9v3WJLSy4CKswZJdQx4WUw7RCUunzzK234Mp7DmRmMNCatUBLv2BcdayNyaBL3FGRKd8Y5n1"
+    },
+    {
+      "label": "trader buys 3 Alpha at 0.40 (match)",
+      "signature": "XjDxb1uJf8Y8ji1y6Rm6jnFy7d4spbs7KGhZm6cZVg9d4h1EcSAtf2vyMdJy3evqmVuyoAaNSctQmUf36Dc62hP"
+    },
+    {
+      "label": "conservation: after split",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after match",
+      "reserve": "6000000"
+    },
+    {
+      "label": "creator rests sell 3 Beta at 0.50",
+      "signature": "4z3UZw9aLySnipjinrANqDkxZVewD2HY2SF3SZarTJ9tsWkiax7ExJv1bvJf6MdiWPYu9ooKLK1koDuSSihJomHr"
+    },
+    {
+      "label": "conservation: after split",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after match",
+      "reserve": "6000000"
+    },
+    {
+      "label": "creator cancels Beta order",
+      "signature": "5MEFmHUevs9uXEUFDPfrKnbRft4nm3mHH8Fk7wCF3dWEzgbjd9rJGZ3CzAYqiyypr1sEmBv9wtP5WVMxsbreP6eG"
+    },
+    {
+      "label": "conservation: after cancel",
+      "reserve": "6000000"
+    },
+    {
+      "label": "freeze at cutoff",
+      "signature": "5AvZuwgLgZ7gX3WDFFmZrE81hZzBBstGFkSdVEByQ6ADtxX4MhzP1ew6YFYbmG4igPtYGDmyyZtx4KWT96xwQTk9"
+    },
+    {
+      "label": "propose Beta",
+      "signature": "3nZiRR3Niu99RanmHgQpBoHCv6UdPFHGAcFNDnAqWBhaarRKqmrUVkP3vBwPVVFB2nYavtSGwi4TpaLRoyZAyDXw"
+    },
+    {
+      "label": "correct to Alpha",
+      "signature": "HhEZJThhZ95maqmquDzL8Xkd67y6Dg4qW4pN1f6pnC71xBpLP7ttJG4A4TUae7EE7Wj5eQtFWvB2TqFLCvfkFW4"
+    },
+    {
+      "label": "correct to Alpha again near the deadline",
+      "signature": "YBPsWwV5kY3yKYx39JFqJGu2cgwCvTbXtNcmmHebfAmqRZ1HFwQc9JNcNEuQ4MAuy3jSianLwarFsBkQcCuLuVF"
+    },
+    {
+      "label": "correction at the phase deadline before maturity",
+      "simulated": "rejected",
+      "error": "PredictionCorrectionWindowClosed"
+    },
+    {
+      "label": "permissionless finalize (signed by trader)",
+      "signature": "xRdPWcS68mUx7sQbFJBHWdhbW7JDBCSQj4tFcWSpwNcnVH4ockCR8f2uzUDA5ViDnqSfYmfcZnVnHdEwqdtNUri"
+    },
+    {
+      "label": "conservation: after split",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after match",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after cancel",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after split",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after match",
+      "reserve": "6000000"
+    },
+    {
+      "label": "conservation: after cancel",
+      "reserve": "6000000"
+    },
+    {
+      "label": "creator redeems",
+      "signature": "2bTqo6z4weFpTqeDZFeM48FEsoxSwhRjd54unf7ZRt6DSqQ2ecKsLTL9bYozb81ithMgcyGb9FAxutETcahGFBbK"
+    },
+    {
+      "label": "trader redeems",
+      "signature": "3RQSWtAq44ufpqhEQTj9pi8KirV26GuypqddhVMo3AC9P8bmymNZGu33EpAtQtyohAmg2BVq7pMf5QcJb96cMQZR"
+    },
+    {
+      "label": "conservation: after redemption",
+      "reserve": "0"
+    },
+    {
+      "label": "withdraw earned fees",
+      "signature": "srK1PXms3drt5YULAfQzK2HVEGEySfvsxbSjgLeKZUJ9BXcVqhNc54yPeaHHpEVyrq6b1q9AGAbcjeGHaBrQcTK"
+    },
+    {
+      "label": "creator withdraws cash",
+      "signature": "5wJ6EspKUrJrVwzb67iNLGPLnKFLhXTQihADtrW9H4iQJWw9hfTnyDCwXVdkSLbdgw1RcJYQ3m3yiD9mXgQ4YEvB"
+    },
+    {
+      "label": "trader withdraws cash",
+      "signature": "54Spzvzua62ehFxpfHKeeRUkKviQ3gTufwu44WgMjhSb5w4nTUxtoJAaw3vPpUv6N3G3LuL1WDzoekTaiRuarf9f"
+    },
+    {
+      "label": "return trader SOL",
+      "signature": "486UQbDSGh6c4hELpxUux62EH6jbJpRGQ6koT7LbBooQtftjArDXMwQ6gtRTMteZf1xd5c9FGGqNkYoTw9bhEwau"
+    }
+  ],
+  "rulesUri": "https://raw.githubusercontent.com/kunal171/outcomia/2981af4390fe072278fe1778d486bfd1c564d892/docs/devnet/release-smoke-rules.json",
+  "rulesSha256": "1e2d8ddc39f5cc750faa0f27a74e6da582a81fc0a7c8f9dceb8b29792783330a",
+  "trader": "7CgVnLKW2TzfYxrTB2q8ez6kncuV4omjTmfYtr81c7ci",
+  "collateralMint": "B61EeqofWb7Coi7NPVeEuDkys4LZ2s6LMxTCtUxSNiCM",
+  "spotBaseMint": "J7nM1AhdbYDCBTQJvy3QhhRwpZ9qACxw2r6y91TWjyCf",
+  "market": "Ey5p8bBin49gfiaCuE7qHPdy8LdomzZX2tQEASbdo8ar",
+  "result": "passed",
+  "resumedAt": "2026-11-21T10:07:31.429Z",
+  "finalWalletTokens": {
+    "creator": "18201200",
+    "trader": "6798800"
+  },
+  "completedAt": "2026-11-21T10:08:09.631Z"
+}

@@ -1,6 +1,7 @@
 import { BN } from "@anchor-lang/core";
 import type { PublicKey } from "@solana/web3.js";
 import type { MultiMarket } from "./multi-outcome";
+import { correctionDeadline, correctionOpen } from "./correction-window";
 /** Mirrors the program's stored resolution phase and exclusive proposal windows.
  * Ledger checks remain authoritative when time or state changes before submission. */
 export function resolutionAvailability(
@@ -26,11 +27,17 @@ export function resolutionAvailability(
   const matureAt = proposed
     ? proposed.proposedAt.add(t.resolutionDelaySeconds)
     : null;
+  const schedule = {
+    closeTs: t.closeTs,
+    earliestResolutionTs: t.earliestResolutionTs,
+    resolutionDelaySeconds: t.resolutionDelaySeconds,
+    fallbackPhase,
+    fallbackAvailableTs: f?.availableTs ?? null,
+  };
   const canCorrect =
     !!proposed &&
     "proposed" in m.status &&
-    !!matureAt &&
-    at.lt(matureAt) &&
+    correctionOpen(schedule, matureAt, at) &&
     !resolved;
   return {
     canPropose:
@@ -51,5 +58,6 @@ export function resolutionAvailability(
       !resolved && "proposed" in m.status && !!matureAt && at.gte(matureAt),
     canTimeout: awaiting && !!f?.deadlineTs && at.gte(f.deadlineTs),
     matureAt,
+    correctionDeadline: correctionDeadline(schedule),
   };
 }

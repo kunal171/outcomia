@@ -5,9 +5,10 @@ creation/discovery/trading/claims UI, and indexer event decoding are implemented
 and checked locally. The shared app exposes `/predictions/multi` and
 `/predictions/multi/new`. Transactions require both
 `NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true` and
-`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. Keep the latter disabled until the
-matching program is deliberately deployed and verified. No multi-outcome devnet
-upgrade or live smoke test has been performed.
+`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. The matching program was deployed to
+devnet on 21 November 2026 and passed a live two-wallet lifecycle smoke test
+(see [deployment](deployment.md)). The UI flag remains disabled until it is
+deliberately enabled with a compatible deployed indexer.
 
 ## Scope
 
@@ -78,7 +79,10 @@ several price displays do not imply shared liquidity.
 Reuse shared wallet custody, bounded matching and signed fee quotes, with new
 market/account namespaces and explicit outcome ID checks. Resolution follows the
 agreed creator/admin, review-delay and fallback model, but chooses a winning
-outcome ID or Invalid. Owners retain cancellation and withdrawal rights after
+outcome ID or Invalid. Binary and multi-outcome markets share one lifecycle
+implementation (`programs/outcomia/src/resolution.rs`), including the per-phase
+correction deadline described in
+[shared balances and settlement](shared-balances-resolution.md#resolution). Owners retain cancellation and withdrawal rights after
 closure. Redemption must burn claimed positions once and reconcile actual vault
 backing, including contracts released by canceled sell orders.
 

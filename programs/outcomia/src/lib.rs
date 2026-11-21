@@ -24,6 +24,7 @@ pub mod multi_outcome_trading;
 pub mod pda;
 pub mod prediction_config;
 mod prediction_orders;
+pub mod resolution;
 pub mod shared_trading;
 pub mod state;
 

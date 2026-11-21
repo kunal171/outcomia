@@ -1,5 +1,6 @@
 "use client";
 import { useIndexerUpdates } from "./use-indexer-updates";
+import { visibleMarket } from "../lib/market-visibility";
 import { useI18n } from "./preferences-provider";
 
 import {
@@ -91,8 +92,20 @@ export function Markets() {
           ]),
         ),
       );
+      const names = new Map(
+        metadataRecords.map(({ account }) => [
+          account.market.toBase58(),
+          account.displayName,
+        ]),
+      );
       setMarkets(
         records
+          .filter(({ publicKey }) =>
+            visibleMarket(
+              publicKey.toBase58(),
+              names.get(publicKey.toBase58()),
+            ),
+          )
           .map(({ publicKey, account }) => ({
             address: publicKey,
             ...account,
