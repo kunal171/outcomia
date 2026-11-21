@@ -184,10 +184,13 @@ pub fn decode_account(bytes: &[u8]) -> io::Result<(String, Value)> {
         .ok_or_else(|| invalid("unknown account discriminator; check deployed IDL"))?;
     let name = definition["name"].as_str().unwrap();
     let mut input = &bytes[8..];
+    // Bytes after a complete decode are ignored, as Anchor's own account
+    // deserialization does. Accounts keep their original allocation, and
+    // Anchor does not zero the tail when an encoding shrinks: an Option that
+    // returns to None or a shorter string leaves stale bytes behind. Rejecting
+    // them made one emptied order book fail every account scan. Truncated or
+    // malformed data still fails inside decode.
     let value = decode(&json!({"defined":{"name":name}}), &mut input, 0)?;
-    if input.iter().any(|v| *v != 0) {
-        return Err(invalid("nonzero trailing account bytes"));
-    }
     Ok((name.to_owned(), value))
 }
 
@@ -294,7 +297,12 @@ mod tests {
             json!({"winner":[[7]]})
         );
         assert!(decode(&ty, &mut &[3][..], 0).is_err());
+        // Stale allocation bytes after a complete decode are ignored.
         account.push(1);
+        let (_, stale) = decode_account(&account).unwrap();
+        assert_eq!(stale, value);
+        // Removing a byte from the encoded fields is still rejected.
+        account.truncate(account.len() - 2);
         assert!(decode_account(&account).is_err());
     }
     #[test]
