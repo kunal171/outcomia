@@ -198,6 +198,11 @@ test("smoke discovery filters preserve normal market questions", () => {
     assert.equal(visibility.visibleMarket("other", name), false, name);
   // Unnamed markets (metadata unavailable) stay visible unless listed.
   assert.equal(visibility.visibleMarket("other"), true);
+  // The release smoke market stays hidden even without its metadata name.
+  assert.equal(
+    visibility.visibleMarket("Ey5p8bBin49gfiaCuE7qHPdy8LdomzZX2tQEASbdo8ar"),
+    false,
+  );
 });
 
 test("resolution follows stored phase, earliest time, review maturity and exclusive fallback deadline", () => {
