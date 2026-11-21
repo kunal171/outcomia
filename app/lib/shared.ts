@@ -21,6 +21,12 @@ export const SHARED_BALANCES_ENABLED =
 export const PREDICTION_RESOLUTION_ENABLED =
   SHARED_BALANCES_ENABLED &&
   process.env.NEXT_PUBLIC_PREDICTION_RESOLUTION_ENABLED === "true";
+/** Complementary YES/NO matching needs a program with match_shared_complement.
+ * Keep it off until that program is deployed: an older program would reject
+ * the instruction and accept crossed resting orders. */
+export const COMPLEMENTARY_MATCHING_ENABLED =
+  SHARED_BALANCES_ENABLED &&
+  process.env.NEXT_PUBLIC_COMPLEMENTARY_MATCHING_ENABLED === "true";
 export type Outcome = "spot" | "yes" | "no";
 export type Side = "bid" | "ask";
 export interface AssetBalance {
@@ -219,8 +225,13 @@ export async function cancelShared(
  * its own best ask, or payout minus the other outcome's best bid (bought
  * through a complete-set mint), whichever is lower. Null when neither exists.
  * Slots: YES bid 0, YES ask 1, NO bid 2, NO ask 3. */
-export function bestBuyPrice(book: SharedBook, outcome: "yes" | "no") {
+export function bestBuyPrice(
+  book: SharedBook,
+  outcome: "yes" | "no",
+  complement = COMPLEMENTARY_MATCHING_ENABLED,
+) {
   const direct = book.bestPrices[outcome === "yes" ? 1 : 3];
+  if (!complement) return direct;
   const otherBid = book.bestPrices[outcome === "yes" ? 2 : 0];
   const implied =
     otherBid && otherBid.lt(book.payoutPerContract)
@@ -258,6 +269,7 @@ export async function buildSharedTrade(
   price: BN,
   quantity: BN,
   prefix: TransactionInstruction[] = [],
+  complement = COMPLEMENTARY_MATCHING_ENABLED,
 ) {
   if (
     price.lten(0) ||
@@ -282,11 +294,8 @@ export async function buildSharedTrade(
   if (notional.isZero() || notional.bitLength() > 64)
     throw new Error("Order value is zero or exceeds u64");
   const opposite: Side = side === "bid" ? "ask" : "bid";
-  const other: Outcome | null = prediction
-    ? outcome === "yes"
-      ? "no"
-      : "yes"
-    : null;
+  const other: Outcome | null =
+    prediction && complement ? (outcome === "yes" ? "no" : "yes") : null;
   const payout = s.book.payoutPerContract;
   const orders = s.orders
     .filter((r) => "open" in r.account.status)

@@ -358,6 +358,8 @@ test("binary bids take cheaper liquidity through the other outcome first", async
     "bid",
     bn(650_000),
     bn(3),
+    [],
+    true,
   );
   assert.deepEqual(Array.from(r.instructions, name), [
     "matchSharedComplement",
@@ -393,6 +395,8 @@ test("direct liquidity wins an exact effective-price tie", async () => {
     "bid",
     bn(600_000),
     bn(1),
+    [],
+    true,
   );
   assert.deepEqual(Array.from(r.instructions, name), ["matchSharedOrder"]);
   assert(account(r.instructions[0], "maker_order").equals(ask));
@@ -409,6 +413,8 @@ test("binary sells merge against the other outcome's asks", async () => {
     "ask",
     bn(500_000),
     bn(2),
+    [],
+    true,
   );
   assert.deepEqual(Array.from(r.instructions, name), ["matchSharedComplement"]);
   assert(account(r.instructions[0], "maker_order").equals(noAsk));
@@ -426,6 +432,8 @@ test("a remainder rests only when no liquidity crosses through either book", asy
     "bid",
     bn(550_000),
     bn(2),
+    [],
+    true,
   );
   assert.deepEqual(Array.from(rest.instructions, name), ["placeSharedOrder"]);
   assert(rest.remaining.isZero());
@@ -440,6 +448,8 @@ test("a remainder rests only when no liquidity crosses through either book", asy
     "bid",
     bn(700_000),
     bn(5),
+    [],
+    true,
   );
   assert.equal(capped.fills, 3);
   assert(capped.instructions.every((i) => name(i) === "matchSharedComplement"));
@@ -453,18 +463,46 @@ test("a remainder rests only when no liquidity crosses through either book", asy
 test("spot books ignore the complement path", async () => {
   const f = fixture();
   add(f, 1, 100, 1, "bid");
-  const r = await s.buildSharedTrade(p, f, owner, "spot", "bid", bn(90), bn(1));
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "spot",
+    "bid",
+    bn(90),
+    bn(1),
+    [],
+    true,
+  );
   assert.deepEqual(Array.from(r.instructions, name), ["placeSharedOrder"]);
 });
 
 test("best buy price includes the other outcome's bids", () => {
   const f = fixture(true);
-  assert.equal(s.bestBuyPrice(f.book, "yes"), null);
+  assert.equal(s.bestBuyPrice(f.book, "yes", true), null);
   f.book.bestPrices = [null, bn(620_000), bn(400_000), null];
   // YES: min(direct 0.62, 1 - NO bid 0.40 = 0.60); NO: 1 - YES bid (none) and no NO ask.
-  assert(s.bestBuyPrice(f.book, "yes").eqn(600_000));
-  assert.equal(s.bestBuyPrice(f.book, "no"), null);
+  assert(s.bestBuyPrice(f.book, "yes", true).eqn(600_000));
+  assert.equal(s.bestBuyPrice(f.book, "no", true), null);
   f.book.bestPrices = [bn(550_000), null, null, bn(500_000)];
-  assert(s.bestBuyPrice(f.book, "no").eqn(450_000));
-  assert(s.bestBuyPrice(f.book, "yes") === null);
+  assert(s.bestBuyPrice(f.book, "no", true).eqn(450_000));
+  assert(s.bestBuyPrice(f.book, "yes", true) === null);
+});
+
+test("with complementary matching disabled the planner keeps direct-only behavior", async () => {
+  const f = fixture(true);
+  add(f, 1, 400_000, 2, "bid", "no");
+  // Off by default: the NO bid is ignored and the YES bid rests as before.
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(650_000),
+    bn(1),
+  );
+  assert.deepEqual(Array.from(r.instructions, name), ["placeSharedOrder"]);
+  f.book.bestPrices = [null, null, bn(400_000), null];
+  assert.equal(s.bestBuyPrice(f.book, "yes"), null);
 });

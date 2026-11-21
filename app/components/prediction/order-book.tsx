@@ -2,7 +2,10 @@
 import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
-import type { SharedSnapshot } from "../../lib/shared";
+import {
+  COMPLEMENTARY_MATCHING_ENABLED,
+  type SharedSnapshot,
+} from "../../lib/shared";
 import { readableAmount } from "../../lib/market-display";
 
 type Outcome = "yes" | "no";
@@ -57,6 +60,7 @@ export function PredictionOrderBook({
       if (outcome in account.outcome && side in account.side)
         add(account.price, account.remainingQuantity, false);
       else if (
+        COMPLEMENTARY_MATCHING_ENABLED &&
         payout?.gtn(0) &&
         other in account.outcome &&
         otherSide in account.side &&
