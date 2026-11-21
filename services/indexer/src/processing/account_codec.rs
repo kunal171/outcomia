@@ -306,6 +306,61 @@ mod tests {
         assert!(decode_account(&account).is_err());
     }
     #[test]
+    fn shrunk_option_leaves_ignorable_stale_bytes() {
+        // A SharedBook whose best price returns to None keeps the old price
+        // bytes after its now-shorter encoding, exactly as seen on devnet.
+        let def = idl()["accounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["name"] == "SharedBook")
+            .unwrap();
+        let mut head: Vec<u8> = def["discriminator"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n.as_u64().unwrap() as u8)
+            .collect();
+        head.extend([1; 32]); // market
+        head.extend([2; 32]); // authority
+        head.push(0); // kind: Spot
+        head.extend([3; 32]); // base_mint
+        head.extend([4; 32]); // quote_mint
+        head.extend([9, 6]); // decimals
+        head.extend(10_000_u64.to_le_bytes()); // price_tick
+        head.extend(1_000_u64.to_le_bytes()); // quantity_lot
+        head.extend(0_u64.to_le_bytes()); // payout_per_contract
+        let tail = |best: [Option<u64>; 4]| {
+            let mut bytes = Vec::new();
+            for price in best {
+                match price {
+                    Some(p) => {
+                        bytes.push(1);
+                        bytes.extend(p.to_le_bytes());
+                    }
+                    None => bytes.push(0),
+                }
+            }
+            bytes.extend(5_u64.to_le_bytes()); // next_order_id
+            bytes.extend(0_u64.to_le_bytes()); // open_order_count
+            bytes.extend(0_u64.to_le_bytes()); // accrued_quote_fees
+            bytes.push(254); // bump
+            bytes
+        };
+        // Allocation sized for the earlier, longer encoding with a best bid.
+        let mut before = head.clone();
+        before.extend(tail([Some(777), None, None, None]));
+        let mut after = head.clone();
+        after.extend(tail([None, None, None, None]));
+        let mut account = after.clone();
+        account.extend(&before[after.len()..]); // stale, nonzero bytes remain
+        assert!(account[after.len()..].iter().any(|b| *b != 0));
+        let (name, value) = decode_account(&account).unwrap();
+        assert_eq!(name, "SharedBook");
+        assert_eq!(value, decode_account(&after).unwrap().1);
+        assert_eq!(value["bestPrices"], json!([null, null, null, null]));
+    }
+    #[test]
     fn rejects_truncation_and_adversarial_lengths() {
         assert!(decode_account(&[0; 8]).is_err());
         assert!(decode(&json!({"vec":"u8"}), &mut &[255; 4][..], 0).is_err());
