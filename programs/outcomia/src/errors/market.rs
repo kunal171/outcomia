@@ -5,5 +5,5 @@ pub use super::OutcomiaError::{
     InvalidQuantityLotSize, InvalidVaultAuthority, MarketAlreadyActive, MarketAlreadyInitialized,
     MarketAlreadyPaused, MarketHasOpenOrders, MarketMustBePaused, MarketNotActive, MarketNotFound,
     MarketPaused, MarketVaultNotEmpty, OpenOrderCountOverflow, OpenOrderCountUnderflow,
-    Unauthorized,
+    SpotIncrementsTooFine, Unauthorized,
 };
