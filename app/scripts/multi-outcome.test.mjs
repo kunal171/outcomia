@@ -596,15 +596,150 @@ test("with complementary matching disabled only direct liquidity is used", async
   assert.deepEqual(names(r), ["placeMultiOutcomeOrder"]);
 });
 
-test("oversized full sets fall back to direct liquidity, else explain the limit", async () => {
-  // Eight outcomes with distinct makers need too many accounts for one packet.
+const tables = loadTypeScript(
+  new URL("../lib/market-lookup-table.ts", import.meta.url),
+);
+const {
+  AddressLookupTableAccount,
+  AddressLookupTableProgram,
+} = require("@solana/web3.js");
+const frozenTable = (addresses, extra = {}) =>
+  new AddressLookupTableAccount({
+    key: key(99),
+    state: {
+      deactivationSlot: BigInt("18446744073709551615"),
+      lastExtendedSlot: 0,
+      lastExtendedSlotStartIndex: 0,
+      authority: undefined,
+      addresses,
+      ...extra,
+    },
+  });
+const { TransactionMessage, VersionedTransaction } = require("@solana/web3.js");
+/** Real encoded size of a planned v0 transaction, independent of the planner. */
+const v0Bytes = (r, table) =>
+  new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: owner,
+      recentBlockhash: PublicKey.default.toBase58(),
+      instructions: r.transaction.instructions,
+    }).compileToV0Message([table]),
+  ).serialize().length;
+const planWith = (f, outcome, side, price, quantity, table) =>
+  m.buildMultiTrade(
+    p,
+    market,
+    f.market,
+    f.book,
+    f.rows,
+    owner,
+    outcome,
+    side,
+    new BN(price),
+    new BN(quantity),
+    100,
+    true,
+    [],
+    table,
+  );
+
+test("eight-outcome full sets need the market table, then fit as v0", async () => {
+  // Distinct makers, each head with a successor: the largest packet case.
   const specs = [];
-  for (let j = 1; j < 8; j++) specs.push([j, "bid", 50000, 3, key(20 + j)]);
+  for (let j = 1; j < 8; j++) {
+    specs.push([j, "bid", 50000, 6, key(20 + j)]);
+    specs.push([j, "bid", 40000, 3, key(40 + j)]);
+  }
+  const f = linkedBook(specs, 8);
+  // Without a table the planner explains that one is needed.
+  await assert.rejects(plan(f, 0, "bid", 800000, 3), /lookup table/);
   const withDirect = linkedBook([...specs, [0, "ask", 700000, 3, maker]], 8);
-  const r = await plan(withDirect, 0, "bid", 800000, 3);
-  assert.deepEqual(names(r), ["matchMultiOutcomeOrder"]);
-  const only = linkedBook(specs, 8);
-  await assert.rejects(plan(only, 0, "bid", 800000, 3), /full-set price/);
+  const fallback = await plan(withDirect, 0, "bid", 800000, 3);
+  assert.deepEqual(names(fallback), ["matchMultiOutcomeOrder"]);
+  assert.equal(fallback.needsLookupTable, true);
+  // With the frozen market table the full set fits in a v0 transaction.
+  const table = frozenTable(tables.marketTableAddresses(market, mint));
+  const r = await planWith(f, 0, "bid", 800000, 3, table);
+  assert.deepEqual(names(r), ["matchMultiOutcomeComplement"]);
+  assert.equal(r.lookupTable, table);
+  assert.equal(r.remaining.toString(), "0");
+  assert.ok(v0Bytes(r, table) <= 1232);
+});
+
+test("when every head would complete, one lot less keeps the packet small", async () => {
+  // Every head holds exactly 6 with a successor: filling 6 needs 7 successor
+  // accounts and overflows even with the table, so the planner fills 3.
+  const specs = [];
+  for (let j = 1; j < 8; j++) {
+    specs.push([j, "bid", 50000, 6, key(20 + j)]);
+    specs.push([j, "bid", 40000, 3, key(40 + j)]);
+  }
+  const f = linkedBook(specs, 8);
+  const table = frozenTable(tables.marketTableAddresses(market, mint));
+  const r = await planWith(f, 0, "bid", 800000, 6, table);
+  const ix = r.transaction.instructions[0];
+  const decoded = p.coder.instruction.decode(ix.data);
+  assert.equal(decoded.name, "matchMultiOutcomeComplement");
+  assert.equal(decoded.data.quantity.toString(), "3");
+  const fixed = idl.instructions.find(
+    (i) => i.name === "match_multi_outcome_complement",
+  ).accounts.length;
+  const nexts = ix.keys.slice(fixed).filter((_, i) => i % 4 === 1);
+  assert.ok(nexts.every((k) => k.pubkey.equals(new PublicKey(idl.address))));
+  // The rest is left for another transaction rather than resting crossed.
+  assert.equal(r.remaining.toString(), "3");
+  assert.ok(v0Bytes(r, table) <= 1232);
+});
+
+test("only a frozen, active table with exactly the market's addresses is used", () => {
+  const addresses = tables.marketTableAddresses(market, mint);
+  assert.equal(addresses.length, 9);
+  assert.ok(addresses[0].equals(market));
+  assert.ok(tables.validMarketTable(frozenTable(addresses), market, mint));
+  assert.ok(
+    !tables.validMarketTable(
+      frozenTable(addresses, { authority: owner }),
+      market,
+      mint,
+    ),
+  );
+  assert.ok(
+    !tables.validMarketTable(
+      frozenTable(addresses, { deactivationSlot: 5n }),
+      market,
+      mint,
+    ),
+  );
+  assert.ok(
+    !tables.validMarketTable(frozenTable(addresses.slice(0, 8)), market, mint),
+  );
+  assert.ok(
+    !tables.validMarketTable(
+      frozenTable([...addresses.slice(1), market]),
+      market,
+      mint,
+    ),
+  );
+  assert.ok(!tables.validMarketTable(frozenTable(addresses), key(77), mint));
+});
+
+test("table creation creates, fills and freezes in one transaction", () => {
+  const { table, instructions } = tables.createMarketTableInstructions(
+    owner,
+    market,
+    mint,
+    1234,
+  );
+  assert.equal(instructions.length, 3);
+  assert.ok(
+    instructions.every((ix) =>
+      ix.programId.equals(AddressLookupTableProgram.programId),
+    ),
+  );
+  assert.ok(instructions[1].keys[0].pubkey.equals(table));
+  assert.ok(
+    m.transactionBytes(new Transaction().add(...instructions), owner) <= 1232,
+  );
 });
 
 test("full-set quotes price each outcome through the others' best orders", () => {

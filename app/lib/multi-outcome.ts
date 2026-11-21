@@ -3,8 +3,12 @@ import { BN, type Program } from "@anchor-lang/core";
 import {
   PublicKey,
   Transaction,
+  TransactionMessage,
+  VersionedTransaction,
+  type AddressLookupTableAccount,
   type TransactionInstruction,
 } from "@solana/web3.js";
+import { provisionalMarketTable } from "./market-lookup-table";
 import { PROGRAM_ID } from "./solana";
 import {
   COMPLEMENTARY_MATCHING_ENABLED,
@@ -349,6 +353,7 @@ export async function buildMultiTrade(
   feeBps: number,
   complement = COMPLEMENTARY_MATCHING_ENABLED,
   prefix: TransactionInstruction[] = [],
+  lookupTable: AddressLookupTableAccount | null = null,
 ) {
   validateBook(marketKey, book, rows);
   validateOrder(m.terms, outcome, price, quantity);
@@ -401,16 +406,49 @@ export async function buildMultiTrade(
     cost = new BN(0),
     fees = new BN(0),
     blocked = false;
-  const fits = (ix: TransactionInstruction) => {
+  // Legacy packets first; a v0 transaction with the market's lookup table
+  // replaces nine fixed accounts with one-byte indexes when legacy is too big.
+  let versioned = false,
+    needsLookupTable = false;
+  const v0Fits = (
+    all: TransactionInstruction[],
+    table: AddressLookupTableAccount,
+  ) => {
+    // Unlike legacy Transaction.serialize, v0 serialization does not reject a
+    // transaction above the packet limit, so compare the length explicitly.
     try {
-      transactionBytes(
-        new Transaction().add(...prefix, ...instructions, ix),
-        owner,
+      return (
+        new VersionedTransaction(
+          new TransactionMessage({
+            payerKey: owner,
+            recentBlockhash: PublicKey.default.toBase58(),
+            instructions: all,
+          }).compileToV0Message([table]),
+        ).serialize().length <= 1232
       );
-      return true;
     } catch {
       return false;
     }
+  };
+  const fits = (ix: TransactionInstruction) => {
+    const all = [...prefix, ...instructions, ix];
+    if (!versioned)
+      try {
+        transactionBytes(new Transaction().add(...all), owner);
+        return true;
+      } catch {
+        /* Try a v0 transaction below. */
+      }
+    if (lookupTable && v0Fits(all, lookupTable)) {
+      versioned = true;
+      return true;
+    }
+    if (
+      !lookupTable &&
+      v0Fits(all, provisionalMarketTable(marketKey, m.collateralMint))
+    )
+      needsLookupTable = true;
+    return false;
   };
   while (remaining.gtn(0)) {
     const direct = head(outcome, opposite);
@@ -434,62 +472,77 @@ export async function buildMultiTrade(
         throw new Error(
           "Your own order heads another outcome's queue. Cancel it first.",
         );
-      const fill = s.heads.reduce(
+      const smallest = s.heads.reduce(
         (a, h) => BN.min(a, h.account.remainingQuantity),
-        remaining,
+        s.heads[0].account.remainingQuantity,
       );
-      const remainingAccounts = s.heads.flatMap((h) => {
-        const next =
-          h.account.remainingQuantity.eq(fill) && h.account.next
-            ? h.account.next
-            : PROGRAM_ID;
-        return [
-          { pubkey: h.publicKey, isSigner: false, isWritable: true },
-          {
-            pubkey: next,
-            isSigner: false,
-            isWritable: !next.equals(PROGRAM_ID),
-          },
-          {
-            pubkey: assetBalancePda(h.account.owner, m.collateralMint),
-            isSigner: false,
-            isWritable: true,
-          },
-          {
-            pubkey: multiPositionPda(marketKey, h.account.owner),
-            isSigner: false,
-            isWritable: true,
-          },
-        ];
-      });
-      const ix = await p.methods
-        .matchMultiOutcomeComplement(
-          [outcome],
-          enumSide(side),
-          price,
-          remaining,
-          feeBps,
-        )
-        .accountsStrict({
-          taker: owner,
-          market: marketKey,
-          book: multiBookPda(marketKey),
-          protocolConfig: deriveProtocolConfigPda(),
-          takerCash: assetBalancePda(owner, m.collateralMint),
-          takerPosition: multiPositionPda(marketKey, owner),
-          mint: m.collateralMint,
-          assetAuthority: assetAuthorityPda(m.collateralMint),
-          assetVault: assetVaultPda(m.collateralMint),
-          marketAuthority: deriveVaultAuthorityPda(marketKey),
-          marketVault: deriveVaultPda(marketKey, m.collateralMint),
-          tokenProgram: TOKEN_PROGRAM_ID,
-        })
-        .remainingAccounts(remainingAccounts)
-        .instruction();
+      const buildSet = (requested: BN) => {
+        const filled = BN.min(requested, smallest);
+        const remainingAccounts = s.heads.flatMap((h) => {
+          const next =
+            h.account.remainingQuantity.eq(filled) && h.account.next
+              ? h.account.next
+              : PROGRAM_ID;
+          return [
+            { pubkey: h.publicKey, isSigner: false, isWritable: true },
+            {
+              pubkey: next,
+              isSigner: false,
+              isWritable: !next.equals(PROGRAM_ID),
+            },
+            {
+              pubkey: assetBalancePda(h.account.owner, m.collateralMint),
+              isSigner: false,
+              isWritable: true,
+            },
+            {
+              pubkey: multiPositionPda(marketKey, h.account.owner),
+              isSigner: false,
+              isWritable: true,
+            },
+          ];
+        });
+        return p.methods
+          .matchMultiOutcomeComplement(
+            [outcome],
+            enumSide(side),
+            price,
+            requested,
+            feeBps,
+          )
+          .accountsStrict({
+            taker: owner,
+            market: marketKey,
+            book: multiBookPda(marketKey),
+            protocolConfig: deriveProtocolConfigPda(),
+            takerCash: assetBalancePda(owner, m.collateralMint),
+            takerPosition: multiPositionPda(marketKey, owner),
+            mint: m.collateralMint,
+            assetAuthority: assetAuthorityPda(m.collateralMint),
+            assetVault: assetVaultPda(m.collateralMint),
+            marketAuthority: deriveVaultAuthorityPda(marketKey),
+            marketVault: deriveVaultPda(marketKey, m.collateralMint),
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .remainingAccounts(remainingAccounts)
+          .instruction();
+      };
+      let fill = BN.min(remaining, smallest);
+      let ix = await buildSet(remaining);
       if (!fits(ix)) {
-        // Too many maker accounts for one legacy packet: use direct liquidity only.
-        fullSetUsable = false;
-        continue;
+        // Completed heads add successor accounts. Filling one lot less than
+        // the smallest head completes none, which keeps the packet smallest.
+        const lot = m.terms.quantityLot;
+        const reduced = smallest.sub(lot);
+        if (fill.eq(smallest) && reduced.gtn(0)) {
+          fill = reduced;
+          ix = await buildSet(reduced);
+        }
+        if (!fill.lt(smallest) || !fits(ix)) {
+          // Too large even so: use direct liquidity for this transaction.
+          fullSetUsable = false;
+          continue;
+        }
       }
       instructions.push(ix);
       const notional = s.effective.mul(fill);
@@ -573,14 +626,20 @@ export async function buildMultiTrade(
   }
   if (!instructions.length && remaining.gtn(0) && blocked)
     throw new Error(
-      setCross
-        ? "Filling at this price needs every other outcome's best order in one transaction, which exceeds the packet limit. Use a price below the full-set price to rest an order."
-        : "These matches exceed the packet limit. Submit a smaller quantity.",
+      needsLookupTable
+        ? "Filling at this price needs this market's lookup table. Enable large full-set fills, then retry."
+        : setCross
+          ? "Filling at this price needs every other outcome's best order in one transaction, which exceeds the packet limit. Use a price below the full-set price to rest an order."
+          : "These matches exceed the packet limit. Submit a smaller quantity.",
     );
   return {
     transaction: new Transaction().add(...instructions),
     remaining: blocked ? remaining : new BN(0),
     cost,
     fees,
+    /** Send as a v0 transaction with this table when set. */
+    lookupTable: versioned ? lookupTable : null,
+    /** A full set would fit with the market's lookup table, which is missing. */
+    needsLookupTable,
   };
 }
