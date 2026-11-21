@@ -2011,3 +2011,42 @@ fn complement_rejects_missing_heads_non_heads_noncrossing_self_and_crossed_place
     assert_eq!(&f.market().supplies[..3], &[0, 0, 0]);
     assert_full_sets_conserved(&f);
 }
+
+/// Eight outcomes is the largest market: seven maker legs in one instruction
+/// must stay inside the default per-instruction compute budget.
+#[test]
+fn eight_way_mint_fits_the_default_compute_budget() {
+    let mut f = Fixture::new();
+    f.setup_active_market(8);
+    f.set_protocol_fee(100);
+    let (owner, taker) = (f.owner.pubkey(), f.taker.pubkey());
+    let ids: Vec<OutcomeId> = (0..8).map(|i| OutcomeId::new(i, 8).unwrap()).collect();
+    // Bids of 0.10 on outcomes 1..=7 (sum 0.70) let outcome 0 buy at 0.30.
+    for (n, o) in ids[1..].iter().enumerate() {
+        f.send(f.place_order(&owner, *o, OrderSide::Bid, 100_000, 8, n as u64 + 1))
+            .expect("bid");
+    }
+    let res = f.send(complement_ix(
+        &f,
+        &taker,
+        ids[0],
+        OrderSide::Bid,
+        400_000,
+        8,
+        100,
+    ));
+    let meta = res.as_ref().expect("eight-way mint");
+    println!(
+        "eight-way mint compute units: {}",
+        meta.compute_units_consumed
+    );
+    assert!(meta.compute_units_consumed < 200_000);
+    assert_eq!(&f.market().supplies[..8], &[8; 8]);
+    assert_eq!(f.position(&taker).free[0], 8);
+    assert_eq!(f.book().open_order_count, 0);
+    assert_eq!(
+        support::events::events::<outcomia::MultiOutcomeFillEvent>(&res).len(),
+        8
+    );
+    assert_full_sets_conserved(&f);
+}
