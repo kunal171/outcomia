@@ -74,8 +74,10 @@ Never silently round a payout or use another trader's cash to cover a remainder.
 ## Trading and resolution
 
 Each outcome has independent buy/sell price priority and FIFO queues. A buy for
-A matches a sell for A. Cross-outcome matching is a separate later feature;
-several price displays do not imply shared liquidity.
+A matches a sell for A. Binary shared books match YES and NO through the
+complete set ([complementary matching](complementary-matching.md)); N-way
+matching across multi-outcome books is a separate later feature, so several
+price displays do not imply shared liquidity.
 
 Reuse shared wallet custody, bounded matching and signed fee quotes, with new
 market/account namespaces and explicit outcome ID checks. Resolution follows the

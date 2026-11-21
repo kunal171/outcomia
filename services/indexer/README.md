@@ -38,8 +38,10 @@ an apparently empty book or a fabricated zero balance.
 
 Finalized logs and retained transaction bodies support ordered execution replay.
 Spot/multi-outcome fill events and legacy/shared spot/binary instruction replay
-feed bounded OHLCV queries. Missing execution order, timestamps, initialization
-provenance or historical coverage produce `INCOMPLETE`, not invented prices.
+feed bounded OHLCV queries. A complementary YES/NO fill (`match_shared_complement`)
+records two trades: the taker's outcome at payout minus the maker price, with the
+fee, and the maker's outcome at its own price. Missing execution order, timestamps,
+initialization provenance or historical coverage produce `INCOMPLETE`, not invented prices.
 Charts currently use finalized executions; provisional candles, depth charts,
 P&L and USD valuation remain later work. These changes do not upgrade the program
 or establish a live deployment.
