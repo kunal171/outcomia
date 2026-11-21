@@ -1,13 +1,10 @@
 # Indexer build context: explicit inputs only; never upload local env/wallet files.
+# List files, not directories: re-including a directory (for example "!app/")
+# also re-includes everything beneath it, such as node_modules, build output
+# and local .env files.
 **
-!services/
-!services/indexer/
 !services/indexer/Cargo.toml
 !services/indexer/Cargo.lock
-!services/indexer/src/
 !services/indexer/src/**
-!services/indexer/migrations/
 !services/indexer/migrations/**
-!app/
-!app/idl/
 !app/idl/outcomia.json
