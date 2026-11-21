@@ -323,9 +323,10 @@ Legacy cash stays withdrawable; redemption credits the shared mint balance.
 
 `/predictions/multi` provides discovery and links to creation and market detail.
 Creation, linked order books, bounded atomic matching, complete sets, resolution
-and redemption use the checked-in IDL. Keep `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED`
-false until the matching program is deployed and verified; shared balances must
-also be enabled. No devnet upgrade or live smoke is part of this local change.
+and redemption use the checked-in IDL. `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`
+requires shared balances as well. The program is deployed and smoke-tested on
+devnet and the flag is enabled in production; keep it false for any deployment
+whose program has not been verified.
 
 Run `npm run test:multi-outcome`; see the [full status and local browser fixture](../docs/multi-outcome-markets.md).
 Smoke-test markets are hidden from discovery, while direct detail links and owner

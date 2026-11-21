@@ -25,8 +25,8 @@ is pending there. Solana functionality below remains available.
 - Wallet-owned positions, collateral deposits and withdrawals, and complete-set
   split/merge: one collateral token backs one YES plus one NO contract.
 - 2–8-outcome markets, linked books, trading/claims UI and indexer events. The
-  program is deployed and smoke-tested on devnet; the UI flag stays off until
-  enabled. See [multi-outcome status](docs/multi-outcome-markets.md).
+  program is deployed and smoke-tested on devnet, and the UI is enabled in
+  production. See [multi-outcome status](docs/multi-outcome-markets.md).
 - YES/NO limit orders, price-time priority, partial fills and owner cancellation.
   The client can match up to three makers atomically and post a safe remainder.
 - Spot markets with base/quote vaults, internal balances, price ticks, quantity

@@ -7,8 +7,9 @@ and checked locally. The shared app exposes `/predictions/multi` and
 `NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true` and
 `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. The matching program was deployed to
 devnet on 21 November 2026 and passed a live two-wallet lifecycle smoke test
-(see [deployment](deployment.md)). The UI flag remains disabled until it is
-deliberately enabled with a compatible deployed indexer.
+(see [deployment](deployment.md)). Production enabled the UI flag the same day.
+Production has no indexer configured, so multi-outcome screens read accounts
+directly over RPC; indexed history arrives when an indexer is deployed.
 
 ## Scope
 
