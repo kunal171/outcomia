@@ -46,8 +46,11 @@ The CLI had already extended ProgramData, so the program briefly ran the old
 Resuming the same buffer with `--use-rpc` completed the upgrade and refunded
 the buffer. No second buffer was allocated.
 
-Multi-outcome trading remains disabled in the app until
-`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true` is set and the app is redeployed.
+After the smoke test, `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true` was set for
+Vercel Production and Preview and production was redeployed from the same
+`master` build. The compiled flag was confirmed enabled in the live bundle.
+Production has no `INDEXER_API_URL`, so the indexer proxy reports itself
+unconfigured and multi-outcome screens read accounts over RPC.
 
 ## Shared-wallet release: 6 November 2026
 
