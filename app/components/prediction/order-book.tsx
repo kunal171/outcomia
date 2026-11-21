@@ -19,6 +19,9 @@ interface Props {
 
 /** A read-only price ladder. Selecting a price only edits the ticket; it never signs.
  * FIFO orders at the same price are summed with BN so large quantities stay exact.
+ * The other outcome's same-side orders also trade through a complete set: a NO
+ * bid at 0.40 is an effective YES sell at 0.60. Those implied amounts are merged
+ * into the ladder and labelled, matching what the trade planner can fill.
  */
 export function PredictionOrderBook({
   snapshot,
@@ -32,23 +35,34 @@ export function PredictionOrderBook({
 }: Props) {
   const { t } = useI18n();
 
+  const other: Outcome = outcome === "yes" ? "no" : "yes";
+  const payout = snapshot?.book.payoutPerContract;
   const sides = (["bid", "ask"] as const).map((side) => {
-    const levels = new Map<string, { price: BN; quantity: BN }>();
-    for (const { account } of snapshot?.orders ?? []) {
-      if (
-        !("open" in account.status) ||
-        !(outcome in account.outcome) ||
-        !(side in account.side)
-      )
-        continue;
-      const key = account.price.toString();
+    const levels = new Map<string, { price: BN; quantity: BN; implied: BN }>();
+    const add = (price: BN, quantity: BN, implied: boolean) => {
+      const key = price.toString();
       const previous = levels.get(key);
       levels.set(key, {
-        price: account.price,
-        quantity: (previous?.quantity ?? new BN(0)).add(
-          account.remainingQuantity,
+        price,
+        quantity: (previous?.quantity ?? new BN(0)).add(quantity),
+        implied: (previous?.implied ?? new BN(0)).add(
+          implied ? quantity : new BN(0),
         ),
       });
+    };
+    // A buy here is fed by the other outcome's sells, and vice versa.
+    const otherSide = side === "bid" ? "ask" : "bid";
+    for (const { account } of snapshot?.orders ?? []) {
+      if (!("open" in account.status)) continue;
+      if (outcome in account.outcome && side in account.side)
+        add(account.price, account.remainingQuantity, false);
+      else if (
+        payout?.gtn(0) &&
+        other in account.outcome &&
+        otherSide in account.side &&
+        account.price.lt(payout)
+      )
+        add(payout.sub(account.price), account.remainingQuantity, true);
     }
     return {
       side,
@@ -96,7 +110,7 @@ export function PredictionOrderBook({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map(({ price, quantity }) => (
+                    {rows.map(({ price, quantity, implied }) => (
                       <tr key={price.toString()}>
                         <td>
                           <button
@@ -113,7 +127,18 @@ export function PredictionOrderBook({
                             {readableAmount(price, decimals)}
                           </button>
                         </td>
-                        <td>{readableAmount(quantity, 0)}</td>
+                        <td>
+                          {readableAmount(quantity, 0)}
+                          {implied.gtn(0) && (
+                            <small className="prediction-book-implied">
+                              {" "}
+                              {t("{value0} via {value1}", {
+                                value0: readableAmount(implied, 0),
+                                value1: other.toUpperCase(),
+                              })}
+                            </small>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -129,6 +154,14 @@ export function PredictionOrderBook({
             </div>
           ))}
         </div>
+      )}
+      {sides.some(({ rows }) => rows.some(({ implied }) => implied.gtn(0))) && (
+        <p className="prediction-book-note">
+          {t(
+            "Includes {value0} orders that match through a complete YES+NO set.",
+            { value0: other.toUpperCase() },
+          )}
+        </p>
       )}
     </section>
   );
