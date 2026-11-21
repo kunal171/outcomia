@@ -86,6 +86,8 @@ pub mod multi_outcome_orders;
 pub use multi_outcome_orders::*;
 pub mod multi_outcome_match;
 pub use multi_outcome_match::*;
+pub mod multi_outcome_complement;
+pub use multi_outcome_complement::*;
 pub mod multi_outcome_fees;
 pub use multi_outcome_fees::*;
 

@@ -142,6 +142,26 @@ pub mod outcomia {
             expected_fee_bps,
         )
     }
+    /// Fills one full set against the best same-side order of every other outcome:
+    /// buys mint a set into the reserve, sells merge one out. Makers are remaining
+    /// accounts `[order, next, cash, position]` per other outcome, in outcome order.
+    pub fn match_multi_outcome_complement<'info>(
+        ctx: Context<'info, MatchMultiOutcomeComplement<'info>>,
+        outcome: OutcomeId,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+        expected_fee_bps: u16,
+    ) -> Result<()> {
+        instructions::multi_outcome_complement::handle_match_multi_outcome_complement(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+            expected_fee_bps,
+        )
+    }
     /// Withdraws only earned fees to a super-admin-owned SPL destination.
     pub fn withdraw_multi_outcome_fees(
         ctx: Context<WithdrawMultiOutcomeFees>,
