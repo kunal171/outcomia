@@ -487,13 +487,19 @@ mainnet liquidity acquisition.
 
 ## Recommended next milestone
 
-Start read-optimized projections on top of the append-only source tables. Replay
-events in deterministic `(slot, transaction_index, signature, log_index)` order
-into market, order, fill, fee, and balance views, then expose the first narrow
-read API. Keep source records immutable so projection bugs and schema changes
-can be rebuilt without re-fetching chain history. Add account reconciliation
-after the first projections are queryable. Yellowstone remains a later scaling
-option after standard RPC throughput is measured.
+Read-optimized indexer projections, the GraphQL read API and wallet sign-in
+are implemented locally (see the [indexer README](../services/indexer/README.md)),
+so the earlier projection milestone is complete.
+
+The next step is a release rather than a new track: the deployed devnet program
+predates multi-outcome markets and the release-hardening fixes (spot increment
+validation and bounded resolution corrections). Upgrade devnet once, run the
+multi-outcome and shared-wallet smoke tests, then enable the corresponding UI
+flags. After that, the strongest candidate for this research track is
+complementary YES/NO (mint/merge) matching, which shares liquidity across
+outcome books without new market types. Account reconciliation for indexed
+data and Yellowstone ingestion remain later scaling work after standard RPC
+throughput is measured.
 
 ## References
 
