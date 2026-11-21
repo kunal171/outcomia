@@ -274,6 +274,19 @@ body:has(.prediction-workspace) {
 .prediction-book-side {
   min-width: 0;
 }
+/* Chain-specific resolution rules, collapsed by default. */
+.resolution-policy {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.resolution-policy summary {
+  cursor: pointer;
+}
+.resolution-policy ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
 /* Liquidity reachable through the other outcome's complete-set match. */
 .prediction-book-implied {
   color: var(--muted);

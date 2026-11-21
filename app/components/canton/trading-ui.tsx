@@ -21,6 +21,7 @@ import {
 import { assetRows } from "../../lib/canton/portfolio";
 import type { Intent } from "../../lib/canton/commands";
 import { walletError } from "../../lib/console-wallet";
+import { ResolutionPolicy } from "../resolution-policy";
 
 export function TradingFrame({
   title,
@@ -654,6 +655,7 @@ export function MarketDetail({ marketId }: { marketId: string }) {
               </div>
             ))}
           </dl>
+          <ResolutionPolicy chain="canton" />
         </section>
       ) : null}
       {tab === "Manage" && manage ? (

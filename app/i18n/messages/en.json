@@ -967,5 +967,15 @@
   "Set up multi-outcome market": "Set up multi-outcome market",
   "the transaction size limit was reached; submit again to continue": "the transaction size limit was reached; submit again to continue",
   "{value0} via {value1}": "{value0} via {value1}",
-  "Includes {value0} orders that match through a complete YES+NO set.": "Includes {value0} orders that match through a complete YES+NO set."
+  "Includes {value0} orders that match through a complete YES+NO set.": "Includes {value0} orders that match through a complete YES+NO set.",
+  "How resolution works on Solana": "How resolution works on Solana",
+  "How resolution works on Canton": "How resolution works on Canton",
+  "The creator proposes after trading closes. Each correction restarts the review delay; corrections stop two review delays after the resolver's window opens.": "The creator proposes after trading closes. Each correction restarts the review delay; corrections stop two review delays after the resolver's window opens.",
+  "A fallback resolver can propose only if no timely proposal exists, and cannot replace one.": "A fallback resolver can propose only if no timely proposal exists, and cannot replace one.",
+  "If a configured fallback deadline passes with no proposal, anyone can finalize the market as Invalid.": "If a configured fallback deadline passes with no proposal, anyone can finalize the market as Invalid.",
+  "Anyone can finalize a proposal once its review delay ends.": "Anyone can finalize a proposal once its review delay ends.",
+  "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.",
+  "After handover, the fallback resolver can correct a pending primary proposal.": "After handover, the fallback resolver can correct a pending primary proposal.",
+  "If the fallback deadline passes with no proposal, the market stays unresolved.": "If the fallback deadline passes with no proposal, the market stays unresolved.",
+  "Only the operator can finalize a proposal once its review delay ends.": "Only the operator can finalize a proposal once its review delay ends."
 }

@@ -967,5 +967,15 @@
   "Set up multi-outcome market": "बहु-परिणाम बाज़ार बनाएँ",
   "the transaction size limit was reached; submit again to continue": "लेन-देन के आकार की सीमा पहुँच गई; जारी रखने के लिए फिर से सबमिट करें",
   "{value0} via {value1}": "{value1} से {value0}",
-  "Includes {value0} orders that match through a complete YES+NO set.": "इसमें {value0} ऑर्डर शामिल हैं जो पूरे YES+NO सेट के ज़रिए मिलते हैं।"
+  "Includes {value0} orders that match through a complete YES+NO set.": "इसमें {value0} ऑर्डर शामिल हैं जो पूरे YES+NO सेट के ज़रिए मिलते हैं।",
+  "How resolution works on Solana": "Solana पर समाधान कैसे होता है",
+  "How resolution works on Canton": "Canton पर समाधान कैसे होता है",
+  "The creator proposes after trading closes. Each correction restarts the review delay; corrections stop two review delays after the resolver's window opens.": "ट्रेडिंग बंद होने के बाद निर्माता प्रस्ताव देता है। हर सुधार समीक्षा अवधि फिर से शुरू करता है; रिज़ॉल्वर की विंडो खुलने के दो समीक्षा अवधियों बाद सुधार बंद हो जाते हैं।",
+  "A fallback resolver can propose only if no timely proposal exists, and cannot replace one.": "फ़ॉलबैक रिज़ॉल्वर तभी प्रस्ताव दे सकता है जब समय पर कोई प्रस्ताव न हो, और वह उसे बदल नहीं सकता।",
+  "If a configured fallback deadline passes with no proposal, anyone can finalize the market as Invalid.": "यदि तय फ़ॉलबैक समय-सीमा बिना प्रस्ताव के बीत जाए, तो कोई भी बाज़ार को Invalid के रूप में अंतिम कर सकता है।",
+  "Anyone can finalize a proposal once its review delay ends.": "समीक्षा अवधि समाप्त होने पर कोई भी प्रस्ताव को अंतिम कर सकता है।",
+  "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "ट्रेडिंग बंद होने के बाद निर्माता प्रस्ताव देता है। समीक्षा समाप्त होने तक हर सुधार समीक्षा अवधि फिर से शुरू करता है।",
+  "After handover, the fallback resolver can correct a pending primary proposal.": "हैंडओवर के बाद, फ़ॉलबैक रिज़ॉल्वर लंबित प्राथमिक प्रस्ताव को सुधार सकता है।",
+  "If the fallback deadline passes with no proposal, the market stays unresolved.": "यदि फ़ॉलबैक समय-सीमा बिना प्रस्ताव के बीत जाए, तो बाज़ार अनसुलझा रहता है।",
+  "Only the operator can finalize a proposal once its review delay ends.": "समीक्षा अवधि समाप्त होने पर केवल ऑपरेटर ही प्रस्ताव को अंतिम कर सकता है।"
 }
