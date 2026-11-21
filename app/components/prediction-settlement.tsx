@@ -37,6 +37,7 @@ import {
 } from "./prediction/position-actions";
 import { PredictionResolutionSummary } from "./prediction/resolution-summary";
 import { predictionCloseLabel } from "../lib/prediction-display";
+import { correctionOpen } from "../lib/correction-window";
 import { useProtocolRole } from "./protocol-role-provider";
 interface Props {
   address: PublicKey;
@@ -265,6 +266,17 @@ function Settlement({
   const maturity = market.proposal
     ? market.proposal.proposedAt.add(market.resolutionDelaySeconds)
     : null;
+  const correctable = correctionOpen(
+    {
+      closeTs: market.closeTs,
+      earliestResolutionTs: market.earliestResolutionTs,
+      resolutionDelaySeconds: market.resolutionDelaySeconds,
+      fallbackPhase: "fallback" in market.resolutionPhase,
+      fallbackAvailableTs: market.fallback?.availableTs ?? null,
+    },
+    maturity,
+    now,
+  );
   return (
     <section className="admin-card prediction-settlement">
       <h2>
@@ -421,7 +433,7 @@ function Settlement({
                     !hash ||
                     !uri ||
                     !proposalWindow ||
-                    (status === "proposed" && !!maturity && now.gte(maturity))
+                    (status === "proposed" && !correctable)
                   }
                   onClick={() => void act("propose")}
                 >

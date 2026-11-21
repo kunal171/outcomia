@@ -256,6 +256,39 @@ test("resolution follows stored phase, earliest time, review maturity and exclus
   assert.equal(available(primaryProposal, maker, false, 180).canTimeout, false);
 });
 
+test("primary corrections stop at earliest resolution plus two review delays", () => {
+  const { resolutionAvailability: available } = loadTypeScript(
+    new URL("../lib/multi-outcome-lifecycle.ts", import.meta.url),
+  );
+  // No fallback: earliest 110 + 2 * 20 gives a correction deadline of 150.
+  const proposed = {
+    terms: {
+      ...terms,
+      closeTs: new BN(100),
+      earliestResolutionTs: new BN(110),
+      resolutionDelaySeconds: new BN(20),
+      fallback: null,
+    },
+    status: { proposed: {} },
+    resolutionPhase: { primary: {} },
+    proposal: {
+      proposedAt: new BN(140),
+      outcome: { winner: [[0]] },
+      evidenceUri: "ar://proof",
+      evidenceHash: Array(32).fill(1),
+    },
+    finalOutcome: null,
+  };
+  assert.equal(
+    available(proposed, owner, true, 149).correctionDeadline.toNumber(),
+    150,
+  );
+  assert.equal(available(proposed, owner, true, 149).canPropose, true);
+  // Still before maturity (160), but the correction window has closed.
+  assert.equal(available(proposed, owner, true, 150).canPropose, false);
+  assert.equal(available(proposed, owner, false, 160).canFinalize, true);
+});
+
 test("mutable owner/market account scans bypass discovery cache", async () => {
   const { createRpcFetch } = loadTypeScript(
     new URL("../lib/rpc-transport.ts", import.meta.url),

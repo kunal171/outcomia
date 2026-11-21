@@ -12374,6 +12374,11 @@
       "code": 6171,
       "name": "SpotIncrementsTooFine",
       "msg": "Price tick times quantity lot must be at least one whole base token"
+    },
+    {
+      "code": 6172,
+      "name": "PredictionCorrectionWindowClosed",
+      "msg": "The correction window for this resolver phase has closed"
     }
   ],
   "types": [
