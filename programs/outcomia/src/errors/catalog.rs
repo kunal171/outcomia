@@ -482,4 +482,6 @@ pub enum OutcomiaError {
     SpotIncrementsTooFine = 171,
     #[msg("The correction window for this resolver phase has closed")]
     PredictionCorrectionWindowClosed = 172,
+    #[msg("A complementary match needs the other outcome on the same side of a binary book")]
+    InvalidComplementMatch = 173,
 }

@@ -245,12 +245,332 @@ pub fn calculate_settlement(
     })
 }
 
+/// One complementary YES/NO fill between a taker and the other outcome's maker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ComplementPlan {
+    /// Whole contracts minted (two buys) or merged (two sells).
+    pub quantity: u64,
+    /// Collateral the maker pays (buy) or receives (sell): its own price per contract.
+    pub maker_amount: u64,
+    /// Collateral the taker pays (buy) or receives (sell): payout minus the maker price.
+    pub taker_amount: u64,
+    /// Collateral entering (mint) or leaving (merge) the market reserve.
+    pub reserve_amount: u64,
+    /// Amount removed from the maker's locked bucket: cash for a buy, contracts for a sell.
+    pub maker_locked_debit: u64,
+    /// Unused buy collateral returned to the maker when its order completes.
+    pub maker_quote_refund: u64,
+    pub maker_fully_filled: bool,
+}
+
+/// Plans a complementary binary fill at the resting maker's price.
+///
+/// A YES order and a NO order on the same side cross through the complete set:
+/// two buys whose prices sum to at least the payout fund a new YES+NO pair
+/// (mint); two sells whose prices sum to at most the payout redeem one (merge).
+/// The maker keeps its own price and the taker receives any improvement, as in
+/// direct matching. Example with payout 1,000,000: a resting NO bid at 400,000
+/// and a YES bid limit of 650,000 mint at 600,000 for the taker; the maker pays
+/// 400,000 and 1,000,000 enters the reserve per contract.
+///
+/// # Inputs
+/// Taker side/limit/remaining whole contracts; maker side/price/remaining/locked
+/// collateral; the market's payout per contract.
+///
+/// # Errors
+/// `InvalidComplementMatch` for different sides or out-of-range prices,
+/// `OrdersDoNotCross`, `InvalidQuantity`, overflow or inconsistent maker collateral.
+///
+/// # Returns
+/// Exact integer amounts; maker + taker amounts always equal the reserve amount.
+#[allow(clippy::too_many_arguments)]
+pub fn calculate_complement(
+    taker_side: OrderSide,
+    taker_limit_price: u64,
+    taker_remaining: u64,
+    maker_side: OrderSide,
+    maker_price: u64,
+    maker_remaining: u64,
+    maker_locked_collateral: u64,
+    payout: u64,
+) -> Result<ComplementPlan> {
+    require!(
+        taker_side == maker_side
+            && maker_price > 0
+            && maker_price < payout
+            && taker_limit_price > 0
+            && taker_limit_price < payout,
+        matching::InvalidComplementMatch
+    );
+    // Prices are each below the payout, so u128 sums cannot overflow.
+    let combined = u128::from(taker_limit_price) + u128::from(maker_price);
+    require!(
+        match taker_side {
+            OrderSide::Bid => combined >= u128::from(payout),
+            OrderSide::Ask => combined <= u128::from(payout),
+        },
+        matching::OrdersDoNotCross
+    );
+    let quantity = taker_remaining.min(maker_remaining);
+    require!(quantity > 0, order::InvalidQuantity);
+    let amount = |price: u64| {
+        u64::try_from(u128::from(price) * u128::from(quantity))
+            .map_err(|_| error!(order::OrderNotionalOverflow))
+    };
+    let maker_amount = amount(maker_price)?;
+    let taker_amount = amount(payout - maker_price)?;
+    let reserve_amount = amount(payout)?;
+    let maker_fully_filled = quantity == maker_remaining;
+    let (maker_locked_debit, maker_quote_refund) = match maker_side {
+        OrderSide::Bid => {
+            let debit = if maker_fully_filled {
+                maker_locked_collateral
+            } else {
+                maker_amount
+            };
+            require!(
+                debit >= maker_amount && maker_locked_collateral >= debit,
+                matching::InvalidMakerCollateral
+            );
+            (debit, debit - maker_amount)
+        }
+        OrderSide::Ask => {
+            require!(
+                maker_locked_collateral == maker_remaining,
+                matching::InvalidMakerCollateral
+            );
+            (quantity, 0)
+        }
+    };
+    Ok(ComplementPlan {
+        quantity,
+        maker_amount,
+        taker_amount,
+        reserve_amount,
+        maker_locked_debit,
+        maker_quote_refund,
+        maker_fully_filled,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const BASE_DECIMALS: u8 = 6;
     const MAKER_PRICE: u64 = 25_000_000;
+
+    const PAYOUT: u64 = 1_000_000;
+
+    #[test]
+    fn complementary_buys_mint_at_the_maker_price() {
+        // Resting NO bid 0.40 x 5; taker YES bid limit 0.65 x 3.
+        let plan = calculate_complement(
+            OrderSide::Bid,
+            650_000,
+            3,
+            OrderSide::Bid,
+            400_000,
+            5,
+            2_000_000,
+            PAYOUT,
+        )
+        .unwrap();
+        assert_eq!(plan.quantity, 3);
+        assert_eq!(plan.maker_amount, 1_200_000);
+        assert_eq!(plan.taker_amount, 1_800_000); // 0.60 each: improvement goes to the taker
+        assert_eq!(plan.reserve_amount, 3_000_000);
+        assert_eq!(plan.maker_amount + plan.taker_amount, plan.reserve_amount);
+        assert_eq!(
+            (plan.maker_locked_debit, plan.maker_quote_refund),
+            (1_200_000, 0)
+        );
+        assert!(!plan.maker_fully_filled);
+    }
+
+    #[test]
+    fn complementary_sells_merge_at_the_maker_price() {
+        // Resting NO ask 0.30 x 2 (locks 2 contracts); taker YES ask limit 0.60 x 4.
+        let plan = calculate_complement(
+            OrderSide::Ask,
+            600_000,
+            4,
+            OrderSide::Ask,
+            300_000,
+            2,
+            2,
+            PAYOUT,
+        )
+        .unwrap();
+        assert_eq!(plan.quantity, 2);
+        assert_eq!(plan.maker_amount, 600_000);
+        assert_eq!(plan.taker_amount, 1_400_000); // 0.70 each, above the 0.60 limit
+        assert_eq!(plan.reserve_amount, 2_000_000);
+        assert_eq!((plan.maker_locked_debit, plan.maker_quote_refund), (2, 0));
+        assert!(plan.maker_fully_filled);
+    }
+
+    #[test]
+    fn complement_crossing_boundaries_are_exact() {
+        // Buys cross at a combined price of exactly one payout, not below it.
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            600_000,
+            1,
+            OrderSide::Bid,
+            400_000,
+            1,
+            400_000,
+            PAYOUT
+        )
+        .is_ok());
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            590_000,
+            1,
+            OrderSide::Bid,
+            400_000,
+            1,
+            400_000,
+            PAYOUT
+        )
+        .is_err());
+        // Sells cross at a combined price of exactly one payout, not above it.
+        assert!(calculate_complement(
+            OrderSide::Ask,
+            600_000,
+            1,
+            OrderSide::Ask,
+            400_000,
+            1,
+            1,
+            PAYOUT
+        )
+        .is_ok());
+        assert!(calculate_complement(
+            OrderSide::Ask,
+            610_000,
+            1,
+            OrderSide::Ask,
+            400_000,
+            1,
+            1,
+            PAYOUT
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn complement_rejects_mismatched_sides_and_bad_prices() {
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            700_000,
+            1,
+            OrderSide::Ask,
+            400_000,
+            1,
+            1,
+            PAYOUT
+        )
+        .is_err());
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            700_000,
+            1,
+            OrderSide::Bid,
+            PAYOUT,
+            1,
+            PAYOUT,
+            PAYOUT
+        )
+        .is_err());
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            PAYOUT,
+            1,
+            OrderSide::Bid,
+            400_000,
+            1,
+            400_000,
+            PAYOUT
+        )
+        .is_err());
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            700_000,
+            0,
+            OrderSide::Bid,
+            400_000,
+            1,
+            400_000,
+            PAYOUT
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn completed_complement_buy_refunds_excess_lock_and_checks_backing() {
+        // A maker bid holding more than its remaining notional returns the excess.
+        let plan = calculate_complement(
+            OrderSide::Bid,
+            700_000,
+            2,
+            OrderSide::Bid,
+            400_000,
+            2,
+            800_005,
+            PAYOUT,
+        )
+        .unwrap();
+        assert_eq!(
+            (plan.maker_locked_debit, plan.maker_quote_refund),
+            (800_005, 5)
+        );
+        // Underfunded bids and mismatched ask locks are rejected.
+        assert!(calculate_complement(
+            OrderSide::Bid,
+            700_000,
+            2,
+            OrderSide::Bid,
+            400_000,
+            2,
+            799_999,
+            PAYOUT
+        )
+        .is_err());
+        assert!(calculate_complement(
+            OrderSide::Ask,
+            500_000,
+            1,
+            OrderSide::Ask,
+            400_000,
+            2,
+            1,
+            PAYOUT
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn complement_amounts_never_create_or_lose_collateral() {
+        for maker_price in (10_000..PAYOUT).step_by(70_000) {
+            for quantity in [1_u64, 3, 7, 1_000] {
+                let plan = calculate_complement(
+                    OrderSide::Bid,
+                    PAYOUT - 10_000,
+                    quantity,
+                    OrderSide::Bid,
+                    maker_price,
+                    quantity,
+                    maker_price * quantity,
+                    PAYOUT,
+                )
+                .unwrap();
+                assert_eq!(plan.maker_amount + plan.taker_amount, plan.reserve_amount);
+                assert!(plan.taker_amount <= (PAYOUT - 10_000) * quantity);
+            }
+        }
+    }
 
     #[test]
     fn spot_increments_must_cover_one_whole_base_token() {
