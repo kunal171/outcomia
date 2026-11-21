@@ -3,7 +3,7 @@ import { useIndexerUpdates } from "../use-indexer-updates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@anchor-lang/core";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { unpackMint, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { accountInfos } from "../../lib/indexed-accounts";
 import {
@@ -121,7 +121,9 @@ export function useMultiMarket(address: string) {
       ++generation.current;
     };
   }, [refresh]);
-  const send = async (build: () => Promise<Transaction>) => {
+  const send = async (
+    build: () => Promise<Transaction | VersionedTransaction>,
+  ) => {
     if (lock.current) return false;
     if (!MULTI_OUTCOME_ENABLED || !wallet || !signed) {
       setError("Connect a wallet to a verified multi-outcome deployment.");
@@ -134,7 +136,13 @@ export function useMultiMarket(address: string) {
     const expected = owner;
     try {
       const tx = await build();
-      transactionBytes(tx, wallet.publicKey);
+      // v0 serialization does not enforce the packet limit; check it here.
+      if (tx instanceof VersionedTransaction) {
+        if (tx.serialize().length > 1232)
+          throw new Error(
+            "Transaction exceeds 1,232 bytes. Submit a smaller quantity.",
+          );
+      } else transactionBytes(tx, wallet.publicKey);
       if (!mounted.current || live.current !== expected)
         throw new Error("Wallet changed. Refresh before signing.");
       const result = await (signed.provider as AnchorProvider).sendAndConfirm(
