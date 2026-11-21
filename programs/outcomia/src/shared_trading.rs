@@ -157,6 +157,27 @@ pub fn order_terms(
     ))
 }
 
+/// Inputs: book, resting slot, side and price. Errors: none.
+/// Returns: whether a new prediction order would cross the other outcome's best
+/// same-side price through the complete set: two bids summing to at least the
+/// payout, or two asks summing to at most it. Such an order must be matched
+/// with `match_shared_complement` instead of resting. Spot books never cross
+/// this way.
+pub fn crosses_complement(book: &SharedBook, slot: usize, side: OrderSide, price: u64) -> bool {
+    if book.kind != MarketKind::Prediction {
+        return false;
+    }
+    // Prediction slots: YES bid 0, YES ask 1, NO bid 2, NO ask 3.
+    let Some(other) = book.best_prices[slot ^ 2] else {
+        return false;
+    };
+    let combined = u128::from(price) + u128::from(other);
+    match side {
+        OrderSide::Bid => combined >= u128::from(book.payout_per_contract),
+        OrderSide::Ask => combined <= u128::from(book.payout_per_contract),
+    }
+}
+
 /// Inputs: raw price/quantity and immutable precision. Errors: scale/result overflow.
 /// Returns: floor(price * base_atoms / 10^base_decimals); prediction uses whole contracts.
 pub fn quote_amount(book: &SharedBook, price: u64, quantity: u64) -> Result<u64> {
