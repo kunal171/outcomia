@@ -4,8 +4,9 @@ Binary shared books keep separate YES and NO queues. Before this change a YES
 buy at 0.60 and a NO buy at 0.40 never traded, although together they fully
 fund a new YES+NO pair. Complementary matching lets orders on the **same side
 of the two outcomes** trade through the complete set, so both books share
-liquidity. It applies to shared binary books only; legacy per-market books and
-multi-outcome markets are unchanged (N-way matching is separate future work).
+liquidity. It applies to shared binary books and, as N-way full sets, to
+multi-outcome books (see [multi-outcome full sets](#multi-outcome-full-sets));
+legacy per-market books are unchanged.
 
 ## Rules
 
@@ -72,3 +73,42 @@ ledger changes are atomic.
   the taker's outcome at `P − q` with the fee, and the maker's outcome at `q`
   without one. A migration stores each binary market's payout and rebuilds the
   instruction-derived history once.
+
+## Multi-outcome full sets
+
+With `N` outcomes (2–8), a set needs one contract of every outcome. A taker
+buying outcome `i` at limit `L` fills against the **best bid of every other
+outcome** when `L + Σ bᵢ ≥ P`; a taker selling fills against every other
+outcome's best ask when `L + Σ aᵢ ≤ P`. Each maker keeps its own price and the
+taker trades at `P − Σ` maker prices. A mint moves `P × n` into the question
+reserve and raises every outcome's supply by `n`; a merge does the reverse, so
+supplies stay equal and exact Invalid refunds (`P / N` per contract) still hold.
+The fill size is the smallest of the taker's and the heads' remaining amounts.
+
+Example with three outcomes: bids of 0.30 (B) and 0.25 (C) let a buyer of A
+with limit 0.50 buy at 0.45; for 6 contracts the B and C makers pay 1.80 and
+1.50, the taker 2.70, and 6.00 enters the reserve.
+
+- **Program:** `match_multi_outcome_complement(outcome, taker_side,
+  limit_price, quantity, expected_fee_bps)`. Makers are the book's own head
+  references, passed as remaining accounts `[order, next, cash, position]` per
+  other outcome in outcome order (`next` is the program ID unless the head fills
+  completely and has a successor). One owner may hold several heads; cash and
+  position accounts are loaded and written once per address. Placement rejects
+  an order that would complete a set at rest. An eight-outcome mint uses about
+  107,000 compute units.
+- **Events and indexer:** each leg emits the existing `MultiOutcomeFillEvent`,
+  makers at their price without a fee and the taker at `P − Σ` with the fee and
+  the default address as counterparty, so indexers record per-outcome trades
+  without a decoder change.
+- **App:** the multi-outcome ticket compares the best direct maker with the
+  full-set price and takes the better one; the trade view shows prices reachable
+  through the other outcomes. Same rollout flag as binary matching.
+- **Transaction size:** the client sends legacy transactions. With distinct
+  maker wallets, a full set fits for three to six outcomes, for seven only when
+  no head completes, and not for eight; shared maker wallets need fewer
+  accounts. When a full set does not fit, the planner uses direct liquidity or
+  explains resting below the full-set price. Versioned transactions with
+  address lookup tables would lift this client limit; the program already
+  accepts every size.
+
