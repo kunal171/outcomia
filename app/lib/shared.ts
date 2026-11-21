@@ -5,11 +5,16 @@ import { BN, type Program } from "@anchor-lang/core";
 import {
   PublicKey,
   SystemProgram,
+  Transaction,
   type TransactionInstruction,
-  type Transaction,
 } from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
-import { deriveProtocolConfigPda } from "./outcomia";
+import {
+  TOKEN_PROGRAM_ID,
+  deriveProtocolConfigPda,
+  deriveVaultAuthorityPda,
+  deriveVaultPda,
+} from "./outcomia";
 import { derivePredictionPositionPda } from "./prediction";
 export const SHARED_BALANCES_ENABLED =
   process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED === "true";
@@ -210,7 +215,24 @@ export async function cancelShared(
     )
     .instruction();
 }
+/** Whether a legacy transaction with these instructions fits one packet.
+ * The placeholder blockhash has the same encoded size as a real one. */
+function fitsPacket(instructions: TransactionInstruction[], owner: PublicKey) {
+  const tx = new Transaction().add(...instructions);
+  tx.feePayer = owner;
+  tx.recentBlockhash = PublicKey.default.toBase58();
+  try {
+    tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+    return true;
+  } catch {
+    return false;
+  }
+}
 /** Plans at most three makers atomically, then posts only a noncrossing remainder.
+ * On binary books, liquidity on the other outcome's same side also crosses
+ * through the complete set: a NO bid at 0.40 sells YES at an effective 0.60.
+ * Makers are taken in effective-price order (direct first on ties). `prefix`
+ * holds instructions already in the transaction so the packet check is exact.
  * Local copies model removed heads so later instructions use the repaired FIFO.
  * The program rechecks every price, link, balance and cutoff during execution. */
 export async function buildSharedTrade(
@@ -221,6 +243,7 @@ export async function buildSharedTrade(
   side: Side,
   price: BN,
   quantity: BN,
+  prefix: TransactionInstruction[] = [],
 ) {
   if (
     price.lten(0) ||
@@ -245,6 +268,12 @@ export async function buildSharedTrade(
   if (notional.isZero() || notional.bitLength() > 64)
     throw new Error("Order value is zero or exceeds u64");
   const opposite: Side = side === "bid" ? "ask" : "bid";
+  const other: Outcome | null = prediction
+    ? outcome === "yes"
+      ? "no"
+      : "yes"
+    : null;
+  const payout = s.book.payoutPerContract;
   const orders = s.orders
     .filter((r) => "open" in r.account.status)
     .map((r) => ({ publicKey: r.publicKey, account: { ...r.account } }));
@@ -252,25 +281,57 @@ export async function buildSharedTrade(
     publicKey: r.publicKey,
     account: { ...r.account },
   }));
-  let remaining = quantity.clone(),
-    fills = 0;
-  const instructions: TransactionInstruction[] = [];
+  type Level = (typeof levels)[number];
+  type Candidate = {
+    level: Level;
+    makerOutcome: Outcome;
+    makerSide: Side;
+    complement: boolean;
+    effective: BN;
+  };
+  const live = (r: Level, o: Outcome, sd: Side) =>
+    o in r.account.outcome &&
+    sd in r.account.side &&
+    r.account.orderCount.gtn(0);
+  const candidates = (): Candidate[] =>
+    [
+      ...levels
+        .filter((r) => live(r, outcome, opposite))
+        .map((level) => ({
+          level,
+          makerOutcome: outcome,
+          makerSide: opposite,
+          complement: false,
+          effective: level.account.price,
+        })),
+      ...(other
+        ? levels
+            .filter((r) => live(r, other, side))
+            .map((level) => ({
+              level,
+              makerOutcome: other,
+              makerSide: side,
+              complement: true,
+              effective: payout.sub(level.account.price),
+            }))
+        : []),
+    ].sort((a, b) => {
+      const byPrice =
+        side === "bid"
+          ? a.effective.cmp(b.effective)
+          : b.effective.cmp(a.effective);
+      return byPrice || Number(a.complement) - Number(b.complement);
+    });
   const crossing = (v: BN) => (side === "bid" ? price.gte(v) : price.lte(v));
+  let remaining = quantity.clone(),
+    fills = 0,
+    packetFull = false;
+  const instructions: TransactionInstruction[] = [];
+  const t = traderAccounts(s.book, owner);
   while (remaining.gtn(0) && fills < 3) {
-    const candidates = levels
-      .filter(
-        (r) =>
-          outcome in r.account.outcome &&
-          opposite in r.account.side &&
-          r.account.orderCount.gtn(0),
-      )
-      .sort((a, b) =>
-        opposite === "ask"
-          ? a.account.price.cmp(b.account.price)
-          : b.account.price.cmp(a.account.price),
-      );
-    const l = candidates[0];
-    if (!l || !crossing(l.account.price)) break;
+    const best = candidates()[0];
+    if (!best || !crossing(best.effective)) break;
+    const l = best.level;
     const maker = orders.find((r) => r.publicKey.equals(l.account.firstOrder!));
     if (!maker) throw new Error("FIFO head missing; refresh");
     if (maker.account.owner.equals(owner))
@@ -280,35 +341,75 @@ export async function buildSharedTrade(
     const fill = BN.min(remaining, maker.account.remainingQuantity),
       full = fill.eq(maker.account.remainingQuantity),
       last = full && l.account.orderCount.eqn(1);
-    const m = traderAccounts(s.book, maker.account.owner),
-      t = traderAccounts(s.book, owner);
-    instructions.push(
-      await p.methods
-        .matchSharedOrder(variant(outcome), variant(side), price, remaining)
-        .accountsPartial(
-          optionalAccounts({
-            taker: owner,
-            market: s.book.market,
-            book: s.key,
-            protocolConfig: deriveProtocolConfigPda(),
-            makerOrder: maker.publicKey,
-            priceLevel: l.publicKey,
-            makerBase: m.baseBalance,
-            makerQuote: m.quoteBalance,
-            makerPosition: m.position,
-            takerBase: t.baseBalance,
-            takerQuote: t.quoteBalance,
-            takerPosition: t.position,
-            nextOrder: full ? maker.account.nextOrder : null,
-            worseLevel:
-              last && l.account.worsePrice
-                ? sharedLevelPda(s.key, outcome, opposite, l.account.worsePrice)
-                : null,
-            levelRentRecipient: last ? l.account.rentPayer : null,
-          }),
-        )
-        .instruction(),
-    );
+    const m = traderAccounts(s.book, maker.account.owner);
+    const removal = {
+      nextOrder: full ? maker.account.nextOrder : null,
+      worseLevel:
+        last && l.account.worsePrice
+          ? sharedLevelPda(
+              s.key,
+              best.makerOutcome,
+              best.makerSide,
+              l.account.worsePrice,
+            )
+          : null,
+      levelRentRecipient: last ? l.account.rentPayer : null,
+    };
+    const ix = best.complement
+      ? await p.methods
+          .matchSharedComplement(
+            variant(outcome),
+            variant(side),
+            price,
+            remaining,
+          )
+          .accountsPartial(
+            optionalAccounts({
+              taker: owner,
+              market: s.book.market,
+              book: s.key,
+              protocolConfig: deriveProtocolConfigPda(),
+              makerOrder: maker.publicKey,
+              priceLevel: l.publicKey,
+              makerQuote: m.quoteBalance,
+              makerPosition: m.position,
+              takerQuote: t.quoteBalance,
+              takerPosition: t.position,
+              mint: s.book.quoteMint,
+              assetAuthority: assetAuthorityPda(s.book.quoteMint),
+              assetVault: assetVaultPda(s.book.quoteMint),
+              marketAuthority: deriveVaultAuthorityPda(s.book.market),
+              marketVault: deriveVaultPda(s.book.market, s.book.quoteMint),
+              tokenProgram: TOKEN_PROGRAM_ID,
+              ...removal,
+            }),
+          )
+          .instruction()
+      : await p.methods
+          .matchSharedOrder(variant(outcome), variant(side), price, remaining)
+          .accountsPartial(
+            optionalAccounts({
+              taker: owner,
+              market: s.book.market,
+              book: s.key,
+              protocolConfig: deriveProtocolConfigPda(),
+              makerOrder: maker.publicKey,
+              priceLevel: l.publicKey,
+              makerBase: m.baseBalance,
+              makerQuote: m.quoteBalance,
+              makerPosition: m.position,
+              takerBase: t.baseBalance,
+              takerQuote: t.quoteBalance,
+              takerPosition: t.position,
+              ...removal,
+            }),
+          )
+          .instruction();
+    if (!fitsPacket([...prefix, ...instructions, ix], owner)) {
+      packetFull = true;
+      break;
+    }
+    instructions.push(ix);
     remaining = remaining.sub(fill);
     fills++;
     maker.account.remainingQuantity = maker.account.remainingQuantity.sub(fill);
@@ -324,19 +425,17 @@ export async function buildSharedTrade(
       const next = levels.find(
         (r) =>
           l.account.worsePrice?.eq(r.account.price) &&
-          outcome in r.account.outcome &&
-          opposite in r.account.side,
+          best.makerOutcome in r.account.outcome &&
+          best.makerSide in r.account.side,
       );
       if (next) next.account.betterPrice = null;
     }
   }
-  const blocked = levels.some(
-    (r) =>
-      outcome in r.account.outcome &&
-      opposite in r.account.side &&
-      r.account.orderCount.gtn(0) &&
-      crossing(r.account.price),
-  );
+  // Direct or complementary liquidity that still crosses forbids a resting
+  // remainder; the program rejects both kinds of crossed placement.
+  const blocked =
+    remaining.gtn(0) &&
+    (packetFull || candidates().some((c) => crossing(c.effective)));
   // A sub-atom-value remainder cannot rest. Keep it free rather than rolling
   // back valid earlier fills with a zero-notional placement instruction.
   const dust =
@@ -345,55 +444,59 @@ export async function buildSharedTrade(
       .mul(remaining)
       .div(new BN(10).pow(new BN(s.book.baseDecimals)))
       .isZero();
+  let unposted = false;
   if (remaining.gtn(0) && !blocked && !dust) {
-    const same = levels.filter(
-      (r) =>
-        outcome in r.account.outcome &&
-        side in r.account.side &&
-        r.account.orderCount.gtn(0),
-    );
+    const same = levels.filter((r) => live(r, outcome, side));
     const existing = same.find((r) => r.account.price.eq(price));
     const sorted = [...same.map((r) => r.account.price), price].sort((a, b) =>
         side === "bid" ? b.cmp(a) : a.cmp(b),
       ),
       at = sorted.findIndex((v) => v.eq(price));
-    instructions.push(
-      await p.methods
-        .placeSharedOrder(
-          variant(outcome),
-          variant(side),
-          price,
-          remaining,
-          s.book.nextOrderId,
-        )
-        .accountsPartial(
-          optionalAccounts({
-            owner,
-            market: s.book.market,
-            book: s.key,
-            ...traderAccounts(s.book, owner),
-            order: sharedOrderPda(s.key, s.book.nextOrderId),
-            priceLevel: sharedLevelPda(s.key, outcome, side, price),
-            tail: existing?.account.lastOrder ?? null,
-            betterLevel:
-              !existing && at > 0
-                ? sharedLevelPda(s.key, outcome, side, sorted[at - 1])
-                : null,
-            worseLevel:
-              !existing && at < sorted.length - 1
-                ? sharedLevelPda(s.key, outcome, side, sorted[at + 1])
-                : null,
-            systemProgram: SystemProgram.programId,
-          }),
-        )
-        .instruction(),
-    );
+    const ix = await p.methods
+      .placeSharedOrder(
+        variant(outcome),
+        variant(side),
+        price,
+        remaining,
+        s.book.nextOrderId,
+      )
+      .accountsPartial(
+        optionalAccounts({
+          owner,
+          market: s.book.market,
+          book: s.key,
+          ...traderAccounts(s.book, owner),
+          order: sharedOrderPda(s.key, s.book.nextOrderId),
+          priceLevel: sharedLevelPda(s.key, outcome, side, price),
+          tail: existing?.account.lastOrder ?? null,
+          betterLevel:
+            !existing && at > 0
+              ? sharedLevelPda(s.key, outcome, side, sorted[at - 1])
+              : null,
+          worseLevel:
+            !existing && at < sorted.length - 1
+              ? sharedLevelPda(s.key, outcome, side, sorted[at + 1])
+              : null,
+          systemProgram: SystemProgram.programId,
+        }),
+      )
+      .instruction();
+    if (fitsPacket([...prefix, ...instructions, ix], owner))
+      instructions.push(ix);
+    else unposted = true;
   }
   return {
     instructions,
-    remaining: blocked || dust ? remaining : new BN(0),
+    remaining: blocked || dust || unposted ? remaining : new BN(0),
     fills,
-    stopReason: blocked ? "maker-limit" : dust ? "zero-notional" : null,
+    stopReason:
+      packetFull || unposted
+        ? "packet-limit"
+        : blocked
+          ? "maker-limit"
+          : dust
+            ? "zero-notional"
+            : null,
   };
 }
 

@@ -964,5 +964,8 @@
   "YesWins": "Gana YES",
   "Multi-outcome market": "Mercado de múltiples resultados",
   "Set 2–8 named outcomes with exactly one winner.": "Define entre 2 y 8 resultados con un único ganador.",
-  "Set up multi-outcome market": "Crear mercado de múltiples resultados"
+  "Set up multi-outcome market": "Crear mercado de múltiples resultados",
+  "the transaction size limit was reached; submit again to continue": "se alcanzó el límite de tamaño de la transacción; envía de nuevo para continuar",
+  "{value0} via {value1}": "{value0} vía {value1}",
+  "Includes {value0} orders that match through a complete YES+NO set.": "Incluye órdenes {value0} que se emparejan mediante un conjunto completo YES+NO."
 }

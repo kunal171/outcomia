@@ -964,5 +964,8 @@
   "YesWins": "YES जीता",
   "Multi-outcome market": "बहु-परिणाम बाज़ार",
   "Set 2–8 named outcomes with exactly one winner.": "2–8 नामित परिणाम तय करें, जिनमें ठीक एक विजेता हो।",
-  "Set up multi-outcome market": "बहु-परिणाम बाज़ार बनाएँ"
+  "Set up multi-outcome market": "बहु-परिणाम बाज़ार बनाएँ",
+  "the transaction size limit was reached; submit again to continue": "लेन-देन के आकार की सीमा पहुँच गई; जारी रखने के लिए फिर से सबमिट करें",
+  "{value0} via {value1}": "{value1} से {value0}",
+  "Includes {value0} orders that match through a complete YES+NO set.": "इसमें {value0} ऑर्डर शामिल हैं जो पूरे YES+NO सेट के ज़रिए मिलते हैं।"
 }

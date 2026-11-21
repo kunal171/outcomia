@@ -964,5 +964,8 @@
   "YesWins": "YesWins",
   "Multi-outcome market": "Multi-outcome market",
   "Set 2–8 named outcomes with exactly one winner.": "Set 2–8 named outcomes with exactly one winner.",
-  "Set up multi-outcome market": "Set up multi-outcome market"
+  "Set up multi-outcome market": "Set up multi-outcome market",
+  "the transaction size limit was reached; submit again to continue": "the transaction size limit was reached; submit again to continue",
+  "{value0} via {value1}": "{value0} via {value1}",
+  "Includes {value0} orders that match through a complete YES+NO set.": "Includes {value0} orders that match through a complete YES+NO set."
 }
