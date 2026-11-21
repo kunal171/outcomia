@@ -1,13 +1,29 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Transaction, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  TransactionMessage,
+  VersionedTransaction,
+  type AddressLookupTableAccount,
+} from "@solana/web3.js";
+import {
+  createMarketTableInstructions,
+  findMarketTable,
+} from "../../lib/market-lookup-table";
 import { parseTokenAmount, TOKEN_PROGRAM_ID } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 import { PROGRAM_ID } from "../../lib/solana";
-import { assetBalancePda, assetCustody } from "../../lib/shared";
+import {
+  COMPLEMENTARY_MATCHING_ENABLED,
+  assetBalancePda,
+  assetCustody,
+} from "../../lib/shared";
 import {
   buildMultiTrade,
+  fullSetQuote,
   multiBookPda,
   multiPositionPda,
   sideOf,
@@ -23,6 +39,49 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
     [quantity, setQuantity] = useState(""),
     [left, setLeft] = useState("");
   const now = useMarketClock();
+  // Large full sets need the market's frozen lookup table (see
+  // lib/market-lookup-table.ts). Only markets with six or more outcomes look.
+  const [table, setTable] = useState<AddressLookupTableAccount | null>(null),
+    [tableState, setTableState] = useState<
+      "unneeded" | "checking" | "missing" | "ready"
+    >("unneeded"),
+    [tableRevision, setTableRevision] = useState(0);
+  const marketKey = s.data?.key.toBase58(),
+    mintKey = s.data?.market.collateralMint.toBase58(),
+    outcomeCount = s.data?.market.terms.outcomeLabels.length ?? 0,
+    connection = s.reader.provider.connection;
+  useEffect(() => {
+    if (
+      !COMPLEMENTARY_MATCHING_ENABLED ||
+      !marketKey ||
+      !mintKey ||
+      outcomeCount < 6
+    ) {
+      setTable(null);
+      setTableState("unneeded");
+      return;
+    }
+    let active = true;
+    setTableState("checking");
+    findMarketTable(
+      connection,
+      new PublicKey(marketKey),
+      new PublicKey(mintKey),
+    )
+      .then((found) => {
+        if (!active) return;
+        setTable(found);
+        setTableState(found ? "ready" : "missing");
+      })
+      .catch(() => {
+        if (!active) return;
+        setTable(null);
+        setTableState("missing");
+      });
+    return () => {
+      active = false;
+    };
+  }, [connection, marketKey, mintKey, outcomeCount, tableRevision]);
   const d = s.data;
   if (!d) return null;
   const ready = !!s.signed && !!s.wallet && !s.busy && !s.loading;
@@ -36,6 +95,25 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       a.account.price.cmp(b.account.price) ||
       a.account.orderId.cmp(b.account.orderId),
   );
+  // Liquidity reachable through every other outcome's best order (full set).
+  const fullSetText =
+    COMPLEMENTARY_MATCHING_ENABLED && d.book
+      ? (["bid", "ask"] as const)
+          .map((q) => {
+            const quote = fullSetQuote(
+              d.market,
+              d.book!.book,
+              outcome,
+              q,
+              d.book!.rows,
+            );
+            return quote
+              ? `${q === "bid" ? "Buy" : "Sell"} via other outcomes: ${readableAmount(quote.price, d.decimals)} × ${quote.quantity.toString()}`
+              : null;
+          })
+          .filter(Boolean)
+          .join(" · ")
+      : "";
   return (
     <section aria-labelledby="multi-trade">
       <h2 id="multi-trade">Trade</h2>
@@ -77,6 +155,34 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
             </table>
           </div>
           {rows.length === 0 && <p>No resting orders for this outcome.</p>}
+          {fullSetText && <p className="multi-full-set">{fullSetText}</p>}
+          {tableState === "missing" && (
+            <p className="multi-full-set">
+              Full sets across this many outcomes need a one-time lookup table
+              for this market (about 0.003 SOL rent, never refunded).{" "}
+              <button
+                type="button"
+                disabled={s.busy || !s.wallet}
+                onClick={() =>
+                  void s
+                    .send(async () => {
+                      if (!s.wallet) throw new Error("Connect a wallet.");
+                      const slot = await connection.getSlot("finalized");
+                      const { instructions } = createMarketTableInstructions(
+                        s.wallet.publicKey,
+                        d.key,
+                        d.market.collateralMint,
+                        slot,
+                      );
+                      return new Transaction().add(...instructions);
+                    })
+                    .then((ok) => ok && setTableRevision((v) => v + 1))
+                }
+              >
+                Enable large full-set fills
+              </button>
+            </p>
+          )}
         </div>
         <div className="multi-card">
           <h3>Limit order</h3>
@@ -100,11 +206,23 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                     parseTokenAmount(price, d.decimals, "Price"),
                     whole(quantity),
                     d.feeBps,
+                    COMPLEMENTARY_MATCHING_ENABLED,
+                    [],
+                    table,
                   );
                   unsubmitted = plan.remaining.isZero()
                     ? ""
                     : plan.remaining.toString();
-                  return plan.transaction;
+                  if (!plan.lookupTable) return plan.transaction;
+                  const { blockhash } =
+                    await connection.getLatestBlockhash("confirmed");
+                  return new VersionedTransaction(
+                    new TransactionMessage({
+                      payerKey: s.wallet.publicKey,
+                      recentBlockhash: blockhash,
+                      instructions: plan.transaction.instructions,
+                    }).compileToV0Message([plan.lookupTable]),
+                  );
                 });
                 if (confirmed && unsubmitted !== null) {
                   setQuantity(unsubmitted);
