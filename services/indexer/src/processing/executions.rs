@@ -625,4 +625,112 @@ mod tests {
             3
         );
     }
+    async fn seed(pool: &PgPool, rows: Vec<(&str, Value, Value)>) {
+        sqlx::query(
+            "INSERT INTO backfill_checkpoints(program_id,completed) VALUES('program',TRUE)",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        for (index, (name, args, accounts)) in rows.into_iter().enumerate() {
+            let signature = format!("signature-{index}");
+            sqlx::query("INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES($1,100,$2,120,'[]')").bind(&signature).bind(index as i32).execute(pool).await.unwrap();
+            sqlx::query("INSERT INTO transaction_execution VALUES($1,'{}')")
+                .bind(&signature)
+                .execute(pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO instruction_decode_state(signature) VALUES($1)")
+                .bind(&signature)
+                .execute(pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES($1,0,$2,$3,$4)")
+                .bind(&signature)
+                .bind(name)
+                .bind(Json(args))
+                .bind(Json(accounts))
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn complementary_fills_record_both_outcomes_exactly_once(pool: PgPool) {
+        seed(
+            &pool,
+            vec![
+                ("initialize_protocol", json!({}), json!({})),
+                ("set_taker_fee", json!({"takerFeeBps":100}), json!({})),
+                (
+                    "initialize_prediction_market",
+                    json!({"config":{"payoutPerContract":"1000000"}}),
+                    json!({"market":"binary"}),
+                ),
+                (
+                    "place_shared_order",
+                    json!({"outcome":{"no":{}},"side":{"bid":{}},"price":"400000","quantity":"3"}),
+                    json!({"market":"binary","order":"no-bid","owner":"alice"}),
+                ),
+                (
+                    "match_shared_complement",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"2"}),
+                    json!({"market":"binary","makerOrder":"no-bid","taker":"bob"}),
+                ),
+                (
+                    "match_shared_complement",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"5"}),
+                    json!({"market":"binary","makerOrder":"no-bid","taker":"bob"}),
+                ),
+            ],
+        )
+        .await;
+        let client = Arc::new(RpcClient::new("http://127.0.0.1:1"));
+        replay(&pool, Arc::clone(&client)).await.unwrap();
+        replay(&pool, client).await.unwrap();
+        let trades: Vec<(String, String, String, String, String, String, String)> = sqlx::query_as(
+            "SELECT execution_id,outcome,maker,taker,price::text,quote_atoms::text,fee_atoms::text FROM indexed_trades ORDER BY transaction_index,execution_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let row = |id: &str, outcome: &str, price: &str, quote: &str, fee: &str| {
+            (
+                id.to_owned(),
+                outcome.to_owned(),
+                "alice".to_owned(),
+                "bob".to_owned(),
+                price.to_owned(),
+                quote.to_owned(),
+                fee.to_owned(),
+            )
+        };
+        // Each fill trades YES for the taker at 0.60 (fee 1%) and NO for the
+        // maker at 0.40 (no fee); the second fill is capped at the 1 remaining.
+        assert_eq!(
+            trades,
+            vec![
+                row("signature-4:ix:0", "0", "600000", "1200000", "12000"),
+                row("signature-4:ix:0:maker", "1", "400000", "800000", "0"),
+                row("signature-5:ix:0", "0", "600000", "600000", "6000"),
+                row("signature-5:ix:0:maker", "1", "400000", "400000", "0"),
+            ]
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT remaining::text FROM execution_orders WHERE address='no-bid'"
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+            "0"
+        );
+        assert!(
+            sqlx::query_scalar::<_, bool>("SELECT ready FROM execution_replay_state")
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        );
+    }
 }
