@@ -104,11 +104,19 @@ with limit 0.50 buy at 0.45; for 6 contracts the B and C makers pay 1.80 and
 - **App:** the multi-outcome ticket compares the best direct maker with the
   full-set price and takes the better one; the trade view shows prices reachable
   through the other outcomes. Same rollout flag as binary matching.
-- **Transaction size:** the client sends legacy transactions. With distinct
-  maker wallets, a full set fits for three to six outcomes, for seven only when
-  no head completes, and not for eight; shared maker wallets need fewer
-  accounts. When a full set does not fit, the planner uses direct liquidity or
-  explains resting below the full-set price. Versioned transactions with
-  address lookup tables would lift this client limit; the program already
-  accepts every size.
+- **Transaction size:** legacy transactions fit full sets for up to six
+  outcomes even with distinct maker wallets. Larger sets use a v0 transaction
+  with the market's address lookup table, which holds the instruction's nine
+  fixed accounts (`app/lib/market-lookup-table.ts`). The table is created,
+  filled and frozen in one transaction (about 0.003 SOL rent, never refunded),
+  so nobody can alter or close it; the trade view offers "Enable large
+  full-set fills" when it is missing, and discovery accepts only a frozen,
+  active table holding exactly those addresses in order. If every head would
+  complete (adding successor accounts), the planner fills one lot less so none
+  completes. The only remaining overflow is eight outcomes where every head
+  holds exactly one lot with a successor and a distinct wallet; the planner
+  then uses direct liquidity or asks to rest below the full-set price.
+  `app/scripts/local-full-set-e2e.mjs` checks the eight-outcome case end to end
+  on a local validator: a 1,018-byte v0 transaction using about 140,000
+  compute units with seven distinct maker wallets.
 

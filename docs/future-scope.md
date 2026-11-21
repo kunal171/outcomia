@@ -58,10 +58,9 @@ Keep the existing limit buy/sell, FIFO, partial-fill and atomic-settlement model
 Extend it to the new access rules and outcome structures.
 
 Binary and multi-outcome books share liquidity through collateral-backed
-complete sets ([complementary matching](complementary-matching.md)). Clients
-still use legacy transactions, which limit full sets of seven or eight
-outcomes with distinct makers; versioned transactions with address lookup
-tables would remove that limit. Matching must never create unbacked positions
+complete sets ([complementary matching](complementary-matching.md)), using
+v0 transactions with a per-market lookup table for the largest full sets.
+Matching must never create unbacked positions
 or bypass order limits, permissions or priority rules.
 
 ## Private markets and clubs
