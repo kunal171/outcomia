@@ -110,6 +110,11 @@ pub fn handle_place_multi_outcome_order(
             order::InvalidPrice
         );
     }
+    // Nor may it rest crossed through a full set with the other outcomes.
+    require!(
+        !rules::crosses_full_set(&ctx.accounts.book, e, outcome, side, price),
+        order::InvalidPrice
+    );
     let next = order_id.checked_add(1).ok_or(order::OrderIdOverflow)?;
     let i = usize::from(outcome.index());
     let lock = if side == OrderSide::Bid {
