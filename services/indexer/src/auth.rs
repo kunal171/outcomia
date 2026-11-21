@@ -358,6 +358,104 @@ pub fn router(state: AuthState) -> Router {
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
+    const SECRET: &str = "0123456789abcdef0123456789abcdef";
+    fn proxied(ip: &str, token: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(CLIENT_IP_HEADER, HeaderValue::from_str(ip).unwrap());
+        headers.insert(PROXY_TOKEN_HEADER, HeaderValue::from_str(token).unwrap());
+        headers
+    }
+    async fn lazy_state(secret: Option<&str>) -> AuthState {
+        let pool = PgPool::connect_lazy("postgres://unused/unused").unwrap();
+        state(pool, "http://localhost:3000")
+            .unwrap()
+            .with_proxy_secret(secret.map(str::to_owned))
+            .unwrap()
+    }
+    #[tokio::test]
+    async fn forwarded_client_ip_is_trusted_only_with_the_proxy_secret() {
+        let peer: SocketAddr = "10.0.0.9:443".parse().unwrap();
+        let state = lazy_state(Some(SECRET)).await;
+        let a = client_key(&state, &proxied("203.0.113.7", SECRET), Some(peer));
+        let b = client_key(&state, &proxied("203.0.113.8", SECRET), Some(peer));
+        assert_ne!(
+            a, b,
+            "distinct browsers behind the proxy get distinct buckets"
+        );
+        assert_eq!(a, hash("client:203.0.113.7"));
+        // A forged or missing token falls back to the TCP peer.
+        let forged = client_key(&state, &proxied("203.0.113.7", "wrong-secret"), Some(peer));
+        assert_eq!(forged, hash("peer:10.0.0.9"));
+        assert_eq!(client_key(&state, &HeaderMap::new(), Some(peer)), forged);
+        // An unparsable forwarded IP is never used.
+        assert_eq!(
+            client_key(&state, &proxied("not-an-ip", SECRET), Some(peer)),
+            forged
+        );
+        // Without a configured secret, forwarded headers are ignored entirely.
+        let open = lazy_state(None).await;
+        assert_eq!(
+            client_key(&open, &proxied("203.0.113.7", SECRET), Some(peer)),
+            forged
+        );
+        assert_eq!(client_key(&open, &HeaderMap::new(), None), hash("unknown"));
+    }
+    #[tokio::test]
+    async fn proxy_secret_must_be_long_and_compares_exactly() {
+        let pool = PgPool::connect_lazy("postgres://unused/unused").unwrap();
+        let base = state(pool, "http://localhost:3000").unwrap();
+        assert!(base
+            .clone()
+            .with_proxy_secret(Some("short".into()))
+            .is_err());
+        assert!(base.with_proxy_secret(Some(SECRET.into())).is_ok());
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"abcd"));
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn one_client_cycling_wallets_cannot_block_other_clients(pool: PgPool) {
+        use axum::{body::Body, http::Request};
+        use tower::ServiceExt;
+        let app = router(
+            state(pool, "http://localhost:3000")
+                .unwrap()
+                .with_proxy_secret(Some(SECRET.into()))
+                .unwrap(),
+        );
+        let ask = |ip: &str, seed: u8| {
+            let wallet = bs58::encode(
+                SigningKey::from_bytes(&[seed; 32])
+                    .verifying_key()
+                    .to_bytes(),
+            )
+            .into_string();
+            Request::builder()
+                .uri("/auth/challenge")
+                .method("POST")
+                .header("content-type", "application/json")
+                .header("origin", "http://localhost:3000")
+                .header(CLIENT_IP_HEADER, ip)
+                .header(PROXY_TOKEN_HEADER, SECRET)
+                .body(Body::from(serde_json::json!({"wallet":wallet}).to_string()))
+                .unwrap()
+        };
+        // The attacker rotates a fresh wallet on every request.
+        for seed in 1..=CHALLENGES_PER_CLIENT as u8 {
+            let response = app
+                .clone()
+                .oneshot(ask("198.51.100.1", seed))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+        let blocked = app.clone().oneshot(ask("198.51.100.1", 99)).await.unwrap();
+        assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
+        // Another browser is unaffected.
+        let other = app.clone().oneshot(ask("198.51.100.2", 100)).await.unwrap();
+        assert_eq!(other.status(), StatusCode::OK);
+    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires isolated PostgreSQL"]
     async fn challenge_replay_origin_and_session_rotation(pool: PgPool) {
