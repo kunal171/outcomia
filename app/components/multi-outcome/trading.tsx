@@ -5,9 +5,14 @@ import { Transaction, SystemProgram } from "@solana/web3.js";
 import { parseTokenAmount, TOKEN_PROGRAM_ID } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 import { PROGRAM_ID } from "../../lib/solana";
-import { assetBalancePda, assetCustody } from "../../lib/shared";
+import {
+  COMPLEMENTARY_MATCHING_ENABLED,
+  assetBalancePda,
+  assetCustody,
+} from "../../lib/shared";
 import {
   buildMultiTrade,
+  fullSetQuote,
   multiBookPda,
   multiPositionPda,
   sideOf,
@@ -36,6 +41,25 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       a.account.price.cmp(b.account.price) ||
       a.account.orderId.cmp(b.account.orderId),
   );
+  // Liquidity reachable through every other outcome's best order (full set).
+  const fullSetText =
+    COMPLEMENTARY_MATCHING_ENABLED && d.book
+      ? (["bid", "ask"] as const)
+          .map((q) => {
+            const quote = fullSetQuote(
+              d.market,
+              d.book!.book,
+              outcome,
+              q,
+              d.book!.rows,
+            );
+            return quote
+              ? `${q === "bid" ? "Buy" : "Sell"} via other outcomes: ${readableAmount(quote.price, d.decimals)} × ${quote.quantity.toString()}`
+              : null;
+          })
+          .filter(Boolean)
+          .join(" · ")
+      : "";
   return (
     <section aria-labelledby="multi-trade">
       <h2 id="multi-trade">Trade</h2>
@@ -77,6 +101,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
             </table>
           </div>
           {rows.length === 0 && <p>No resting orders for this outcome.</p>}
+          {fullSetText && <p className="multi-full-set">{fullSetText}</p>}
         </div>
         <div className="multi-card">
           <h3>Limit order</h3>

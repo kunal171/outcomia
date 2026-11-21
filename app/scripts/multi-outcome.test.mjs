@@ -606,3 +606,16 @@ test("oversized full sets fall back to direct liquidity, else explain the limit"
   const only = linkedBook(specs, 8);
   await assert.rejects(plan(only, 0, "bid", 800000, 3), /full-set price/);
 });
+
+test("full-set quotes price each outcome through the others' best orders", () => {
+  const f = linkedBook([
+    [1, "bid", 300000, 6, maker],
+    [2, "bid", 250000, 3, key(6)],
+    [1, "ask", 400000, 3, maker],
+  ]);
+  const buy = m.fullSetQuote(f.market, f.book, 0, "bid", f.rows);
+  assert.equal(buy.price.toString(), "450000");
+  assert.equal(buy.quantity.toString(), "3");
+  // Outcome 2 has no ask, so no full-set sell quote exists.
+  assert.equal(m.fullSetQuote(f.market, f.book, 0, "ask", f.rows), null);
+});

@@ -299,6 +299,35 @@ export async function readMultiBook(p: Program, market: PublicKey) {
   validateBook(market, book, rows);
   return { book, rows };
 }
+/** Effective price and size to buy (`side` "bid") or sell ("ask") `outcome`
+ * through a full set with every other outcome's best same-side order, or null.
+ * Buying takes payout minus the others' best bids; selling, minus their asks.
+ * Size is the smallest head remaining. Reads only the book's signed heads. */
+export function fullSetQuote(
+  m: MultiMarket,
+  book: Book,
+  outcome: number,
+  side: Side,
+  rows: Row[],
+) {
+  const count = m.terms.outcomeLabels.length;
+  const byKey = new Map(rows.map((r) => [r.publicKey.toBase58(), r.account]));
+  let sum = new BN(0),
+    size: BN | null = null;
+  for (let j = 0; j < count; j++) {
+    if (j === outcome) continue;
+    const ref = book.heads[slot(j, side)];
+    const order = ref && byKey.get(ref.order.toBase58());
+    if (!ref || !order) return null;
+    sum = sum.add(ref.price);
+    size = size
+      ? BN.min(size, order.remainingQuantity)
+      : order.remainingQuantity;
+  }
+  const payout = m.terms.payoutPerContract;
+  if (!size || sum.gte(payout)) return null;
+  return { price: payout.sub(sum), quantity: size };
+}
 /** Packs a bounded maker path and safe remainder. Never skips a crossing FIFO order.
  * With complementary matching, the best same-side order of every other outcome
  * also crosses through a full set: buying outcome i at price p fills against
