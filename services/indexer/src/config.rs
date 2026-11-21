@@ -28,6 +28,10 @@ pub struct Config {
 
     pub api_address: String,
     pub app_origin: String,
+
+    /// Shared secret proving that a forwarded client IP came from the app's
+    /// own server-side proxy. Unset means only TCP peer addresses are used.
+    pub proxy_secret: Option<String>,
 }
 
 impl Config {
@@ -58,6 +62,9 @@ impl Config {
             app_origin: env::var("APP_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".into()),
             health_address: env::var("HEALTH_ADDRESS")
                 .unwrap_or_else(|_| DEFAULT_HEALTH_ADDRESS.to_owned()),
+            proxy_secret: env::var("INDEXER_PROXY_SECRET")
+                .ok()
+                .filter(|v| !v.is_empty()),
         })
     }
 }

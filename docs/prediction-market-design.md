@@ -556,7 +556,8 @@ positive whole u64. Price is positive, below payout and divisible by the tick.
 
 This first path accepts only an empty selected outcome/side list. A buy at or
 above that outcome's best ask, or a sell at or below its best bid, is rejected.
-There is no cross-outcome matching. Same-price append uses its own instruction;
+This legacy path has no cross-outcome matching; shared books add it (see
+[complementary matching](complementary-matching.md)). Same-price append uses its own instruction;
 new-price insertion uses a separate instruction, and crossing orders use the matching path. The program does not silently create a crossed
 book or skip existing priority.
 

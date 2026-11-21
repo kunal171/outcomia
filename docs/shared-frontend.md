@@ -32,6 +32,22 @@ This boundary prevents accidental cross-network UI reads. It is not backend
 access control. Contracts must enforce trading permissions, collateral ownership
 and settlement rights independently.
 
+## Resolution differs by network
+
+The same UI shows binary markets from both networks, but their programs resolve
+them differently. Each market's rules view states its own network's rules
+(`components/resolution-policy.tsx`, text in `lib/resolution-policy.ts`):
+
+| Case | Solana | Canton |
+| --- | --- | --- |
+| Corrections | Restart the review delay; stop two review delays after the resolver's window opens | Restart the review delay, until the review ends |
+| Fallback versus a timely primary proposal | Cannot replace it | Can correct it after handover |
+| Fallback deadline passes with no proposal | Anyone can finalize the market as Invalid | The market stays unresolved |
+| Who finalizes after the review delay | Anyone | Only the operator |
+
+Keep that text in sync with Solana `programs/outcomia/src/resolution.rs` and
+Canton `Resolution.daml` when either changes.
+
 ## Configuration and verification
 
 Set `NEXT_PUBLIC_CANTON_NETWORK_ID=canton:testnet` in the shared app's environment.

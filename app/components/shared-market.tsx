@@ -234,6 +234,7 @@ function Market(props: Props) {
               props.kind === "prediction" ? 0 : props.baseDecimals!,
               "Quantity",
             ),
+            tx.instructions,
           );
           tx.add(...plan.instructions);
           if (plan.remaining.gtn(0))
@@ -246,9 +247,13 @@ function Market(props: Props) {
                 value1:
                   plan.stopReason === "zero-notional"
                     ? t("its value is below one quote atom")
-                    : t(
-                        "the three-maker limit was reached; refresh before retrying",
-                      ),
+                    : plan.stopReason === "packet-limit"
+                      ? t(
+                          "the transaction size limit was reached; submit again to continue",
+                        )
+                      : t(
+                          "the three-maker limit was reached; refresh before retrying",
+                        ),
               }),
             );
         }

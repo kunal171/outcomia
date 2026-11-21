@@ -10819,6 +10819,312 @@
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "match_shared_complement",
+      "docs": [
+        "Fills one maker of the other outcome on the same side of a binary shared book:",
+        "two buys mint a YES+NO pair into the reserve, two sells merge one out of it.",
+        "Inputs: taker outcome/side/limit/contracts and the maker's FIFO hints.",
+        "Errors: priority/crossing/funds/accounts/overflow. Returns: atomic maker-price fill."
+      ],
+      "discriminator": [
+        3,
+        31,
+        86,
+        83,
+        92,
+        144,
+        60,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "book"
+          ]
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "maker_order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "maker_quote",
+          "writable": true
+        },
+        {
+          "name": "maker_position",
+          "writable": true
+        },
+        {
+          "name": "taker_quote",
+          "writable": true
+        },
+        {
+          "name": "taker_position",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -12379,6 +12685,11 @@
       "code": 6172,
       "name": "PredictionCorrectionWindowClosed",
       "msg": "The correction window for this resolver phase has closed"
+    },
+    {
+      "code": 6173,
+      "name": "InvalidComplementMatch",
+      "msg": "A complementary match needs the other outcome on the same side of a binary book"
     }
   ],
   "types": [

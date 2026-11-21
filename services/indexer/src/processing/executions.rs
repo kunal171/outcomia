@@ -278,7 +278,13 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 .await?;
             }
             "initialize_market" | "initialize_prediction_market" => {
-                sqlx::query("INSERT INTO execution_market_info(market,kind,base_decimals) VALUES($1,$2,$3) ON CONFLICT DO NOTHING").bind(text(&accounts,"market")?).bind(if decimals.is_some(){"SPOT"}else{"BINARY"}).bind(decimals.unwrap_or(0)).execute(&mut *tx).await?;
+                // Binary payouts price complementary fills; spot has none.
+                let payout = if decimals.is_some() {
+                    None
+                } else {
+                    Some(text(&args["config"], "payoutPerContract")?.to_owned())
+                };
+                sqlx::query("INSERT INTO execution_market_info(market,kind,base_decimals,payout_per_contract) VALUES($1,$2,$3,$4::text::numeric) ON CONFLICT DO NOTHING").bind(text(&accounts,"market")?).bind(if decimals.is_some(){"SPOT"}else{"BINARY"}).bind(decimals.unwrap_or(0)).bind(payout).execute(&mut *tx).await?;
             }
             "place_shared_order"
             | "place_prediction_order"
@@ -345,6 +351,73 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 sqlx::query("INSERT INTO indexed_trades(execution_id,signature,slot,transaction_index,execution_index,block_time,market,engine,outcome,maker,taker,taker_side,price,quantity,quote_atoms,fee_atoms) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::text::numeric,$14::text::numeric,$15::text::numeric,$16::text::numeric)")
                     .bind(format!("{signature}:ix:{index}")).bind(signature).bind(slot).bind(row.get::<i32,_>("transaction_index")).bind(index).bind(row.get::<Option<i64>,_>("block_time"))
                     .bind(&market).bind(engine).bind(selected).bind(order.get::<String,_>("owner")).bind(text(&accounts,"taker")?).bind(side).bind(price.to_string()).bind(quantity.to_string()).bind(quote.to_string()).bind(fee.to_string()).execute(&mut *tx).await?;
+                sqlx::query(
+                    "UPDATE execution_orders SET remaining=$2::text::numeric WHERE address=$1",
+                )
+                .bind(text(&accounts, "makerOrder")?)
+                .bind((remaining - quantity).to_string())
+                .execute(&mut *tx)
+                .await?;
+            }
+            "match_shared_complement" => {
+                // One complete-set fill trades both outcomes: the taker's at
+                // payout minus the maker price, the maker's at its own price.
+                if !state.get::<bool, _>("fee_known") {
+                    return Err("historical fee configuration is missing".into());
+                }
+                let order=sqlx::query("SELECT *,price::text AS price_text,remaining::text AS remaining_text FROM execution_orders WHERE address=$1 FOR UPDATE").bind(text(&accounts,"makerOrder")?).fetch_optional(&mut *tx).await?.ok_or("historical fill is missing its maker placement")?;
+                let market: String = order.get("market");
+                let engine: String = order.get("engine");
+                let maker_outcome: String = order.get("outcome");
+                let taker_outcome = outcome(&args["outcome"])?;
+                let side = variant(&args["takerSide"])?;
+                let maker_price = order.get::<String, _>("price_text").parse::<u64>()?;
+                let remaining = order.get::<String, _>("remaining_text").parse::<u64>()?;
+                let quantity = remaining.min(number(&args, "quantity")?);
+                if quantity == 0
+                    || market != text(&accounts, "market")?
+                    || engine != "SHARED_BINARY"
+                    || !matches!(taker_outcome, "0" | "1")
+                    || !matches!(maker_outcome.as_str(), "0" | "1")
+                    || maker_outcome == taker_outcome
+                    || order.get::<String, _>("side") != side
+                {
+                    return Err("historical complement context is inconsistent".into());
+                }
+                let payout = sqlx::query_scalar::<_, Option<String>>(
+                    "SELECT payout_per_contract::text FROM execution_market_info WHERE market=$1",
+                )
+                .bind(&market)
+                .fetch_one(&mut *tx)
+                .await?
+                .ok_or("historical binary payout is missing")?
+                .parse::<u64>()?;
+                let taker_price = payout
+                    .checked_sub(maker_price)
+                    .filter(|p| *p > 0)
+                    .ok_or("historical complement price is outside the payout")?;
+                let taker_quote = u64::try_from(u128::from(taker_price) * u128::from(quantity))?;
+                let maker_quote = u64::try_from(u128::from(maker_price) * u128::from(quantity))?;
+                let fee = u64::try_from(
+                    (u128::from(taker_quote) * u128::try_from(state.get::<i16, _>("fee_bps"))?)
+                        .div_ceil(10000),
+                )?;
+                let signature: String = row.get("signature");
+                let index: i32 = row.get("execution_index");
+                for (suffix, traded, price, quote, fee) in [
+                    ("", taker_outcome, taker_price, taker_quote, fee),
+                    (
+                        ":maker",
+                        maker_outcome.as_str(),
+                        maker_price,
+                        maker_quote,
+                        0,
+                    ),
+                ] {
+                    sqlx::query("INSERT INTO indexed_trades(execution_id,signature,slot,transaction_index,execution_index,block_time,market,engine,outcome,maker,taker,taker_side,price,quantity,quote_atoms,fee_atoms) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::text::numeric,$14::text::numeric,$15::text::numeric,$16::text::numeric)")
+                        .bind(format!("{signature}:ix:{index}{suffix}")).bind(&signature).bind(slot).bind(row.get::<i32,_>("transaction_index")).bind(index).bind(row.get::<Option<i64>,_>("block_time"))
+                        .bind(&market).bind(&engine).bind(traded).bind(order.get::<String,_>("owner")).bind(text(&accounts,"taker")?).bind(side).bind(price.to_string()).bind(quantity.to_string()).bind(quote.to_string()).bind(fee.to_string()).execute(&mut *tx).await?;
+                }
                 sqlx::query(
                     "UPDATE execution_orders SET remaining=$2::text::numeric WHERE address=$1",
                 )
@@ -451,7 +524,7 @@ mod tests {
             ),
             (
                 "initialize_prediction_market",
-                json!({}),
+                json!({"config":{"payoutPerContract":"1000000"}}),
                 json!({"market":"binary"}),
             ),
             (
@@ -550,6 +623,114 @@ mod tests {
                 .await
                 .unwrap(),
             3
+        );
+    }
+    async fn seed(pool: &PgPool, rows: Vec<(&str, Value, Value)>) {
+        sqlx::query(
+            "INSERT INTO backfill_checkpoints(program_id,completed) VALUES('program',TRUE)",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        for (index, (name, args, accounts)) in rows.into_iter().enumerate() {
+            let signature = format!("signature-{index}");
+            sqlx::query("INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES($1,100,$2,120,'[]')").bind(&signature).bind(index as i32).execute(pool).await.unwrap();
+            sqlx::query("INSERT INTO transaction_execution VALUES($1,'{}')")
+                .bind(&signature)
+                .execute(pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO instruction_decode_state(signature) VALUES($1)")
+                .bind(&signature)
+                .execute(pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES($1,0,$2,$3,$4)")
+                .bind(&signature)
+                .bind(name)
+                .bind(Json(args))
+                .bind(Json(accounts))
+                .execute(pool)
+                .await
+                .unwrap();
+        }
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn complementary_fills_record_both_outcomes_exactly_once(pool: PgPool) {
+        seed(
+            &pool,
+            vec![
+                ("initialize_protocol", json!({}), json!({})),
+                ("set_taker_fee", json!({"takerFeeBps":100}), json!({})),
+                (
+                    "initialize_prediction_market",
+                    json!({"config":{"payoutPerContract":"1000000"}}),
+                    json!({"market":"binary"}),
+                ),
+                (
+                    "place_shared_order",
+                    json!({"outcome":{"no":{}},"side":{"bid":{}},"price":"400000","quantity":"3"}),
+                    json!({"market":"binary","order":"no-bid","owner":"alice"}),
+                ),
+                (
+                    "match_shared_complement",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"2"}),
+                    json!({"market":"binary","makerOrder":"no-bid","taker":"bob"}),
+                ),
+                (
+                    "match_shared_complement",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"5"}),
+                    json!({"market":"binary","makerOrder":"no-bid","taker":"bob"}),
+                ),
+            ],
+        )
+        .await;
+        let client = Arc::new(RpcClient::new("http://127.0.0.1:1"));
+        replay(&pool, Arc::clone(&client)).await.unwrap();
+        replay(&pool, client).await.unwrap();
+        let trades: Vec<(String, String, String, String, String, String, String)> = sqlx::query_as(
+            "SELECT execution_id,outcome,maker,taker,price::text,quote_atoms::text,fee_atoms::text FROM indexed_trades ORDER BY transaction_index,execution_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let row = |id: &str, outcome: &str, price: &str, quote: &str, fee: &str| {
+            (
+                id.to_owned(),
+                outcome.to_owned(),
+                "alice".to_owned(),
+                "bob".to_owned(),
+                price.to_owned(),
+                quote.to_owned(),
+                fee.to_owned(),
+            )
+        };
+        // Each fill trades YES for the taker at 0.60 (fee 1%) and NO for the
+        // maker at 0.40 (no fee); the second fill is capped at the 1 remaining.
+        assert_eq!(
+            trades,
+            vec![
+                row("signature-4:ix:0", "0", "600000", "1200000", "12000"),
+                row("signature-4:ix:0:maker", "1", "400000", "800000", "0"),
+                row("signature-5:ix:0", "0", "600000", "600000", "6000"),
+                row("signature-5:ix:0:maker", "1", "400000", "400000", "0"),
+            ]
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT remaining::text FROM execution_orders WHERE address='no-bid'"
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+            "0"
+        );
+        assert!(
+            sqlx::query_scalar::<_, bool>("SELECT ready FROM execution_replay_state")
+                .fetch_one(&pool)
+                .await
+                .unwrap()
         );
     }
 }

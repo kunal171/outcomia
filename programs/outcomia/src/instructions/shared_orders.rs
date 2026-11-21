@@ -80,6 +80,12 @@ pub fn handle_place_shared_order(
             order::InvalidPrice
         );
     }
+    // A resting order must not cross through the complete set either; the
+    // client matches that liquidity with match_shared_complement first.
+    require!(
+        !rules::crosses_complement(book, slot, side, price),
+        order::InvalidPrice
+    );
     let next_id = order_id.checked_add(1).ok_or(order::OrderIdOverflow)?;
     let next_count = book
         .open_order_count

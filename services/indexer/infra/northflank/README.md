@@ -30,6 +30,7 @@ Create a secret group named `indexer-runtime`, applied to the indexer service:
 | `SOLANA_WS_URL`       | `wss://devnet.helius-rpc.com/?api-key=<your key>`                      |
 | `OUTCOMIA_PROGRAM_ID` | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`                         |
 | `APP_ORIGIN`          | `https://outcomia-self.vercel.app` (exact; no trailing slash)          |
+| `INDEXER_PROXY_SECRET` | 32+ random characters; the same value as on Vercel                   |
 | `API_ADDRESS`         | `0.0.0.0:8081`                                                         |
 | `HEALTH_ADDRESS`      | `0.0.0.0:8080`                                                         |
 
@@ -84,6 +85,8 @@ service logs for backfill progress and the probes for readiness.
 In Vercel (Production and Preview):
 
 - `INDEXER_API_URL=https://<host>`: server-only; never a `NEXT_PUBLIC_` value.
+- `INDEXER_PROXY_SECRET`: server-only, identical to the indexer's value, so
+  sign-in rate limits apply per browser rather than to the proxy as a whole.
 - `NEXT_PUBLIC_INDEXER_ENABLED=true`: build-time flag, so redeploy afterwards.
 
 The same-origin proxy at `/api/indexer/*` forwards only GraphQL and sign-in

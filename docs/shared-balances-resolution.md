@@ -101,6 +101,13 @@ and transaction-wide rollback. New clients remain gated until the matching
 program is deployed. Prediction-specific typed indexing is a separate task;
 source ingestion must be extended before new event types are emitted publicly.
 
+## Complementary matching
+
+On shared binary books, a YES order and a NO order on the same side also trade
+through the complete set: two buys mint a pair into the reserve and two sells
+merge one out of it, preserving both equations above. See
+[complementary matching](complementary-matching.md).
+
 ## Instruction map
 
 | Operation | Instruction | Who signs |
@@ -109,6 +116,7 @@ source ingestion must be extended before new event types are emitted publicly.
 | Move old free cash | `migrate_spot_asset`, `migrate_prediction_asset` | Asset owner |
 | Enable a shared book | `initialize_shared_book` | Stored market creator, active admin |
 | Place / fill / cancel | `place_shared_order`, `match_shared_order`, `cancel_shared_order` | Trader / taker / order owner |
+| Fill through the complete set (binary) | `match_shared_complement` | Taker |
 | Withdraw book fees | `withdraw_shared_fees` | Protocol super-admin |
 | Drain book before shutdown | `close_shared_book` | Stored creator, active admin |
 | Move backing into/out of complete sets | `shared_complete_set` | Position owner |

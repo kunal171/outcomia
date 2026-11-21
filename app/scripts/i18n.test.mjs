@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import { test } from "node:test";
+import { loadTypeScript } from "./support/typescript.mjs";
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 const root = new URL("../", import.meta.url);
@@ -166,4 +167,17 @@ test("deadlines retain UTC and review periods localize without rounding integers
     display.predictionCloseLabel(new BN("18446744073709551615"), "hi"),
     "18446744073709551615 Unix seconds",
   );
+});
+
+// Resolution rules are translated through a variable, so the literal-call audit
+// above cannot see them; check every rule against every catalog explicitly.
+test("chain resolution rules have entries in every catalog", () => {
+  const { RESOLUTION_RULES } = loadTypeScript(
+    new URL("lib/resolution-policy.ts", root),
+  );
+  const rules = Object.values(RESOLUTION_RULES).flat();
+  assert.ok(rules.length >= 8);
+  for (const [locale, catalog] of Object.entries(catalogs))
+    for (const rule of rules)
+      assert.ok(Object.hasOwn(catalog, rule), `${locale}: ${rule}`);
 });

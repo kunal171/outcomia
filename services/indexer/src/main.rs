@@ -143,10 +143,19 @@ async fn main() -> Result<(), BoxError> {
     sqlx::query("UPDATE history_sync SET ready=FALSE WHERE singleton")
         .execute(&pool)
         .await?;
-    let auth = auth::state(pool.clone(), &config.app_origin).map_err(io::Error::other)?;
+    let auth = auth::state(pool.clone(), &config.app_origin)
+        .and_then(|state| state.with_proxy_secret(config.proxy_secret.clone()))
+        .map_err(io::Error::other)?;
     let api_listener = TcpListener::bind(&config.api_address).await?;
     let router = api::router(pool.clone(), auth);
-    let mut api_server = tokio::spawn(async move { axum::serve(api_listener, router).await });
+    // Peer addresses key sign-in rate limits when no trusted proxy header exists.
+    let mut api_server = tokio::spawn(async move {
+        axum::serve(
+            api_listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+    });
     let mut account_worker = tokio::spawn(account_ingest::run(
         pool.clone(),
         Arc::clone(&client),

@@ -964,5 +964,18 @@
   "YesWins": "YES gagne",
   "Multi-outcome market": "Marché à plusieurs résultats",
   "Set 2–8 named outcomes with exactly one winner.": "Définissez 2 à 8 résultats avec un seul gagnant.",
-  "Set up multi-outcome market": "Créer un marché à plusieurs résultats"
+  "Set up multi-outcome market": "Créer un marché à plusieurs résultats",
+  "the transaction size limit was reached; submit again to continue": "la taille maximale de la transaction est atteinte ; soumettez à nouveau pour continuer",
+  "{value0} via {value1}": "{value0} via {value1}",
+  "Includes {value0} orders that match through a complete YES+NO set.": "Inclut des ordres {value0} appariés via un ensemble complet YES+NO.",
+  "How resolution works on Solana": "Fonctionnement de la résolution sur Solana",
+  "How resolution works on Canton": "Fonctionnement de la résolution sur Canton",
+  "The creator proposes after trading closes. Each correction restarts the review delay; corrections stop two review delays after the resolver's window opens.": "Le créateur propose après la clôture des échanges. Chaque correction relance le délai d'examen ; les corrections cessent deux délais d'examen après l'ouverture de la fenêtre du résolveur.",
+  "A fallback resolver can propose only if no timely proposal exists, and cannot replace one.": "Un résolveur de secours ne peut proposer qu'en l'absence de proposition dans les délais, et ne peut pas la remplacer.",
+  "If a configured fallback deadline passes with no proposal, anyone can finalize the market as Invalid.": "Si l'échéance de secours configurée passe sans proposition, n'importe qui peut finaliser le marché comme Invalid.",
+  "Anyone can finalize a proposal once its review delay ends.": "N'importe qui peut finaliser une proposition une fois son délai d'examen écoulé.",
+  "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "Le créateur propose après la clôture des échanges. Chaque correction relance le délai d'examen, jusqu'à la fin de l'examen.",
+  "After handover, the fallback resolver can correct a pending primary proposal.": "Après la passation, le résolveur de secours peut corriger une proposition principale en attente.",
+  "If the fallback deadline passes with no proposal, the market stays unresolved.": "Si l'échéance de secours passe sans proposition, le marché reste non résolu.",
+  "Only the operator can finalize a proposal once its review delay ends.": "Seul l'opérateur peut finaliser une proposition une fois son délai d'examen écoulé."
 }

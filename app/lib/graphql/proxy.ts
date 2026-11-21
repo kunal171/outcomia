@@ -7,6 +7,24 @@ const paths = new Set([
   "auth/me",
   "auth/logout",
 ]);
+/** Rate-limit identity for the indexer's sign-in limits.
+ * Vercel sets x-real-ip / x-forwarded-for from the connection, replacing any
+ * client-supplied values. The indexer trusts the forwarded IP only together
+ * with the shared server-only secret, so callers cannot forge it directly.
+ * Returns no headers unless both a secret and a client IP are available. */
+export function clientIdentityHeaders(
+  request: Request,
+  secret: string | undefined,
+): Record<string, string> {
+  const client =
+    request.headers.get("x-real-ip")?.trim() ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (!secret || !client) return {};
+  return {
+    "x-outcomia-client-ip": client,
+    "x-outcomia-proxy-token": secret,
+  };
+}
 export async function proxyIndexerRequest(
   request: Request,
   context: { params: Promise<{ path: string[] }> },
@@ -65,6 +83,7 @@ export async function proxyIndexerRequest(
     const headers = new Headers({
       "Content-Type": "application/json",
       Origin: origin,
+      ...clientIdentityHeaders(request, process.env.INDEXER_PROXY_SECRET),
     });
     const cookie = request.headers.get("cookie");
     if (cookie) headers.set("cookie", cookie);

@@ -3,7 +3,7 @@ import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
 import type { ReactNode } from "react";
-import type { SharedSnapshot, Side } from "../../lib/shared";
+import { bestBuyPrice, type SharedSnapshot, type Side } from "../../lib/shared";
 import { parseTokenAmount } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 
@@ -111,7 +111,7 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
         aria-label={t("Choose outcome")}
       >
         {(["yes", "no"] as const).map((value) => {
-          const offer = snapshot?.book.bestPrices[value === "yes" ? 1 : 3];
+          const offer = snapshot ? bestBuyPrice(snapshot.book, value) : null;
           return (
             <button
               type="button"

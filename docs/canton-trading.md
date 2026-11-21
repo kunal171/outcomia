@@ -33,6 +33,20 @@ command may reach the public read participant later; controls remain blocked
 while its consumed target still appears. Refresh synchronizes the view without
 resubmitting the command.
 
+## Resolution rules shown to users
+
+The Rules tab includes "How resolution works on Canton", because Canton and
+Solana markets share the UI but resolve differently:
+
+| Case | Solana | Canton |
+| --- | --- | --- |
+| Corrections | Restart the review delay; stop two review delays after the resolver's window opens | Restart the review delay, until the review ends |
+| Fallback versus a timely primary proposal | Cannot replace it | Can correct it after handover |
+| Fallback deadline passes with no proposal | Anyone can finalize the market as Invalid | The market stays unresolved |
+| Who finalizes after the review delay | Anyone | Only the operator |
+
+See the [shared frontend notes](shared-frontend.md#resolution-differs-by-network).
+
 ## Deployment configuration
 
 Server-only variables are listed in `app/.env.example`:

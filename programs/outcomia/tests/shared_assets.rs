@@ -1688,3 +1688,513 @@ fn active_fallback_resolver_can_propose_no_and_deadline_cannot_override_it() {
     assert_eq!(f.ledger().free, 1_000_000);
     assert_eq!(load::<PredictionMarket>(&f, market).backing_reserve, 0);
 }
+
+/// Shared binary book with the fixture owner as maker and a funded second
+/// trader. Returns (market, owner position, book, protocol config, taker,
+/// taker cash, taker position). Taker cash is backed by real vault tokens.
+fn complement_market(
+    f: &mut Fixture,
+    taker_cash: u64,
+) -> (Pubkey, Pubkey, Pubkey, Pubkey, Keypair, Pubkey, Pubkey) {
+    clock(f, 1);
+    assert!(f.send(&[f.init(), f.transfer(10_000_000, false)]));
+    let (market, pos) = prediction(f);
+    let owner = f.owner.pubkey();
+    let book = pda(SHARED_BOOK_SEED, &[market.as_ref()]);
+    assert!(f.send(&[ix(
+        outcomia::accounts::InitializeSharedBook {
+            authority: owner,
+            admin_record: pda(ADMIN_SEED, &[owner.as_ref()]),
+            market,
+            book,
+            system_program: system_program::ID
+        },
+        outcomia::instruction::InitializeSharedBook {
+            kind: MarketKind::Prediction
+        }
+    )]));
+    let taker = Keypair::new();
+    f.svm.airdrop(&taker.pubkey(), 1_000_000_000).unwrap();
+    let mint = f.mint;
+    let tq = cash(f, taker.pubkey(), mint, taker_cash);
+    token_account(
+        &mut f.svm,
+        f.vault,
+        f.mint,
+        f.authority,
+        10_000_000 + taker_cash,
+    );
+    let (tp, bump) = Pubkey::find_program_address(
+        &[
+            PREDICTION_POSITION_SEED,
+            market.as_ref(),
+            taker.pubkey().as_ref(),
+        ],
+        &outcomia::ID,
+    );
+    store(
+        &mut f.svm,
+        tp,
+        &PredictionPosition {
+            market,
+            owner: taker.pubkey(),
+            collateral_free: 0,
+            collateral_locked: 0,
+            yes_free: 0,
+            yes_locked: 0,
+            no_free: 0,
+            no_locked: 0,
+            bump,
+        },
+    );
+    let (config, bump) = Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &outcomia::ID);
+    store(
+        &mut f.svm,
+        config,
+        &ProtocolConfig {
+            super_admin: owner,
+            taker_fee_bps: 100,
+            bump,
+        },
+    );
+    (market, pos, book, config, taker, tq, tp)
+}
+#[allow(clippy::too_many_arguments)]
+fn pred_place(
+    market: Pubkey,
+    book: Pubkey,
+    owner: Pubkey,
+    cash: Pubkey,
+    position: Pubkey,
+    id: u64,
+    outcome: SharedOutcome,
+    side: OrderSide,
+    price: u64,
+    quantity: u64,
+) -> Instruction {
+    ix(
+        outcomia::accounts::PlaceSharedOrder {
+            owner,
+            market,
+            book,
+            base_balance: None,
+            quote_balance: cash,
+            position: Some(position),
+            order: pda(SHARED_ORDER_SEED, &[book.as_ref(), &id.to_le_bytes()]),
+            price_level: pda(
+                SHARED_LEVEL_SEED,
+                &[
+                    book.as_ref(),
+                    outcome.seed(),
+                    side.seed(),
+                    &price.to_le_bytes(),
+                ],
+            ),
+            tail: None,
+            better_level: None,
+            worse_level: None,
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::PlaceSharedOrder {
+            outcome,
+            side,
+            price,
+            quantity,
+            order_id: id,
+        },
+    )
+}
+/// Complementary fill against the fixture owner's order `id`; `last` supplies
+/// the rent recipient when that order is the final one at its level.
+#[allow(clippy::too_many_arguments)]
+fn complement(
+    f: &Fixture,
+    market: Pubkey,
+    book: Pubkey,
+    config: Pubkey,
+    taker: Pubkey,
+    taker_cash: Pubkey,
+    taker_position: Pubkey,
+    maker_position: Pubkey,
+    id: u64,
+    maker: (SharedOutcome, OrderSide, u64),
+    outcome: SharedOutcome,
+    limit_price: u64,
+    quantity: u64,
+    last: bool,
+) -> Instruction {
+    let (maker_outcome, side, maker_price) = maker;
+    ix(
+        outcomia::accounts::MatchSharedComplement {
+            taker,
+            market,
+            book,
+            protocol_config: config,
+            maker_order: pda(SHARED_ORDER_SEED, &[book.as_ref(), &id.to_le_bytes()]),
+            price_level: pda(
+                SHARED_LEVEL_SEED,
+                &[
+                    book.as_ref(),
+                    maker_outcome.seed(),
+                    side.seed(),
+                    &maker_price.to_le_bytes(),
+                ],
+            ),
+            maker_quote: f.balance,
+            maker_position,
+            taker_quote: taker_cash,
+            taker_position,
+            mint: f.mint,
+            asset_authority: f.authority,
+            asset_vault: f.vault,
+            market_authority: pda(VAULT_AUTHORITY_SEED, &[market.as_ref()]),
+            market_vault: pda(VAULT_SEED, &[market.as_ref(), f.mint.as_ref()]),
+            token_program: anchor_spl::token::ID,
+            next_order: None,
+            worse_level: None,
+            level_rent_recipient: last.then_some(f.owner.pubkey()),
+        },
+        outcomia::instruction::MatchSharedComplement {
+            outcome,
+            taker_side: side,
+            limit_price,
+            quantity,
+        },
+    )
+}
+fn send_as(f: &mut Fixture, signer: &Keypair, build: impl FnOnce(&Fixture) -> Instruction) -> bool {
+    let instruction = build(f);
+    f.svm.expire_blockhash();
+    let msg = Message::new_with_blockhash(
+        &[instruction],
+        Some(&signer.pubkey()),
+        &f.svm.latest_blockhash(),
+    );
+    f.svm
+        .send_transaction(
+            VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[signer]).unwrap(),
+        )
+        .is_ok()
+}
+/// Both custody equations: the question vault equals its backing (no legacy
+/// cash here) and the global vault equals all shared claims plus book fees.
+fn assert_complement_conserved(f: &Fixture, market: Pubkey, book: Pubkey, taker_cash: Pubkey) {
+    let m: PredictionMarket = load(f, market);
+    assert_eq!(m.yes_supply, m.no_supply);
+    assert_eq!(m.backing_reserve, m.yes_supply * m.payout_per_contract);
+    assert_eq!(
+        f.tokens(pda(VAULT_SEED, &[market.as_ref(), f.mint.as_ref()])),
+        m.backing_reserve
+    );
+    let (maker, taker) = (f.ledger(), load::<AssetBalance>(f, taker_cash));
+    assert_eq!(
+        f.tokens(f.vault),
+        maker.free
+            + maker.locked
+            + taker.free
+            + taker.locked
+            + load::<SharedBook>(f, book).accrued_quote_fees
+    );
+}
+
+#[test]
+fn complementary_buys_mint_and_sells_merge_while_conserving_custody() {
+    let mut f = Fixture::new();
+    let (market, pos, book, config, taker, tq, tp) = complement_market(&mut f, 5_000_000);
+    let owner = f.owner.pubkey();
+    // Maker: NO bid 0.40 x 3 locks 1.2 collateral.
+    assert!(f.send(&[pred_place(
+        market,
+        book,
+        owner,
+        f.balance,
+        pos,
+        1,
+        SharedOutcome::No,
+        OrderSide::Bid,
+        400_000,
+        3,
+    )]));
+    assert_eq!(f.ledger().locked, 1_200_000);
+
+    // Taker: YES bid limit 0.65 x 2 mints 2 pairs at 0.60 for the taker.
+    let no_bid = (SharedOutcome::No, OrderSide::Bid, 400_000);
+    assert!(send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        650_000,
+        2,
+        false
+    ),));
+    let m: PredictionMarket = load(&f, market);
+    assert_eq!(
+        (m.yes_supply, m.no_supply, m.backing_reserve),
+        (2, 2, 2_000_000)
+    );
+    assert_eq!(load::<PredictionPosition>(&f, tp).yes_free, 2);
+    assert_eq!(load::<PredictionPosition>(&f, pos).no_free, 2);
+    // Taker pays 1.2 plus a 1% fee of 12,000; maker's lock falls by 0.8.
+    assert_eq!(
+        load::<AssetBalance>(&f, tq).free,
+        5_000_000 - 1_200_000 - 12_000
+    );
+    assert_eq!((f.ledger().free, f.ledger().locked), (8_800_000, 400_000));
+    assert_eq!(load::<SharedBook>(&f, book).accrued_quote_fees, 12_000);
+    assert_eq!(
+        load::<SharedOrder>(
+            &f,
+            pda(SHARED_ORDER_SEED, &[book.as_ref(), &1u64.to_le_bytes()])
+        )
+        .remaining_quantity,
+        1
+    );
+    assert_complement_conserved(&f, market, book, tq);
+
+    // A larger taker completes the maker: order filled, level closed, head cleared.
+    assert!(send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        700_000,
+        5,
+        true
+    ),));
+    let order: SharedOrder = load(
+        &f,
+        pda(SHARED_ORDER_SEED, &[book.as_ref(), &1u64.to_le_bytes()]),
+    );
+    assert_eq!(
+        (
+            order.status,
+            order.remaining_quantity,
+            order.locked_collateral
+        ),
+        (OrderStatus::Filled, 0, 0)
+    );
+    let level = pda(
+        SHARED_LEVEL_SEED,
+        &[book.as_ref(), b"no", b"bid", &400_000u64.to_le_bytes()],
+    );
+    assert!(f.svm.get_account(&level).is_none_or(|a| a.lamports == 0));
+    let b: SharedBook = load(&f, book);
+    assert_eq!((b.best_prices[2], b.open_order_count), (None, 0));
+    assert_eq!(load::<PredictionPosition>(&f, tp).yes_free, 3);
+    assert_eq!((f.ledger().free, f.ledger().locked), (8_800_000, 0));
+    assert_complement_conserved(&f, market, book, tq);
+
+    // Merge: maker rests a NO ask 0.30 x 2; taker sells 2 YES at limit 0.60.
+    assert!(f.send(&[pred_place(
+        market,
+        book,
+        owner,
+        f.balance,
+        pos,
+        2,
+        SharedOutcome::No,
+        OrderSide::Ask,
+        300_000,
+        2,
+    )]));
+    assert_eq!(load::<PredictionPosition>(&f, pos).no_locked, 2);
+    let taker_before = load::<AssetBalance>(&f, tq).free;
+    let fees_before = load::<SharedBook>(&f, book).accrued_quote_fees;
+    let no_ask = (SharedOutcome::No, OrderSide::Ask, 300_000);
+    assert!(send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        2,
+        no_ask,
+        SharedOutcome::Yes,
+        600_000,
+        2,
+        true
+    ),));
+    let m: PredictionMarket = load(&f, market);
+    assert_eq!(
+        (m.yes_supply, m.no_supply, m.backing_reserve),
+        (1, 1, 1_000_000)
+    );
+    assert_eq!(load::<PredictionPosition>(&f, tp).yes_free, 1);
+    assert_eq!(load::<PredictionPosition>(&f, pos).no_locked, 0);
+    // Taker receives 0.70 x 2 = 1.4 minus a 14,000 fee; maker receives 0.6.
+    assert_eq!(
+        load::<AssetBalance>(&f, tq).free,
+        taker_before + 1_400_000 - 14_000
+    );
+    assert_eq!(f.ledger().free, 8_800_000 + 600_000);
+    assert_eq!(
+        load::<SharedBook>(&f, book).accrued_quote_fees,
+        fees_before + 14_000
+    );
+    assert_complement_conserved(&f, market, book, tq);
+}
+
+#[test]
+fn complement_rejects_noncrossing_self_wrong_side_closed_and_crossing_placement() {
+    let mut f = Fixture::new();
+    let (market, pos, book, config, taker, tq, tp) = complement_market(&mut f, 5_000_000);
+    let owner = f.owner.pubkey();
+    assert!(f.send(&[pred_place(
+        market,
+        book,
+        owner,
+        f.balance,
+        pos,
+        1,
+        SharedOutcome::No,
+        OrderSide::Bid,
+        400_000,
+        2,
+    )]));
+    let no_bid = (SharedOutcome::No, OrderSide::Bid, 400_000);
+    // 0.59 + 0.40 < 1: no cross.
+    assert!(!send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        590_000,
+        1,
+        false
+    ),));
+    // The maker's own outcome cannot be the taker's outcome.
+    assert!(!send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::No,
+        700_000,
+        1,
+        false
+    ),));
+    // A taker ask cannot complement a maker bid.
+    let mut wrong_side = complement(
+        &f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        300_000,
+        1,
+        false,
+    );
+    wrong_side.data = outcomia::instruction::MatchSharedComplement {
+        outcome: SharedOutcome::Yes,
+        taker_side: OrderSide::Ask,
+        limit_price: 300_000,
+        quantity: 1,
+    }
+    .data();
+    assert!(!send_as(&mut f, &taker, |_| wrong_side));
+    // Self-trade: the maker cannot take its own order.
+    let mut own = complement(
+        &f,
+        market,
+        book,
+        config,
+        owner,
+        f.balance,
+        pos,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        700_000,
+        1,
+        false,
+    );
+    own.accounts[0].is_signer = true;
+    assert!(!f.send(&[own]));
+    // Placement cannot rest a YES bid crossing the NO bid through the set...
+    assert!(!f.send(&[pred_place(
+        market,
+        book,
+        owner,
+        f.balance,
+        pos,
+        2,
+        SharedOutcome::Yes,
+        OrderSide::Bid,
+        600_000,
+        1,
+    )]));
+    // ...but one tick below the boundary rests normally.
+    assert!(f.send(&[pred_place(
+        market,
+        book,
+        owner,
+        f.balance,
+        pos,
+        2,
+        SharedOutcome::Yes,
+        OrderSide::Bid,
+        590_000,
+        1,
+    )]));
+    // Nothing moved: no supply, no reserve, taker cash untouched.
+    let m: PredictionMarket = load(&f, market);
+    assert_eq!((m.yes_supply, m.backing_reserve), (0, 0));
+    assert_eq!(load::<AssetBalance>(&f, tq).free, 5_000_000);
+    // After the trading cutoff a crossing complement is rejected.
+    clock(&mut f, 100);
+    assert!(!send_as(&mut f, &taker, |f| complement(
+        f,
+        market,
+        book,
+        config,
+        taker.pubkey(),
+        tq,
+        tp,
+        pos,
+        1,
+        no_bid,
+        SharedOutcome::Yes,
+        700_000,
+        1,
+        false
+    ),));
+    assert_complement_conserved(&f, market, book, tq);
+}

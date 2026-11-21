@@ -260,6 +260,26 @@ pub mod outcomia {
         )
     }
 
+    /// Fills one maker of the other outcome on the same side of a binary shared book:
+    /// two buys mint a YES+NO pair into the reserve, two sells merge one out of it.
+    /// Inputs: taker outcome/side/limit/contracts and the maker's FIFO hints.
+    /// Errors: priority/crossing/funds/accounts/overflow. Returns: atomic maker-price fill.
+    pub fn match_shared_complement(
+        ctx: Context<MatchSharedComplement>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        instructions::shared_complement::handle_match_shared_complement(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
     /// Inserts a shared-wallet limit order. Inputs: owner/book/claims/hints and exact order units.
     /// Errors: closed/crossing/grid/identity/funds/overflow. Returns: funded FIFO order.
     pub fn place_shared_order(

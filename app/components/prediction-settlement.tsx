@@ -36,6 +36,7 @@ import {
   type PositionAmounts,
 } from "./prediction/position-actions";
 import { PredictionResolutionSummary } from "./prediction/resolution-summary";
+import { ResolutionPolicy } from "./resolution-policy";
 import { predictionCloseLabel } from "../lib/prediction-display";
 import { correctionOpen } from "../lib/correction-window";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -301,6 +302,7 @@ function Settlement({
         </p>
       )}
       {view !== "position" && <PredictionResolutionSummary market={market} />}
+      {view !== "position" && <ResolutionPolicy chain="solana" />}
       {wallet && (
         <>
           {view !== "position" && (

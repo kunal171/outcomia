@@ -15,8 +15,10 @@ are backed by one collateral asset per market. Complete pairs can be created
 and merged; final resolution permits redemption into the shared asset wallet.
 
 Market creation currently requires an active protocol admin. Permissionless
-creation, private trading permissions, clubs, governance
-and cross-outcome matching are future work. See
+creation, private trading permissions, clubs and governance are future work.
+Binary shared books match YES and NO orders through the complete set; see
+[complementary matching](complementary-matching.md). Multi-outcome N-way
+matching remains future work. See
 [prediction design](prediction-market-design.md) and
 [shared custody and settlement](shared-balances-resolution.md) for the current
 implementation.
@@ -55,10 +57,11 @@ market creation does not automatically grant authority to decide its winner.
 Keep the existing limit buy/sell, FIFO, partial-fill and atomic-settlement model.
 Extend it to the new access rules and outcome structures.
 
-Cross-outcome matching should let compatible orders share liquidity through
-collateral-backed complete sets. Its exact price conditions, fees, rounding and
-payout model need a separate design. It must not create unbacked positions or
-bypass order limits, permissions or priority rules.
+Binary shared books now share liquidity through collateral-backed complete
+sets ([complementary matching](complementary-matching.md)). Extending this to
+multi-outcome markets (N outcomes completing one set) needs its own design for
+price conditions, fees and transaction size. It must not create unbacked
+positions or bypass order limits, permissions or priority rules.
 
 ## Private markets and clubs
 

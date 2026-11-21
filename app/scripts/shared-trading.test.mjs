@@ -6,7 +6,9 @@ import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { loadTypeScript } from "./support/typescript.mjs";
-const indexed = loadTypeScript(new URL("../lib/indexed-accounts.ts", import.meta.url));
+const indexed = loadTypeScript(
+  new URL("../lib/indexed-accounts.ts", import.meta.url),
+);
 const require = createRequire(import.meta.url),
   { BN, Program } = require("@anchor-lang/core"),
   { PublicKey, Connection, Transaction } = require("@solana/web3.js");
@@ -34,20 +36,31 @@ runInNewContext(
     Buffer,
     process: { env: {} },
     require: (name) =>
-      name === "./indexed-accounts" ? indexed : name === "./solana"
-        ? { PROGRAM_ID: programId }
-        : name === "./outcomia"
-          ? { deriveProtocolConfigPda: () => derive("protocol_config") }
-          : name === "./prediction"
+      name === "./indexed-accounts"
+        ? indexed
+        : name === "./solana"
+          ? { PROGRAM_ID: programId }
+          : name === "./outcomia"
             ? {
-                derivePredictionPositionPda: (market, owner) =>
-                  derive(
-                    "prediction_position",
-                    market.toBuffer(),
-                    owner.toBuffer(),
-                  ),
+                deriveProtocolConfigPda: () => derive("protocol_config"),
+                deriveVaultAuthorityPda: (m) =>
+                  derive("vault-authority", m.toBuffer()),
+                deriveVaultPda: (m, mint) =>
+                  derive("vault", m.toBuffer(), mint.toBuffer()),
+                TOKEN_PROGRAM_ID: new PublicKey(
+                  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+                ),
               }
-            : require(name),
+            : name === "./prediction"
+              ? {
+                  derivePredictionPositionPda: (market, owner) =>
+                    derive(
+                      "prediction_position",
+                      market.toBuffer(),
+                      owner.toBuffer(),
+                    ),
+                }
+              : require(name),
   },
 );
 const s = mod.exports,
@@ -330,4 +343,166 @@ test("a zero-notional dust remainder stays free without rolling back valid fills
   assert.equal(name(r.instructions[0]), "matchSharedOrder");
   assert.equal(r.stopReason, "zero-notional");
   assert(r.remaining.eqn(1));
+});
+
+test("binary bids take cheaper liquidity through the other outcome first", async () => {
+  const f = fixture(true),
+    noBid = add(f, 1, 400_000, 2, "bid", "no"),
+    yesAsk = add(f, 2, 620_000, 1, "ask", "yes");
+  // A NO bid at 0.40 sells YES at an effective 0.60, cheaper than the 0.62 ask.
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(650_000),
+    bn(3),
+    [],
+    true,
+  );
+  assert.deepEqual(Array.from(r.instructions, name), [
+    "matchSharedComplement",
+    "matchSharedOrder",
+  ]);
+  assert(account(r.instructions[0], "maker_order").equals(noBid));
+  assert(account(r.instructions[0], "level_rent_recipient").equals(maker));
+  assert(
+    account(r.instructions[0], "market_vault").equals(
+      derive("vault", market.toBuffer(), quote.toBuffer()),
+    ),
+  );
+  assert(
+    account(r.instructions[0], "asset_vault").equals(s.assetVaultPda(quote)),
+  );
+  assert(account(r.instructions[1], "maker_order").equals(yesAsk));
+  assert(r.remaining.isZero());
+  assert.equal(r.stopReason, null, "a complete fill reports no stop reason");
+  s.assertSharedTransactionFits(
+    new (require("@solana/web3.js").Transaction)().add(...r.instructions),
+    owner,
+  );
+});
+test("direct liquidity wins an exact effective-price tie", async () => {
+  const f = fixture(true);
+  add(f, 1, 400_000, 1, "bid", "no");
+  const ask = add(f, 2, 600_000, 1, "ask", "yes");
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(600_000),
+    bn(1),
+    [],
+    true,
+  );
+  assert.deepEqual(Array.from(r.instructions, name), ["matchSharedOrder"]);
+  assert(account(r.instructions[0], "maker_order").equals(ask));
+});
+test("binary sells merge against the other outcome's asks", async () => {
+  const f = fixture(true),
+    noAsk = add(f, 1, 300_000, 2, "ask", "no");
+  // Selling YES at 0.50 or better meets a NO ask at 0.30: effective 0.70.
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "ask",
+    bn(500_000),
+    bn(2),
+    [],
+    true,
+  );
+  assert.deepEqual(Array.from(r.instructions, name), ["matchSharedComplement"]);
+  assert(account(r.instructions[0], "maker_order").equals(noAsk));
+  assert(r.remaining.isZero());
+});
+test("a remainder rests only when no liquidity crosses through either book", async () => {
+  const f = fixture(true);
+  add(f, 1, 400_000, 1, "bid", "no");
+  // 0.55 + 0.40 < 1: no complementary cross, so the bid rests.
+  const rest = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(550_000),
+    bn(2),
+    [],
+    true,
+  );
+  assert.deepEqual(Array.from(rest.instructions, name), ["placeSharedOrder"]);
+  assert(rest.remaining.isZero());
+  // Four crossing NO bids exceed the three-maker cap: no unsafe remainder.
+  const g = fixture(true);
+  for (let i = 1; i <= 4; i++) add(g, i, 400_000 + i * 10_000, 1, "bid", "no");
+  const capped = await s.buildSharedTrade(
+    p,
+    g,
+    owner,
+    "yes",
+    "bid",
+    bn(700_000),
+    bn(5),
+    [],
+    true,
+  );
+  assert.equal(capped.fills, 3);
+  assert(capped.instructions.every((i) => name(i) === "matchSharedComplement"));
+  assert(capped.remaining.eqn(2));
+  assert.ok(["maker-limit", "packet-limit"].includes(capped.stopReason));
+  s.assertSharedTransactionFits(
+    new (require("@solana/web3.js").Transaction)().add(...capped.instructions),
+    owner,
+  );
+});
+test("spot books ignore the complement path", async () => {
+  const f = fixture();
+  add(f, 1, 100, 1, "bid");
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "spot",
+    "bid",
+    bn(90),
+    bn(1),
+    [],
+    true,
+  );
+  assert.deepEqual(Array.from(r.instructions, name), ["placeSharedOrder"]);
+});
+
+test("best buy price includes the other outcome's bids", () => {
+  const f = fixture(true);
+  assert.equal(s.bestBuyPrice(f.book, "yes", true), null);
+  f.book.bestPrices = [null, bn(620_000), bn(400_000), null];
+  // YES: min(direct 0.62, 1 - NO bid 0.40 = 0.60); NO: 1 - YES bid (none) and no NO ask.
+  assert(s.bestBuyPrice(f.book, "yes", true).eqn(600_000));
+  assert.equal(s.bestBuyPrice(f.book, "no", true), null);
+  f.book.bestPrices = [bn(550_000), null, null, bn(500_000)];
+  assert(s.bestBuyPrice(f.book, "no", true).eqn(450_000));
+  assert(s.bestBuyPrice(f.book, "yes", true) === null);
+});
+
+test("with complementary matching disabled the planner keeps direct-only behavior", async () => {
+  const f = fixture(true);
+  add(f, 1, 400_000, 2, "bid", "no");
+  // Off by default: the NO bid is ignored and the YES bid rests as before.
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(650_000),
+    bn(1),
+  );
+  assert.deepEqual(Array.from(r.instructions, name), ["placeSharedOrder"]);
+  f.book.bestPrices = [null, null, bn(400_000), null];
+  assert.equal(s.bestBuyPrice(f.book, "yes"), null);
 });

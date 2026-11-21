@@ -964,5 +964,18 @@
   "YesWins": "YES vence",
   "Multi-outcome market": "Mercado de múltiplos resultados",
   "Set 2–8 named outcomes with exactly one winner.": "Defina de 2 a 8 resultados com um único vencedor.",
-  "Set up multi-outcome market": "Criar mercado de múltiplos resultados"
+  "Set up multi-outcome market": "Criar mercado de múltiplos resultados",
+  "the transaction size limit was reached; submit again to continue": "o limite de tamanho da transação foi atingido; envie novamente para continuar",
+  "{value0} via {value1}": "{value0} via {value1}",
+  "Includes {value0} orders that match through a complete YES+NO set.": "Inclui ordens {value0} que se combinam por meio de um conjunto completo YES+NO.",
+  "How resolution works on Solana": "Como a resolução funciona na Solana",
+  "How resolution works on Canton": "Como a resolução funciona na Canton",
+  "The creator proposes after trading closes. Each correction restarts the review delay; corrections stop two review delays after the resolver's window opens.": "O criador propõe após o fim da negociação. Cada correção reinicia o prazo de revisão; as correções terminam dois prazos de revisão após a abertura da janela do resolvedor.",
+  "A fallback resolver can propose only if no timely proposal exists, and cannot replace one.": "Um resolvedor reserva só pode propor se não houver proposta dentro do prazo, e não pode substituí-la.",
+  "If a configured fallback deadline passes with no proposal, anyone can finalize the market as Invalid.": "Se o prazo de reserva configurado passar sem proposta, qualquer pessoa pode finalizar o mercado como Invalid.",
+  "Anyone can finalize a proposal once its review delay ends.": "Qualquer pessoa pode finalizar uma proposta quando o prazo de revisão termina.",
+  "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "O criador propõe após o fim da negociação. Cada correção reinicia o prazo de revisão, até a revisão terminar.",
+  "After handover, the fallback resolver can correct a pending primary proposal.": "Após a passagem, o resolvedor reserva pode corrigir uma proposta principal pendente.",
+  "If the fallback deadline passes with no proposal, the market stays unresolved.": "Se o prazo de reserva passar sem proposta, o mercado permanece sem resolução.",
+  "Only the operator can finalize a proposal once its review delay ends.": "Somente o operador pode finalizar uma proposta quando o prazo de revisão termina."
 }

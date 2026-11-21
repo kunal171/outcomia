@@ -495,9 +495,9 @@ The next step is a release rather than a new track: the deployed devnet program
 predates multi-outcome markets and the release-hardening fixes (spot increment
 validation and bounded resolution corrections). Upgrade devnet once, run the
 multi-outcome and shared-wallet smoke tests, then enable the corresponding UI
-flags. After that, the strongest candidate for this research track is
-complementary YES/NO (mint/merge) matching, which shares liquidity across
-outcome books without new market types. Account reconciliation for indexed
+flags. Complementary YES/NO matching is implemented for binary shared books
+([design](complementary-matching.md)); it ships with the next program upgrade
+behind its own UI flag. Account reconciliation for indexed
 data and Yellowstone ingestion remain later scaling work after standard RPC
 throughput is measured.
 
