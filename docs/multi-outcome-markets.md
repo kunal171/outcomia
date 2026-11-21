@@ -78,7 +78,10 @@ several price displays do not imply shared liquidity.
 Reuse shared wallet custody, bounded matching and signed fee quotes, with new
 market/account namespaces and explicit outcome ID checks. Resolution follows the
 agreed creator/admin, review-delay and fallback model, but chooses a winning
-outcome ID or Invalid. Owners retain cancellation and withdrawal rights after
+outcome ID or Invalid. Binary and multi-outcome markets share one lifecycle
+implementation (`programs/outcomia/src/resolution.rs`), including the per-phase
+correction deadline described in
+[shared balances and settlement](shared-balances-resolution.md#resolution). Owners retain cancellation and withdrawal rights after
 closure. Redemption must burn claimed positions once and reconcile actual vault
 backing, including contracts released by canceled sell orders.
 
