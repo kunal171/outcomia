@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "environment": "Solana devnet only",
+  "question": "Smoke test - which outcome does the release smoke resolve to?",
+  "purpose": "A technical deployment check with a newly created valueless token, not a public market.",
+  "resolutionSource": "docs/devnet/release-smoke-result.json in this repository, written by the smoke runner.",
+  "resolutionRules": {
+    "outcomes": [
+      {
+        "label": "Alpha",
+        "criteria": "The runner proposes and finalizes Alpha."
+      },
+      {
+        "label": "Beta",
+        "criteria": "The runner proposes and finalizes Beta."
+      },
+      {
+        "label": "Gamma",
+        "criteria": "The runner proposes and finalizes Gamma."
+      }
+    ],
+    "invalidRefund": "equal-share",
+    "invalidCriteria": "The smoke run is interrupted before finalization.",
+    "evidenceRequirements": "Transaction signatures recorded in the smoke result document.",
+    "conflictingEvidencePolicy": "The on-chain proposal is authoritative."
+  },
+  "closeTimestamp": 1795255545,
+  "earliestResolutionTimestamp": null,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 20
+}
