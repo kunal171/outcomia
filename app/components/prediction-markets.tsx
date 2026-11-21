@@ -3,7 +3,7 @@ import { useIndexerUpdates } from "./use-indexer-updates";
 import { TradingChart } from "./trading-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
-import { visiblePredictionMarket } from "../lib/market-visibility";
+import { visibleMarket } from "../lib/market-visibility";
 
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 import { PredictionDetailLayout } from "./prediction-detail-layout";
@@ -127,7 +127,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const visibleRecords = records.filter(
     (row) =>
       address ||
-      (visiblePredictionMarket(
+      (visibleMarket(
         row.address.toBase58(),
         row.metadata?.displayName,
       ) &&

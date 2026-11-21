@@ -171,30 +171,33 @@ test("smoke discovery filters preserve normal market questions", () => {
     new URL("../lib/market-visibility.ts", import.meta.url),
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
+    visibility.visibleMarket(
       "4AhXYjfYy5kVBTyWbmrxFJ7KmydghcaktprU74aVv5kC",
       "Anything",
     ),
     false,
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
-      "other",
-      "SMOKE ONLY - shared wallet settlement",
-    ),
+    visibility.visibleMarket("other", "SMOKE ONLY - shared wallet settlement"),
     false,
   );
   assert.equal(
-    visibility.visiblePredictionMarket("other", "Will candidate A win?"),
+    visibility.visibleMarket("other", "Will candidate A win?"),
     true,
   );
   assert.equal(
-    visibility.visiblePredictionMarket(
-      "other",
-      "Will wildfire smoke clear tomorrow?",
-    ),
+    visibility.visibleMarket("other", "Will wildfire smoke clear tomorrow?"),
     true,
-  );
+  ); // Names used by this release's deployment smoke test, for every market kind.
+  for (const name of [
+    "Smoke test - multi-outcome lifecycle",
+    "Smoke test - binary corrections",
+    "Smoke test",
+    "smoke-test spot",
+  ])
+    assert.equal(visibility.visibleMarket("other", name), false, name);
+  // Unnamed markets (metadata unavailable) stay visible unless listed.
+  assert.equal(visibility.visibleMarket("other"), true);
 });
 
 test("resolution follows stored phase, earliest time, review maturity and exclusive fallback deadline", () => {
