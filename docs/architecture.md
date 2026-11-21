@@ -268,6 +268,13 @@ program ID. Reversing the pair produces a different address.
 | `quote_decimals`    | Decimal precision read from the quote SPL mint during initialization           |
 | `price_tick_size`   | Smallest permitted price increment, expressed in raw price units               |
 | `quantity_lot_size` | Smallest permitted quantity increment, expressed in base-mint atoms            |
+
+Tick and lot must satisfy `price_tick_size × quantity_lot_size ≥ 10^base_decimals`.
+Every fill uses an on-tick price of at least one tick and a lot-multiple quantity of
+at least one lot, so this guarantees every fill moves at least one quote atom. Without
+it, a partial fill could leave a remainder worth zero quote at the FIFO head; no taker
+could fill it, freezing that price level and every worse one until the maker cancels.
+Opening a shared book over an older spot market applies the same rule.
 | `best_bid`          | Price of the first bid level, or `None`; advances when a level is removed |
 | `best_ask`          | Price of the first ask level, or `None`; advances when a level is removed |
 | `bump`              | Canonical market PDA bump                                                      |
@@ -511,7 +518,7 @@ FIFO-head and best-level removal, while a partial maker remains at the head.
 | `enable_admin`               | Super-admin               | Signer matches config; target is disabled                                                                                                                                                                                      | `Disabled -> Active`                                                                                                                                                                      |
 | `remove_admin`               | Super-admin               | Signer matches config; target is disabled                                                                                                                                                                                      | Closes the admin record                                                                                                                                                                   |
 | `set_taker_fee`              | Super-admin               | Signer matches config; rate is at most 1,000 bps                                                                                                                                                                               | Updates the global fee rate used by subsequent fills                                                                                                                                      |
-| `initialize_market`          | Active admin              | Admin record belongs to signer, is canonical and active; both accounts deserialize as SPL mints; base and quote differ; tick and lot sizes are nonzero; market, fee accumulator, vault authority, and vault PDAs are canonical | Atomically creates an active market, zeroed fee accumulator, and empty base/quote SPL Token vaults                                                                                        |
+| `initialize_market`          | Active admin              | Admin record belongs to signer, is canonical and active; both accounts deserialize as SPL mints; base and quote differ; tick and lot sizes are nonzero and their product is at least `10^base_decimals`; market, fee accumulator, vault authority, and vault PDAs are canonical | Atomically creates an active market, zeroed fee accumulator, and empty base/quote SPL Token vaults                                                                                        |
 | `initialize_market_metadata` | Active admin              | Admin record is canonical and active; metadata PDA belongs to the supplied market; labels use bounded printable ASCII; kind is not `Prediction`                                                                                | Creates the market's canonical metadata account with immutable classification                                                                                                             |
 | `update_market_metadata`     | Active admin              | Admin record is canonical and active; metadata belongs to the supplied market; labels remain valid                                                                                                                             | Updates base symbol, quote symbol, and display name without changing kind                                                                                                                 |
 | `close_market_metadata`      | Market authority          | Market authority matches; market is paused; metadata PDA belongs to the market                                                                                                                                                 | Closes metadata and returns its rent before market shutdown                                                                                                                               |
@@ -577,6 +584,7 @@ Anchor account validation
    |-- base mint != quote mint
    |-- tick size > 0
    |-- lot size > 0
+   |-- tick size × lot size >= 10^base decimals
    |-- market PDA matches the ordered pair
    |-- vault authority matches ["vault-authority", market]
    |-- vaults match ["vault", market, mint]
@@ -854,7 +862,8 @@ The program currently enforces:
 5. A market must be active to accept a new order.
 6. A market must be paused before it can be closed.
 7. Price and quantity must both be nonzero.
-8. Market tick and lot sizes must both be nonzero.
+8. Market tick and lot sizes must both be nonzero, and their product must be at
+   least one whole base token (`10^base_decimals`) so no fill rounds to zero quote.
 9. Order prices must be exact multiples of the market tick size.
 10. Order quantities must be exact multiples of the market lot size.
 11. Checked order notional must be at least one quote-mint atom.
@@ -1001,6 +1010,7 @@ The 193-test suite currently covers:
 - cancellation while the market is paused;
 - persistence of mint decimals, tick size, and lot size;
 - rejection of zero tick and lot sizes;
+- rejection of tick × lot below one whole base token, at market and shared-book creation;
 - rejection of off-tick prices and off-lot quantities;
 - rejection of orders whose notional rounds below one quote atom;
 - canonical base/quote vault mints, shared authority, and zero balances;
