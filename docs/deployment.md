@@ -8,9 +8,46 @@
 | Program ID                    | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` |
 | ProgramData address           | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` |
 | Upgrade authority             | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` |
-| Last verified deployment slot | `519350600`                                    |
+| Last verified deployment slot | `524674178`                                    |
 
 [Open the program in Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+
+## Release hardening and multi-outcome: 21 November 2026
+
+Upgrades devnet to the release-hardening build, which also carries the
+previously undeployed multi-outcome program.
+
+- SHA-256: `4525a47616016fd4dcf9b83ceeede2afb741c401c828fd1d1e95ea22a5b96b95`
+  (deployed bytes dumped and compared with the local build).
+- Length: 1,727,496 bytes; ProgramData was auto-extended by 328,056 bytes
+  (about 1.67 SOL, permanent).
+- Upgrade transaction:
+  `8LdYn5QVUuGdowEJ5JEDrxc6VWkeC8MfB7E4mPVo5bucoKT1QvAMTDwqnsZhWQTKCqa4huV7CZZFax3u2w334vo`.
+- All 40 existing program accounts were hashed before and after the upgrade;
+  none changed, appeared or disappeared.
+- [Smoke result](devnet/release-smoke-result.json) and its
+  [rules document](devnet/release-smoke-rules.json).
+
+The smoke used a fresh valueless mint and a temporary second wallet. It
+simulated a too-fine spot market (rejected with `SpotIncrementsTooFine`; no
+spot market was created) and ran a full multi-outcome lifecycle on a hidden
+market named "Smoke test - multi-outcome lifecycle": split, resting sell,
+matched buy through the app's trade builder, cancellation, freeze, proposal,
+two corrections, a correction rejected with `PredictionCorrectionWindowClosed`
+at the phase deadline while the proposal was still immature, permissionless
+finalization by the second wallet, redemption by both wallets, fee and cash
+withdrawal. Reserve and shared-vault backing were checked after every step.
+The token supply was burned to zero and the temporary wallet's SOL returned.
+The market is hidden by name and address and remains reachable for audit.
+
+The first upload attempt sent writes through validator TPU ports; 20 failed.
+The CLI had already extended ProgramData, so the program briefly ran the old
+6 November bytes followed by zeros (verified by hash; behavior unchanged).
+Resuming the same buffer with `--use-rpc` completed the upgrade and refunded
+the buffer. No second buffer was allocated.
+
+Multi-outcome trading remains disabled in the app until
+`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true` is set and the app is redeployed.
 
 ## Shared-wallet release: 6 November 2026
 
@@ -55,14 +92,29 @@ Build and verify before every upgrade:
 ```bash
 anchor build
 anchor test --skip-deploy
-anchor program deploy --no-idl
+# Upgrade the existing program explicitly; keep the buffer key to resume.
+solana-keygen new --no-bip39-passphrase -o <private-dir>/buffer-keypair.json
+solana program deploy target/deploy/outcomia.so \
+  --program-id AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL \
+  --upgrade-authority ~/.config/solana/id.json \
+  --buffer <private-dir>/buffer-keypair.json --use-rpc
 ```
+
+Afterwards, dump the program and compare the first `len(outcomia.so)` bytes
+with the local build's SHA-256, and compare program-account hashes taken
+before and after the upgrade. A failed upload can be resumed by rerunning the
+same command with the same buffer key.
+
+**Do not rely on `target/deploy/outcomia-keypair.json` in a fresh checkout.**
+`anchor build` generates a new random keypair when the file is missing, and
+`anchor program deploy` would then target that new address instead of
+upgrading the live program. Always pass `--program-id` explicitly, or restore
+the original keypair from secure storage first.
 
 Bare `anchor test` deploys to the provider cluster before executing the test
 script. Use `--skip-deploy` for the LiteSVM-only local verification workflow.
 
-The deployment keypair at `target/deploy/outcomia-keypair.json` determines the
-program address. It is intentionally excluded from Git and must be preserved
+The original deployment keypair determines the program address. It is intentionally excluded from Git and must be preserved
 securely; replacing it would create a different program ID.
 
 ## Public test-faucet bootstrap

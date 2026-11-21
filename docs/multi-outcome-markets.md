@@ -5,9 +5,10 @@ creation/discovery/trading/claims UI, and indexer event decoding are implemented
 and checked locally. The shared app exposes `/predictions/multi` and
 `/predictions/multi/new`. Transactions require both
 `NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true` and
-`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. Keep the latter disabled until the
-matching program is deliberately deployed and verified. No multi-outcome devnet
-upgrade or live smoke test has been performed.
+`NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true`. The matching program was deployed to
+devnet on 21 November 2026 and passed a live two-wallet lifecycle smoke test
+(see [deployment](deployment.md)). The UI flag remains disabled until it is
+deliberately enabled with a compatible deployed indexer.
 
 ## Scope
 
