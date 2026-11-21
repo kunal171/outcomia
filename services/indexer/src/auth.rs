@@ -1,6 +1,6 @@
 //! Wallet ownership creates a user/session; it never credits a financial balance.
 use axum::{
-    extract::State,
+    extract::{ConnectInfo, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -13,7 +13,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use solana_pubkey::Pubkey;
 use sqlx::{PgPool, Row};
-use std::{str::FromStr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 
 #[derive(Clone)]
 pub struct AuthState {
@@ -21,6 +25,8 @@ pub struct AuthState {
     pub origin: Arc<str>,
     pub domain: Arc<str>,
     pub secure: bool,
+    /// Secret the app proxy sends with the browser's IP; see `client_key`.
+    pub proxy_secret: Option<Arc<str>>,
 }
 #[derive(Debug)]
 pub struct AuthError(pub StatusCode, pub &'static str);
@@ -39,6 +45,15 @@ impl From<sqlx::Error> for AuthError {
 }
 type Result<T> = std::result::Result<T, AuthError>;
 const SESSION: &str = "outcomia_session";
+/// Challenges any one client may request per minute.
+const CHALLENGES_PER_CLIENT: i64 = 10;
+/// Challenges for one wallet address per minute.
+const CHALLENGES_PER_WALLET: i64 = 5;
+/// Safety ceiling across all clients per minute; not the primary control.
+const CHALLENGES_GLOBAL: i64 = 600;
+/// Headers set by the app's server-side proxy, never trusted without the secret.
+const CLIENT_IP_HEADER: &str = "x-outcomia-client-ip";
+const PROXY_TOKEN_HEADER: &str = "x-outcomia-proxy-token";
 const CHALLENGE: &str = "outcomia_challenge";
 fn bad() -> AuthError {
     AuthError(
@@ -98,7 +113,55 @@ pub fn state(pool: PgPool, origin: &str) -> std::result::Result<AuthState, Strin
         origin: origin.into(),
         domain: domain.into(),
         secure,
+        proxy_secret: None,
     })
+}
+impl AuthState {
+    /// Inputs: optional proxy secret. Errors: a secret shorter than 32 bytes.
+    /// Returns: state that trusts forwarded client IPs only with that secret.
+    pub fn with_proxy_secret(
+        mut self,
+        secret: Option<String>,
+    ) -> std::result::Result<Self, String> {
+        if let Some(secret) = secret {
+            if secret.len() < 32 {
+                return Err("INDEXER_PROXY_SECRET must be at least 32 characters".into());
+            }
+            self.proxy_secret = Some(secret.into());
+        }
+        Ok(self)
+    }
+}
+/// Compares secrets without stopping at the first differing byte.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0_u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+/// Rate-limit identity for one sign-in request, stored only as a digest.
+///
+/// The app's server-side proxy forwards the browser's IP with a shared secret;
+/// that IP is trusted only when the secret matches, because the API port is
+/// public and any caller could otherwise forge the header. Without it, the TCP
+/// peer address is used (behind a load balancer that is the balancer itself,
+/// so direct callers share one bucket).
+fn client_key(state: &AuthState, headers: &HeaderMap, peer: Option<SocketAddr>) -> String {
+    let forwarded = state.proxy_secret.as_deref().and_then(|secret| {
+        let token = headers.get(PROXY_TOKEN_HEADER)?.to_str().ok()?;
+        if !constant_time_eq(token.as_bytes(), secret.as_bytes()) {
+            return None;
+        }
+        headers
+            .get(CLIENT_IP_HEADER)?
+            .to_str()
+            .ok()?
+            .trim()
+            .parse::<IpAddr>()
+            .ok()
+    });
+    match (forwarded, peer) {
+        (Some(ip), _) => hash(&format!("client:{ip}")),
+        (None, Some(addr)) => hash(&format!("peer:{}", addr.ip())),
+        (None, None) => hash("unknown"),
+    }
 }
 #[derive(Deserialize)]
 struct WalletInput {
@@ -122,11 +185,17 @@ pub struct User {
 }
 async fn challenge(
     State(state): State<AuthState>,
+    peer: Option<axum::Extension<ConnectInfo<SocketAddr>>>,
     headers: HeaderMap,
     Json(input): Json<WalletInput>,
 ) -> Result<Response> {
     check_origin(&state, &headers)?;
     Pubkey::from_str(&input.wallet).map_err(|_| bad())?;
+    let client = client_key(
+        &state,
+        &headers,
+        peer.map(|axum::Extension(ConnectInfo(a))| a),
+    );
     let nonce = random();
     let mut tx = state.pool.begin().await?;
     // One bounded global issuance gate also serializes per-wallet rate checks.
@@ -136,8 +205,11 @@ async fn challenge(
     sqlx::query("DELETE FROM login_challenges WHERE expires_at<NOW()")
         .execute(&mut *tx)
         .await?;
-    let (global,owned):(i64,i64)=sqlx::query_as("SELECT COUNT(*),COUNT(*) FILTER(WHERE wallet_address=$1) FROM login_challenges WHERE created_at>NOW()-INTERVAL '1 minute'").bind(&input.wallet).fetch_one(&mut *tx).await?;
-    if global >= 120 || owned >= 5 {
+    let (global,owned,from_client):(i64,i64,i64)=sqlx::query_as("SELECT COUNT(*),COUNT(*) FILTER(WHERE wallet_address=$1),COUNT(*) FILTER(WHERE client_hash=$2) FROM login_challenges WHERE created_at>NOW()-INTERVAL '1 minute'").bind(&input.wallet).bind(&client).fetch_one(&mut *tx).await?;
+    if from_client >= CHALLENGES_PER_CLIENT
+        || owned >= CHALLENGES_PER_WALLET
+        || global >= CHALLENGES_GLOBAL
+    {
         return Err(AuthError(
             StatusCode::TOO_MANY_REQUESTS,
             "Too many sign-in requests; retry shortly",
@@ -145,8 +217,8 @@ async fn challenge(
     }
     let (issued,expires):(String,String)=sqlx::query_as("SELECT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),to_char((NOW()+INTERVAL '5 minutes') AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')").fetch_one(&mut *tx).await?;
     let message=format!("{} wants you to sign in with your Solana account:\n{}\n\nSign in to Outcomia.\n\nURI: {}\nVersion: 1\nChain ID: devnet\nNonce: {}\nIssued At: {}\nExpiration Time: {}",state.domain,input.wallet,state.origin,nonce,issued,expires);
-    sqlx::query("INSERT INTO login_challenges(challenge_hash,wallet_address,domain,message,expires_at) VALUES($1,$2,$3,$4,NOW()+INTERVAL '5 minutes')")
-        .bind(hash(&nonce)).bind(&input.wallet).bind(state.origin.as_ref()).bind(&message).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO login_challenges(challenge_hash,wallet_address,domain,message,expires_at,client_hash) VALUES($1,$2,$3,$4,NOW()+INTERVAL '5 minutes',$5)")
+        .bind(hash(&nonce)).bind(&input.wallet).bind(state.origin.as_ref()).bind(&message).bind(&client).execute(&mut *tx).await?;
     tx.commit().await?;
     let mut response = Json(ChallengeResponse {
         nonce: nonce.clone(),
