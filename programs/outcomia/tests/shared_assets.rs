@@ -859,6 +859,41 @@ fn prediction_split_resolution_correction_redemption_and_replay_are_conserved() 
     assert_eq!(f.tokens(f.vault), f.ledger().free);
 }
 
+/// A resolver who re-corrects just before every maturity cannot postpone
+/// finalization forever. With close 100, no earliest time and delay 10, the
+/// primary may correct only before 100 + 2 * 10 = 120, so the last accepted
+/// proposal matures by 128 and anyone can finalize it.
+#[test]
+fn repeated_corrections_cannot_postpone_finalization_past_the_window() {
+    let mut f = Fixture::new();
+    clock(&mut f, 1);
+    let (market, _) = prediction(&mut f);
+    clock(&mut f, 100);
+    assert!(f.send(&[propose(&f, market, PredictionResolution::No, false)]));
+    clock(&mut f, 109); // matures at 110
+    assert!(f.send(&[propose(&f, market, PredictionResolution::Yes, true)]));
+    clock(&mut f, 118); // matures at 119
+    assert!(f.send(&[propose(&f, market, PredictionResolution::No, true)]));
+
+    // 120 is still before the current maturity (128), but the window closed.
+    clock(&mut f, 120);
+    assert!(!f.send(&[propose(&f, market, PredictionResolution::Yes, true)]));
+    let m: PredictionMarket = load(&f, market);
+    let proposal = m.proposal.expect("last accepted proposal is kept");
+    assert_eq!(
+        (proposal.outcome, proposal.proposed_at),
+        (PredictionResolution::No, 118)
+    );
+
+    clock(&mut f, 127);
+    assert!(!f.send(&[advance(market, 2)]));
+    clock(&mut f, 128);
+    assert!(f.send(&[advance(market, 2)]));
+    let m: PredictionMarket = load(&f, market);
+    assert_eq!(m.final_outcome, Some(PredictionResolution::No));
+    assert_eq!(m.status, PredictionStatus::Resolved);
+}
+
 #[test]
 fn configured_fallback_timeout_pays_exact_half_and_cannot_override_proposal() {
     let mut f = Fixture::new();

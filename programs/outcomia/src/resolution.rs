@@ -530,11 +530,61 @@ mod tests {
         assert!(advance(&mut M::build(None), 4, i64::MAX).is_err());
     }
 
+    fn corrections_stop_at_the_phase_deadline<M: Fixture>() {
+        // Primary: window starts at the earliest resolution time.
+        let primary_deadline = EARLIEST + 2 * DELAY as i64;
+        let mut m = M::build(None);
+        assert_eq!(correction_deadline(&m), primary_deadline);
+        m.propose(M::sample(), primary_deadline - 20); // matures after the deadline
+        assert!(check_proposal_state(&m, primary_deadline - 1, true).is_ok());
+        assert!(check_proposal_state(&m, primary_deadline, true).is_err());
+
+        // Fallback: window restarts at fallback availability.
+        let fallback_deadline = AVAILABLE + 2 * DELAY as i64;
+        let mut m = M::build(Some(fallback(None)));
+        m.set_resolution_phase(PredictionResolutionPhase::Fallback);
+        assert_eq!(correction_deadline(&m), fallback_deadline);
+        m.propose(M::sample(), fallback_deadline - 10);
+        assert!(check_proposal_state(&m, fallback_deadline - 1, true).is_ok());
+        assert!(check_proposal_state(&m, fallback_deadline, true).is_err());
+    }
+
+    fn a_stalling_resolver_is_cut_off<M: Fixture>() {
+        // Re-correct one second before each maturity for as long as allowed.
+        let mut m = M::build(None);
+        let mut at = EARLIEST;
+        m.propose(M::sample(), at);
+        let mut corrections = 0;
+        loop {
+            let next = maturity(&m).unwrap() - 1;
+            if check_proposal_state(&m, next, true).is_err() {
+                break;
+            }
+            at = next;
+            m.propose(M::sample(), at);
+            corrections += 1;
+            assert!(corrections < 10, "corrections were not bounded");
+        }
+        let mature = maturity(&m).unwrap();
+        assert!(mature <= correction_deadline(&m) + DELAY as i64);
+        advance(&mut m, 2, mature).unwrap();
+        assert_eq!(m.status(), PredictionStatus::Resolved);
+    }
+
+    #[test]
+    fn huge_delays_saturate_the_correction_deadline() {
+        let mut m = PredictionMarket::build(None);
+        m.resolution_delay_seconds = u64::MAX;
+        assert_eq!(correction_deadline(&m), i64::MAX);
+    }
+
     #[test]
     fn binary_lifecycle() {
         resolver_window_respects_schedule::<PredictionMarket>();
         proposal_state_allows_one_proposal_and_timely_corrections::<PredictionMarket>();
         advance_follows_the_published_clock::<PredictionMarket>();
+        corrections_stop_at_the_phase_deadline::<PredictionMarket>();
+        a_stalling_resolver_is_cut_off::<PredictionMarket>();
     }
 
     #[test]
@@ -542,6 +592,8 @@ mod tests {
         resolver_window_respects_schedule::<MultiOutcomeMarket>();
         proposal_state_allows_one_proposal_and_timely_corrections::<MultiOutcomeMarket>();
         advance_follows_the_published_clock::<MultiOutcomeMarket>();
+        corrections_stop_at_the_phase_deadline::<MultiOutcomeMarket>();
+        a_stalling_resolver_is_cut_off::<MultiOutcomeMarket>();
     }
 
     #[test]
