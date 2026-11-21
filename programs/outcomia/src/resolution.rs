@@ -92,11 +92,41 @@ pub fn maturity<M: ResolutionMarket>(m: &M) -> Result<i64> {
         .ok_or_else(|| error!(prediction::PredictionTimestampOverflow))
 }
 
+/// Review delays after the current resolver phase begins during which that
+/// resolver may still correct a proposal.
+pub const CORRECTION_WINDOW_DELAYS: u64 = 2;
+
+/// Last instant (exclusive) at which the current resolver may correct.
+///
+/// Each correction restarts the review delay, so without a bound a resolver
+/// could keep a market from finalizing forever. The window is anchored at the
+/// start of the current resolver's phase: the earliest resolution time for the
+/// primary, fallback availability for the fallback. It is derived only from
+/// immutable terms, so deployed markets need no layout change. A proposal can
+/// therefore mature no later than `correction_deadline + delay`.
+///
+/// Example: earliest 1,100 and delay 50 give a primary deadline of 1,200; a
+/// proposal at 1,180 is correctable until 1,199 and matures by 1,250.
+///
+/// # Returns
+/// The deadline in Unix seconds; saturates rather than failing for huge delays.
+pub fn correction_deadline<M: ResolutionMarket>(m: &M) -> i64 {
+    let start = match (m.resolution_phase(), m.fallback()) {
+        (PredictionResolutionPhase::Fallback, Some(f)) => f.available_ts,
+        _ => m.earliest_resolution_ts().unwrap_or(m.close_ts()),
+    };
+    let window = m
+        .resolution_delay_seconds()
+        .saturating_mul(CORRECTION_WINDOW_DELAYS);
+    start.saturating_add(i64::try_from(window).unwrap_or(i64::MAX))
+}
+
 /// Checks that the market's lifecycle state accepts a new proposal or a correction.
 /// # Inputs
 /// Market, current Unix seconds and whether this replaces a pending proposal.
 /// # Errors
-/// Already final, correcting without a pending/immature proposal, or proposing twice.
+/// Already final, correcting without a pending/immature proposal, correcting
+/// after the phase's correction deadline, or proposing twice.
 /// # Returns
 /// Success when the caller may store a (replacement) proposal.
 pub fn check_proposal_state<M: ResolutionMarket>(m: &M, now: i64, correction: bool) -> Result<()> {
@@ -108,6 +138,10 @@ pub fn check_proposal_state<M: ResolutionMarket>(m: &M, now: i64, correction: bo
         require!(
             m.status() == PredictionStatus::Proposed && now < maturity(m)?,
             shared::PredictionProposalUnavailable
+        );
+        require!(
+            now < correction_deadline(m),
+            shared::PredictionCorrectionWindowClosed
         );
     } else {
         require!(
