@@ -53,7 +53,11 @@
 #![allow(clippy::result_large_err, clippy::too_many_arguments)]
 use anchor_lang::{
     prelude::{Clock, Pubkey},
-    solana_program::{instruction::Instruction, program_pack::Pack, system_program},
+    solana_program::{
+        instruction::{AccountMeta, Instruction},
+        program_pack::Pack,
+        system_program,
+    },
     AccountDeserialize, AccountSerialize, InstructionData, ToAccountMetas,
 };
 use anchor_spl::token::spl_token::state::{Account as TokenAccount, AccountState, Mint};
@@ -1724,3 +1728,286 @@ fn eight_outcome_budget_and_atomic_multi_maker_fills() {
 
 #[path = "multi_outcome_orders/staging.rs"]
 mod staging;
+
+// ============================================================================
+// N-way complete-set (complementary) matching
+// ============================================================================
+
+/// Builds `MatchMultiOutcomeComplement` against the current best same-side head
+/// of every other outcome, with `[order, next, cash, position]` per maker.
+fn complement_ix(
+    f: &Fixture,
+    taker: &Pubkey,
+    outcome: OutcomeId,
+    side: OrderSide,
+    limit_price: u64,
+    quantity: u64,
+    fee_bps: u16,
+) -> Instruction {
+    let count = f.market().terms.outcome_labels.len() as u8;
+    let book = f.book();
+    let heads: Vec<(Pubkey, MultiOutcomeOrder)> = (0..count)
+        .filter(|j| *j != outcome.index())
+        .map(|j| {
+            let o = OutcomeId::new(j, count).unwrap();
+            let r = book.heads[outcomia::multi_outcome_trading::slot(o, side)].expect("head");
+            (r.order, f.read::<MultiOutcomeOrder>(r.order))
+        })
+        .collect();
+    let fill = heads
+        .iter()
+        .map(|(_, o)| o.remaining_quantity)
+        .fold(quantity, u64::min);
+    let mut accounts = outcomia::accounts::MatchMultiOutcomeComplement {
+        taker: *taker,
+        market: f.market_key(),
+        book: f.book_key(),
+        protocol_config: f.config_key(),
+        taker_cash: f.balance_key(taker),
+        taker_position: f.position_key(taker),
+        mint: f.mint,
+        asset_authority: pda(ASSET_AUTHORITY_SEED, &[f.mint.as_ref()]),
+        asset_vault: f.global(),
+        market_authority: pda(VAULT_AUTHORITY_SEED, &[f.market_key().as_ref()]),
+        market_vault: f.reserve(),
+        token_program: anchor_spl::token::ID,
+    }
+    .to_account_metas(None);
+    for (key, o) in &heads {
+        let next = if o.remaining_quantity == fill {
+            o.next.unwrap_or(outcomia::ID)
+        } else {
+            outcomia::ID
+        };
+        accounts.push(AccountMeta::new(*key, false));
+        accounts.push(if next == outcomia::ID {
+            AccountMeta::new_readonly(next, false)
+        } else {
+            AccountMeta::new(next, false)
+        });
+        accounts.push(AccountMeta::new(f.balance_key(&o.owner), false));
+        accounts.push(AccountMeta::new(f.position_key(&o.owner), false));
+    }
+    Instruction::new_with_bytes(
+        outcomia::ID,
+        &outcomia::instruction::MatchMultiOutcomeComplement {
+            outcome,
+            taker_side: side,
+            limit_price,
+            quantity,
+            expected_fee_bps: fee_bps,
+        }
+        .data(),
+        accounts,
+    )
+}
+
+/// Reserve equals every outcome's (equal) supply times the payout, and the
+/// global vault equals both traders' shared claims plus book fees.
+fn assert_full_sets_conserved(f: &Fixture) {
+    let m = f.market();
+    let count = m.terms.outcome_labels.len();
+    assert!(m.supplies[..count].iter().all(|s| *s == m.supplies[0]));
+    assert_eq!(
+        m.backing_reserve,
+        m.supplies[0] * m.terms.payout_per_contract
+    );
+    assert_eq!(f.tokens(f.reserve()), m.backing_reserve);
+    let claims: u64 = [f.owner.pubkey(), f.taker.pubkey()]
+        .iter()
+        .map(|k| {
+            let b = f.balance(k);
+            b.free + b.locked
+        })
+        .sum();
+    assert_eq!(
+        f.tokens(f.global()),
+        claims + f.book().accrued_collateral_fees
+    );
+}
+
+#[test]
+fn three_way_buys_mint_full_sets_even_when_one_maker_holds_two_legs() {
+    let mut f = Fixture::new();
+    f.setup_active_market(3);
+    f.set_protocol_fee(100);
+    let (owner, taker) = (f.owner.pubkey(), f.taker.pubkey());
+    let [o0, o1, o2] = [0, 1, 2].map(|i| OutcomeId::new(i, 3).unwrap());
+    // One maker holds the best bid on both other outcomes: its cash and
+    // position accounts appear twice and must absorb both legs' deltas.
+    f.send(f.place_order(&owner, o1, OrderSide::Bid, 300_000, 6, 1))
+        .expect("bid 1");
+    f.send(f.place_order(&owner, o2, OrderSide::Bid, 250_000, 9, 2))
+        .expect("bid 2");
+    assert_eq!(f.balance(&owner).locked, 1_800_000 + 2_250_000);
+    let taker_cash = f.balance(&taker).free;
+
+    // Taker bids 0.50 for outcome 0: buys at 1 - 0.30 - 0.25 = 0.45, capped at 6.
+    let res = f.send(complement_ix(
+        &f,
+        &taker,
+        o0,
+        OrderSide::Bid,
+        500_000,
+        12,
+        100,
+    ));
+    res.as_ref().expect("complement mint");
+    let m = f.market();
+    assert_eq!(&m.supplies[..3], &[6, 6, 6]);
+    assert_eq!(m.backing_reserve, 6_000_000);
+    // Taker pays 6 x 0.45 = 2.7 plus a 1% fee of 27,000.
+    assert_eq!(f.balance(&taker).free, taker_cash - 2_700_000 - 27_000);
+    assert_eq!(f.position(&taker).free[0], 6);
+    // Both legs debit the same maker cash: 1.8 (all of bid 1) + 1.5 (part of bid 2).
+    assert_eq!(f.balance(&owner).locked, 2_250_000 - 1_500_000);
+    let p = f.position(&owner);
+    assert_eq!((p.free[1], p.free[2]), (6, 6));
+    // Bid 1 completed and left the book; bid 2 keeps 3 and stays head.
+    assert_eq!(f.order(1).status, OrderStatus::Filled);
+    assert_eq!(f.order(2).remaining_quantity, 3);
+    assert_eq!(f.order(2).locked_amount, 750_000);
+    let book = f.book();
+    assert!(book.heads[outcomia::multi_outcome_trading::slot(o1, OrderSide::Bid)].is_none());
+    assert_eq!(
+        book.heads[outcomia::multi_outcome_trading::slot(o2, OrderSide::Bid)].map(|r| r.order),
+        Some(f.order_key(2))
+    );
+    assert_eq!((book.open_order_count, f.market().open_order_count), (1, 1));
+    assert_eq!(book.accrued_collateral_fees, 27_000);
+    // One event per leg; the taker leg's counterparty is the complete set.
+    let events = support::events::events::<outcomia::MultiOutcomeFillEvent>(&res);
+    assert_eq!(events.len(), 3);
+    let taker_leg = events.iter().find(|e| e.outcome == o0).unwrap();
+    assert_eq!(
+        (taker_leg.price, taker_leg.fee_atoms, taker_leg.maker),
+        (450_000, 27_000, Pubkey::default())
+    );
+    assert!(events
+        .iter()
+        .filter(|e| e.outcome != o0)
+        .all(|e| e.fee_atoms == 0 && e.maker == owner));
+    assert_full_sets_conserved(&f);
+}
+
+#[test]
+fn three_way_sells_merge_full_sets_out_of_the_reserve() {
+    let mut f = Fixture::new();
+    f.setup_active_market(3);
+    f.set_protocol_fee(100);
+    let (owner, taker) = (f.owner.pubkey(), f.taker.pubkey());
+    let [o0, o1, o2] = [0, 1, 2].map(|i| OutcomeId::new(i, 3).unwrap());
+    f.send(f.complete(&owner, 6, true)).expect("owner split");
+    f.send(f.complete(&taker, 6, true)).expect("taker split");
+    f.send(f.place_order(&owner, o1, OrderSide::Ask, 400_000, 3, 1))
+        .expect("ask 1");
+    f.send(f.place_order(&owner, o2, OrderSide::Ask, 350_000, 3, 2))
+        .expect("ask 2");
+    let (owner_cash, taker_cash) = (f.balance(&owner).free, f.balance(&taker).free);
+
+    // Taker sells outcome 0 at 0.20 or better: receives 1 - 0.40 - 0.35 = 0.25.
+    f.send(complement_ix(
+        &f,
+        &taker,
+        o0,
+        OrderSide::Ask,
+        200_000,
+        3,
+        100,
+    ))
+    .expect("complement merge");
+    let m = f.market();
+    assert_eq!(&m.supplies[..3], &[9, 9, 9]);
+    assert_eq!(m.backing_reserve, 9_000_000);
+    assert_eq!(f.position(&taker).free[0], 3);
+    // Taker receives 3 x 0.25 = 0.75 minus a 7,500 fee; maker receives 2.25.
+    assert_eq!(f.balance(&taker).free, taker_cash + 750_000 - 7_500);
+    assert_eq!(f.balance(&owner).free, owner_cash + 1_200_000 + 1_050_000);
+    let p = f.position(&owner);
+    assert_eq!((p.locked[1], p.locked[2]), (0, 0));
+    assert_eq!(f.book().open_order_count, 0);
+    assert_full_sets_conserved(&f);
+}
+
+#[test]
+fn complement_rejects_missing_heads_non_heads_noncrossing_self_and_crossed_placement() {
+    let mut f = Fixture::new();
+    f.setup_active_market(3);
+    // Quotes below sign a zero fee; the stale-quote case signs 25 bps.
+    f.set_protocol_fee(0);
+    let (owner, taker) = (f.owner.pubkey(), f.taker.pubkey());
+    let [o0, o1, o2] = [0, 1, 2].map(|i| OutcomeId::new(i, 3).unwrap());
+    f.send(f.place_order(&owner, o1, OrderSide::Bid, 300_000, 3, 1))
+        .expect("bid 1");
+    // Outcome 2 has no bid: no full set can form.
+    let missing = Instruction::new_with_bytes(
+        outcomia::ID,
+        &outcomia::instruction::MatchMultiOutcomeComplement {
+            outcome: o0,
+            taker_side: OrderSide::Bid,
+            limit_price: 900_000,
+            quantity: 3,
+            expected_fee_bps: 0,
+        }
+        .data(),
+        outcomia::accounts::MatchMultiOutcomeComplement {
+            taker,
+            market: f.market_key(),
+            book: f.book_key(),
+            protocol_config: f.config_key(),
+            taker_cash: f.balance_key(&taker),
+            taker_position: f.position_key(&taker),
+            mint: f.mint,
+            asset_authority: pda(ASSET_AUTHORITY_SEED, &[f.mint.as_ref()]),
+            asset_vault: f.global(),
+            market_authority: pda(VAULT_AUTHORITY_SEED, &[f.market_key().as_ref()]),
+            market_vault: f.reserve(),
+            token_program: anchor_spl::token::ID,
+        }
+        .to_account_metas(None),
+    );
+    f.reject(missing, Some("InvalidComplementMatch"));
+
+    f.send(f.place_order(&owner, o2, OrderSide::Bid, 250_000, 3, 2))
+        .expect("bid 2");
+    f.send(f.place_order(&owner, o1, OrderSide::Bid, 290_000, 3, 3))
+        .expect("worse bid 1");
+    // 0.44 + 0.30 + 0.25 < 1: no cross.
+    f.reject(
+        complement_ix(&f, &taker, o0, OrderSide::Bid, 440_000, 3, 0),
+        Some("OrdersDoNotCross"),
+    );
+    // A non-head maker cannot be substituted for the book's head.
+    let mut swapped = complement_ix(&f, &taker, o0, OrderSide::Bid, 450_000, 3, 0);
+    let head_index = swapped
+        .accounts
+        .iter()
+        .position(|m| m.pubkey == f.order_key(1))
+        .unwrap();
+    swapped.accounts[head_index].pubkey = f.order_key(3);
+    f.reject(swapped, Some("MakerNotFifoHead"));
+    // A malformed remaining-account list is rejected.
+    let mut short = complement_ix(&f, &taker, o0, OrderSide::Bid, 450_000, 3, 0);
+    short.accounts.pop();
+    f.reject(short, Some("InvalidComplementMatch"));
+    // Stale fee quote.
+    f.reject(
+        complement_ix(&f, &taker, o0, OrderSide::Bid, 450_000, 3, 25),
+        Some("MultiOutcomeFeeQuoteChanged"),
+    );
+    // Self-trade: the maker cannot complete a set against its own bids.
+    f.reject(
+        complement_ix(&f, &owner, o0, OrderSide::Bid, 450_000, 3, 0),
+        Some("SelfTradeNotAllowed"),
+    );
+    // Placement cannot rest a bid that completes a set (0.45 + 0.30 + 0.25 = 1)...
+    f.reject(
+        f.place_order(&taker, o0, OrderSide::Bid, 450_000, 3, 4),
+        Some("InvalidPrice"),
+    );
+    // ...but one tick below rests normally.
+    f.send(f.place_order(&taker, o0, OrderSide::Bid, 440_000, 3, 4))
+        .expect("rest");
+    assert_eq!(&f.market().supplies[..3], &[0, 0, 0]);
+    assert_full_sets_conserved(&f);
+}
