@@ -3,6 +3,7 @@
 use crate::{
     constants::*,
     errors::{admin, balance, shared},
+    matching::validate_spot_increments,
     shared_trading,
     state::*,
 };
@@ -45,6 +46,11 @@ pub fn handle_initialize_shared_book(
         admin::UnauthorizedAdmin
     );
     require!(value.tick > 0 && value.lot > 0, shared::InvalidSharedBook);
+    if kind == MarketKind::Spot {
+        // Markets created before increment validation may still be too fine;
+        // never open a shared book that could freeze behind a zero-value head.
+        validate_spot_increments(value.base_decimals, value.tick, value.lot)?;
+    }
     ctx.accounts.book.set_inner(SharedBook {
         market: ctx.accounts.market.key(),
         authority: value.authority,

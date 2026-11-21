@@ -691,6 +691,17 @@ fn load_market(svm: &LiteSVM, address: Pubkey) -> outcomia::state::Market {
     outcomia::state::Market::try_deserialize(&mut data).unwrap()
 }
 
+/// Overwrites a market in place, keeping its allocated length. `Market` holds
+/// `Option<u64>` fields, so its encoding can be shorter than the allocation.
+fn store_market(svm: &mut LiteSVM, address: Pubkey, state: &outcomia::state::Market) {
+    let mut account = svm.get_account(&address).unwrap();
+    let mut data = Vec::new();
+    state.try_serialize(&mut data).unwrap();
+    assert!(data.len() <= account.data.len());
+    account.data[..data.len()].copy_from_slice(&data);
+    svm.set_account(address, account).unwrap();
+}
+
 fn load_market_fees(svm: &LiteSVM, address: Pubkey) -> outcomia::state::MarketFees {
     let account = svm.get_account(&address).unwrap();
     let mut data: &[u8] = &account.data;
@@ -1815,6 +1826,9 @@ fn off_lot_quantity_is_rejected() {
     assert!(svm.get_account(&order).is_none());
 }
 
+/// New markets cannot have increments this fine, but markets created before
+/// increment validation still can, so placement must keep rejecting orders
+/// whose quote notional rounds to zero.
 #[test]
 fn zero_quote_notional_is_rejected() {
     let ActiveMarketFixture {
@@ -1822,7 +1836,11 @@ fn zero_quote_notional_is_rejected() {
         payer,
         market,
         ..
-    } = setup_active_market(9, 1, 1);
+    } = setup_active_market(9, TEST_PRICE_TICK_SIZE, TEST_QUANTITY_LOT_SIZE);
+    let mut legacy = load_market(&svm, market);
+    legacy.price_tick_size = 1;
+    legacy.quantity_lot_size = 1;
+    store_market(&mut svm, market, &legacy);
 
     let (order, result) = send_initial_limit_order(&mut svm, &payer, market, 1, 1);
 
@@ -3903,8 +3921,10 @@ fn final_bid_fill_returns_fixed_point_rounding_dust() {
         payer: maker,
         market,
         ..
-    } = setup_active_market(6, 1, 1);
-    let price = 1_500_000;
+    } = setup_active_market(1, 15, 1);
+    // Base scale 10: price 15 locks floor(15 * 2 / 10) = 3 quote atoms, but
+    // each one-unit fill costs floor(15 / 10) = 1, leaving 1 atom of dust.
+    let price = 15;
     let maker_quantity = 2;
 
     let (maker_order, placement_result) = send_insert_limit_order(
@@ -3935,7 +3955,7 @@ fn final_bid_fill_returns_fixed_point_rounding_dust() {
         market,
         maker_order,
         outcomia::state::OrderSide::Ask,
-        1_000_000,
+        price,
         1,
     );
     assert!(
@@ -3952,7 +3972,7 @@ fn final_bid_fill_returns_fixed_point_rounding_dust() {
         market,
         maker_order,
         outcomia::state::OrderSide::Ask,
-        1_000_000,
+        price,
         1,
         None,
         None,
