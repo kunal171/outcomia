@@ -1166,6 +1166,63 @@ fn shared_book_requires_active_creator_and_empty_shutdown() {
     assert!(f.svm.get_account(&book).is_none_or(|a| a.lamports == 0));
 }
 
+/// A spot market created before increment validation may have increments so
+/// fine that a one-atom remainder is worth zero quote and freezes the FIFO head.
+/// Opening a shared book over it must be rejected until the increments cover
+/// one whole base token; the identical setup then succeeds.
+#[test]
+fn shared_spot_book_rejects_increments_that_allow_zero_value_fills() {
+    let mut f = Fixture::new();
+    let (market, book) = shared_spot(&mut f, Pubkey::new_unique());
+    f.svm.set_account(book, Account::default()).unwrap();
+    let mut m: Market = load(&f, market);
+    m.base_decimals = 9;
+    m.price_tick_size = 1;
+    m.quantity_lot_size = 1;
+    store(&mut f.svm, market, &m);
+    let owner = f.owner.pubkey();
+    let (admin, bump) = Pubkey::find_program_address(&[ADMIN_SEED, owner.as_ref()], &outcomia::ID);
+    store(
+        &mut f.svm,
+        admin,
+        &AdminRecord {
+            authority: owner,
+            added_by: owner,
+            status: AdminStatus::Active,
+            bump,
+        },
+    );
+    let initialize = ix(
+        outcomia::accounts::InitializeSharedBook {
+            authority: owner,
+            admin_record: admin,
+            market,
+            book,
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::InitializeSharedBook {
+            kind: MarketKind::Spot,
+        },
+    );
+    assert!(!f.send(std::slice::from_ref(&initialize)));
+    assert!(f.svm.get_account(&book).is_none_or(|a| a.lamports == 0));
+
+    // tick * lot == 10^9: exactly one whole base token is accepted.
+    m.price_tick_size = 10_000;
+    m.quantity_lot_size = 100_000;
+    store(&mut f.svm, market, &m);
+    assert!(f.send(&[initialize]));
+    let created: SharedBook = load(&f, book);
+    assert_eq!(
+        (
+            created.base_decimals,
+            created.price_tick,
+            created.quantity_lot
+        ),
+        (9, 10_000, 100_000)
+    );
+}
+
 #[test]
 fn shared_prediction_trade_then_both_wallets_redeem_without_spending_legacy_cash() {
     let mut f = Fixture::new();

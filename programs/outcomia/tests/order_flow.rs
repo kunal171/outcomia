@@ -1784,6 +1784,56 @@ fn zero_quantity_lot_size_is_rejected() {
     assert!(svm.get_account(&quote_vault).is_none());
 }
 
+/// With 9 base decimals, tick 1 and lot 1, a one-atom remainder at any
+/// realistic price is worth zero quote atoms and could never be filled. Market
+/// creation must reject such increments atomically and accept the exact
+/// boundary of one whole base token (tick * lot == 10^9).
+#[test]
+fn increments_below_one_whole_base_token_are_rejected() {
+    let payer = Keypair::new();
+    let mut svm = LiteSVM::new();
+    svm.add_program(outcomia::id(), PROGRAM_BYTES).unwrap();
+    svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
+    store_admin_record(
+        &mut svm,
+        payer.pubkey(),
+        outcomia::state::AdminStatus::Active,
+    );
+    let base_mint = create_test_mint(&mut svm, 9);
+    let quote_mint = create_test_mint(&mut svm, 6);
+
+    for (tick, lot) in [(1, 1), (10_000, 99_999)] {
+        let (market, result) =
+            send_initialize_market_with_config(&mut svm, &payer, base_mint, quote_mint, tick, lot);
+
+        let failure = result.expect_err("increments below 10^9 were accepted");
+        assert!(
+            failure
+                .meta
+                .logs
+                .iter()
+                .any(|line| line.contains("SpotIncrementsTooFine")),
+            "tick {tick} * lot {lot} failed for another reason: {:?}",
+            failure.meta.logs
+        );
+        assert!(svm.get_account(&market).is_none());
+        let (_, base_vault, quote_vault) =
+            derive_market_vault_addresses(&outcomia::id(), &market, &base_mint, &quote_mint);
+        assert!(svm.get_account(&base_vault).is_none());
+        assert!(svm.get_account(&quote_vault).is_none());
+        svm.expire_blockhash();
+    }
+
+    let (market, result) = send_initialize_market_with_config(
+        &mut svm, &payer, base_mint, quote_mint, 10_000, 100_000,
+    );
+    assert!(
+        result.is_ok(),
+        "boundary increments were rejected: {result:?}"
+    );
+    assert!(svm.get_account(&market).is_some());
+}
+
 #[test]
 fn off_tick_price_is_rejected() {
     let ActiveMarketFixture {
