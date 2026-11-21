@@ -12369,6 +12369,11 @@
       "code": 6170,
       "name": "InvalidMultiOutcomeTerms",
       "msg": "Staged multi-outcome terms, offset, owner or content hash are invalid"
+    },
+    {
+      "code": 6171,
+      "name": "SpotIncrementsTooFine",
+      "msg": "Price tick times quantity lot must be at least one whole base token"
     }
   ],
   "types": [

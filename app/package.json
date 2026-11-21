@@ -13,6 +13,7 @@
     "test:prediction": "node scripts/prediction-rules.test.mjs && node scripts/prediction-matching-plan.test.mjs && node scripts/arweave-rules.test.mjs",
     "test:wallet": "node scripts/wallet-overview.test.mjs",
     "test:shared": "node scripts/shared-trading.test.mjs",
+    "test:spot": "node scripts/spot-increments.test.mjs",
     "devnet:shared-smoke": "node scripts/devnet-shared-smoke.mjs",
     "test:rpc-proxy": "node scripts/rpc-proxy.test.mjs",
     "test:theme": "node scripts/theme.test.mjs",
