@@ -379,3 +379,84 @@ fn maximum_account_serializations_match_space_without_changing_binary_discrimina
     assert_eq!(u32::from(OutcomiaError::NothingToRedeem), 6155);
     assert_eq!(u32::from(OutcomiaError::InvalidMultiOutcomeCount), 6156);
 }
+
+mod complement {
+    use super::*;
+    use crate::state::OrderSide;
+    const P: u64 = 1_000_000;
+
+    #[test]
+    fn three_way_buys_mint_at_maker_prices() {
+        // Others bid 0.30 and 0.25; a taker bid limit 0.50 buys at 0.45.
+        let plan =
+            plan_multi_complement(P, OrderSide::Bid, 500_000, 9, &[300_000, 250_000], &[6, 4])
+                .unwrap();
+        assert_eq!(plan.quantity, 4);
+        assert_eq!(plan.taker_price, 450_000);
+        assert_eq!(plan.taker_amount, 1_800_000);
+        assert_eq!(plan.maker_amounts, vec![1_200_000, 1_000_000]);
+        assert_eq!(plan.reserve_amount, 4_000_000);
+        assert_eq!(
+            plan.taker_amount + plan.maker_amounts.iter().sum::<u64>(),
+            plan.reserve_amount
+        );
+    }
+
+    #[test]
+    fn three_way_sells_merge_at_maker_prices() {
+        // Others ask 0.40 and 0.35; a taker ask limit 0.20 sells at 0.25.
+        let plan =
+            plan_multi_complement(P, OrderSide::Ask, 200_000, 2, &[400_000, 350_000], &[5, 5])
+                .unwrap();
+        assert_eq!((plan.quantity, plan.taker_price), (2, 250_000));
+        assert_eq!(plan.maker_amounts, vec![800_000, 700_000]);
+        assert_eq!(plan.reserve_amount, 2_000_000);
+    }
+
+    #[test]
+    fn crossing_boundaries_are_exact_for_both_sides() {
+        assert!(
+            plan_multi_complement(P, OrderSide::Bid, 450_000, 1, &[300_000, 250_000], &[1, 1])
+                .is_ok()
+        );
+        assert!(
+            plan_multi_complement(P, OrderSide::Bid, 440_000, 1, &[300_000, 250_000], &[1, 1])
+                .is_err()
+        );
+        assert!(
+            plan_multi_complement(P, OrderSide::Ask, 250_000, 1, &[400_000, 350_000], &[1, 1])
+                .is_ok()
+        );
+        assert!(
+            plan_multi_complement(P, OrderSide::Ask, 260_000, 1, &[400_000, 350_000], &[1, 1])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn makers_alone_reaching_the_payout_or_empty_inputs_are_rejected() {
+        assert!(
+            plan_multi_complement(P, OrderSide::Bid, 10_000, 1, &[600_000, 400_000], &[1, 1])
+                .is_err()
+        );
+        assert!(plan_multi_complement(P, OrderSide::Bid, 500_000, 1, &[], &[]).is_err());
+        assert!(plan_multi_complement(P, OrderSide::Bid, 500_000, 1, &[300_000], &[1, 1]).is_err());
+        assert!(plan_multi_complement(P, OrderSide::Bid, 800_000, 0, &[300_000], &[1]).is_err());
+    }
+
+    #[test]
+    fn eight_outcomes_conserve_collateral_for_every_quantity() {
+        let makers = [100_000_u64, 90_000, 80_000, 70_000, 60_000, 50_000, 40_000];
+        for quantity in [1_u64, 2, 3, 7, 1_000] {
+            let remaining = [quantity; 7];
+            let plan =
+                plan_multi_complement(P, OrderSide::Bid, 600_000, quantity, &makers, &remaining)
+                    .unwrap();
+            assert_eq!(plan.taker_price, P - makers.iter().sum::<u64>());
+            assert_eq!(
+                plan.taker_amount + plan.maker_amounts.iter().sum::<u64>(),
+                plan.reserve_amount
+            );
+        }
+    }
+}

@@ -1,8 +1,13 @@
 import { indexedAccounts } from "./indexed-accounts";
 import { BN, type Program } from "@anchor-lang/core";
-import { PublicKey, Transaction } from "@solana/web3.js";
+import {
+  PublicKey,
+  Transaction,
+  type TransactionInstruction,
+} from "@solana/web3.js";
 import { PROGRAM_ID } from "./solana";
 import {
+  COMPLEMENTARY_MATCHING_ENABLED,
   SHARED_BALANCES_ENABLED,
   assetBalancePda,
   assetVaultPda,
@@ -294,7 +299,42 @@ export async function readMultiBook(p: Program, market: PublicKey) {
   validateBook(market, book, rows);
   return { book, rows };
 }
-/** Packs a bounded maker path and safe remainder. Never skips a crossing FIFO order. */
+/** Effective price and size to buy (`side` "bid") or sell ("ask") `outcome`
+ * through a full set with every other outcome's best same-side order, or null.
+ * Buying takes payout minus the others' best bids; selling, minus their asks.
+ * Size is the smallest head remaining. Reads only the book's signed heads. */
+export function fullSetQuote(
+  m: MultiMarket,
+  book: Book,
+  outcome: number,
+  side: Side,
+  rows: Row[],
+) {
+  const count = m.terms.outcomeLabels.length;
+  const byKey = new Map(rows.map((r) => [r.publicKey.toBase58(), r.account]));
+  let sum = new BN(0),
+    size: BN | null = null;
+  for (let j = 0; j < count; j++) {
+    if (j === outcome) continue;
+    const ref = book.heads[slot(j, side)];
+    const order = ref && byKey.get(ref.order.toBase58());
+    if (!ref || !order) return null;
+    sum = sum.add(ref.price);
+    size = size
+      ? BN.min(size, order.remainingQuantity)
+      : order.remainingQuantity;
+  }
+  const payout = m.terms.payoutPerContract;
+  if (!size || sum.gte(payout)) return null;
+  return { price: payout.sub(sum), quantity: size };
+}
+/** Packs a bounded maker path and safe remainder. Never skips a crossing FIFO order.
+ * With complementary matching, the best same-side order of every other outcome
+ * also crosses through a full set: buying outcome i at price p fills against
+ * other outcomes' bids b_j when p + Σb_j ≥ payout, at an effective p = payout − Σb_j.
+ * Each step takes the better of the direct and full-set candidates (direct on
+ * ties). A full-set fill that does not fit one legacy packet is skipped for
+ * this transaction; no remainder rests while liquidity still crosses. */
 export async function buildMultiTrade(
   p: Program,
   marketKey: PublicKey,
@@ -307,28 +347,159 @@ export async function buildMultiTrade(
   price: BN,
   quantity: BN,
   feeBps: number,
+  complement = COMPLEMENTARY_MATCHING_ENABLED,
+  prefix: TransactionInstruction[] = [],
 ) {
   validateBook(marketKey, book, rows);
   validateOrder(m.terms, outcome, price, quantity);
   if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000)
     throw new Error("Invalid fee quote.");
-  const opposite = rows
-    .filter(
-      (r) => r.account.outcome[0] === outcome && sideOf(r.account) !== side,
-    )
-    .sort((a, b) => priority(a.account, b.account));
-  const tx = new Transaction();
+  const count = m.terms.outcomeLabels.length,
+    payout = m.terms.payoutPerContract,
+    opposite: Side = side === "bid" ? "ask" : "bid";
+  // Local queues per outcome/side, best first, so later steps see filled heads.
+  const queues = new Map<string, Row[]>();
+  for (const r of rows) {
+    const key = `${r.account.outcome[0]}:${sideOf(r.account)}`;
+    const list = queues.get(key) ?? [];
+    list.push({
+      publicKey: r.publicKey,
+      account: {
+        ...r.account,
+        remainingQuantity: r.account.remainingQuantity.clone(),
+      },
+    });
+    queues.set(key, list);
+  }
+  for (const list of queues.values())
+    list.sort((a, b) => priority(a.account, b.account));
+  const head = (o: number, sd: Side) => queues.get(`${o}:${sd}`)?.[0] ?? null;
+  const consume = (o: number, sd: Side, fill: BN) => {
+    const list = queues.get(`${o}:${sd}`)!;
+    list[0].account.remainingQuantity =
+      list[0].account.remainingQuantity.sub(fill);
+    if (list[0].account.remainingQuantity.isZero()) list.shift();
+  };
+  const crossing = (effective: BN) =>
+    side === "bid" ? price.gte(effective) : price.lte(effective);
+  let fullSetUsable = complement && count >= 2;
+  const fullSet = () => {
+    if (!fullSetUsable) return null;
+    const heads: Row[] = [];
+    for (let j = 0; j < count; j++) {
+      if (j === outcome) continue;
+      const h = head(j, side);
+      if (!h) return null;
+      heads.push(h);
+    }
+    const sum = heads.reduce((a, h) => a.add(h.account.price), new BN(0));
+    if (sum.gte(payout)) return null;
+    return { heads, effective: payout.sub(sum) };
+  };
+  const instructions: TransactionInstruction[] = [];
   let remaining = quantity.clone(),
     cost = new BN(0),
     fees = new BN(0),
     blocked = false;
-  for (const maker of opposite) {
-    const o = maker.account;
-    if (side === "bid" ? price.lt(o.price) : price.gt(o.price)) break;
-    if (tx.instructions.length === 3) {
+  const fits = (ix: TransactionInstruction) => {
+    try {
+      transactionBytes(
+        new Transaction().add(...prefix, ...instructions, ix),
+        owner,
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  while (remaining.gtn(0)) {
+    const direct = head(outcome, opposite);
+    const set = fullSet();
+    const directOk = !!direct && crossing(direct.account.price);
+    const setOk = !!set && crossing(set.effective);
+    if (!directOk && !setOk) break;
+    if (instructions.length === 3) {
       blocked = true;
       break;
     }
+    const useSet =
+      setOk &&
+      (!directOk ||
+        (side === "bid"
+          ? set!.effective.lt(direct!.account.price)
+          : set!.effective.gt(direct!.account.price)));
+    if (useSet) {
+      const s = set!;
+      if (s.heads.some((h) => h.account.owner.equals(owner)))
+        throw new Error(
+          "Your own order heads another outcome's queue. Cancel it first.",
+        );
+      const fill = s.heads.reduce(
+        (a, h) => BN.min(a, h.account.remainingQuantity),
+        remaining,
+      );
+      const remainingAccounts = s.heads.flatMap((h) => {
+        const next =
+          h.account.remainingQuantity.eq(fill) && h.account.next
+            ? h.account.next
+            : PROGRAM_ID;
+        return [
+          { pubkey: h.publicKey, isSigner: false, isWritable: true },
+          {
+            pubkey: next,
+            isSigner: false,
+            isWritable: !next.equals(PROGRAM_ID),
+          },
+          {
+            pubkey: assetBalancePda(h.account.owner, m.collateralMint),
+            isSigner: false,
+            isWritable: true,
+          },
+          {
+            pubkey: multiPositionPda(marketKey, h.account.owner),
+            isSigner: false,
+            isWritable: true,
+          },
+        ];
+      });
+      const ix = await p.methods
+        .matchMultiOutcomeComplement(
+          [outcome],
+          enumSide(side),
+          price,
+          remaining,
+          feeBps,
+        )
+        .accountsStrict({
+          taker: owner,
+          market: marketKey,
+          book: multiBookPda(marketKey),
+          protocolConfig: deriveProtocolConfigPda(),
+          takerCash: assetBalancePda(owner, m.collateralMint),
+          takerPosition: multiPositionPda(marketKey, owner),
+          mint: m.collateralMint,
+          assetAuthority: assetAuthorityPda(m.collateralMint),
+          assetVault: assetVaultPda(m.collateralMint),
+          marketAuthority: deriveVaultAuthorityPda(marketKey),
+          marketVault: deriveVaultPda(marketKey, m.collateralMint),
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .remainingAccounts(remainingAccounts)
+        .instruction();
+      if (!fits(ix)) {
+        // Too many maker accounts for one legacy packet: use direct liquidity only.
+        fullSetUsable = false;
+        continue;
+      }
+      instructions.push(ix);
+      const notional = s.effective.mul(fill);
+      cost = cost.add(notional);
+      fees = fees.add(notional.muln(feeBps).addn(9999).divn(10000));
+      for (const h of s.heads) consume(h.account.outcome[0], side, fill);
+      remaining = remaining.sub(fill);
+      continue;
+    }
+    const o = direct!.account;
     if (o.owner.equals(owner))
       throw new Error(
         "Your own order is next in FIFO priority. Cancel it first.",
@@ -343,7 +514,7 @@ export async function buildMultiTrade(
         market: marketKey,
         book: multiBookPda(marketKey),
         protocolConfig: deriveProtocolConfigPda(),
-        makerOrder: maker.publicKey,
+        makerOrder: direct!.publicKey,
         makerCash: assetBalancePda(o.owner, m.collateralMint),
         makerPosition: multiPositionPda(marketKey, o.owner),
         takerCash: assetBalancePda(owner, m.collateralMint),
@@ -351,21 +522,33 @@ export async function buildMultiTrade(
         next: o.next ?? PROGRAM_ID,
       })
       .instruction();
-    try {
-      transactionBytes(new Transaction().add(...tx.instructions, ix), owner);
-    } catch {
-      if (!tx.instructions.length)
+    if (!fits(ix)) {
+      if (!instructions.length)
         throw new Error("One match exceeds the packet limit.");
       blocked = true;
       break;
     }
-    tx.add(ix);
+    instructions.push(ix);
     remaining = remaining.sub(fill);
     cost = cost.add(notional);
     fees = fees.add(fee);
-    if (remaining.isZero()) break;
+    consume(outcome, opposite, fill);
   }
-  if (!remaining.isZero() && !blocked) {
+  // Crossing liquidity of either kind forbids a resting remainder; the program
+  // rejects crossed placements. A skipped full set still counts as crossing.
+  const directCross = (() => {
+    const d = head(outcome, opposite);
+    return !!d && crossing(d.account.price);
+  })();
+  const setCross = (() => {
+    const saved = fullSetUsable;
+    fullSetUsable = complement && count >= 2;
+    const s = fullSet();
+    fullSetUsable = saved;
+    return !!s && crossing(s.effective);
+  })();
+  if (remaining.gtn(0) && (directCross || setCross)) blocked = true;
+  if (remaining.gtn(0) && !blocked) {
     const ix = await p.methods
       .placeMultiOutcomeOrder(
         [outcome],
@@ -385,17 +568,17 @@ export async function buildMultiTrade(
         ...neighbors(rows, outcome, side, price, book.nextOrderId),
       })
       .instruction();
-    try {
-      transactionBytes(new Transaction().add(...tx.instructions, ix), owner);
-      tx.add(ix);
-    } catch {
-      if (!tx.instructions.length)
-        throw new Error("Placement exceeds the packet limit.");
-      blocked = true;
-    }
+    if (fits(ix)) instructions.push(ix);
+    else blocked = true;
   }
+  if (!instructions.length && remaining.gtn(0) && blocked)
+    throw new Error(
+      setCross
+        ? "Filling at this price needs every other outcome's best order in one transaction, which exceeds the packet limit. Use a price below the full-set price to rest an order."
+        : "These matches exceed the packet limit. Submit a smaller quantity.",
+    );
   return {
-    transaction: tx,
+    transaction: new Transaction().add(...instructions),
     remaining: blocked ? remaining : new BN(0),
     cost,
     fees,

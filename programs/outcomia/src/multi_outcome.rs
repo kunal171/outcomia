@@ -250,5 +250,89 @@ fn checked_atoms(amount: u128) -> Result<u64> {
     u64::try_from(amount).map_err(|_| error!(multi::MultiOutcomeAccountingOverflow))
 }
 
+/// One full-set fill between a taker and the best same-side order of every
+/// other outcome (`maker_prices`/`maker_remaining`, one entry per other outcome).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MultiComplementPlan {
+    /// Whole contracts minted (all buys) or merged (all sells) for every outcome.
+    pub quantity: u64,
+    /// Payout minus the makers' prices: the taker's effective price per contract.
+    pub taker_price: u64,
+    /// Collateral the taker pays (mint) or receives before fees (merge).
+    pub taker_amount: u64,
+    /// Collateral each maker pays (mint) or receives (merge) at its own price.
+    pub maker_amounts: Vec<u64>,
+    /// Collateral entering (mint) or leaving (merge) the question reserve.
+    pub reserve_amount: u64,
+}
+
+/// Plans an N-way complete-set fill at the resting makers' prices.
+///
+/// A buy of outcome `i` plus the best buys of every other outcome fund a full
+/// set when their prices sum to at least the payout; sells release one when
+/// they sum to at most it. Makers keep their prices and the taker receives any
+/// improvement, so the taker price is `payout - sum(maker prices)`. Example with
+/// payout 1,000,000 and three outcomes: bids of 300,000 and 250,000 on the
+/// others let a taker with limit 500,000 buy at 450,000.
+///
+/// # Errors
+/// `InvalidComplementMatch` when no makers are given or the makers alone reach
+/// the payout (no positive taker price), `OrdersDoNotCross`, `InvalidQuantity`
+/// or arithmetic overflow.
+///
+/// # Returns
+/// Exact amounts; the taker and maker amounts always sum to the reserve amount.
+pub fn plan_multi_complement(
+    payout: u64,
+    taker_side: crate::state::OrderSide,
+    taker_limit_price: u64,
+    taker_remaining: u64,
+    maker_prices: &[u64],
+    maker_remaining: &[u64],
+) -> Result<MultiComplementPlan> {
+    use crate::errors::{matching, order};
+    use crate::state::OrderSide;
+    require!(
+        !maker_prices.is_empty() && maker_prices.len() == maker_remaining.len(),
+        matching::InvalidComplementMatch
+    );
+    let makers: u128 = maker_prices.iter().map(|p| u128::from(*p)).sum();
+    // Resting books never fund a full set among themselves, so the taker
+    // always pays (or receives) a positive price.
+    require!(
+        makers < u128::from(payout),
+        matching::InvalidComplementMatch
+    );
+    let combined = makers + u128::from(taker_limit_price);
+    require!(
+        match taker_side {
+            OrderSide::Bid => combined >= u128::from(payout),
+            OrderSide::Ask => combined <= u128::from(payout),
+        },
+        matching::OrdersDoNotCross
+    );
+    let quantity = maker_remaining
+        .iter()
+        .copied()
+        .fold(taker_remaining, u64::min);
+    require!(quantity > 0, order::InvalidQuantity);
+    let atoms = |price: u128| {
+        u64::try_from(price * u128::from(quantity))
+            .map_err(|_| error!(order::OrderNotionalOverflow))
+    };
+    let taker_price =
+        payout - u64::try_from(makers).map_err(|_| error!(order::OrderNotionalOverflow))?;
+    Ok(MultiComplementPlan {
+        quantity,
+        taker_price,
+        taker_amount: atoms(u128::from(taker_price))?,
+        maker_amounts: maker_prices
+            .iter()
+            .map(|p| atoms(u128::from(*p)))
+            .collect::<Result<_>>()?,
+        reserve_amount: atoms(u128::from(payout))?,
+    })
+}
+
 #[cfg(test)]
 mod tests;

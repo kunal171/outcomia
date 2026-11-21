@@ -140,6 +140,39 @@ pub fn position(
 }
 
 /// Stable root slot for an outcome/side pair. Callers validate the outcome first.
+/// Best same-side heads of every outcome except `outcome`, in outcome order,
+/// or `None` when any of them is missing (no full set can form).
+pub fn complement_heads(
+    book: &MultiOutcomeBook,
+    e: MultiOutcomeEconomics,
+    outcome: OutcomeId,
+    side: OrderSide,
+) -> Option<Vec<MultiOutcomeOrderReference>> {
+    (0..e.outcome_count)
+        .filter(|index| *index != outcome.index())
+        .map(|index| OutcomeId::new(index, e.outcome_count).and_then(|o| best(book, o, side)))
+        .collect()
+}
+/// Whether an order at `price` would complete a full set with the other
+/// outcomes' best same-side orders: bids summing to at least the payout, or
+/// asks summing to at most it. Such an order must be matched, not rested.
+pub fn crosses_full_set(
+    book: &MultiOutcomeBook,
+    e: MultiOutcomeEconomics,
+    outcome: OutcomeId,
+    side: OrderSide,
+    price: u64,
+) -> bool {
+    let Some(heads) = complement_heads(book, e, outcome, side) else {
+        return false;
+    };
+    let combined: u128 =
+        u128::from(price) + heads.iter().map(|r| u128::from(r.price)).sum::<u128>();
+    match side {
+        OrderSide::Bid => combined >= u128::from(e.payout_per_contract),
+        OrderSide::Ask => combined <= u128::from(e.payout_per_contract),
+    }
+}
 pub fn slot(outcome: OutcomeId, side: OrderSide) -> usize {
     usize::from(outcome.index()) * 2 + usize::from(side == OrderSide::Ask)
 }
