@@ -300,3 +300,226 @@ impl ResolutionMarket for MultiOutcomeMarket {
         self.final_outcome = Some(outcome);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{
+        MultiOutcomeProposal, MultiOutcomeTerms, OutcomeId, PredictionProposal,
+        MULTI_OUTCOME_CAPACITY,
+    };
+
+    const CLOSE: i64 = 1_000;
+    const EARLIEST: i64 = 1_100;
+    const DELAY: u64 = 50;
+    const AVAILABLE: i64 = 2_000;
+    const DEADLINE: i64 = 3_000;
+
+    fn primary() -> Pubkey {
+        Pubkey::new_from_array([1; 32])
+    }
+    fn backup() -> Pubkey {
+        Pubkey::new_from_array([2; 32])
+    }
+    fn fallback(deadline: Option<i64>) -> PredictionFallback {
+        PredictionFallback {
+            resolver: backup(),
+            available_ts: AVAILABLE,
+            deadline_ts: deadline,
+        }
+    }
+
+    /// Test adapter: builds a fresh market and stores a proposal in it.
+    trait Fixture: ResolutionMarket + Sized {
+        fn build(fallback: Option<PredictionFallback>) -> Self;
+        fn propose(&mut self, outcome: Self::Outcome, at: i64);
+        fn sample() -> Self::Outcome;
+    }
+
+    impl Fixture for PredictionMarket {
+        fn build(fallback: Option<PredictionFallback>) -> Self {
+            PredictionMarket {
+                market_id: [7; 32],
+                authority: primary(),
+                resolver: primary(),
+                fallback,
+                collateral_mint: Pubkey::default(),
+                collateral_vault: Pubkey::default(),
+                metadata: Pubkey::default(),
+                question_hash: [1; 32],
+                rules_hash: [1; 32],
+                rules_uri: "ar://rules".into(),
+                close_ts: CLOSE,
+                earliest_resolution_ts: Some(EARLIEST),
+                resolution_delay_seconds: DELAY,
+                resolution_phase: PredictionResolutionPhase::Primary,
+                status: PredictionStatus::Open,
+                proposal: None,
+                final_outcome: None,
+                payout_per_contract: 1_000_000,
+                price_tick: 10_000,
+                yes_supply: 0,
+                no_supply: 0,
+                backing_reserve: 0,
+                open_order_count: 0,
+                bump: 255,
+            }
+        }
+        fn propose(&mut self, outcome: Self::Outcome, at: i64) {
+            self.proposal = Some(PredictionProposal {
+                outcome,
+                proposed_at: at,
+                evidence_uri: "ar://evidence".into(),
+                evidence_hash: [9; 32],
+            });
+            self.status = PredictionStatus::Proposed;
+        }
+        fn sample() -> Self::Outcome {
+            PredictionResolution::No
+        }
+    }
+
+    impl Fixture for MultiOutcomeMarket {
+        fn build(fallback: Option<PredictionFallback>) -> Self {
+            MultiOutcomeMarket {
+                market_id: [7; 32],
+                authority: primary(),
+                collateral_mint: Pubkey::default(),
+                collateral_vault: Pubkey::default(),
+                metadata: Pubkey::default(),
+                terms: MultiOutcomeTerms {
+                    resolver: primary(),
+                    fallback,
+                    outcome_labels: vec!["A".into(), "B".into(), "C".into()],
+                    question_hash: [1; 32],
+                    rules_hash: [1; 32],
+                    rules_uri: "ar://rules".into(),
+                    close_ts: CLOSE,
+                    earliest_resolution_ts: Some(EARLIEST),
+                    resolution_delay_seconds: DELAY,
+                    payout_per_contract: 1_000_000,
+                    price_tick: 10_000,
+                    quantity_lot: 3,
+                },
+                resolution_phase: PredictionResolutionPhase::Primary,
+                status: PredictionStatus::Open,
+                proposal: None,
+                final_outcome: None,
+                supplies: [0; MULTI_OUTCOME_CAPACITY],
+                backing_reserve: 0,
+                open_order_count: 0,
+                bump: 255,
+            }
+        }
+        fn propose(&mut self, outcome: Self::Outcome, at: i64) {
+            self.proposal = Some(MultiOutcomeProposal {
+                outcome,
+                proposed_at: at,
+                evidence_uri: "ar://evidence".into(),
+                evidence_hash: [9; 32],
+            });
+            self.status = PredictionStatus::Proposed;
+        }
+        fn sample() -> Self::Outcome {
+            MultiOutcomeResolution::Winner(OutcomeId::new(2, 3).unwrap())
+        }
+    }
+
+    fn resolver_window_respects_schedule<M: Fixture>() {
+        let no_fallback = M::build(None);
+        assert!(resolver_window(&no_fallback, primary(), CLOSE).is_err()); // before earliest
+        assert!(resolver_window(&no_fallback, primary(), EARLIEST).is_ok());
+        assert!(resolver_window(&no_fallback, primary(), i64::MAX).is_ok()); // no end
+        assert!(resolver_window(&no_fallback, backup(), EARLIEST).is_err());
+
+        let mut m = M::build(Some(fallback(Some(DEADLINE))));
+        assert!(resolver_window(&m, primary(), AVAILABLE - 1).is_ok());
+        assert!(resolver_window(&m, primary(), AVAILABLE).is_err()); // primary ends
+        m.set_resolution_phase(PredictionResolutionPhase::Fallback);
+        assert!(resolver_window(&m, backup(), AVAILABLE - 1).is_err());
+        assert!(resolver_window(&m, backup(), AVAILABLE).is_ok());
+        assert!(resolver_window(&m, primary(), AVAILABLE).is_err());
+        assert!(resolver_window(&m, backup(), DEADLINE).is_err()); // exclusive
+    }
+
+    fn proposal_state_allows_one_proposal_and_timely_corrections<M: Fixture>() {
+        let mut m = M::build(None);
+        assert!(check_proposal_state(&m, EARLIEST, false).is_ok());
+        assert!(check_proposal_state(&m, EARLIEST, true).is_err()); // nothing to correct
+        m.propose(M::sample(), EARLIEST);
+        let mature = EARLIEST + DELAY as i64;
+        assert_eq!(maturity(&m).unwrap(), mature);
+        assert!(check_proposal_state(&m, EARLIEST, false).is_err()); // no second proposal
+        assert!(check_proposal_state(&m, mature - 1, true).is_ok());
+        assert!(check_proposal_state(&m, mature, true).is_err()); // matured
+    }
+
+    fn advance_follows_the_published_clock<M: Fixture>()
+    where
+        M::Outcome: PartialEq + core::fmt::Debug,
+    {
+        // 0: freeze only at the cutoff.
+        let mut m = M::build(None);
+        assert!(advance(&mut m, 0, CLOSE - 1).is_err());
+        advance(&mut m, 0, CLOSE).unwrap();
+        assert_eq!(m.status(), PredictionStatus::Frozen);
+
+        // 2: finalize exactly the proposed outcome, only at maturity.
+        m.propose(M::sample(), EARLIEST);
+        let mature = EARLIEST + DELAY as i64;
+        assert!(advance(&mut m, 2, mature - 1).is_err());
+        advance(&mut m, 2, mature).unwrap();
+        assert_eq!(m.final_outcome(), Some(M::sample()));
+        assert_eq!(m.status(), PredictionStatus::Resolved);
+        for action in 0..=3 {
+            assert!(advance(&mut m, action, i64::MAX).is_err()); // final is final
+        }
+
+        // 1: activate fallback inside its window.
+        let mut m = M::build(Some(fallback(Some(DEADLINE))));
+        assert!(advance(&mut m, 1, AVAILABLE - 1).is_err());
+        advance(&mut m, 1, AVAILABLE).unwrap();
+        assert_eq!(m.resolution_phase(), PredictionResolutionPhase::Fallback);
+        assert!(advance(&mut m, 1, AVAILABLE).is_err()); // once only
+
+        // 3: Invalid after an unproposed deadline, never over a proposal.
+        let mut m = M::build(Some(fallback(Some(DEADLINE))));
+        assert!(advance(&mut m, 3, DEADLINE - 1).is_err());
+        advance(&mut m, 3, DEADLINE).unwrap();
+        assert_eq!(m.final_outcome(), Some(M::INVALID));
+        let mut m = M::build(Some(fallback(Some(DEADLINE))));
+        m.propose(M::sample(), EARLIEST);
+        assert!(advance(&mut m, 3, DEADLINE).is_err());
+        let mut m = M::build(Some(fallback(None)));
+        assert!(advance(&mut m, 3, i64::MAX).is_err()); // no deadline, no timeout
+
+        assert!(advance(&mut M::build(None), 4, i64::MAX).is_err());
+    }
+
+    #[test]
+    fn binary_lifecycle() {
+        resolver_window_respects_schedule::<PredictionMarket>();
+        proposal_state_allows_one_proposal_and_timely_corrections::<PredictionMarket>();
+        advance_follows_the_published_clock::<PredictionMarket>();
+    }
+
+    #[test]
+    fn multi_outcome_lifecycle() {
+        resolver_window_respects_schedule::<MultiOutcomeMarket>();
+        proposal_state_allows_one_proposal_and_timely_corrections::<MultiOutcomeMarket>();
+        advance_follows_the_published_clock::<MultiOutcomeMarket>();
+    }
+
+    #[test]
+    fn evidence_must_be_bounded_supported_and_hashed() {
+        let hash = [9; 32];
+        assert!(validate_evidence("ar://tx", &hash).is_ok());
+        assert!(validate_evidence("https://example.org/a", &hash).is_ok());
+        assert!(validate_evidence("ar://", &hash).is_err());
+        assert!(validate_evidence("http://example.org", &hash).is_err());
+        assert!(validate_evidence("ar://a b", &hash).is_err());
+        assert!(validate_evidence("ar://tx", &[0; 32]).is_err());
+        let long = format!("ar://{}", "a".repeat(PREDICTION_URI_MAX_LENGTH));
+        assert!(validate_evidence(&long, &hash).is_err());
+    }
+}
