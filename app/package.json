@@ -19,7 +19,7 @@
     "test:rpc-proxy": "node scripts/rpc-proxy.test.mjs",
     "test:theme": "node scripts/theme.test.mjs",
     "test:i18n": "node scripts/i18n.test.mjs",
-    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs && node scripts/canton-factory.test.mjs",
+    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs && node scripts/canton-factory.test.mjs && node scripts/canton-clubs.test.mjs",
     "test:canton:browser": "node scripts/canton-browser.test.mjs",
     "test:multi-outcome": "node scripts/multi-outcome.test.mjs",
     "idl:sync": "node scripts/sync-idl.mjs",

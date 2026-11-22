@@ -49,7 +49,19 @@ export type Action =
   | "factoryClose"
   | "factoryPropose"
   | "createInviteList"
-  | "setInvites";
+  | "setInvites"
+  | "createClub"
+  | "clubInvite"
+  | "clubAccept"
+  | "clubDecline"
+  | "clubRevoke"
+  | "clubClear"
+  | "clubPolicy"
+  | "clubSetAdmin"
+  | "clubRemove"
+  | "clubLeave"
+  | "clubNominate"
+  | "clubAcceptOwnership";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -116,6 +128,18 @@ export function buildPlan(
     factoryPropose: "BinaryMarket",
     createInviteList: "OutcomiaMarketFactory",
     setInvites: "InviteListPolicy",
+    createClub: "ClubRegistry",
+    clubInvite: "Club",
+    clubAccept: "Club",
+    clubDecline: "Club",
+    clubRevoke: "Club",
+    clubClear: "Club",
+    clubPolicy: "Club",
+    clubSetAdmin: "Club",
+    clubRemove: "Club",
+    clubLeave: "Club",
+    clubNominate: "Club",
+    clubAcceptOwnership: "Club",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -239,6 +263,15 @@ export function buildPlan(
     const access = market.data.access;
     if (!access) return null;
     const wanted = factoryRefKey(access);
+    // Club markets: the club roster is the policy; no extra evidence.
+    const club = all.find(
+      (c) => c.kind === "Club" && factoryRefKey(c.data.ref) === wanted,
+    );
+    if (club) {
+      if (!list(club.data.members).includes(who))
+        throw new Error("Only current club members can trade in this market.");
+      return { policy: use(club), evidence: [] };
+    }
     const policy = single(
       all.filter(
         (c) =>
@@ -249,6 +282,22 @@ export function buildPlan(
     if (policy.data.manager !== who && !list(policy.data.parties).includes(who))
       throw new Error("This wallet is not invited to this market.");
     return { policy: use(policy), evidence: [] };
+  };
+  /** The club factory a club keeps in sync, for admin changes. */
+  const clubFactory = (club: Contract) => factoryFor(club.data.factoryRef);
+  const clubAdmin = (club: Contract) => {
+    if (!list(club.data.admins).includes(party))
+      throw new Error("Only club admins can do this.");
+  };
+  const clubMember = (club: Contract, who: string) => {
+    if (!list(club.data.members).includes(who))
+      throw new Error("That wallet is not a member of this club.");
+  };
+  const walletValue = () => {
+    const w = text(v.wallet).trim();
+    if (!/^[A-Za-z0-9:_-]+::[A-Za-z0-9:_-]+$/.test(w))
+      throw new Error("Enter a valid Canton party.");
+    return w;
   };
   const notFactoryMarket = () => {
     if (target.data.factory)
@@ -584,7 +633,25 @@ export function buildPlan(
       }
       break;
     case "factoryCreate": {
-      if (!mayCreate(target.data.policy, party))
+      const creation = obj(target.data.policy);
+      let proof: RecordValue | null = null,
+        club: Contract | undefined;
+      if (creation.tag === "ByPolicy") {
+        // Club factories: the creator presents the club as creation proof.
+        const wanted = factoryRefKey(creation.value);
+        club = owned.find(
+          (c) => c.kind === "Club" && factoryRefKey(c.data.ref) === wanted,
+        );
+        if (!club)
+          throw new Error("Only club members can create markets here.");
+        clubMember(club, party);
+        if (
+          club.data.marketPolicy !== "AnyMember" &&
+          !list(club.data.admins).includes(party)
+        )
+          throw new Error("Only club admins can create markets in this club.");
+        proof = { policy: use(club), evidence: [] };
+      } else if (!mayCreate(creation, party))
         throw new Error(
           "This factory's creation policy does not allow this wallet.",
         );
@@ -597,7 +664,10 @@ export function buildPlan(
       )
         throw new Error("This factory does not admit that collateral.");
       let access: RecordValue = { tag: "Public", value: {} };
-      if (v.access === "invite") {
+      if (v.access === "club") {
+        if (!club) throw new Error("Members-only access needs a club factory.");
+        access = { tag: "Restricted", value: obj(club.data.ref) };
+      } else if (v.access === "invite") {
         const list_ = owned.find(
           (c) => c.kind === "InviteListPolicy" && c.id === text(v.policy),
         );
@@ -607,7 +677,7 @@ export function buildPlan(
       }
       interfaceRoot = interfaceId(d, "MarketFactory");
       choice = "MarketFactory_Create";
-      args = { creator: party, terms, access };
+      args = { creator: party, terms, access, proof };
       break;
     }
     case "factoryClose":
@@ -650,6 +720,124 @@ export function buildPlan(
         throw new Error("Only the invite list's manager can edit it.");
       choice = "InviteList_Set";
       args = { replacementParties: invitees(v.parties) };
+      break;
+    case "createClub": {
+      const name = text(v.name);
+      if (!name || name.trim() !== name || name.length > 64)
+        throw new Error(
+          "Club names need 1 to 64 characters without outer spaces.",
+        );
+      choice = "ClubRegistry_CreateClub";
+      args = { owner: party, name };
+      break;
+    }
+    case "clubInvite": {
+      clubAdmin(target);
+      const invitee = walletValue();
+      if (list(target.data.members).includes(invitee))
+        throw new Error("That wallet is already a member.");
+      choice = "Club_Invite";
+      args = { inviter: party, invitee };
+      break;
+    }
+    case "clubAccept":
+    case "clubDecline": {
+      const pending = list(target.data.invitations)
+        .map(obj)
+        .find((i) => i.invitee === party);
+      if (!pending) throw new Error("There is no invitation for this wallet.");
+      if (
+        intent.action === "clubAccept" &&
+        Date.parse(text(pending.expiresAt)) <= Date.now()
+      )
+        throw new Error("This invitation has expired.");
+      choice = intent.action === "clubAccept" ? "Club_Accept" : "Club_Decline";
+      args = { invitee: party };
+      break;
+    }
+    case "clubRevoke":
+      clubAdmin(target);
+      choice = "Club_RevokeInvite";
+      args = { actor: party, invitee: walletValue() };
+      break;
+    case "clubClear":
+      if (
+        !list(target.data.invitations).some(
+          (i) => Date.parse(text(obj(i).expiresAt)) <= Date.now(),
+        )
+      )
+        throw new Error("No invitation has expired.");
+      choice = "Club_ClearExpired";
+      args = { closer: party };
+      break;
+    case "clubPolicy":
+      clubAdmin(target);
+      choice = "Club_SetMarketPolicy";
+      args = {
+        actor: party,
+        replacementPolicy:
+          v.policy === "AnyMember" ? "AnyMember" : "AdminsOnly",
+      };
+      break;
+    case "clubSetAdmin": {
+      if (target.data.owner !== party)
+        throw new Error("Only the club owner can change admins.");
+      const member = walletValue();
+      clubMember(target, member);
+      if (member === target.data.owner)
+        throw new Error("The owner always stays an admin.");
+      choice = "Club_SetAdmin";
+      args = {
+        wallet: member,
+        makeAdmin: v.makeAdmin === "true",
+        factory: use(clubFactory(target)),
+      };
+      break;
+    }
+    case "clubRemove": {
+      clubAdmin(target);
+      const member = walletValue();
+      clubMember(target, member);
+      if (member === target.data.owner)
+        throw new Error("The owner cannot be removed.");
+      if (
+        list(target.data.admins).includes(member) &&
+        target.data.owner !== party
+      )
+        throw new Error("Only the owner can remove an admin.");
+      choice = "Club_RemoveMember";
+      args = {
+        actor: party,
+        wallet: member,
+        factory: use(clubFactory(target)),
+      };
+      break;
+    }
+    case "clubLeave":
+      clubMember(target, party);
+      if (target.data.owner === party)
+        throw new Error("Transfer ownership before leaving.");
+      choice = "Club_Leave";
+      args = { wallet: party, factory: use(clubFactory(target)) };
+      break;
+    case "clubNominate": {
+      if (target.data.owner !== party)
+        throw new Error("Only the club owner can nominate.");
+      let nominee: string | null = null;
+      if (typeof v.wallet === "string" && v.wallet.trim()) {
+        nominee = walletValue();
+        clubMember(target, nominee);
+        if (nominee === party) throw new Error("Nominate another member.");
+      }
+      choice = "Club_Nominate";
+      args = { nominee };
+      break;
+    }
+    case "clubAcceptOwnership":
+      if (target.data.pendingOwner !== party)
+        throw new Error("This wallet is not the nominated owner.");
+      choice = "Club_AcceptOwnership";
+      args = { factory: use(clubFactory(target)) };
       break;
     default:
       throw new Error("Unsupported Canton action.");

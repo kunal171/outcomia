@@ -18,6 +18,8 @@ export const templates = {
   FinalResolution: "Outcomia.Resolution:FinalResolution",
   OutcomiaMarketFactory: "Outcomia.Factory:OutcomiaMarketFactory",
   InviteListPolicy: "Outcomia.Factory:InviteListPolicy",
+  ClubRegistry: "Outcomia.Clubs:ClubRegistry",
+  Club: "Outcomia.Clubs:Club",
 } as const;
 /** Interfaces of the open market-factory standard (separate package). */
 export const interfaces = {
@@ -68,6 +70,7 @@ export const publicKinds: Kind[] = [
   "ResolutionProposal",
   "FinalResolution",
   "OutcomiaMarketFactory",
+  "ClubRegistry",
 ];
 export function obj(value: unknown): RecordValue {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -190,7 +193,7 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
     const identity =
       kind === "FinalResolution"
         ? obj(data.proposal)
-        : kind === "InviteListPolicy"
+        : kind === "InviteListPolicy" || kind === "Club"
           ? { operator: data.operator, protocolName: obj(data.ref).namespace }
           : data;
     if (
@@ -234,6 +237,15 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
       text(data.manager);
       list(data.parties).forEach(text);
       factoryRefKey(data.ref);
+    }
+    if (kind === "Club") {
+      text(data.name);
+      text(data.owner);
+      list(data.admins).forEach(text);
+      list(data.members).forEach(text);
+      list(data.invitations).forEach((i) => text(obj(i).invitee));
+      factoryRefKey(data.ref);
+      factoryRefKey(data.factoryRef);
     }
     if (kind === "Protocol") {
       list(data.admins).forEach(text);

@@ -1075,5 +1075,21 @@
   "Who can trade": "कौन ट्रेड कर सकता है",
   "Anyone": "कोई भी",
   "Factory admins only": "केवल फ़ैक्टरी एडमिन",
-  "Listed creators": "सूचीबद्ध निर्माता"
+  "Listed creators": "सूचीबद्ध निर्माता",
+  "members": "सदस्य",
+  "Expires": "समाप्ति",
+  "Clubs are not deployed yet.": "क्लब अभी तैनात नहीं हैं।",
+  "Club": "क्लब",
+  "This club is not visible to your wallet.": "यह क्लब आपके वॉलेट को दिखाई नहीं देता।",
+  "Remove admin": "एडमिन हटाएँ",
+  "Accept ownership": "स्वामित्व स्वीकार करें",
+  "Cancel nomination": "नामांकन रद्द करें",
+  "Invite": "आमंत्रित करें",
+  "Wallet party": "वॉलेट पार्टी",
+  "Clear expired": "समाप्त हटाएँ",
+  "Who can create markets": "कौन मार्केट बना सकता है",
+  "Save": "सहेजें",
+  "Market creators": "मार्केट निर्माता",
+  "Admins only": "केवल एडमिन",
+  "Any member": "कोई भी सदस्य"
 }
