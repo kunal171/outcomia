@@ -125,6 +125,34 @@ export const sharedLevelPda = (
     Buffer.from(side),
     price.toArrayLike(Buffer, "le", 8),
   );
+/** Club markets trade on a separate book namespace; see docs/clubs-private-markets.md. */
+export const clubBookPda = (market: PublicKey) =>
+  address("club_book", market.toBytes());
+export const clubMemberPda = (club: PublicKey, wallet: PublicKey) =>
+  address("club_member", club.toBytes(), wallet.toBytes());
+export const clubFeeConfigPda = () => address("club_fee_config");
+/** Trading context of a club market. In members-only markets the program
+ * requires current membership for placement and for both sides of every fill;
+ * `members` lets the planner explain a blocked queue before signing. */
+export interface ClubTrading {
+  club: PublicKey;
+  clubMarket: PublicKey;
+  membersOnly: boolean;
+  members: ReadonlySet<string>;
+}
+export const bookPda = (market: PublicKey, club?: ClubTrading | null) =>
+  club ? clubBookPda(market) : sharedBookPda(market);
+/** Membership account for `wallet`, passed only where the program reads it. */
+const membership = (club: ClubTrading | null | undefined, wallet: PublicKey) =>
+  club?.membersOnly ? clubMemberPda(club.club, wallet) : null;
+/** Whether an order's owner has left a members-only club market, so anyone
+ * may cancel it and it can no longer fill. */
+export function departedOrder(
+  club: ClubTrading | null | undefined,
+  order: Pick<SharedOrder, "owner">,
+) {
+  return !!club?.membersOnly && !club.members.has(order.owner.toBase58());
+}
 export function traderAccounts(book: SharedBook, owner: PublicKey) {
   return {
     baseBalance:
@@ -137,7 +165,7 @@ export function traderAccounts(book: SharedBook, owner: PublicKey) {
   };
 }
 /** Anchor encodes an omitted optional account as the program ID sentinel. */
-function optionalAccounts(
+export function optionalAccounts(
   values: Record<string, PublicKey | null>,
 ): Record<string, PublicKey> {
   return Object.fromEntries(
@@ -155,9 +183,13 @@ export function assetCustody(owner: PublicKey, mint: PublicKey) {
   };
 }
 /** Fetch one coherent queue snapshot. Stale links fail on chain; never skip a FIFO maker. */
-export async function readSharedBook(p: Program, market: PublicKey) {
+export async function readSharedBook(
+  p: Program,
+  market: PublicKey,
+  club?: ClubTrading | null,
+) {
   const a = sharedAccounts(p),
-    key = sharedBookPda(market);
+    key = bookPda(market, club);
   const book = await a.sharedBook.fetchNullable(key);
   if (!book) return null;
   if (!book.market.equals(market))
@@ -181,44 +213,59 @@ export async function readSharedBook(p: Program, market: PublicKey) {
 export type SharedSnapshot = NonNullable<
   Awaited<ReturnType<typeof readSharedBook>>
 >;
-/** Owner cancellation includes only exact queue neighbors. Lifecycle never gates an exit. */
+/** Owner cancellation includes only exact queue neighbors. Lifecycle never gates an exit.
+ * On a members-only club book anyone may cancel a departed member's order; the
+ * refund always goes to the order's owner. */
 export async function cancelShared(
   p: Program,
   s: SharedSnapshot,
-  owner: PublicKey,
+  signer: PublicKey,
   key: PublicKey,
+  club?: ClubTrading | null,
 ) {
   const row = s.orders.find((r) => r.publicKey.equals(key));
-  if (!row || !row.account.owner.equals(owner))
-    throw new Error("Order owner mismatch");
+  if (!row) throw new Error("Order not found; refresh");
   const o = row.account,
-    l = s.levels.find((r) => r.publicKey.equals(o.priceLevel))?.account;
+    owner = o.owner;
+  if (!owner.equals(signer) && !departedOrder(club, o))
+    throw new Error("Order owner mismatch");
+  const l = s.levels.find((r) => r.publicKey.equals(o.priceLevel))?.account;
   if (!l) throw new Error("Level missing; refresh");
   const outcome = Object.keys(o.outcome)[0] as Outcome,
     side = Object.keys(o.side)[0] as Side;
   const last = l.orderCount.eqn(1);
+  const accounts = {
+    book: s.key,
+    ...traderAccounts(s.book, owner),
+    order: key,
+    priceLevel: o.priceLevel,
+    previousOrder: o.previousOrder,
+    nextOrder: o.nextOrder,
+    betterLevel:
+      last && l.betterPrice
+        ? sharedLevelPda(s.key, outcome, side, l.betterPrice)
+        : null,
+    worseLevel:
+      last && l.worsePrice
+        ? sharedLevelPda(s.key, outcome, side, l.worsePrice)
+        : null,
+    levelRentRecipient: last ? l.rentPayer : null,
+  };
+  if (club)
+    return p.methods
+      .cancelClubOrder()
+      .accountsPartial(
+        optionalAccounts({
+          canceller: signer,
+          clubMarket: club.clubMarket,
+          ownerMember: clubMemberPda(club.club, owner),
+          ...accounts,
+        }),
+      )
+      .instruction();
   return p.methods
     .cancelSharedOrder()
-    .accountsPartial(
-      optionalAccounts({
-        owner,
-        book: s.key,
-        ...traderAccounts(s.book, owner),
-        order: key,
-        priceLevel: o.priceLevel,
-        previousOrder: o.previousOrder,
-        nextOrder: o.nextOrder,
-        betterLevel:
-          last && l.betterPrice
-            ? sharedLevelPda(s.key, outcome, side, l.betterPrice)
-            : null,
-        worseLevel:
-          last && l.worsePrice
-            ? sharedLevelPda(s.key, outcome, side, l.worsePrice)
-            : null,
-        levelRentRecipient: last ? l.rentPayer : null,
-      }),
-    )
+    .accountsPartial(optionalAccounts({ owner, ...accounts }))
     .instruction();
 }
 /** Lowest price at which `outcome` can currently be bought on a binary book:
@@ -270,7 +317,10 @@ export async function buildSharedTrade(
   quantity: BN,
   prefix: TransactionInstruction[] = [],
   complement = COMPLEMENTARY_MATCHING_ENABLED,
+  club?: ClubTrading | null,
 ) {
+  if (club?.membersOnly && !club.members.has(owner.toBase58()))
+    throw new Error("Only club members can trade in this market");
   if (
     price.lten(0) ||
     quantity.lten(0) ||
@@ -361,6 +411,10 @@ export async function buildSharedTrade(
       throw new Error(
         "Your order is first in this queue. Cancel it before trading against this price.",
       );
+    if (departedOrder(club, maker.account))
+      throw new Error(
+        "A former member's order is first in this queue. Clear departed members' orders, then retry.",
+      );
     const fill = BN.min(remaining, maker.account.remainingQuantity),
       full = fill.eq(maker.account.remainingQuantity),
       last = full && l.account.orderCount.eqn(1);
@@ -378,14 +432,18 @@ export async function buildSharedTrade(
           : null,
       levelRentRecipient: last ? l.account.rentPayer : null,
     };
+    const clubAccounts: Record<string, PublicKey | null> = club
+      ? {
+          clubMarket: club.clubMarket,
+          clubFeeConfig: clubFeeConfigPda(),
+          takerMember: membership(club, owner),
+          makerMember: membership(club, maker.account.owner),
+        }
+      : {};
     const ix = best.complement
-      ? await p.methods
-          .matchSharedComplement(
-            variant(outcome),
-            variant(side),
-            price,
-            remaining,
-          )
+      ? await (
+          club ? p.methods.matchClubComplement : p.methods.matchSharedComplement
+        )(variant(outcome), variant(side), price, remaining)
           .accountsPartial(
             optionalAccounts({
               taker: owner,
@@ -405,11 +463,16 @@ export async function buildSharedTrade(
               marketVault: deriveVaultPda(s.book.market, s.book.quoteMint),
               tokenProgram: TOKEN_PROGRAM_ID,
               ...removal,
+              ...clubAccounts,
             }),
           )
           .instruction()
-      : await p.methods
-          .matchSharedOrder(variant(outcome), variant(side), price, remaining)
+      : await (club ? p.methods.matchClubOrder : p.methods.matchSharedOrder)(
+          variant(outcome),
+          variant(side),
+          price,
+          remaining,
+        )
           .accountsPartial(
             optionalAccounts({
               taker: owner,
@@ -425,6 +488,7 @@ export async function buildSharedTrade(
               takerQuote: t.quoteBalance,
               takerPosition: t.position,
               ...removal,
+              ...clubAccounts,
             }),
           )
           .instruction();
@@ -475,14 +539,9 @@ export async function buildSharedTrade(
         side === "bid" ? b.cmp(a) : a.cmp(b),
       ),
       at = sorted.findIndex((v) => v.eq(price));
-    const ix = await p.methods
-      .placeSharedOrder(
-        variant(outcome),
-        variant(side),
-        price,
-        remaining,
-        s.book.nextOrderId,
-      )
+    const ix = await (
+      club ? p.methods.placeClubOrder : p.methods.placeSharedOrder
+    )(variant(outcome), variant(side), price, remaining, s.book.nextOrderId)
       .accountsPartial(
         optionalAccounts({
           owner,
@@ -501,6 +560,9 @@ export async function buildSharedTrade(
               ? sharedLevelPda(s.key, outcome, side, sorted[at + 1])
               : null,
           systemProgram: SystemProgram.programId,
+          ...(club
+            ? { clubMarket: club.clubMarket, member: membership(club, owner) }
+            : {}),
         }),
       )
       .instruction();

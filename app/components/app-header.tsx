@@ -11,6 +11,7 @@ import { BrandMark, OutcomiaBrand } from "./workspace-brand";
 export { OutcomiaBrand } from "./workspace-brand";
 import { NETWORK } from "../lib/solana";
 import { useProtocolRole } from "./protocol-role-provider";
+import { CLUBS_ENABLED } from "../lib/clubs";
 
 const roleLabels = {
   disconnected: null,
@@ -24,7 +25,8 @@ const roleLabels = {
 type NavigationItem = {
   href: string;
   label: string;
-  icon: "prediction" | "spot" | "wallet" | "orders" | "admins" | "create";
+  icon:
+    "prediction" | "spot" | "wallet" | "orders" | "admins" | "create" | "clubs";
   active: boolean;
 };
 
@@ -37,6 +39,8 @@ function NavigationIcon({ name }: { name: NavigationItem["icon"] }) {
     admins:
       "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 4a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87",
     create: "M12 5v14 M5 12h14",
+    clubs:
+      "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1",
   };
   return (
     <svg
@@ -129,6 +133,16 @@ export function AppHeader() {
       icon: "wallet",
       active: pathname === "/wallet",
     },
+    ...(CLUBS_ENABLED
+      ? [
+          {
+            href: "/clubs",
+            label: "Clubs",
+            icon: "clubs" as const,
+            active: pathname.startsWith("/clubs"),
+          },
+        ]
+      : []),
     ...(canViewOrders
       ? [
           {

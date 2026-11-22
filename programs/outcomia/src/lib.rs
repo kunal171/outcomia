@@ -176,6 +176,75 @@ pub mod outcomia {
         crate::instructions::club_resolution::handle_advance_club_prediction(ctx, action)
     }
 
+    /// Creates a club market's book (club admin or the creator-member).
+    pub fn initialize_club_book(ctx: Context<InitializeClubBook>) -> Result<()> {
+        crate::instructions::club_orders::handle_initialize_club_book(ctx)
+    }
+
+    /// Places a resting order on a club book; members only in members-only markets.
+    pub fn place_club_order(
+        ctx: Context<PlaceClubOrder>,
+        outcome: SharedOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+    ) -> Result<()> {
+        crate::instructions::club_orders::handle_place_club_order(
+            ctx, outcome, side, price, quantity, order_id,
+        )
+    }
+
+    /// Cancels a club order: by its owner, or by anyone once the owner has left a
+    /// members-only market. Funds always return to the owner.
+    pub fn cancel_club_order(ctx: Context<CancelClubOrder>) -> Result<()> {
+        crate::instructions::club_orders::handle_cancel_club_order(ctx)
+    }
+
+    /// Fills the best maker of the same outcome on a club book.
+    pub fn match_club_order(
+        ctx: Context<MatchClubOrder>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        crate::instructions::club_matching::handle_match_club_order(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
+    /// Fills the best maker of the other outcome on a club book through the complete set.
+    pub fn match_club_complement(
+        ctx: Context<MatchClubComplement>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        crate::instructions::club_matching::handle_match_club_complement(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
+    /// Lets the club owner withdraw the club's accrued fee share from a club market.
+    pub fn withdraw_club_fees(ctx: Context<WithdrawClubFees>, amount: u64) -> Result<()> {
+        crate::instructions::club_fees::handle_withdraw_club_fees(ctx, amount)
+    }
+
+    /// Lets the super-admin withdraw the protocol's fee share from a club book.
+    pub fn withdraw_club_book_fees(ctx: Context<WithdrawClubBookFees>, amount: u64) -> Result<()> {
+        crate::instructions::club_fees::handle_withdraw_club_book_fees(ctx, amount)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

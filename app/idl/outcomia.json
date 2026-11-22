@@ -13819,6 +13819,1436 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "cancel_club_order",
+      "docs": [
+        "Cancels a club order: by its owner, or by anyone once the owner has left a",
+        "members-only market. Funds always return to the owner."
+      ],
+      "discriminator": [
+        31,
+        40,
+        118,
+        220,
+        91,
+        248,
+        191,
+        52
+      ],
+      "accounts": [
+        {
+          "name": "canceller",
+          "docs": [
+            "The order owner, or anyone when the owner has left a members-only club market."
+          ],
+          "signer": true
+        },
+        {
+          "name": "club_market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book.market",
+                "account": "SharedBook"
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book.market",
+                "account": "SharedBook"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club_market.club",
+                "account": "ClubMarket"
+              },
+              {
+                "kind": "account",
+                "path": "order.owner",
+                "account": "SharedOrder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_balance",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "quote_balance",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "previous_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_club_book",
+      "docs": [
+        "Creates a club market's book (club admin or the creator-member)."
+      ],
+      "discriminator": [
+        229,
+        220,
+        138,
+        160,
+        55,
+        161,
+        7,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "club_market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "relations": [
+            "club_market"
+          ]
+        },
+        {
+          "name": "actor_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club_market.club",
+                "account": "ClubMarket"
+              },
+              {
+                "kind": "account",
+                "path": "actor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "match_club_complement",
+      "docs": [
+        "Fills the best maker of the other outcome on a club book through the complete set."
+      ],
+      "discriminator": [
+        19,
+        87,
+        217,
+        138,
+        231,
+        4,
+        78,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "club_market",
+            "book"
+          ]
+        },
+        {
+          "name": "club_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_member",
+          "optional": true
+        },
+        {
+          "name": "maker_member",
+          "optional": true
+        },
+        {
+          "name": "maker_order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "maker_quote",
+          "writable": true
+        },
+        {
+          "name": "maker_position",
+          "writable": true
+        },
+        {
+          "name": "taker_quote",
+          "writable": true
+        },
+        {
+          "name": "taker_position",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "asset_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  45,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "match_club_order",
+      "docs": [
+        "Fills the best maker of the same outcome on a club book."
+      ],
+      "discriminator": [
+        126,
+        97,
+        206,
+        245,
+        120,
+        176,
+        3,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "taker",
+          "signer": true
+        },
+        {
+          "name": "market",
+          "relations": [
+            "club_market",
+            "book"
+          ]
+        },
+        {
+          "name": "club_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_fee_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "taker_member",
+          "optional": true
+        },
+        {
+          "name": "maker_member",
+          "optional": true
+        },
+        {
+          "name": "maker_order",
+          "writable": true
+        },
+        {
+          "name": "price_level",
+          "writable": true
+        },
+        {
+          "name": "maker_base",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "maker_quote",
+          "writable": true
+        },
+        {
+          "name": "maker_position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "taker_base",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "taker_quote",
+          "writable": true
+        },
+        {
+          "name": "taker_position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "next_order",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "level_rent_recipient",
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "taker_side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "limit_price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "place_club_order",
+      "docs": [
+        "Places a resting order on a club book; members only in members-only markets."
+      ],
+      "discriminator": [
+        123,
+        189,
+        78,
+        233,
+        243,
+        127,
+        124,
+        243
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "relations": [
+            "club_market",
+            "book"
+          ]
+        },
+        {
+          "name": "club_market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member",
+          "docs": [
+            "The owner's membership; required in members-only markets."
+          ],
+          "optional": true
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_balance",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "quote_balance",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "order",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "arg",
+                "path": "order_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_level",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101,
+                  100,
+                  95,
+                  108,
+                  101,
+                  118,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book"
+              },
+              {
+                "kind": "arg",
+                "path": "outcome"
+              },
+              {
+                "kind": "arg",
+                "path": "side"
+              },
+              {
+                "kind": "arg",
+                "path": "price"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tail",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "better_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "worse_level",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "outcome",
+          "type": {
+            "defined": {
+              "name": "SharedOutcome"
+            }
+          }
+        },
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "OrderSide"
+            }
+          }
+        },
+        {
+          "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "order_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_club_book_fees",
+      "docs": [
+        "Lets the super-admin withdraw the protocol's fee share from a club book."
+      ],
+      "discriminator": [
+        194,
+        109,
+        177,
+        97,
+        16,
+        62,
+        55,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "book",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  98,
+                  111,
+                  111,
+                  107
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "book.market",
+                "account": "SharedBook"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_club_fees",
+      "docs": [
+        "Lets the club owner withdraw the club's accrued fee share from a club market."
+      ],
+      "discriminator": [
+        23,
+        149,
+        123,
+        30,
+        40,
+        105,
+        88,
+        52
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "relations": [
+            "club_market"
+          ]
+        },
+        {
+          "name": "club_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club_market.market",
+                "account": "ClubMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "asset_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -19412,6 +20842,15 @@
       ],
       "type": "bytes",
       "value": "[99, 108, 117, 98, 95, 112, 114, 101, 100, 105, 99, 116, 105, 111, 110, 95, 109, 97, 114, 107, 101, 116]"
+    },
+    {
+      "name": "CLUB_BOOK_SEED",
+      "docs": [
+        "Book of a club market: [\"club_book\", market]. Its orders and levels use the",
+        "shared order/level seeds under this book's address."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 98, 111, 111, 107]"
     }
   ]
 }

@@ -4,6 +4,13 @@ import { TradingChart } from "./trading-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
 import { visibleMarket } from "../lib/market-visibility";
+import {
+  clubAccounts,
+  clubMarketHref,
+  clubMarketPda,
+  isClubPredictionMarket,
+  isPublicPredictionMarket,
+} from "../lib/clubs";
 
 import { PREDICTION_RESOLUTION_ENABLED } from "../lib/shared";
 import { PredictionDetailLayout } from "./prediction-detail-layout";
@@ -54,6 +61,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
+  /** Set when the requested address is a club market, which has its own page. */
+  const [clubHref, setClubHref] = useState<string | null>(null);
   const lastConnection = useRef(connection);
   useIndexerUpdates(() => setRefresh((v) => v + 1));
 
@@ -70,6 +79,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
         : current.filter((row) => row.address.toBase58() === address),
     );
     async function load() {
+      setClubHref(null);
       try {
         const accounts = getOutcomiaAccounts(program);
         let markets: Array<{
@@ -81,9 +91,25 @@ export function PredictionMarkets({ address }: { address?: string }) {
           const account = await accounts.predictionMarket.fetchNullable(key);
           if (!account)
             throw new Error("Prediction market was not found on this network");
+          if (isClubPredictionMarket(key, account.marketId)) {
+            // Club markets trade only through club instructions.
+            const binding = await clubAccounts(
+              program,
+            ).clubMarket.fetchNullable(clubMarketPda(key));
+            if (!binding) throw new Error("Club market binding is missing");
+            if (!canceled) {
+              setClubHref(clubMarketHref(binding.club, key));
+              setRecords([]);
+            }
+            return;
+          }
           markets = [{ publicKey: key, account }];
         } else {
-          markets = await accounts.predictionMarket.all();
+          // Club markets share this account type; never list them publicly.
+          markets = (await accounts.predictionMarket.all()).filter(
+            ({ publicKey, account }) =>
+              isPublicPredictionMarket(publicKey, account.marketId),
+          );
         }
         const rows = await Promise.all(
           markets.map(async ({ publicKey, account }) => {
@@ -127,10 +153,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
   const visibleRecords = records.filter(
     (row) =>
       address ||
-      (visibleMarket(
-        row.address.toBase58(),
-        row.metadata?.displayName,
-      ) &&
+      (visibleMarket(row.address.toBase58(), row.metadata?.displayName) &&
         `${row.metadata?.displayName ?? ""} ${row.address.toBase58()}`
           .toLowerCase()
           .includes(query.trim().toLowerCase())),
@@ -147,6 +170,14 @@ export function PredictionMarkets({ address }: { address?: string }) {
           <Link className="text-button" href="/predictions">
             {t("← Prediction markets")}
           </Link>
+        )}
+        {clubHref && (
+          <div className="access-card">
+            <p>{t("This market belongs to a club.")}</p>
+            <Link className="primary-button" href={clubHref}>
+              {t("Open in club →")}
+            </Link>
+          </div>
         )}
         {!address && (
           <div className="route-heading">
@@ -214,7 +245,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
             {t(error ?? "")}
           </div>
         )}
-        {!loading && !error && records.length === 0 && (
+        {!loading && !error && !clubHref && records.length === 0 && (
           <div className="access-card">
             {t("No prediction markets exist on this network yet.")}
           </div>

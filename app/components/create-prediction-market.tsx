@@ -1,7 +1,7 @@
 "use client";
 import { useI18n } from "./preferences-provider";
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import {
@@ -38,14 +38,24 @@ import {
   deriveVaultAuthorityPda,
   deriveVaultPda,
   getOutcomiaProgram,
+  getOutcomiaReadProgram,
   getOutcomiaAccounts,
   parseTokenAmount,
   TOKEN_PROGRAM_ID,
   transactionExplorerUrl,
 } from "../lib/outcomia";
+import {
+  canCreateClubMarket,
+  clubMarketHref,
+  createClubMarketInstructions,
+  readClub,
+} from "../lib/clubs";
 
-export function CreatePredictionMarket() {
+/** Public markets need an active protocol admin. With `club`, any member the
+ * club's policy allows creates a club market instead; club admins resolve it. */
+export function CreatePredictionMarket({ club }: { club?: string } = {}) {
   const { t } = useI18n();
+  const clubKey = useMemo(() => (club ? new PublicKey(club) : null), [club]);
 
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -53,8 +63,44 @@ export function CreatePredictionMarket() {
   const creator = wallet?.publicKey.toBase58() ?? "";
   const currentCreator = useRef(creator);
   currentCreator.current = creator;
-  const { role, loading, error: roleError } = useProtocolRole();
-  const isAdmin = !loading && (role === "admin" || role === "super-admin");
+  const {
+    role,
+    loading: roleLoading,
+    error: protocolRoleError,
+  } = useProtocolRole();
+  const [clubAccess, setClubAccess] = useState<{
+    name: string;
+    allowed: boolean;
+  } | null>(null);
+  const [publicAccess, setPublicAccess] = useState(false);
+  useEffect(() => {
+    if (!clubKey || !wallet) return;
+    let dead = false;
+    void readClub(getOutcomiaReadProgram(connection), clubKey)
+      .then((snapshot) => {
+        if (dead) return;
+        const member = snapshot?.members.find((m) =>
+          m.wallet.equals(wallet.publicKey),
+        );
+        setClubAccess(
+          snapshot
+            ? {
+                name: snapshot.club.name,
+                allowed: canCreateClubMarket(snapshot.club, member),
+              }
+            : { name: "", allowed: false },
+        );
+      })
+      .catch(() => !dead && setClubAccess({ name: "", allowed: false }));
+    return () => {
+      dead = true;
+    };
+  }, [clubKey, wallet, connection]);
+  const loading = clubKey ? !!wallet && !clubAccess : roleLoading;
+  const roleError = clubKey ? null : protocolRoleError;
+  const isAdmin = clubKey
+    ? !!clubAccess?.allowed
+    : !roleLoading && (role === "admin" || role === "super-admin");
   const program = useMemo(
     () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
     [connection, wallet],
@@ -123,19 +169,25 @@ export function CreatePredictionMarket() {
         new TextEncoder().encode(content).buffer,
       );
       validatePredictionCreatorResolver(rules.resolver, wallet.publicKey);
+      if (clubKey && rules.fallback)
+        throw new Error(
+          "Club markets have no fallback resolver; club admins resolve them",
+        );
       if (rules.closeTs.lte(new BN(String(Math.floor(Date.now() / 1000)))))
         throw new Error("Trading close time must be in the future");
-      const admin = await getOutcomiaAccounts(
-        program,
-      ).adminRecord.fetchNullable(deriveAdminRecordPda(wallet.publicKey));
-      if (
-        !admin ||
-        !admin.authority.equals(wallet.publicKey) ||
-        !("active" in admin.status)
-      )
-        throw new Error(
-          "An active administrator record is required before uploading rules",
-        );
+      if (!clubKey) {
+        const admin = await getOutcomiaAccounts(
+          program,
+        ).adminRecord.fetchNullable(deriveAdminRecordPda(wallet.publicKey));
+        if (
+          !admin ||
+          !admin.authority.equals(wallet.publicKey) ||
+          !("active" in admin.status)
+        )
+          throw new Error(
+            "An active administrator record is required before uploading rules",
+          );
+      }
       const collateralMint = new PublicKey(mint.trim());
       const mintAccount = await getMint(
         connection,
@@ -194,6 +246,36 @@ export function CreatePredictionMarket() {
         );
       // New random IDs permit multiple independent questions for one mint.
       const marketId = crypto.getRandomValues(new Uint8Array(32));
+      if (clubKey) {
+        const { market, instructions } = await createClubMarketInstructions(
+          program,
+          wallet.publicKey,
+          clubKey,
+          collateralMint,
+          {
+            resolver: rules.resolver,
+            fallback: null,
+            closeTs: rules.closeTs,
+            earliestResolutionTs: rules.earliestResolutionTs,
+            resolutionDelaySeconds: rules.resolutionDelaySeconds,
+            payoutPerContract: payout,
+            priceTick,
+            rulesUri: upload.uri,
+            questionHash: rules.questionHash,
+            rulesHash: rules.rulesHash,
+          },
+          name,
+          symbol,
+          publicAccess,
+          marketId,
+        );
+        setStage("Approve market creation in your wallet…");
+        const signature = await (
+          program.provider as AnchorProvider
+        ).sendAndConfirm(new Transaction().add(...instructions));
+        setResult({ market: clubMarketHref(clubKey, market), signature });
+        return;
+      }
       const market = derivePredictionMarketPda(marketId);
       const instruction = await program.methods
         .initializePredictionMarket(
@@ -231,7 +313,7 @@ export function CreatePredictionMarket() {
       const signature = await (
         program.provider as AnchorProvider
       ).sendAndConfirm(new Transaction().add(instruction));
-      setResult({ market: market.toBase58(), signature });
+      setResult({ market: `/predictions/${market.toBase58()}`, signature });
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Draft creation failed",
@@ -246,11 +328,22 @@ export function CreatePredictionMarket() {
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell route-shell-narrow">
-        <Link className="market-type-back" href="/markets/new">
-          {t("← Change market type")}
-        </Link>
+        {clubKey ? (
+          <Link className="market-type-back" href={`/clubs/${club}`}>
+            {t("← Club")}
+          </Link>
+        ) : (
+          <Link className="market-type-back" href="/markets/new">
+            {t("← Change market type")}
+          </Link>
+        )}
         <div className="route-heading">
-          <h1>{t("Create a prediction market")}</h1>
+          <h1>
+            {clubKey
+              ? t("Create a club market")
+              : t("Create a prediction market")}
+          </h1>
+          {clubAccess?.name && <p>{clubAccess.name}</p>}
         </div>
         {!PREDICTION_DRAFTS_ENABLED && (
           <div className="access-card">
@@ -261,14 +354,18 @@ export function CreatePredictionMarket() {
         )}
         {!wallet ? (
           <div className="access-card">
-            {t("Connect your administrator wallet.")}
+            {clubKey
+              ? t("Connect a wallet to see your clubs.")
+              : t("Connect your administrator wallet.")}
           </div>
         ) : loading ? (
           <div className="access-card">{t("Checking role…")}</div>
         ) : (
           !isAdmin && (
             <div className="access-card">
-              {t("An active administrator role is required.")}
+              {clubKey
+                ? t("This club's policy does not let you create markets.")
+                : t("An active administrator role is required.")}
             </div>
           )
         )}
@@ -331,6 +428,26 @@ export function CreatePredictionMarket() {
                 inputMode="decimal"
               />
             </label>
+            {clubKey && (
+              <label className="rules-checkbox">
+                <input
+                  type="checkbox"
+                  checked={publicAccess}
+                  disabled={pending}
+                  onChange={(e) => setPublicAccess(e.target.checked)}
+                />
+                {t(
+                  "Public market: anyone can trade. Leave unchecked to admit only current club members.",
+                )}
+              </label>
+            )}
+            {clubKey && (
+              <p className="rules-help">
+                {t(
+                  "Club markets have no fallback resolver: any current club admin resolves them. The market opens with its order book in the same transaction.",
+                )}
+              </p>
+            )}
             <details className="inline-explainer">
               <summary>{t("How does the price increment work?")}</summary>
               <p>
@@ -447,9 +564,7 @@ export function CreatePredictionMarket() {
           <div className="access-card transaction-success">
             <p>
               {t("Draft confirmed.")}{" "}
-              <Link href={`/predictions/${result.market}`}>
-                {t("Inspect draft →")}
-              </Link>
+              <Link href={result.market}>{t("Inspect draft →")}</Link>
             </p>
             <a
               href={transactionExplorerUrl(result.signature)}

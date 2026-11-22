@@ -155,3 +155,8 @@ pub const CLUB_PREDICTION_MARKET_SEED: &[u8] = b"club_prediction_market";
 /// Club binding of a club market: ["club_market", market].
 #[constant]
 pub const CLUB_MARKET_SEED: &[u8] = b"club_market";
+
+/// Book of a club market: ["club_book", market]. Its orders and levels use the
+/// shared order/level seeds under this book's address.
+#[constant]
+pub const CLUB_BOOK_SEED: &[u8] = b"club_book";

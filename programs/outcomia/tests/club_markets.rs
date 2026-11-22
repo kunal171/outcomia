@@ -6,7 +6,7 @@
 use anchor_lang::{
     prelude::{Clock, Pubkey},
     solana_program::{instruction::Instruction, program_pack::Pack, system_program},
-    AccountDeserialize, InstructionData, ToAccountMetas,
+    AccountDeserialize, AccountSerialize, InstructionData, ToAccountMetas,
 };
 use anchor_spl::token::spl_token::state::{Account as TokenState, AccountState, Mint};
 use litesvm::LiteSVM;
@@ -16,6 +16,8 @@ use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
 use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
+use OrderSide::{Ask, Bid};
+use SharedOutcome::{No, Yes};
 
 const PROGRAM_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -240,32 +242,7 @@ impl Fixture {
     /// Deposits `amount` collateral atoms into the wallet's shared balance and
     /// creates its club position.
     fn fund(&mut self, wallet: &Keypair, amount: u64) {
-        let token = Pubkey::new_unique();
-        let state = TokenState {
-            mint: self.mint,
-            owner: wallet.pubkey(),
-            amount,
-            delegate: None.into(),
-            state: AccountState::Initialized,
-            is_native: None.into(),
-            delegated_amount: 0,
-            close_authority: None.into(),
-        };
-        let mut data = vec![0; TokenState::LEN];
-        TokenState::pack(state, &mut data).unwrap();
-        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
-        self.svm
-            .set_account(
-                token,
-                Account {
-                    lamports,
-                    data,
-                    owner: anchor_spl::token::ID,
-                    executable: false,
-                    rent_epoch: 0,
-                },
-            )
-            .unwrap();
+        let token = self.token_account(&wallet.pubkey(), amount);
         let (owner, mint) = (wallet.pubkey(), self.mint);
         let balance = self.balance_pda(&owner);
         let authority = pda(ASSET_AUTHORITY_SEED, &[mint.as_ref()]);
@@ -301,6 +278,36 @@ impl Fixture {
             ),
         );
         self.ok(wallet, self.init_position(&owner));
+    }
+    /// A token account of the collateral mint owned by `owner`.
+    fn token_account(&mut self, owner: &Pubkey, amount: u64) -> Pubkey {
+        let token = Pubkey::new_unique();
+        let state = TokenState {
+            mint: self.mint,
+            owner: *owner,
+            amount,
+            delegate: None.into(),
+            state: AccountState::Initialized,
+            is_native: None.into(),
+            delegated_amount: 0,
+            close_authority: None.into(),
+        };
+        let mut data = vec![0; TokenState::LEN];
+        TokenState::pack(state, &mut data).unwrap();
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.svm
+            .set_account(
+                token,
+                Account {
+                    lamports,
+                    data,
+                    owner: anchor_spl::token::ID,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .unwrap();
+        token
     }
     fn custody_accounts(
         &self,
@@ -376,6 +383,320 @@ impl Fixture {
         ix(
             self.custody_accounts(owner, false),
             outcomia::instruction::RedeemClubPrediction { yes, no },
+        )
+    }
+
+    fn book(&self) -> Pubkey {
+        pda(CLUB_BOOK_SEED, &[market_pda(&MARKET_ID).as_ref()])
+    }
+    fn order_pda(&self, id: u64) -> Pubkey {
+        pda(
+            SHARED_ORDER_SEED,
+            &[self.book().as_ref(), &id.to_le_bytes()],
+        )
+    }
+    fn level_pda(&self, outcome: SharedOutcome, side: OrderSide, price: u64) -> Pubkey {
+        pda(
+            SHARED_LEVEL_SEED,
+            &[
+                self.book().as_ref(),
+                outcome.seed(),
+                side.seed(),
+                &price.to_le_bytes(),
+            ],
+        )
+    }
+    fn init_book(&self, actor: &Pubkey) -> Instruction {
+        let market = market_pda(&MARKET_ID);
+        ix(
+            outcomia::accounts::InitializeClubBook {
+                actor: *actor,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                actor_member: self.member_pda(actor),
+                book: self.book(),
+                system_program: system_program::ID,
+            },
+            outcomia::instruction::InitializeClubBook {},
+        )
+    }
+    /// Places an order at a price no other order of that list uses yet.
+    #[allow(clippy::too_many_arguments)]
+    fn place(
+        &self,
+        owner: &Pubkey,
+        with_member: bool,
+        outcome: SharedOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+    ) -> Instruction {
+        let market = market_pda(&MARKET_ID);
+        ix(
+            outcomia::accounts::PlaceClubOrder {
+                owner: *owner,
+                market,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                member: with_member.then(|| self.member_pda(owner)),
+                book: self.book(),
+                base_balance: None,
+                quote_balance: self.balance_pda(owner),
+                position: Some(pda(
+                    PREDICTION_POSITION_SEED,
+                    &[market.as_ref(), owner.as_ref()],
+                )),
+                order: self.order_pda(order_id),
+                price_level: self.level_pda(outcome, side, price),
+                tail: None,
+                better_level: None,
+                worse_level: None,
+                system_program: system_program::ID,
+            },
+            outcomia::instruction::PlaceClubOrder {
+                outcome,
+                side,
+                price,
+                quantity,
+                order_id,
+            },
+        )
+    }
+    /// Cancels an order that is alone at its level.
+    fn cancel(&self, canceller: &Pubkey, order_id: u64) -> Instruction {
+        let order: SharedOrder = self.load(&self.order_pda(order_id)).unwrap();
+        let market = market_pda(&MARKET_ID);
+        let level: SharedPriceLevel = self.load(&order.price_level).unwrap();
+        ix(
+            outcomia::accounts::CancelClubOrder {
+                canceller: *canceller,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                book: self.book(),
+                owner_member: self.member_pda(&order.owner),
+                base_balance: None,
+                quote_balance: self.balance_pda(&order.owner),
+                position: Some(pda(
+                    PREDICTION_POSITION_SEED,
+                    &[market.as_ref(), order.owner.as_ref()],
+                )),
+                order: self.order_pda(order_id),
+                price_level: order.price_level,
+                previous_order: None,
+                next_order: None,
+                better_level: None,
+                worse_level: None,
+                level_rent_recipient: Some(level.rent_payer),
+            },
+            outcomia::instruction::CancelClubOrder {},
+        )
+    }
+    fn lamports(&self, address: &Pubkey) -> u64 {
+        self.svm.get_account(address).map_or(0, |a| a.lamports)
+    }
+    fn locked_cash(&self, owner: &Pubkey) -> u64 {
+        self.load::<AssetBalance>(&self.balance_pda(owner))
+            .unwrap()
+            .locked
+    }
+    fn club_book(&self) -> SharedBook {
+        self.load(&self.book()).unwrap()
+    }
+    /// Opens the default market with a book, as the owner.
+    fn open_book(&mut self, access: ClubMarketAccess) {
+        self.open_market(access);
+        let owner = self.owner.insecure_clone();
+        self.ok(&owner, self.init_book(&owner.pubkey()));
+    }
+
+    fn store<T: AccountSerialize>(&mut self, address: Pubkey, value: &T) {
+        let mut data = Vec::new();
+        value.try_serialize(&mut data).unwrap();
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.svm
+            .set_account(
+                address,
+                Account {
+                    lamports,
+                    data,
+                    owner: outcomia::ID,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .unwrap();
+    }
+    /// Sets the protocol taker fee and, when given, the club share.
+    fn set_fees(&mut self, taker_fee_bps: u16, club_share_bps: Option<u16>) {
+        self.set_fees_with_admin(taker_fee_bps, club_share_bps, Pubkey::new_unique());
+    }
+    fn set_fees_with_admin(
+        &mut self,
+        taker_fee_bps: u16,
+        club_share_bps: Option<u16>,
+        super_admin: Pubkey,
+    ) {
+        let (config, bump) = Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &outcomia::ID);
+        self.store(
+            config,
+            &ProtocolConfig {
+                super_admin,
+                taker_fee_bps,
+                bump,
+            },
+        );
+        if let Some(club_share_bps) = club_share_bps {
+            let (address, bump) =
+                Pubkey::find_program_address(&[CLUB_FEE_CONFIG_SEED], &outcomia::ID);
+            self.store(
+                address,
+                &ClubFeeConfig {
+                    club_share_bps,
+                    bump,
+                },
+            );
+        }
+    }
+    fn club_market(&self) -> ClubMarket {
+        self.load(&pda(CLUB_MARKET_SEED, &[market_pda(&MARKET_ID).as_ref()]))
+            .unwrap()
+    }
+    /// Fills against order `maker_id`, which must be alone at its level.
+    #[allow(clippy::too_many_arguments)]
+    fn take(
+        &self,
+        taker: &Pubkey,
+        taker_member: bool,
+        maker_member: bool,
+        maker_id: u64,
+        outcome: SharedOutcome,
+        side: OrderSide,
+        limit: u64,
+        quantity: u64,
+        complement: bool,
+    ) -> Instruction {
+        let maker: SharedOrder = self.load(&self.order_pda(maker_id)).unwrap();
+        let level: SharedPriceLevel = self.load(&maker.price_level).unwrap();
+        let market = market_pda(&MARKET_ID);
+        let completes = quantity >= maker.remaining_quantity;
+        let position = |o: &Pubkey| pda(PREDICTION_POSITION_SEED, &[market.as_ref(), o.as_ref()]);
+        let club_market = pda(CLUB_MARKET_SEED, &[market.as_ref()]);
+        let protocol_config = pda(PROTOCOL_CONFIG_SEED, &[]);
+        let club_fee_config = pda(CLUB_FEE_CONFIG_SEED, &[]);
+        let taker_member = taker_member.then(|| self.member_pda(taker));
+        let maker_member = maker_member.then(|| self.member_pda(&maker.owner));
+        let level_rent_recipient = completes.then_some(level.rent_payer);
+        if complement {
+            ix(
+                outcomia::accounts::MatchClubComplement {
+                    taker: *taker,
+                    market,
+                    club_market,
+                    book: self.book(),
+                    protocol_config,
+                    club_fee_config,
+                    taker_member,
+                    maker_member,
+                    maker_order: self.order_pda(maker_id),
+                    price_level: maker.price_level,
+                    maker_quote: self.balance_pda(&maker.owner),
+                    maker_position: position(&maker.owner),
+                    taker_quote: self.balance_pda(taker),
+                    taker_position: position(taker),
+                    mint: self.mint,
+                    asset_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+                    asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+                    market_authority: pda(VAULT_AUTHORITY_SEED, &[market.as_ref()]),
+                    market_vault: self.market_vault(),
+                    token_program: anchor_spl::token::ID,
+                    next_order: None,
+                    worse_level: None,
+                    level_rent_recipient,
+                },
+                outcomia::instruction::MatchClubComplement {
+                    outcome,
+                    taker_side: side,
+                    limit_price: limit,
+                    quantity,
+                },
+            )
+        } else {
+            ix(
+                outcomia::accounts::MatchClubOrder {
+                    taker: *taker,
+                    market,
+                    club_market,
+                    book: self.book(),
+                    protocol_config,
+                    club_fee_config,
+                    taker_member,
+                    maker_member,
+                    maker_order: self.order_pda(maker_id),
+                    price_level: maker.price_level,
+                    maker_base: None,
+                    maker_quote: self.balance_pda(&maker.owner),
+                    maker_position: Some(position(&maker.owner)),
+                    taker_base: None,
+                    taker_quote: self.balance_pda(taker),
+                    taker_position: Some(position(taker)),
+                    next_order: None,
+                    worse_level: None,
+                    level_rent_recipient,
+                },
+                outcomia::instruction::MatchClubOrder {
+                    outcome,
+                    taker_side: side,
+                    limit_price: limit,
+                    quantity,
+                },
+            )
+        }
+    }
+    /// Global vault tokens minus every wallet claim, book fee and club fee.
+    fn vault_surplus(&self, wallets: &[&Pubkey]) -> i128 {
+        let vault = self.token_amount(&pda(ASSET_VAULT_SEED, &[self.mint.as_ref()])) as i128;
+        let claims: i128 = wallets
+            .iter()
+            .map(|w| {
+                let b: AssetBalance = self.load(&self.balance_pda(w)).unwrap();
+                (b.free + b.locked) as i128
+            })
+            .sum();
+        vault
+            - claims
+            - self.club_book().accrued_quote_fees as i128
+            - self.club_market().accrued_club_fees as i128
+    }
+
+    fn withdraw_club(&self, owner: &Pubkey, destination: Pubkey, amount: u64) -> Instruction {
+        let market = market_pda(&MARKET_ID);
+        ix(
+            outcomia::accounts::WithdrawClubFees {
+                owner: *owner,
+                club: self.club,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                mint: self.mint,
+                destination,
+                vault_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+                asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+                token_program: anchor_spl::token::ID,
+            },
+            outcomia::instruction::WithdrawClubFees { amount },
+        )
+    }
+    fn withdraw_book(&self, super_admin: &Pubkey, destination: Pubkey, amount: u64) -> Instruction {
+        ix(
+            outcomia::accounts::WithdrawClubBookFees {
+                super_admin: *super_admin,
+                protocol_config: pda(PROTOCOL_CONFIG_SEED, &[]),
+                book: self.book(),
+                mint: self.mint,
+                destination,
+                vault_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+                asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+                token_program: anchor_spl::token::ID,
+            },
+            outcomia::instruction::WithdrawClubBookFees { amount },
         )
     }
 
@@ -1051,4 +1372,426 @@ fn club_markets_freeze_at_the_cutoff_and_the_creator_may_leave() {
         &owner,
         f.propose(&owner.pubkey(), PredictionResolution::Yes, false),
     );
+}
+
+#[test]
+fn club_admins_or_the_creator_initialize_the_club_book() {
+    let mut f = Fixture::new();
+    f.open_market(ClubMarketAccess::MembersOnly);
+    let member = f.join(false);
+    f.fails(
+        &member,
+        f.init_book(&member.pubkey()),
+        "UnauthorizedClubAdmin",
+    );
+    let owner = f.owner.insecure_clone();
+    f.ok(&owner, f.init_book(&owner.pubkey()));
+    let book = f.club_book();
+    assert_eq!(
+        (book.market, book.kind, book.payout_per_contract),
+        (market_pda(&MARKET_ID), MarketKind::Prediction, PAYOUT)
+    );
+    assert_eq!(
+        (book.price_tick, book.quantity_lot, book.next_order_id),
+        (10_000, 1, 1)
+    );
+    assert!(f.send(&owner, f.init_book(&owner.pubkey())).is_err());
+}
+
+#[test]
+fn only_current_members_place_in_members_only_markets() {
+    let mut f = Fixture::new();
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let member = f.join(false);
+    let outsider = f.wallet();
+    f.fund(&member, 10 * PAYOUT);
+    f.fund(&outsider, 10 * PAYOUT);
+    f.fails(
+        &outsider,
+        f.place(&outsider.pubkey(), false, Yes, Bid, 400_000, 2, 1),
+        "ClubMembershipRequired",
+    );
+    f.ok(
+        &member,
+        f.place(&member.pubkey(), true, Yes, Bid, 400_000, 2, 1),
+    );
+    assert_eq!(f.locked_cash(&member.pubkey()), 800_000);
+    assert_eq!(f.club_book().best_prices[0], Some(400_000));
+    f.remove(&member.pubkey());
+    f.fails(
+        &member,
+        f.place(&member.pubkey(), false, No, Bid, 300_000, 1, 2),
+        "ClubMembershipRequired",
+    );
+}
+
+#[test]
+fn anyone_places_in_public_club_markets() {
+    let mut f = Fixture::new();
+    f.open_book(ClubMarketAccess::Public);
+    let outsider = f.wallet();
+    f.fund(&outsider, 10 * PAYOUT);
+    f.ok(
+        &outsider,
+        f.place(&outsider.pubkey(), false, No, Bid, 300_000, 3, 1),
+    );
+    assert_eq!(f.locked_cash(&outsider.pubkey()), 900_000);
+}
+
+#[test]
+fn a_removed_members_orders_can_be_cancelled_by_anyone_for_the_owner() {
+    let mut f = Fixture::new();
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let (member, other) = (f.join(false), f.join(false));
+    let stranger = f.wallet();
+    f.fund(&member, 10 * PAYOUT);
+    f.ok(
+        &member,
+        f.place(&member.pubkey(), true, Yes, Bid, 400_000, 2, 1),
+    );
+    f.ok(&member, f.complete_set(&member.pubkey(), true, 2, true));
+    f.ok(
+        &member,
+        f.place(&member.pubkey(), true, No, Ask, 700_000, 2, 2),
+    );
+    // While the owner is a member, only the owner cancels.
+    f.fails(
+        &stranger,
+        f.cancel(&stranger.pubkey(), 1),
+        "UnauthorizedSharedOrderOwner",
+    );
+    f.fails(
+        &other,
+        f.cancel(&other.pubkey(), 1),
+        "UnauthorizedSharedOrderOwner",
+    );
+
+    f.remove(&member.pubkey());
+    let rent_before = f.lamports(&member.pubkey());
+    f.ok(&stranger, f.cancel(&stranger.pubkey(), 1));
+    f.ok(&stranger, f.cancel(&stranger.pubkey(), 2));
+    // Cash, contracts and level rent all return to the former member.
+    assert_eq!(f.locked_cash(&member.pubkey()), 0);
+    assert_eq!(f.free_cash(&member.pubkey()), 8 * PAYOUT);
+    let p = f.position(&member.pubkey());
+    assert_eq!((p.no_free, p.no_locked), (2, 0));
+    assert!(f.lamports(&member.pubkey()) > rent_before);
+    let book = f.club_book();
+    assert_eq!((book.open_order_count, book.best_prices), (0, [None; 4]));
+}
+
+#[test]
+fn owners_always_cancel_and_strangers_never_in_public_markets() {
+    let mut f = Fixture::new();
+    f.open_book(ClubMarketAccess::Public);
+    let (trader, stranger) = (f.wallet(), f.wallet());
+    f.fund(&trader, 2 * PAYOUT);
+    f.ok(
+        &trader,
+        f.place(&trader.pubkey(), false, Yes, Bid, 500_000, 2, 1),
+    );
+    f.ok(
+        &trader,
+        f.place(&trader.pubkey(), false, No, Bid, 200_000, 1, 2),
+    );
+    // Not a member, but the market is public: the order is not abandoned.
+    f.fails(
+        &stranger,
+        f.cancel(&stranger.pubkey(), 1),
+        "UnauthorizedSharedOrderOwner",
+    );
+    f.ok(&trader, f.cancel(&trader.pubkey(), 1));
+    // Exits survive the end of trading.
+    f.set_clock(200);
+    f.ok(&trader, f.cancel(&trader.pubkey(), 2));
+    assert_eq!(f.free_cash(&trader.pubkey()), 2 * PAYOUT);
+}
+
+#[test]
+fn public_trading_instructions_cannot_use_club_books() {
+    let mut f = Fixture::new();
+    f.open_book(ClubMarketAccess::Public);
+    let trader = f.wallet();
+    f.fund(&trader, 2 * PAYOUT);
+    let market = market_pda(&MARKET_ID);
+    let public = ix(
+        outcomia::accounts::PlaceSharedOrder {
+            owner: trader.pubkey(),
+            market,
+            book: f.book(),
+            base_balance: None,
+            quote_balance: f.balance_pda(&trader.pubkey()),
+            position: Some(pda(
+                PREDICTION_POSITION_SEED,
+                &[market.as_ref(), trader.pubkey().as_ref()],
+            )),
+            order: f.order_pda(1),
+            price_level: f.level_pda(Yes, Bid, 500_000),
+            tail: None,
+            better_level: None,
+            worse_level: None,
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::PlaceSharedOrder {
+            outcome: Yes,
+            side: Bid,
+            price: 500_000,
+            quantity: 1,
+            order_id: 1,
+        },
+    );
+    f.fails(&trader, public, "ConstraintSeeds");
+}
+
+#[test]
+fn member_fills_split_the_taker_fee_with_the_club() {
+    let mut f = Fixture::new();
+    f.set_fees(100, Some(2_500));
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let (maker, taker) = (f.join(false), f.join(false));
+    f.fund(&maker, 10 * PAYOUT);
+    f.fund(&taker, 10 * PAYOUT);
+    f.ok(&maker, f.complete_set(&maker.pubkey(), true, 2, true));
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), true, Yes, Ask, 600_000, 2, 1),
+    );
+    f.ok(
+        &taker,
+        f.take(&taker.pubkey(), true, true, 1, Yes, Bid, 600_000, 2, false),
+    );
+    // Notional 1.2 at 1%: fee 12,000, of which 25% (3,000) goes to the club.
+    assert_eq!(f.free_cash(&taker.pubkey()), 10 * PAYOUT - 1_212_000);
+    assert_eq!(f.free_cash(&maker.pubkey()), 8 * PAYOUT + 1_200_000);
+    assert_eq!(f.position(&taker.pubkey()).yes_free, 2);
+    assert_eq!(f.club_book().accrued_quote_fees, 9_000);
+    assert_eq!(f.club_market().accrued_club_fees, 3_000);
+    assert_eq!(f.vault_surplus(&[&maker.pubkey(), &taker.pubkey()]), 0);
+}
+
+#[test]
+fn removed_or_outside_parties_cannot_fill_in_members_only_markets() {
+    let mut f = Fixture::new();
+    f.set_fees(0, None);
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let (maker, taker) = (f.join(false), f.join(false));
+    let outsider = f.wallet();
+    for w in [&maker, &taker, &outsider] {
+        f.fund(w, 10 * PAYOUT);
+    }
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), true, No, Bid, 400_000, 3, 1),
+    );
+    f.ok(&taker, f.complete_set(&taker.pubkey(), true, 3, true));
+    f.fails(
+        &outsider,
+        f.take(
+            &outsider.pubkey(),
+            false,
+            true,
+            1,
+            No,
+            Ask,
+            400_000,
+            1,
+            false,
+        ),
+        "ClubMembershipRequired",
+    );
+    // Omitting the maker's membership is not a way around the check.
+    f.fails(
+        &taker,
+        f.take(&taker.pubkey(), true, false, 1, No, Ask, 400_000, 1, false),
+        "ClubMembershipRequired",
+    );
+    f.remove(&maker.pubkey());
+    f.fails(
+        &taker,
+        f.take(&taker.pubkey(), true, false, 1, No, Ask, 400_000, 1, false),
+        "ClubMembershipRequired",
+    );
+    f.fails(
+        &taker,
+        f.take(&taker.pubkey(), true, false, 1, Yes, Bid, 600_000, 1, true),
+        "ClubMembershipRequired",
+    );
+    // The blocked head is cleared by anyone and the book moves on.
+    f.ok(&outsider, f.cancel(&outsider.pubkey(), 1));
+    assert_eq!(f.club_book().best_prices[2], None);
+}
+
+#[test]
+fn complementary_club_fills_mint_and_merge_with_the_fee_split() {
+    let mut f = Fixture::new();
+    f.set_fees(100, Some(5_000));
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let (a, b) = (f.join(false), f.join(true));
+    f.fund(&a, 10 * PAYOUT);
+    f.fund(&b, 10 * PAYOUT);
+    // Mint: a NO bid at 0.40 and a YES buyer at 0.60 create three pairs.
+    f.ok(&a, f.place(&a.pubkey(), true, No, Bid, 400_000, 3, 1));
+    f.ok(
+        &b,
+        f.take(&b.pubkey(), true, true, 1, Yes, Bid, 600_000, 3, true),
+    );
+    let m = f.market();
+    assert_eq!(
+        (m.yes_supply, m.no_supply, m.backing_reserve),
+        (3, 3, 3 * PAYOUT)
+    );
+    assert_eq!(f.token_amount(&f.market_vault()), 3 * PAYOUT);
+    // Taker notional 1.8 at 1%: 18,000 fee, half to the club.
+    assert_eq!(f.club_market().accrued_club_fees, 9_000);
+    assert_eq!(f.club_book().accrued_quote_fees, 9_000);
+    assert_eq!(f.free_cash(&b.pubkey()), 10 * PAYOUT - 1_818_000);
+    assert_eq!(
+        (
+            f.position(&a.pubkey()).no_free,
+            f.position(&b.pubkey()).yes_free
+        ),
+        (3, 3)
+    );
+
+    // Merge: a sells NO at 0.45 resting, b sells YES at 0.55 into it.
+    f.ok(&a, f.place(&a.pubkey(), true, No, Ask, 450_000, 3, 2));
+    f.ok(
+        &b,
+        f.take(&b.pubkey(), true, true, 2, Yes, Ask, 550_000, 3, true),
+    );
+    let m = f.market();
+    assert_eq!((m.yes_supply, m.backing_reserve), (0, 0));
+    assert_eq!(f.token_amount(&f.market_vault()), 0);
+    assert_eq!(f.club_market().accrued_club_fees, 9_000 + 8_250);
+    assert_eq!(f.vault_surplus(&[&a.pubkey(), &b.pubkey()]), 0);
+}
+
+#[test]
+fn without_a_fee_config_the_whole_fee_stays_with_the_book() {
+    let mut f = Fixture::new();
+    f.set_fees(100, None);
+    f.open_book(ClubMarketAccess::Public);
+    let (maker, taker) = (f.wallet(), f.wallet());
+    f.fund(&maker, 10 * PAYOUT);
+    f.fund(&taker, 10 * PAYOUT);
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), false, Yes, Bid, 500_000, 2, 1),
+    );
+    f.ok(&taker, f.complete_set(&taker.pubkey(), false, 2, true));
+    // Anyone trades in a public club market.
+    f.ok(
+        &taker,
+        f.take(
+            &taker.pubkey(),
+            false,
+            false,
+            1,
+            Yes,
+            Ask,
+            500_000,
+            2,
+            false,
+        ),
+    );
+    assert_eq!(f.club_book().accrued_quote_fees, 10_000);
+    assert_eq!(f.club_market().accrued_club_fees, 0);
+    assert_eq!(f.vault_surplus(&[&maker.pubkey(), &taker.pubkey()]), 0);
+}
+
+#[test]
+fn club_fills_stop_when_trading_closes() {
+    let mut f = Fixture::new();
+    f.set_fees(0, None);
+    f.open_book(ClubMarketAccess::Public);
+    let (maker, taker) = (f.wallet(), f.wallet());
+    f.fund(&maker, 2 * PAYOUT);
+    f.fund(&taker, 2 * PAYOUT);
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), false, Yes, Bid, 500_000, 1, 1),
+    );
+    f.ok(&taker, f.complete_set(&taker.pubkey(), false, 1, true));
+    let owner = f.owner.insecure_clone();
+    f.ok(&owner, f.manage(&owner.pubkey(), false));
+    f.fails(
+        &taker,
+        f.take(
+            &taker.pubkey(),
+            false,
+            false,
+            1,
+            Yes,
+            Ask,
+            500_000,
+            1,
+            false,
+        ),
+        "PredictionOrderUnavailable",
+    );
+}
+
+#[test]
+fn the_club_owner_and_the_super_admin_each_withdraw_only_their_fee_share() {
+    let mut f = Fixture::new();
+    let super_admin = f.wallet();
+    f.set_fees_with_admin(100, Some(2_500), super_admin.pubkey());
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let owner = f.owner.insecure_clone();
+    let (maker, taker) = (f.join(true), f.join(false));
+    f.fund(&maker, 10 * PAYOUT);
+    f.fund(&taker, 10 * PAYOUT);
+    f.ok(&maker, f.complete_set(&maker.pubkey(), true, 2, true));
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), true, Yes, Ask, 600_000, 2, 1),
+    );
+    f.ok(
+        &taker,
+        f.take(&taker.pubkey(), true, true, 1, Yes, Bid, 600_000, 2, false),
+    );
+    let wallets = [&maker.pubkey(), &taker.pubkey()];
+
+    let owner_token = f.token_account(&owner.pubkey(), 0);
+    let admin_token = f.token_account(&maker.pubkey(), 0);
+    // A club admin is not the owner; the super-admin has no club share.
+    f.fails(
+        &maker,
+        f.withdraw_club(&maker.pubkey(), admin_token, 1),
+        "UnauthorizedClubOwner",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_book(&owner.pubkey(), owner_token, 1),
+        "UnauthorizedAdmin",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_club(&owner.pubkey(), owner_token, 3_001),
+        "InsufficientFreeBalance",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_club(&owner.pubkey(), owner_token, 0),
+        "InvalidWithdrawalAmount",
+    );
+
+    f.ok(&owner, f.withdraw_club(&owner.pubkey(), owner_token, 3_000));
+    assert_eq!(f.token_amount(&owner_token), 3_000);
+    assert_eq!(f.club_market().accrued_club_fees, 0);
+    assert_eq!(f.vault_surplus(&wallets), 0);
+
+    let protocol_token = f.token_account(&super_admin.pubkey(), 0);
+    f.fails(
+        &super_admin,
+        f.withdraw_book(&super_admin.pubkey(), protocol_token, 9_001),
+        "InsufficientFreeBalance",
+    );
+    f.ok(
+        &super_admin,
+        f.withdraw_book(&super_admin.pubkey(), protocol_token, 9_000),
+    );
+    assert_eq!(f.token_amount(&protocol_token), 9_000);
+    assert_eq!(f.club_book().accrued_quote_fees, 0);
+    assert_eq!(f.vault_surplus(&wallets), 0);
 }
