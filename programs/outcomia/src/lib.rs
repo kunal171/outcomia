@@ -102,6 +102,40 @@ pub mod outcomia {
         crate::instructions::club_fees::handle_set_club_fee_share(ctx, club_share_bps)
     }
 
+    /// Creates a draft binary market in a club, members-only or public.
+    pub fn create_club_prediction_market(
+        ctx: Context<CreateClubPredictionMarket>,
+        market_id: [u8; 32],
+        config: crate::prediction_config::PredictionMarketConfig,
+        display_name: String,
+        collateral_symbol: String,
+        access: ClubMarketAccess,
+    ) -> Result<()> {
+        crate::instructions::club_markets::handle_create_club_prediction_market(
+            ctx,
+            market_id,
+            config,
+            display_name,
+            collateral_symbol,
+            access,
+        )
+    }
+
+    /// Opens a draft club market (club admin or its creator-member).
+    pub fn open_club_prediction_market(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+        crate::instructions::club_markets::handle_open_club_prediction_market(ctx)
+    }
+
+    /// Stops trading in a club market early (club admin or its creator-member).
+    pub fn close_club_trading(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+        crate::instructions::club_markets::handle_close_club_trading(ctx)
+    }
+
+    /// Creates the signer's empty position in a club market.
+    pub fn initialize_club_position(ctx: Context<InitializeClubPosition>) -> Result<()> {
+        crate::instructions::club_markets::handle_initialize_club_position(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
