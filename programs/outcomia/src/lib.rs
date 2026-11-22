@@ -201,6 +201,40 @@ pub mod outcomia {
         crate::instructions::club_orders::handle_cancel_club_order(ctx)
     }
 
+    /// Fills the best maker of the same outcome on a club book.
+    pub fn match_club_order(
+        ctx: Context<MatchClubOrder>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        crate::instructions::club_matching::handle_match_club_order(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
+    /// Fills the best maker of the other outcome on a club book through the complete set.
+    pub fn match_club_complement(
+        ctx: Context<MatchClubComplement>,
+        outcome: SharedOutcome,
+        taker_side: OrderSide,
+        limit_price: u64,
+        quantity: u64,
+    ) -> Result<()> {
+        crate::instructions::club_matching::handle_match_club_complement(
+            ctx,
+            outcome,
+            taker_side,
+            limit_price,
+            quantity,
+        )
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
