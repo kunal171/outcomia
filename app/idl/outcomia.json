@@ -12269,6 +12269,97 @@
           }
         }
       ]
+    },
+    {
+      "name": "set_club_fee_share",
+      "docs": [
+        "Lets the super-admin set the share of club-market taker fees paid to clubs."
+      ],
+      "discriminator": [
+        16,
+        68,
+        240,
+        99,
+        1,
+        70,
+        85,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_fee_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "club_share_bps",
+          "type": "u16"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -12608,6 +12699,19 @@
         176,
         43,
         43
+      ]
+    },
+    {
+      "name": "ClubFeeConfig",
+      "discriminator": [
+        104,
+        179,
+        6,
+        15,
+        244,
+        98,
+        58,
+        61
       ]
     }
   ],
@@ -13918,6 +14022,11 @@
       "code": 6182,
       "name": "ClubCounterMismatch",
       "msg": "Club member counters are inconsistent"
+    },
+    {
+      "code": 6183,
+      "name": "ClubFeeShareTooHigh",
+      "msg": "The club fee share cannot exceed 5,000 basis points (half of the taker fee)"
     }
   ],
   "types": [
@@ -17441,6 +17550,30 @@
           }
         ]
       }
+    },
+    {
+      "name": "ClubFeeConfig",
+      "docs": [
+        "Protocol-wide share of club-market taker fees paid to the club.",
+        "",
+        "PDA: [\"club_fee_config\"]. Until the super-admin creates it, the share is zero."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club_share_bps",
+            "docs": [
+              "Basis points of each club-market taker fee credited to the club."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -17711,6 +17844,14 @@
       ],
       "type": "bytes",
       "value": "[99, 108, 117, 98]"
+    },
+    {
+      "name": "CLUB_FEE_CONFIG_SEED",
+      "docs": [
+        "Singleton club fee-share configuration: [\"club_fee_config\"]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 102, 101, 101, 95, 99, 111, 110, 102, 105, 103]"
     }
   ]
 }
