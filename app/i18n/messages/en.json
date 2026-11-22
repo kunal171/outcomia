@@ -1075,5 +1075,21 @@
   "Who can trade": "Who can trade",
   "Anyone": "Anyone",
   "Factory admins only": "Factory admins only",
-  "Listed creators": "Listed creators"
+  "Listed creators": "Listed creators",
+  "members": "members",
+  "Expires": "Expires",
+  "Clubs are not deployed yet.": "Clubs are not deployed yet.",
+  "Club": "Club",
+  "This club is not visible to your wallet.": "This club is not visible to your wallet.",
+  "Remove admin": "Remove admin",
+  "Accept ownership": "Accept ownership",
+  "Cancel nomination": "Cancel nomination",
+  "Invite": "Invite",
+  "Wallet party": "Wallet party",
+  "Clear expired": "Clear expired",
+  "Who can create markets": "Who can create markets",
+  "Save": "Save",
+  "Market creators": "Market creators",
+  "Admins only": "Admins only",
+  "Any member": "Any member"
 }

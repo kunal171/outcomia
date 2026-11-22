@@ -1075,5 +1075,21 @@
   "Who can trade": "Qui peut négocier",
   "Anyone": "Tout le monde",
   "Factory admins only": "Administrateurs de la fabrique uniquement",
-  "Listed creators": "Créateurs listés"
+  "Listed creators": "Créateurs listés",
+  "members": "membres",
+  "Expires": "Expire",
+  "Clubs are not deployed yet.": "Les clubs ne sont pas encore déployés.",
+  "Club": "Club",
+  "This club is not visible to your wallet.": "Ce club n’est pas visible pour votre portefeuille.",
+  "Remove admin": "Retirer l’administrateur",
+  "Accept ownership": "Accepter la propriété",
+  "Cancel nomination": "Annuler la nomination",
+  "Invite": "Inviter",
+  "Wallet party": "Partie du portefeuille",
+  "Clear expired": "Effacer les expirées",
+  "Who can create markets": "Qui peut créer des marchés",
+  "Save": "Enregistrer",
+  "Market creators": "Créateurs de marchés",
+  "Admins only": "Administrateurs uniquement",
+  "Any member": "Tout membre"
 }

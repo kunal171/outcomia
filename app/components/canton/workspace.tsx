@@ -27,6 +27,11 @@ const destinations = [
     icon: "M8 6h12 M8 12h12 M8 18h12 M3 6h1 M3 12h1 M3 18h1",
   },
   {
+    href: "/canton/clubs",
+    label: "Clubs",
+    icon: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M3 21v-1a6 6 0 0 1 12 0v1 M16 3.1a4 4 0 0 1 0 7.8 M21 21v-1a6 6 0 0 0-4-5.6",
+  },
+  {
     href: "/canton/wallet",
     label: "Wallet",
     icon: "M20 8V5H5a2 2 0 0 0 0 4h15v11H5a2 2 0 0 1-2-2V7 M16 12h5v5h-5Z",

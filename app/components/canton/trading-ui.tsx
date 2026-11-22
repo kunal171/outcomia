@@ -252,6 +252,13 @@ export function MarketList() {
         (c) =>
           c.kind === "OutcomiaMarketFactory" && mayCreate(c.data.policy, party),
       ));
+  // Club markets are listed on their club pages.
+  const contracts = s.catalog?.contracts ?? [],
+    markets = marketRecords(contracts).filter(
+      (c) =>
+        obj(issuingFactory(contracts, marketRecord(c))?.data.policy).tag !==
+        "ByPolicy",
+    );
   return (
     <TradingFrame
       title="Predictions"
@@ -262,7 +269,7 @@ export function MarketList() {
       }
     >
       <div className="canton-market-list">
-        {marketRecords(s.catalog?.contracts ?? []).map((c) => {
+        {markets.map((c) => {
           const data = marketRecord(c),
             terms = obj(data.terms);
           return (
@@ -282,9 +289,7 @@ export function MarketList() {
             </Link>
           );
         })}
-        {s.catalog && !marketRecords(s.catalog.contracts).length ? (
-          <p>{t("No markets yet.")}</p>
-        ) : null}
+        {s.catalog && !markets.length ? <p>{t("No markets yet.")}</p> : null}
       </div>
     </TradingFrame>
   );
