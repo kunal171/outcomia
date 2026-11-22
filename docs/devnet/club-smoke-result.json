@@ -1,0 +1,25 @@
+{
+  "cluster": "devnet",
+  "steps": [
+    "devnet protocol: 10 bps taker fee, 0 bps club share",
+    "four wallets funded with 10 USD of shared balance",
+    "club created; alice and bob accepted invitations",
+    "members-only market open with its book; absent from public discovery",
+    "positions created; alice split 3 pairs",
+    "bob bought 1 YES at 0.60 + 600 fee; the club accrued 0",
+    "alice removed; carol cleared her order and the contract returned to alice",
+    "resolved YES by the club owner; removed alice redeemed 2 YES for 2 USD",
+    "no club fee share is configured, so there is nothing to withdraw",
+    "temporary wallets' remaining SOL returned to the authority"
+  ],
+  "club": "FaTBZjAydSKY7yquXuDx6hk4B67CtvSyvFFL7e7ieAdv",
+  "market": "HcQ9refTLHbHrFjRrSQus2PUjzdhdvhcSPmjwUQZTdWu",
+  "mint": "241qNJLtuycwkUb4KD47uqTQFLLAzXEFdDktvXMUzV7g",
+  "wallets": {
+    "owner": "9aH8RKxGpDXAGcgaciPiBXAzitfjALmyDU27EPZa1RwM",
+    "alice": "4fBzviFHTpQs8VCu6CJ4ByR965GtMq4zBWasrdGfVRby",
+    "bob": "E9aeTb9eJsEM2GCtuHuVZDoeLteYTcV1VBSiFkkW3n3A",
+    "carol": "ALbBmEtzbwsByqwtZoiLTF8zceEuYD9VMB6VXnmKqQSP"
+  },
+  "result": "passed"
+}

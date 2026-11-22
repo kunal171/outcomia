@@ -11,7 +11,12 @@
  * market (create, open and book in one transaction), trades between members
  * with the club fee split, removes a member and clears their order as an
  * outsider, resolves as a club admin, redeems as the removed member and
- * withdraws the club's fees. Uses only the local validator. */
+ * withdraws the club's fees. Uses only the local validator by default.
+ *
+ * Devnet smoke (RPC=<url> RESULT=<json path> node scripts/local-club-e2e.mjs
+ * <authority.json>): uses the deployed protocol as configured (no fee or
+ * config changes), a fresh valueless mint, temporary wallets funded by
+ * transfer whose SOL is returned afterwards, and hidden "Smoke test" names. */
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
@@ -29,7 +34,26 @@ const c = loadTypeScript(new URL(`file://${APP}/lib/clubs.ts`));
 const sh = loadTypeScript(new URL(`file://${APP}/lib/shared.ts`));
 const o = loadTypeScript(new URL(`file://${APP}/lib/outcomia.ts`));
 const idl = JSON.parse(fs.readFileSync(`${APP}/idl/outcomia.json`, "utf8"));
-const conn = new Connection("http://127.0.0.1:8899", "confirmed");
+const DEVNET = !!process.env.RPC;
+/** Retries network failures of any JSON-RPC call. Safe: resending the same
+ * signed transaction or read is idempotent. */
+async function fetchWithRetry(url, init) {
+  for (let i = 0; ; i++) {
+    try {
+      const response = await fetch(url, init);
+      if (response.status !== 429 && response.status < 500) return response;
+      if (i >= 6) return response;
+    } catch (e) {
+      if (i >= 6) throw e;
+    }
+    await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+  }
+}
+const conn = new Connection(process.env.RPC ?? "http://127.0.0.1:8899", {
+  commitment: "confirmed",
+  fetch: fetchWithRetry,
+});
+const report = { cluster: DEVNET ? "devnet" : "local", steps: [] };
 const admin = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(fs.readFileSync(process.argv[2], "utf8"))),
 );
@@ -39,7 +63,10 @@ const program = (kp) =>
     new AnchorProvider(conn, new Wallet(kp), { commitment: "confirmed" }),
   );
 const P = program(admin);
-const log = (...a) => console.log("ok ", ...a);
+const log = (...a) => {
+  report.steps.push(a.join(" "));
+  console.log("ok ", ...a);
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 for (let i = 0; ; i++) {
@@ -51,14 +78,80 @@ for (let i = 0; ; i++) {
     await sleep(1000);
   }
 }
+/** Retries token-helper calls after connection failures. A retried mint after
+ * an unconfirmed success only creates a spare valueless mint or tokens. */
+async function retry(attempt) {
+  for (let i = 0; ; i++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      const transient =
+        /fetch failed|ETIMEDOUT|ECONNRESET|429|socket hang up|block height exceeded|Blockhash not found/i.test(
+          `${e.message} ${e.cause?.code ?? ""}`,
+        );
+      if (!transient || i >= 4) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+}
 const airdrop = async (kp) => {
+  if (DEVNET)
+    return send(admin, [
+      SystemProgram.transfer({
+        fromPubkey: admin.publicKey,
+        toPubkey: kp.publicKey,
+        lamports: 60_000_000,
+      }),
+    ]);
   const s = await conn.requestAirdrop(kp.publicKey, 5e9);
   await conn.confirmTransaction(s, "confirmed");
 };
-const send = (kp, ixs) =>
-  web3.sendAndConfirmTransaction(conn, new Transaction().add(...ixs), [kp], {
-    commitment: "confirmed",
-  });
+/** Signs once and rebroadcasts the same bytes until confirmed, so a lost
+ * confirmation can never execute an instruction twice. Only when the blockhash
+ * expires and the signature provably did not land is it re-signed. Program
+ * errors surface from preflight simulation unchanged. */
+async function send(kp, ixs) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { blockhash, lastValidBlockHeight } =
+      await conn.getLatestBlockhash("confirmed");
+    const tx = new Transaction({
+      feePayer: kp.publicKey,
+      blockhash,
+      lastValidBlockHeight,
+    }).add(...ixs);
+    tx.sign(kp);
+    const raw = tx.serialize();
+    const signature = await conn.sendRawTransaction(raw, {
+      preflightCommitment: "confirmed",
+    });
+    for (;;) {
+      const status = (await conn.getSignatureStatuses([signature])).value[0];
+      if (status?.err)
+        throw new Error(`transaction failed: ${JSON.stringify(status.err)}`);
+      if (
+        status?.confirmationStatus === "confirmed" ||
+        status?.confirmationStatus === "finalized"
+      )
+        return signature;
+      if ((await conn.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+        const final = (
+          await conn.getSignatureStatuses([signature], {
+            searchTransactionHistory: true,
+          })
+        ).value[0];
+        if (final?.err)
+          throw new Error(`transaction failed: ${JSON.stringify(final.err)}`);
+        if (final) return signature;
+        break; // expired without landing: safe to re-sign
+      }
+      await conn
+        .sendRawTransaction(raw, { skipPreflight: true })
+        .catch(() => {});
+      await sleep(2000);
+    }
+  }
+  throw new Error("transaction did not land after 5 blockhashes");
+}
 const rejects = async (promise, pattern) => {
   try {
     await promise;
@@ -71,52 +164,87 @@ const rejects = async (promise, pattern) => {
 };
 const chainNow = async () => conn.getBlockTime(await conn.getSlot());
 
-await airdrop(admin);
-const programData = PublicKey.findProgramAddressSync(
-  [new PublicKey(idl.address).toBuffer()],
-  new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
-)[0];
-await send(admin, [
-  await P.methods
-    .initializeProtocol()
-    .accountsPartial({
-      deployer: admin.publicKey,
-      program: new PublicKey(idl.address),
-      programData,
-    })
-    .instruction(),
-  await P.methods
-    .setTakerFee(100)
-    .accountsPartial({
-      superAdmin: admin.publicKey,
-      protocolConfig: o.deriveProtocolConfigPda(),
-    })
-    .instruction(),
-  await P.methods
-    .setClubFeeShare(2_500)
-    .accountsPartial({
-      superAdmin: admin.publicKey,
-      protocolConfig: o.deriveProtocolConfigPda(),
-      clubFeeConfig: sh.clubFeeConfigPda(),
-      systemProgram: SystemProgram.programId,
-    })
-    .instruction(),
-]);
-log("protocol initialized: 1% taker fee, 25% club share");
-
-const usd = await spl.createMint(conn, admin, admin.publicKey, null, 6);
-const [owner, alice, bob, carol] = Array.from({ length: 4 }, () =>
-  Keypair.generate(),
+let takerFeeBps = 100,
+  clubShareBps = 2_500;
+if (DEVNET) {
+  // The deployed protocol is used exactly as configured.
+  takerFeeBps = (
+    await o
+      .getOutcomiaAccounts(P)
+      .protocolConfig.fetch(o.deriveProtocolConfigPda())
+  ).takerFeeBps;
+  const share = await P.account.clubFeeConfig.fetchNullable(
+    sh.clubFeeConfigPda(),
+  );
+  clubShareBps = share?.clubShareBps ?? 0;
+  log(
+    `devnet protocol: ${takerFeeBps} bps taker fee, ${clubShareBps} bps club share`,
+  );
+} else {
+  await airdrop(admin);
+  const programData = PublicKey.findProgramAddressSync(
+    [new PublicKey(idl.address).toBuffer()],
+    new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"),
+  )[0];
+  await send(admin, [
+    await P.methods
+      .initializeProtocol()
+      .accountsPartial({
+        deployer: admin.publicKey,
+        program: new PublicKey(idl.address),
+        programData,
+      })
+      .instruction(),
+    await P.methods
+      .setTakerFee(100)
+      .accountsPartial({
+        superAdmin: admin.publicKey,
+        protocolConfig: o.deriveProtocolConfigPda(),
+      })
+      .instruction(),
+    await P.methods
+      .setClubFeeShare(2_500)
+      .accountsPartial({
+        superAdmin: admin.publicKey,
+        protocolConfig: o.deriveProtocolConfigPda(),
+        clubFeeConfig: sh.clubFeeConfigPda(),
+        systemProgram: SystemProgram.programId,
+      })
+      .instruction(),
+  ]);
+  log("protocol initialized: 1% taker fee, 25% club share");
+}
+const fee = Math.ceil((600_000 * takerFeeBps) / 10_000),
+  clubFee = Math.floor((fee * clubShareBps) / 10_000);
+const usd = await retry(() =>
+  spl.createMint(conn, admin, admin.publicKey, null, 6),
 );
+// Persist temporary keypairs before funding them, so an interrupted devnet
+// run can be swept instead of stranding SOL (WALLETS=<private json path>).
+const walletFile = process.env.WALLETS;
+const [owner, alice, bob, carol] =
+  walletFile && fs.existsSync(walletFile)
+    ? JSON.parse(fs.readFileSync(walletFile, "utf8")).map((k) =>
+        Keypair.fromSecretKey(Uint8Array.from(k)),
+      )
+    : Array.from({ length: 4 }, () => Keypair.generate());
+if (walletFile)
+  fs.writeFileSync(
+    walletFile,
+    JSON.stringify(
+      [owner, alice, bob, carol].map((k) => Array.from(k.secretKey)),
+    ),
+    { mode: 0o600 },
+  );
 for (const kp of [owner, alice, bob, carol]) {
   await airdrop(kp);
-  const ata = await spl.getOrCreateAssociatedTokenAccount(
-    conn,
-    admin,
-    usd,
-    kp.publicKey,
+  const ata = await retry(() =>
+    spl.getOrCreateAssociatedTokenAccount(conn, admin, usd, kp.publicKey),
   );
-  await spl.mintTo(conn, admin, usd, ata.address, admin, 10_000_000);
+  // A retried mint after an unconfirmed success only leaves spare test tokens.
+  await retry(() =>
+    spl.mintTo(conn, admin, usd, ata.address, admin, 10_000_000),
+  );
   const custody = {
     owner: kp.publicKey,
     mint: usd,
@@ -142,7 +270,7 @@ log("four wallets funded with 10 USD of shared balance");
 const created = await c.createClubInstruction(
   program(owner),
   owner.publicKey,
-  "Local chess club",
+  DEVNET ? "Smoke test - club" : "Local chess club",
 );
 const club = created.club;
 await send(owner, [created.instruction]);
@@ -168,7 +296,7 @@ assert.equal((await c.readWalletClubs(P, alice.publicKey)).clubs.length, 1);
 log("club created; alice and bob accepted invitations");
 
 // ----- Members-only market: create, open and book in one transaction -----
-const closeTs = (await chainNow()) + 25;
+const closeTs = (await chainNow()) + (DEVNET ? 300 : 25);
 const { market, instructions } = await c.createClubMarketInstructions(
   P,
   owner.publicKey,
@@ -186,7 +314,9 @@ const { market, instructions } = await c.createClubMarketInstructions(
     questionHash: Array(32).fill(1),
     rulesHash: Array(32).fill(2),
   },
-  "Will the local club market resolve YES?",
+  DEVNET
+    ? "Smoke test - club market"
+    : "Will the local club market resolve YES?",
   "USD",
   false,
 );
@@ -290,10 +420,13 @@ const bobAfter = (
     .sharedAccounts(P)
     .assetBalance.fetchNullable(sh.assetBalancePda(bob.publicKey, usd))
 ).free;
-assert.equal(bobBefore.sub(bobAfter).toString(), "606000");
+assert.equal(bobBefore.sub(bobAfter).toString(), String(600_000 + fee));
 snapshot = await c.readClub(P, club);
-assert.equal(snapshot.markets[0].binding.accruedClubFees.toString(), "1500");
-log("bob bought 1 YES at 0.60 + 6,000 fee; the club accrued 1,500");
+assert.equal(
+  snapshot.markets[0].binding.accruedClubFees.toString(),
+  String(clubFee),
+);
+log(`bob bought 1 YES at 0.60 + ${fee} fee; the club accrued ${clubFee}`);
 
 // ----- Removal: the departed order blocks fills until anyone clears it -----
 await send(owner, [
@@ -375,22 +508,54 @@ assert.equal(aliceRedeemed.sub(aliceCash).toString(), "2000000");
 log("resolved YES by the club owner; removed alice redeemed 2 YES for 2 USD");
 
 // ----- Club fee withdrawal by the owner -----
-const destination = spl.getAssociatedTokenAddressSync(usd, owner.publicKey);
-const ownerTokens = (await spl.getAccount(conn, destination)).amount;
-await send(owner, [
-  await c.withdrawClubFeesInstruction(
-    P,
-    owner.publicKey,
-    club,
-    market,
-    usd,
-    destination,
-    new BN(1500),
-  ),
-]);
-assert.equal(
-  (await spl.getAccount(conn, destination)).amount - ownerTokens,
-  1500n,
+if (clubFee > 0) {
+  const destination = spl.getAssociatedTokenAddressSync(usd, owner.publicKey);
+  const ownerTokens = (await spl.getAccount(conn, destination)).amount;
+  await send(owner, [
+    await c.withdrawClubFeesInstruction(
+      P,
+      owner.publicKey,
+      club,
+      market,
+      usd,
+      destination,
+      new BN(clubFee),
+    ),
+  ]);
+  assert.equal(
+    (await spl.getAccount(conn, destination)).amount - ownerTokens,
+    BigInt(clubFee),
+  );
+  log(`owner withdrew the club's ${clubFee} fee share`);
+} else log("no club fee share is configured, so there is nothing to withdraw");
+
+report.club = club.toBase58();
+report.market = market.toBase58();
+report.mint = usd.toBase58();
+report.wallets = Object.fromEntries(
+  [
+    ["owner", owner],
+    ["alice", alice],
+    ["bob", bob],
+    ["carol", carol],
+  ].map(([n, k]) => [n, k.publicKey.toBase58()]),
 );
-log("owner withdrew the club's 1,500 fee share");
-console.log("PASS: club lifecycle end to end on a local validator");
+if (DEVNET) {
+  // Return the temporary wallets' SOL; their rent-bearing accounts stay for audit.
+  for (const kp of [owner, alice, bob, carol]) {
+    const balance = await conn.getBalance(kp.publicKey, "confirmed");
+    if (balance > 5_000)
+      await send(kp, [
+        SystemProgram.transfer({
+          fromPubkey: kp.publicKey,
+          toPubkey: admin.publicKey,
+          lamports: balance - 5_000,
+        }),
+      ]);
+  }
+  log("temporary wallets' remaining SOL returned to the authority");
+}
+report.result = "passed";
+if (process.env.RESULT)
+  fs.writeFileSync(process.env.RESULT, JSON.stringify(report, null, 2) + "\n");
+console.log(`PASS: club lifecycle end to end on ${report.cluster}`);
