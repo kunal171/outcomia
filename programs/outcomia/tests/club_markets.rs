@@ -242,32 +242,7 @@ impl Fixture {
     /// Deposits `amount` collateral atoms into the wallet's shared balance and
     /// creates its club position.
     fn fund(&mut self, wallet: &Keypair, amount: u64) {
-        let token = Pubkey::new_unique();
-        let state = TokenState {
-            mint: self.mint,
-            owner: wallet.pubkey(),
-            amount,
-            delegate: None.into(),
-            state: AccountState::Initialized,
-            is_native: None.into(),
-            delegated_amount: 0,
-            close_authority: None.into(),
-        };
-        let mut data = vec![0; TokenState::LEN];
-        TokenState::pack(state, &mut data).unwrap();
-        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
-        self.svm
-            .set_account(
-                token,
-                Account {
-                    lamports,
-                    data,
-                    owner: anchor_spl::token::ID,
-                    executable: false,
-                    rent_epoch: 0,
-                },
-            )
-            .unwrap();
+        let token = self.token_account(&wallet.pubkey(), amount);
         let (owner, mint) = (wallet.pubkey(), self.mint);
         let balance = self.balance_pda(&owner);
         let authority = pda(ASSET_AUTHORITY_SEED, &[mint.as_ref()]);
@@ -303,6 +278,36 @@ impl Fixture {
             ),
         );
         self.ok(wallet, self.init_position(&owner));
+    }
+    /// A token account of the collateral mint owned by `owner`.
+    fn token_account(&mut self, owner: &Pubkey, amount: u64) -> Pubkey {
+        let token = Pubkey::new_unique();
+        let state = TokenState {
+            mint: self.mint,
+            owner: *owner,
+            amount,
+            delegate: None.into(),
+            state: AccountState::Initialized,
+            is_native: None.into(),
+            delegated_amount: 0,
+            close_authority: None.into(),
+        };
+        let mut data = vec![0; TokenState::LEN];
+        TokenState::pack(state, &mut data).unwrap();
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.svm
+            .set_account(
+                token,
+                Account {
+                    lamports,
+                    data,
+                    owner: anchor_spl::token::ID,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .unwrap();
+        token
     }
     fn custody_accounts(
         &self,
@@ -522,8 +527,15 @@ impl Fixture {
     }
     /// Sets the protocol taker fee and, when given, the club share.
     fn set_fees(&mut self, taker_fee_bps: u16, club_share_bps: Option<u16>) {
+        self.set_fees_with_admin(taker_fee_bps, club_share_bps, Pubkey::new_unique());
+    }
+    fn set_fees_with_admin(
+        &mut self,
+        taker_fee_bps: u16,
+        club_share_bps: Option<u16>,
+        super_admin: Pubkey,
+    ) {
         let (config, bump) = Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &outcomia::ID);
-        let super_admin = Pubkey::new_unique();
         self.store(
             config,
             &ProtocolConfig {
@@ -653,6 +665,39 @@ impl Fixture {
             - claims
             - self.club_book().accrued_quote_fees as i128
             - self.club_market().accrued_club_fees as i128
+    }
+
+    fn withdraw_club(&self, owner: &Pubkey, destination: Pubkey, amount: u64) -> Instruction {
+        let market = market_pda(&MARKET_ID);
+        ix(
+            outcomia::accounts::WithdrawClubFees {
+                owner: *owner,
+                club: self.club,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                mint: self.mint,
+                destination,
+                vault_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+                asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+                token_program: anchor_spl::token::ID,
+            },
+            outcomia::instruction::WithdrawClubFees { amount },
+        )
+    }
+    fn withdraw_book(&self, super_admin: &Pubkey, destination: Pubkey, amount: u64) -> Instruction {
+        ix(
+            outcomia::accounts::WithdrawClubBookFees {
+                super_admin: *super_admin,
+                protocol_config: pda(PROTOCOL_CONFIG_SEED, &[]),
+                book: self.book(),
+                mint: self.mint,
+                destination,
+                vault_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+                asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+                token_program: anchor_spl::token::ID,
+            },
+            outcomia::instruction::WithdrawClubBookFees { amount },
+        )
     }
 
     fn create_market(
@@ -1684,4 +1729,69 @@ fn club_fills_stop_when_trading_closes() {
         ),
         "PredictionOrderUnavailable",
     );
+}
+
+#[test]
+fn the_club_owner_and_the_super_admin_each_withdraw_only_their_fee_share() {
+    let mut f = Fixture::new();
+    let super_admin = f.wallet();
+    f.set_fees_with_admin(100, Some(2_500), super_admin.pubkey());
+    f.open_book(ClubMarketAccess::MembersOnly);
+    let owner = f.owner.insecure_clone();
+    let (maker, taker) = (f.join(true), f.join(false));
+    f.fund(&maker, 10 * PAYOUT);
+    f.fund(&taker, 10 * PAYOUT);
+    f.ok(&maker, f.complete_set(&maker.pubkey(), true, 2, true));
+    f.ok(
+        &maker,
+        f.place(&maker.pubkey(), true, Yes, Ask, 600_000, 2, 1),
+    );
+    f.ok(
+        &taker,
+        f.take(&taker.pubkey(), true, true, 1, Yes, Bid, 600_000, 2, false),
+    );
+    let wallets = [&maker.pubkey(), &taker.pubkey()];
+
+    let owner_token = f.token_account(&owner.pubkey(), 0);
+    let admin_token = f.token_account(&maker.pubkey(), 0);
+    // A club admin is not the owner; the super-admin has no club share.
+    f.fails(
+        &maker,
+        f.withdraw_club(&maker.pubkey(), admin_token, 1),
+        "UnauthorizedClubOwner",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_book(&owner.pubkey(), owner_token, 1),
+        "UnauthorizedAdmin",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_club(&owner.pubkey(), owner_token, 3_001),
+        "InsufficientFreeBalance",
+    );
+    f.fails(
+        &owner,
+        f.withdraw_club(&owner.pubkey(), owner_token, 0),
+        "InvalidWithdrawalAmount",
+    );
+
+    f.ok(&owner, f.withdraw_club(&owner.pubkey(), owner_token, 3_000));
+    assert_eq!(f.token_amount(&owner_token), 3_000);
+    assert_eq!(f.club_market().accrued_club_fees, 0);
+    assert_eq!(f.vault_surplus(&wallets), 0);
+
+    let protocol_token = f.token_account(&super_admin.pubkey(), 0);
+    f.fails(
+        &super_admin,
+        f.withdraw_book(&super_admin.pubkey(), protocol_token, 9_001),
+        "InsufficientFreeBalance",
+    );
+    f.ok(
+        &super_admin,
+        f.withdraw_book(&super_admin.pubkey(), protocol_token, 9_000),
+    );
+    assert_eq!(f.token_amount(&protocol_token), 9_000);
+    assert_eq!(f.club_book().accrued_quote_fees, 0);
+    assert_eq!(f.vault_surplus(&wallets), 0);
 }

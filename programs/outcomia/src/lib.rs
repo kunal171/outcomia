@@ -235,6 +235,16 @@ pub mod outcomia {
         )
     }
 
+    /// Lets the club owner withdraw the club's accrued fee share from a club market.
+    pub fn withdraw_club_fees(ctx: Context<WithdrawClubFees>, amount: u64) -> Result<()> {
+        crate::instructions::club_fees::handle_withdraw_club_fees(ctx, amount)
+    }
+
+    /// Lets the super-admin withdraw the protocol's fee share from a club book.
+    pub fn withdraw_club_book_fees(ctx: Context<WithdrawClubBookFees>, amount: u64) -> Result<()> {
+        crate::instructions::club_fees::handle_withdraw_club_book_fees(ctx, amount)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
