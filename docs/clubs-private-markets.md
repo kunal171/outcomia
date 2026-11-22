@@ -1,6 +1,7 @@
 # Clubs and private markets (Solana design)
 
-Status: design agreed, not implemented. This document records the product
+Status: design agreed; clubs and membership (milestone 1) implemented, club
+markets not yet. This document records the product
 decisions and the on-chain model they imply. Implementation follows in small
 PRs (see [delivery plan](#delivery-plan)). The Canton note in
 `outcomia-canton/docs/clubs-private-markets.md` covers the same feature for
@@ -65,11 +66,17 @@ in `Club` and is always an admin.
 
 ## Instructions
 
-**Club administration:** `create_club`, `set_club_market_policy`,
-`invite_member`, `revoke_invite`, `accept_invite`, `close_expired_invite`,
-`set_member_role` (owner: promote/demote admins), `remove_member` (admins remove
-members; only the owner removes admins), `leave_club`, `transfer_club_ownership`
-(two-step: owner nominates a member, the member accepts).
+**Club administration** (implemented): `create_club`, `set_club_market_policy`,
+`invite_club_member`, `accept_club_invite`, `close_club_invite` (any club admin
+revokes, the invited wallet declines, anyone clears an expired invitation; rent
+always returns to the inviter), `set_club_member_role` (owner promotes or
+demotes admins), `remove_club_member` (admins remove members; only the owner
+removes admins), `leave_club`, and the two-step `nominate_club_owner` /
+`accept_club_ownership` (nominating the owner itself cancels; the previous
+owner stays an admin). An invitation belongs to the club, so it stays valid if
+its inviter later stops being an admin. A nomination ends when the nominee
+leaves or is removed. These instructions emit no events: the accounts are the
+record, and the IDL-driven indexer decodes them.
 
 **Club markets (binary first):** `create_club_prediction_market` (creator must be
 an admin, or a member under the any-member policy; access chosen per market),
@@ -102,15 +109,16 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
   orders, and funds always return to the order owner.
 - Exits (cancel, withdraw, merge, redeem) never require membership.
 - Club roles grant no protocol-admin power, and protocol admins gain no club
-  power from their protocol role.
+  power from their protocol role. Club instructions accept no protocol
+  accounts, and protocol instructions accept no club accounts.
 - Fee split conserves the global vault; only the owner withdraws club fees.
 - Invitations expire after 7 days, accept exactly once, and return rent to the
   inviter; the owner cannot leave or be removed without transferring ownership.
 
 ## Delivery plan
 
-1. **Clubs and membership:** accounts, roles, invitations, leaving, removal,
-   ownership transfer; LiteSVM tests.
+1. **Clubs and membership** (done): accounts, roles, invitations, leaving,
+   removal, ownership transfer; `programs/outcomia/tests/clubs.rs`.
 2. **Club fee configuration:** `ClubFeeConfig` and its super-admin setter.
 3. **Club binary markets:** club namespace creation, opening, closing,
    resolution and redemption.
