@@ -124,3 +124,22 @@ pub const MULTI_OUTCOME_POSITION_SEED: &[u8] = b"multi_position";
 pub const MULTI_OUTCOME_BOOK_SEED: &[u8] = b"multi_book";
 #[constant]
 pub const MULTI_OUTCOME_ORDER_SEED: &[u8] = b"multi_order";
+
+/// Club keyed by a creator-chosen identifier: ["club", club_id].
+#[constant]
+pub const CLUB_SEED: &[u8] = b"club";
+
+/// Active membership: ["club_member", club, wallet].
+#[constant]
+pub const CLUB_MEMBER_SEED: &[u8] = b"club_member";
+
+/// Pending invitation: ["club_invite", club, wallet].
+#[constant]
+pub const CLUB_INVITE_SEED: &[u8] = b"club_invite";
+
+/// Maximum UTF-8 byte length of a club name.
+pub const CLUB_NAME_MAX_LENGTH: usize = 64;
+
+/// Invitations can be accepted for seven days after they are issued.
+#[constant]
+pub const CLUB_INVITE_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;

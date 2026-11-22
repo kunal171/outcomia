@@ -65,6 +65,8 @@ or bypass order limits, permissions or priority rules.
 
 ## Private markets and clubs
 
+The agreed Solana design is in [clubs and private markets](clubs-private-markets.md).
+
 Private means restricted participation, not confidential on-chain data. Account
 contents, orders and transactions remain publicly inspectable. Hiding a page
 is not a trading permission check.

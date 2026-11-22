@@ -11459,6 +11459,816 @@
           "type": "u16"
         }
       ]
+    },
+    {
+      "name": "accept_club_invite",
+      "docs": [
+        "Lets the invited wallet join the club before its invitation expires."
+      ],
+      "discriminator": [
+        82,
+        214,
+        25,
+        207,
+        206,
+        210,
+        22,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "invite"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "invite",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  105,
+                  110,
+                  118,
+                  105,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "inviter",
+          "writable": true
+        },
+        {
+          "name": "member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accept_club_ownership",
+      "docs": [
+        "Lets the nominated member accept ownership of the club."
+      ],
+      "discriminator": [
+        176,
+        130,
+        233,
+        136,
+        133,
+        36,
+        239,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "candidate",
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "candidate_member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "candidate"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_club_invite",
+      "docs": [
+        "Revokes (club admin), declines (invited wallet) or clears an expired invitation (anyone)."
+      ],
+      "discriminator": [
+        25,
+        144,
+        120,
+        40,
+        137,
+        161,
+        3,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "closer",
+          "signer": true
+        },
+        {
+          "name": "invite",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  105,
+                  110,
+                  118,
+                  105,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "invite.club",
+                "account": "ClubInvite"
+              },
+              {
+                "kind": "account",
+                "path": "invite.wallet",
+                "account": "ClubInvite"
+              }
+            ]
+          }
+        },
+        {
+          "name": "inviter",
+          "writable": true
+        },
+        {
+          "name": "closer_member",
+          "docs": [
+            "The closer's membership, required only when revoking as an admin."
+          ],
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_club",
+      "docs": [
+        "Creates a club owned by the signer, who also becomes its first admin."
+      ],
+      "discriminator": [
+        245,
+        213,
+        68,
+        31,
+        171,
+        94,
+        42,
+        103
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "club_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "club_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "invite_club_member",
+      "docs": [
+        "Lets a club admin invite a wallet; the invitation expires after seven days."
+      ],
+      "discriminator": [
+        93,
+        175,
+        160,
+        32,
+        141,
+        138,
+        100,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "inviter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "club"
+        },
+        {
+          "name": "inviter_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "inviter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "existing_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "invite",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  105,
+                  110,
+                  118,
+                  105,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "arg",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "wallet",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "leave_club",
+      "docs": [
+        "Lets any member except the owner leave the club."
+      ],
+      "discriminator": [
+        174,
+        49,
+        33,
+        51,
+        161,
+        252,
+        0,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "nominate_club_owner",
+      "docs": [
+        "Lets the club owner nominate a member as the next owner (or cancel with itself)."
+      ],
+      "discriminator": [
+        75,
+        24,
+        205,
+        122,
+        202,
+        64,
+        126,
+        191
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "candidate_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "candidate_member.wallet",
+                "account": "ClubMember"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "remove_club_member",
+      "docs": [
+        "Lets a club admin remove a member; only the owner removes admins."
+      ],
+      "discriminator": [
+        193,
+        110,
+        59,
+        35,
+        94,
+        127,
+        204,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "admin_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_club_market_policy",
+      "docs": [
+        "Lets a club admin choose who may create club markets."
+      ],
+      "discriminator": [
+        177,
+        247,
+        25,
+        34,
+        200,
+        211,
+        167,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "admin_member",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "policy",
+          "type": {
+            "defined": {
+              "name": "ClubMarketPolicy"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_club_member_role",
+      "docs": [
+        "Lets the club owner promote a member to admin or demote an admin."
+      ],
+      "discriminator": [
+        128,
+        95,
+        75,
+        148,
+        8,
+        250,
+        251,
+        180
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "member.wallet",
+                "account": "ClubMember"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "role",
+          "type": {
+            "defined": {
+              "name": "ClubRole"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -11759,6 +12569,45 @@
         50,
         78,
         195
+      ]
+    },
+    {
+      "name": "Club",
+      "discriminator": [
+        84,
+        214,
+        36,
+        249,
+        146,
+        164,
+        94,
+        181
+      ]
+    },
+    {
+      "name": "ClubInvite",
+      "discriminator": [
+        125,
+        235,
+        215,
+        165,
+        28,
+        144,
+        149,
+        187
+      ]
+    },
+    {
+      "name": "ClubMember",
+      "discriminator": [
+        132,
+        27,
+        32,
+        107,
+        184,
+        176,
+        43,
+        43
       ]
     }
   ],
@@ -13024,6 +13873,51 @@
       "code": 6173,
       "name": "InvalidComplementMatch",
       "msg": "A complementary match needs the other outcome on the same side of a binary book"
+    },
+    {
+      "code": 6174,
+      "name": "InvalidClubName",
+      "msg": "Club names must be trimmed, nonempty and at most 64 bytes of UTF-8"
+    },
+    {
+      "code": 6175,
+      "name": "UnauthorizedClubAdmin",
+      "msg": "Only a current club admin can do this"
+    },
+    {
+      "code": 6176,
+      "name": "UnauthorizedClubOwner",
+      "msg": "Only the club owner can do this"
+    },
+    {
+      "code": 6177,
+      "name": "AlreadyClubMember",
+      "msg": "The wallet is already a member of this club"
+    },
+    {
+      "code": 6178,
+      "name": "ClubInviteExpired",
+      "msg": "The club invitation has expired"
+    },
+    {
+      "code": 6179,
+      "name": "ClubInviteNotExpired",
+      "msg": "The club invitation has not expired yet"
+    },
+    {
+      "code": 6180,
+      "name": "ClubOwnerProtected",
+      "msg": "The club owner must transfer ownership before leaving or losing the admin role"
+    },
+    {
+      "code": 6181,
+      "name": "InvalidClubMember",
+      "msg": "Club member, invitation or nominee does not belong to this club and wallet"
+    },
+    {
+      "code": 6182,
+      "name": "ClubCounterMismatch",
+      "msg": "Club member counters are inconsistent"
     }
   ],
   "types": [
@@ -16372,6 +17266,181 @@
           "u8"
         ]
       }
+    },
+    {
+      "name": "Club",
+      "docs": [
+        "One club, keyed by a creator-chosen 32-byte identifier.",
+        "",
+        "PDA: [\"club\", club_id]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_owner",
+            "docs": [
+              "Member nominated by the owner; becomes owner only by accepting."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "market_policy",
+            "type": {
+              "defined": {
+                "name": "ClubMarketPolicy"
+              }
+            }
+          },
+          {
+            "name": "member_count",
+            "docs": [
+              "Active `ClubMember` records, the owner's included."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "admin_count",
+            "docs": [
+              "Active members holding `ClubRole::Admin`, the owner's included."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubInvite",
+      "docs": [
+        "Pending invitation. The inviter pays its rent and receives it back when the",
+        "invitation is accepted, revoked, declined or closed after expiry.",
+        "",
+        "PDA: [\"club_invite\", club, wallet]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "inviter",
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubMarketPolicy",
+      "docs": [
+        "Who may create markets inside a club."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "AdminsOnly"
+          },
+          {
+            "name": "AnyMember"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubMember",
+      "docs": [
+        "Proof of active membership. It exists only while the wallet is a member;",
+        "leaving or removal closes it.",
+        "",
+        "PDA: [\"club_member\", club, wallet]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "role",
+            "type": {
+              "defined": {
+                "name": "ClubRole"
+              }
+            }
+          },
+          {
+            "name": "joined_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubRole",
+      "docs": [
+        "Role of an active member. The owner always holds `Admin`."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Member"
+          },
+          {
+            "name": "Admin"
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -16610,6 +17679,38 @@
       ],
       "type": "bytes",
       "value": "[109, 117, 108, 116, 105, 95, 112, 111, 115, 105, 116, 105, 111, 110]"
+    },
+    {
+      "name": "CLUB_INVITE_SEED",
+      "docs": [
+        "Pending invitation: [\"club_invite\", club, wallet]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 105, 110, 118, 105, 116, 101]"
+    },
+    {
+      "name": "CLUB_INVITE_TTL_SECONDS",
+      "docs": [
+        "Invitations can be accepted for seven days after they are issued."
+      ],
+      "type": "i64",
+      "value": "604800"
+    },
+    {
+      "name": "CLUB_MEMBER_SEED",
+      "docs": [
+        "Active membership: [\"club_member\", club, wallet]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 109, 101, 109, 98, 101, 114]"
+    },
+    {
+      "name": "CLUB_SEED",
+      "docs": [
+        "Club keyed by a creator-chosen identifier: [\"club\", club_id]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98]"
     }
   ]
 }

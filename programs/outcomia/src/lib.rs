@@ -44,6 +44,59 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod outcomia {
     use super::*;
 
+    /// Creates a club owned by the signer, who also becomes its first admin.
+    pub fn create_club(ctx: Context<CreateClub>, club_id: [u8; 32], name: String) -> Result<()> {
+        crate::instructions::club_settings::handle_create_club(ctx, club_id, name)
+    }
+
+    /// Lets a club admin choose who may create club markets.
+    pub fn set_club_market_policy(
+        ctx: Context<ManageClub>,
+        policy: ClubMarketPolicy,
+    ) -> Result<()> {
+        crate::instructions::club_settings::handle_set_club_market_policy(ctx, policy)
+    }
+
+    /// Lets a club admin invite a wallet; the invitation expires after seven days.
+    pub fn invite_club_member(ctx: Context<InviteClubMember>, wallet: Pubkey) -> Result<()> {
+        crate::instructions::club_invites::handle_invite_club_member(ctx, wallet)
+    }
+
+    /// Lets the invited wallet join the club before its invitation expires.
+    pub fn accept_club_invite(ctx: Context<AcceptClubInvite>) -> Result<()> {
+        crate::instructions::club_invites::handle_accept_club_invite(ctx)
+    }
+
+    /// Revokes (club admin), declines (invited wallet) or clears an expired invitation (anyone).
+    pub fn close_club_invite(ctx: Context<CloseClubInvite>) -> Result<()> {
+        crate::instructions::club_invites::handle_close_club_invite(ctx)
+    }
+
+    /// Lets the club owner promote a member to admin or demote an admin.
+    pub fn set_club_member_role(ctx: Context<SetClubMemberRole>, role: ClubRole) -> Result<()> {
+        crate::instructions::club_members::handle_set_club_member_role(ctx, role)
+    }
+
+    /// Lets a club admin remove a member; only the owner removes admins.
+    pub fn remove_club_member(ctx: Context<RemoveClubMember>) -> Result<()> {
+        crate::instructions::club_members::handle_remove_club_member(ctx)
+    }
+
+    /// Lets any member except the owner leave the club.
+    pub fn leave_club(ctx: Context<LeaveClub>) -> Result<()> {
+        crate::instructions::club_members::handle_leave_club(ctx)
+    }
+
+    /// Lets the club owner nominate a member as the next owner (or cancel with itself).
+    pub fn nominate_club_owner(ctx: Context<NominateClubOwner>) -> Result<()> {
+        crate::instructions::club_ownership::handle_nominate_club_owner(ctx)
+    }
+
+    /// Lets the nominated member accept ownership of the club.
+    pub fn accept_club_ownership(ctx: Context<AcceptClubOwnership>) -> Result<()> {
+        crate::instructions::club_ownership::handle_accept_club_ownership(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
