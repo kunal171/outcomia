@@ -165,7 +165,7 @@ export function traderAccounts(book: SharedBook, owner: PublicKey) {
   };
 }
 /** Anchor encodes an omitted optional account as the program ID sentinel. */
-function optionalAccounts(
+export function optionalAccounts(
   values: Record<string, PublicKey | null>,
 ): Record<string, PublicKey> {
   return Object.fromEntries(
