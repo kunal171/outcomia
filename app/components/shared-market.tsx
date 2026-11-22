@@ -19,10 +19,13 @@ import {
   assetCustody,
   assetAuthorityPda,
   assetVaultPda,
+  departedOrder,
+  type ClubTrading,
   type Outcome,
   type Side,
   type SharedSnapshot,
 } from "../lib/shared";
+import { initializeClubPositionInstruction } from "../lib/clubs";
 import {
   getOutcomiaProgram,
   getOutcomiaReadProgram,
@@ -61,6 +64,8 @@ interface Props {
   baseMint?: PublicKey;
   baseDecimals?: number;
   baseSymbol?: string;
+  /** Club markets trade on their club book under the program's membership rules. */
+  club?: ClubTrading;
 }
 export function SharedMarket(props: Props) {
   const { connection } = useConnection(),
@@ -103,7 +108,7 @@ function Market(props: Props) {
   useEffect(() => {
     let dead = false;
     setLoaded(false);
-    void readSharedBook(program, props.market)
+    void readSharedBook(program, props.market, props.club)
       .then((s) => {
         if (!dead) {
           setSnapshot(s);
@@ -117,7 +122,7 @@ function Market(props: Props) {
     return () => {
       dead = true;
     };
-  }, [program, props.market, revision, props.refreshKey]);
+  }, [program, props.market, props.club, revision, props.refreshKey]);
   async function transact(
     action: "initialize" | "trade" | "cancel" | "fees",
     order?: PublicKey,
@@ -144,7 +149,7 @@ function Market(props: Props) {
             .instruction(),
         );
       else {
-        const current = await readSharedBook(p, props.market);
+        const current = await readSharedBook(p, props.market, props.club);
         if (!current) throw new Error("Shared book is not initialized");
         if (action === "fees") {
           const destination = getAssociatedTokenAddressSync(
@@ -160,8 +165,11 @@ function Market(props: Props) {
             ),
           );
           tx.add(
-            await p.methods
-              .withdrawSharedFees(current.book.accruedQuoteFees)
+            await (
+              props.club
+                ? p.methods.withdrawClubBookFees
+                : p.methods.withdrawSharedFees
+            )(current.book.accruedQuoteFees)
               .accountsPartial({
                 superAdmin: wallet.publicKey,
                 protocolConfig: deriveProtocolConfigPda(),
@@ -175,7 +183,15 @@ function Market(props: Props) {
               .instruction(),
           );
         } else if (action === "cancel")
-          tx.add(await cancelShared(p, current, wallet.publicKey, order!));
+          tx.add(
+            await cancelShared(
+              p,
+              current,
+              wallet.publicKey,
+              order!,
+              props.club,
+            ),
+          );
         else {
           // Initialize each mint ledger once; it is reused across every subsequent market.
           const mints =
@@ -211,15 +227,22 @@ function Market(props: Props) {
               ))
             )
               tx.add(
-                await p.methods
-                  .initializePredictionPosition()
-                  .accountsPartial({
-                    owner: wallet.publicKey,
-                    market: props.market,
-                    position,
-                    systemProgram: SystemProgram.programId,
-                  })
-                  .instruction(),
+                props.club
+                  ? await initializeClubPositionInstruction(
+                      p,
+                      wallet.publicKey,
+                      props.market,
+                      position,
+                    )
+                  : await p.methods
+                      .initializePredictionPosition()
+                      .accountsPartial({
+                        owner: wallet.publicKey,
+                        market: props.market,
+                        position,
+                        systemProgram: SystemProgram.programId,
+                      })
+                      .instruction(),
               );
           }
           const plan = await buildSharedTrade(
@@ -235,6 +258,8 @@ function Market(props: Props) {
               "Quantity",
             ),
             tx.instructions,
+            undefined,
+            props.club,
           );
           tx.add(...plan.instructions);
           if (plan.remaining.gtn(0))
@@ -274,11 +299,16 @@ function Market(props: Props) {
       setPending(false);
     }
   }
+  // Club books are created with their market; there is nothing to set up here.
   const canSetup =
+    !props.club &&
     !!wallet?.publicKey.equals(props.authority) &&
     !role.loading &&
     !role.error &&
     (role.role === "admin" || role.role === "super-admin");
+  const departed = (snapshot?.orders ?? []).filter(
+    (r) => "open" in r.account.status && departedOrder(props.club, r.account),
+  );
   const feedback = (
     <div className="prediction-feedback">
       {issue && <p role="alert">{t(issue ?? "")}</p>}
@@ -338,6 +368,24 @@ function Market(props: Props) {
           </button>
         </div>
         {openOrders}
+        {departed.length > 0 && wallet && (
+          <div className="access-card">
+            <p>
+              {t(
+                "{value0} open orders belong to former members. They cannot fill and block their queues until cleared; funds return to their owners.",
+                { value0: String(departed.length) },
+              )}
+            </p>
+            <button
+              type="button"
+              className="admin-action-button"
+              disabled={pending}
+              onClick={() => void transact("cancel", departed[0].publicKey)}
+            >
+              {t("Clear one departed order")}
+            </button>
+          </div>
+        )}
         {feedback}
         {fees}
       </section>
