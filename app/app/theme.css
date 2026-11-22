@@ -343,6 +343,16 @@ body {
   border-block: 1px solid var(--line);
   color: var(--muted);
 }
+/* Multi-outcome orders follow the binary ledger as a second titled table. */
+.multi-orders-ledger {
+  margin-top: 40px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.orders-section-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
 .orders-legacy {
   margin-top: 40px;
   border-top: 1px solid var(--line);

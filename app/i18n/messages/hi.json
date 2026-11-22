@@ -1057,5 +1057,12 @@
   "Only club members can trade in this market": "इस बाज़ार में केवल क्लब सदस्य ट्रेड कर सकते हैं",
   "A former member's order is first in this queue. Clear departed members' orders, then retry.": "इस कतार में सबसे पहले एक पूर्व सदस्य का ऑर्डर है। पूर्व सदस्यों के ऑर्डर हटाएँ, फिर दोबारा प्रयास करें।",
   "Enter a valid wallet address": "एक मान्य वॉलेट पता दर्ज करें",
-  "Club markets have no fallback resolver; club admins resolve them": "क्लब बाज़ारों में कोई फ़ॉलबैक रिज़ॉल्वर नहीं होता; क्लब एडमिन उन्हें रिज़ॉल्व करते हैं"
+  "Club markets have no fallback resolver; club admins resolve them": "क्लब बाज़ारों में कोई फ़ॉलबैक रिज़ॉल्वर नहीं होता; क्लब एडमिन उन्हें रिज़ॉल्व करते हैं",
+  "Multi-outcome positions": "बहु-परिणाम पोज़िशन",
+  "Multi-outcome positions could not be loaded.": "बहु-परिणाम पोज़िशन लोड नहीं हो सकीं।",
+  "Loading multi-outcome positions…": "बहु-परिणाम पोज़िशन लोड हो रही हैं…",
+  "No multi-outcome positions yet.": "अभी कोई बहु-परिणाम पोज़िशन नहीं है।",
+  "Multi-outcome": "बहु-परिणाम",
+  "Multi-outcome orders": "बहु-परिणाम ऑर्डर",
+  "Manage →": "प्रबंधित करें →"
 }

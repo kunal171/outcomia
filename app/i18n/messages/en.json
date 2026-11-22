@@ -1057,5 +1057,12 @@
   "Only club members can trade in this market": "Only club members can trade in this market",
   "A former member's order is first in this queue. Clear departed members' orders, then retry.": "A former member's order is first in this queue. Clear departed members' orders, then retry.",
   "Enter a valid wallet address": "Enter a valid wallet address",
-  "Club markets have no fallback resolver; club admins resolve them": "Club markets have no fallback resolver; club admins resolve them"
+  "Club markets have no fallback resolver; club admins resolve them": "Club markets have no fallback resolver; club admins resolve them",
+  "Multi-outcome positions": "Multi-outcome positions",
+  "Multi-outcome positions could not be loaded.": "Multi-outcome positions could not be loaded.",
+  "Loading multi-outcome positions…": "Loading multi-outcome positions…",
+  "No multi-outcome positions yet.": "No multi-outcome positions yet.",
+  "Multi-outcome": "Multi-outcome",
+  "Multi-outcome orders": "Multi-outcome orders",
+  "Manage →": "Manage →"
 }

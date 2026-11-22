@@ -20,6 +20,11 @@ export interface MultiWalletMarket {
   position: Position | null;
   orders: Row[];
 }
+/** Whether any outcome has free or locked contracts; empty positions (for
+ * example from finished test markets) are not listed as holdings. */
+export const holdsContracts = (r: Pick<MultiWalletMarket, "position">) =>
+  !!r.position &&
+  [...r.position.free, ...r.position.locked].some((v) => !v.isZero());
 /** Owner filters are only RPC hints; canonical identities are verified before displaying claims. */
 export async function loadMultiWallet(
   p: Program,
