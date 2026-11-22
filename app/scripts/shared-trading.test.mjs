@@ -506,3 +506,131 @@ test("with complementary matching disabled the planner keeps direct-only behavio
   f.book.bestPrices = [null, null, bn(400_000), null];
   assert.equal(s.bestBuyPrice(f.book, "yes"), null);
 });
+
+// Club books: same planner, club namespace, club instructions and membership accounts.
+const clubKey = key(9),
+  clubMarket = key(10);
+function clubFixture() {
+  const f = fixture(true);
+  f.key = s.clubBookPda(market);
+  return f;
+}
+const clubContext = (membersOnly, members = [owner, maker]) => ({
+  club: clubKey,
+  clubMarket,
+  membersOnly,
+  members: new Set(members.map((m) => m.toBase58())),
+});
+test("club trades use club instructions, the club book and both memberships", async () => {
+  const f = clubFixture(),
+    noBid = add(f, 1, 400_000, 1, "bid", "no"),
+    yesAsk = add(f, 2, 620_000, 1, "ask", "yes");
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    owner,
+    "yes",
+    "bid",
+    bn(650_000),
+    bn(3),
+    [],
+    true,
+    clubContext(true),
+  );
+  assert.deepEqual(Array.from(r.instructions, name), [
+    "matchClubComplement",
+    "matchClubOrder",
+    "placeClubOrder",
+  ]);
+  const [complement, direct, place] = r.instructions;
+  assert(account(complement, "maker_order").equals(noBid));
+  assert(account(direct, "maker_order").equals(yesAsk));
+  for (const i of [complement, direct]) {
+    assert(account(i, "book").equals(s.clubBookPda(market)));
+    assert(account(i, "club_market").equals(clubMarket));
+    assert(account(i, "club_fee_config").equals(s.clubFeeConfigPda()));
+    assert(account(i, "taker_member").equals(s.clubMemberPda(clubKey, owner)));
+    assert(account(i, "maker_member").equals(s.clubMemberPda(clubKey, maker)));
+  }
+  assert(account(place, "member").equals(s.clubMemberPda(clubKey, owner)));
+  assert(
+    account(place, "order").equals(
+      s.sharedOrderPda(s.clubBookPda(market), bn(50)),
+    ),
+  );
+});
+test("public club markets omit membership accounts", async () => {
+  const f = clubFixture();
+  add(f, 1, 400_000, 1, "ask", "yes");
+  const outsider = key(11);
+  const r = await s.buildSharedTrade(
+    p,
+    f,
+    outsider,
+    "yes",
+    "bid",
+    bn(400_000),
+    bn(1),
+    [],
+    true,
+    clubContext(false, []),
+  );
+  assert.equal(name(r.instructions[0]), "matchClubOrder");
+  assert(account(r.instructions[0], "taker_member").equals(programId));
+  assert(account(r.instructions[0], "maker_member").equals(programId));
+});
+test("members-only planning stops for outsiders and departed makers", async () => {
+  const f = clubFixture();
+  add(f, 1, 400_000, 1, "ask", "yes");
+  await assert.rejects(
+    s.buildSharedTrade(
+      p,
+      f,
+      key(11),
+      "yes",
+      "bid",
+      bn(400_000),
+      bn(1),
+      [],
+      true,
+      clubContext(true),
+    ),
+    /Only club members/,
+  );
+  await assert.rejects(
+    s.buildSharedTrade(
+      p,
+      f,
+      owner,
+      "yes",
+      "bid",
+      bn(400_000),
+      bn(1),
+      [],
+      true,
+      clubContext(true, [owner]),
+    ),
+    /former member/,
+  );
+});
+test("anyone may cancel a departed member's club order, refunding its owner", async () => {
+  const f = clubFixture(),
+    o = add(f, 1, 400_000, 1, "bid", "yes");
+  const stranger = key(12);
+  await assert.rejects(
+    s.cancelShared(p, f, stranger, o, clubContext(true)),
+    /owner/,
+  );
+  await assert.rejects(
+    s.cancelShared(p, f, stranger, o, clubContext(false, [])),
+    /owner/,
+  );
+  const i = await s.cancelShared(p, f, stranger, o, clubContext(true, [owner]));
+  assert.equal(name(i), "cancelClubOrder");
+  assert(account(i, "canceller").equals(stranger));
+  assert(account(i, "owner_member").equals(s.clubMemberPda(clubKey, maker)));
+  assert(account(i, "quote_balance").equals(s.assetBalancePda(maker, quote)));
+  assert(account(i, "level_rent_recipient").equals(maker));
+  assert(s.departedOrder(clubContext(true, [owner]), { owner: maker }));
+  assert(!s.departedOrder(clubContext(false, []), { owner: maker }));
+});
