@@ -559,3 +559,5 @@ report.result = "passed";
 if (process.env.RESULT)
   fs.writeFileSync(process.env.RESULT, JSON.stringify(report, null, 2) + "\n");
 console.log(`PASS: club lifecycle end to end on ${report.cluster}`);
+// Open RPC connections can keep Node alive after the run; finish explicitly.
+process.exit(0);
