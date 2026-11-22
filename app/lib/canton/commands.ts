@@ -4,6 +4,8 @@ import {
   integer,
   list,
   marketKey,
+  factoryRefKey,
+  interfaceId,
   obj,
   orderQuote,
   raw,
@@ -42,7 +44,12 @@ export type Action =
   | "close"
   | "cancelDraft"
   | "setFee"
-  | "setAdmins";
+  | "setAdmins"
+  | "factoryCreate"
+  | "factoryClose"
+  | "factoryPropose"
+  | "createInviteList"
+  | "setInvites";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -104,6 +111,11 @@ export function buildPlan(
     cancelDraft: "BinaryMarket",
     setFee: "Protocol",
     setAdmins: "Protocol",
+    factoryCreate: "OutcomiaMarketFactory",
+    factoryClose: "BinaryMarket",
+    factoryPropose: "BinaryMarket",
+    createInviteList: "OutcomiaMarketFactory",
+    setInvites: "InviteListPolicy",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -205,6 +217,44 @@ export function buildPlan(
       assetDecimals: text(target.data.assetDecimals),
     },
   });
+  /** The factory instance that issued a scoped market or proposal. */
+  const factoryFor = (scope: unknown) => {
+    const wanted = factoryRefKey(scope);
+    return single(
+      catalog.contracts.filter(
+        (c) =>
+          c.kind === "OutcomiaMarketFactory" &&
+          factoryRefKey(c.data.ref) === wanted,
+      ),
+      "OutcomiaMarketFactory",
+    );
+  };
+  const factoryAdmin = (factory: Contract) => {
+    if (!list(factory.data.admins).includes(party))
+      throw new Error("Admin of this market's factory required.");
+  };
+  /** Restricted markets need the current policy contract named by the market;
+   * public markets send no proof. The ledger rechecks everything. */
+  const eligibilityFor = (market: Contract, who: string) => {
+    const access = market.data.access;
+    if (!access) return null;
+    const wanted = factoryRefKey(access);
+    const policy = single(
+      all.filter(
+        (c) =>
+          c.kind === "InviteListPolicy" && factoryRefKey(c.data.ref) === wanted,
+      ),
+      "InviteListPolicy",
+    );
+    if (policy.data.manager !== who && !list(policy.data.parties).includes(who))
+      throw new Error("This wallet is not invited to this market.");
+    return { policy: use(policy), evidence: [] };
+  };
+  const notFactoryMarket = () => {
+    if (target.data.factory)
+      throw new Error("This market is managed through its factory.");
+  };
+  let interfaceRoot: string | null = null;
   switch (intent.action) {
     case "enroll":
       root = single(catalog.contracts, "VaultAuthority");
@@ -263,6 +313,7 @@ export function buildPlan(
         price: text(v.price),
         quantity: q,
         ...approval(),
+        eligibility: eligibilityFor(find("BinaryMarket"), party),
       };
       if (side === "buy") {
         const balance = account();
@@ -311,8 +362,10 @@ export function buildPlan(
           ? "MarketReserve_Split"
           : "MarketReserve_Merge";
       args = { owner: party, balance: use(account()), quantity: quantity() };
-      if (intent.action === "split") args.market = currentMarket();
-      else args.positions = lots().map(use);
+      if (intent.action === "split") {
+        args.market = currentMarket();
+        args.eligibility = eligibilityFor(find("BinaryMarket"), party);
+      } else args.positions = lots().map(use);
       context = true;
       break;
     }
@@ -368,11 +421,20 @@ export function buildPlan(
         outcome,
         buyerBalance: use(account(text(buy.data.owner))),
         sellerBalance: use(account(text(sell.data.owner))),
+        buyerEligibility: eligibilityFor(
+          find("BinaryMarket"),
+          text(buy.data.owner),
+        ),
+        sellerEligibility: eligibilityFor(
+          find("BinaryMarket"),
+          text(sell.data.owner),
+        ),
       };
       context = true;
       break;
     }
     case "propose":
+      notFactoryMarket();
       creator();
       if (!resolverEligible(target.data, party))
         throw new Error("Resolution is not available in this time window.");
@@ -384,6 +446,7 @@ export function buildPlan(
       };
       break;
     case "fallbackPropose":
+      notFactoryMarket();
       admin();
       if (
         party === target.data.creator ||
@@ -398,21 +461,32 @@ export function buildPlan(
         evidence: evidence(v.evidence),
       };
       break;
-    case "correct":
-      admin();
-      if (
-        !resolverEligible(target.data, party) ||
-        Date.now() >= Date.parse(text(target.data.finalizableAt))
-      )
-        throw new Error("Correction window is closed.");
+    case "correct": {
+      const scope = obj(target.data.key).scope;
+      let roles = policy.id;
+      if (scope) {
+        const factory = factoryFor(scope);
+        factoryAdmin(factory);
+        roles = use(factory);
+        if (Date.now() >= Date.parse(text(target.data.finalizableAt)))
+          throw new Error("Correction window is closed.");
+      } else {
+        admin();
+        if (
+          !resolverEligible(target.data, party) ||
+          Date.now() >= Date.parse(text(target.data.finalizableAt))
+        )
+          throw new Error("Correction window is closed.");
+      }
       choice = "ResolutionProposal_Correct";
       args = {
         resolver: party,
-        roles: policy.id,
+        roles,
         replacementOutcome: resolutionOutcome(v.outcome),
         replacementEvidence: evidence(v.evidence),
       };
       break;
+    }
     case "finalize":
       operator();
       if (Date.now() < Date.parse(text(target.data.finalizableAt)))
@@ -440,6 +514,7 @@ export function buildPlan(
       break;
     case "reserve":
     case "book": {
+      notFactoryMarket();
       creator();
       const admission = single(
         catalog.contracts.filter(
@@ -467,11 +542,13 @@ export function buildPlan(
       break;
     }
     case "open":
+      notFactoryMarket();
       creator();
       choice = "Binary_Open";
       args = { protocol: policy.id };
       break;
     case "close":
+      notFactoryMarket();
       creator();
       choice = "Binary_Close";
       args = { protocol: policy.id, reason: text(v.reason) };
@@ -506,6 +583,74 @@ export function buildPlan(
         args = { replacementAdmins: admins };
       }
       break;
+    case "factoryCreate": {
+      if (!mayCreate(target.data.policy, party))
+        throw new Error(
+          "This factory's creation policy does not allow this wallet.",
+        );
+      const terms = standardTerms(v.terms);
+      const collateral = obj(terms.collateral);
+      if (
+        !list(target.data.assets).some((a) =>
+          sameInstrument(obj(a).instrument, collateral),
+        )
+      )
+        throw new Error("This factory does not admit that collateral.");
+      let access: RecordValue = { tag: "Public", value: {} };
+      if (v.access === "invite") {
+        const list_ = owned.find(
+          (c) => c.kind === "InviteListPolicy" && c.id === text(v.policy),
+        );
+        if (!list_ || list_.data.manager !== party)
+          throw new Error("Choose an invite list you manage.");
+        access = { tag: "Restricted", value: obj(list_.data.ref) };
+      }
+      interfaceRoot = interfaceId(d, "MarketFactory");
+      choice = "MarketFactory_Create";
+      args = { creator: party, terms, access };
+      break;
+    }
+    case "factoryClose":
+    case "factoryPropose": {
+      if (!target.data.factory)
+        throw new Error("This market is managed through the protocol root.");
+      const factory = factoryFor(target.data.factory);
+      factoryAdmin(factory);
+      if (intent.action === "factoryClose") {
+        if (target.data.status !== "Open")
+          throw new Error("Only an open market can close.");
+        choice = "Binary_FactoryClose";
+        args = { actor: party, roles: use(factory), reason: text(v.reason) };
+      } else {
+        const t = obj(target.data.terms);
+        const earliest = Date.parse(text(t.earliestResolutionAt ?? t.closeAt));
+        if (Date.now() < earliest)
+          throw new Error("Resolution is not available yet.");
+        choice = "Binary_FactoryPropose";
+        args = {
+          actor: party,
+          roles: use(factory),
+          outcome: resolutionOutcome(v.outcome),
+          evidence: evidence(v.evidence),
+        };
+      }
+      break;
+    }
+    case "createInviteList": {
+      if (!mayCreate(target.data.policy, party))
+        throw new Error(
+          "This factory's creation policy does not allow this wallet.",
+        );
+      choice = "OutcomiaFactory_CreateInviteList";
+      args = { manager: party, parties: invitees(v.parties) };
+      break;
+    }
+    case "setInvites":
+      if (target.data.manager !== party)
+        throw new Error("Only the invite list's manager can edit it.");
+      choice = "InviteList_Set";
+      args = { replacementParties: invitees(v.parties) };
+      break;
     default:
       throw new Error("Unsupported Canton action.");
   }
@@ -515,7 +660,7 @@ export function buildPlan(
   return {
     command: {
       ExerciseCommand: {
-        templateId: templateId(d, root.kind),
+        templateId: interfaceRoot ?? templateId(d, root.kind),
         contractId: cid(root.id),
         choice,
         choiceArgument: args,
@@ -559,5 +704,49 @@ function marketTerms(value: unknown) {
   integer(t.quantityLot);
   integer(t.resolutionDelaySeconds);
   obj(t.collateral);
+  return t;
+}
+
+/** Mirrors the standard's `mayCreate` for a JSON-encoded CreationPolicy. */
+export function mayCreate(policy: unknown, party: string): boolean {
+  const p = obj(policy);
+  if (p.tag === "AnyParty") return true;
+  if (p.tag === "AdminsOnly" || p.tag === "Allowlist")
+    return list(p.value).includes(party);
+  return false;
+}
+function invitees(value: unknown) {
+  const parties = list(value).map(text);
+  if (parties.length > 256 || new Set(parties).size !== parties.length)
+    throw new Error("Invite lists hold at most 256 unique parties.");
+  return parties;
+}
+/** Standard MarketTerms for a binary factory market: outcomes YES then NO. */
+function standardTerms(value: unknown) {
+  const t = obj(value);
+  if (
+    JSON.stringify(list(t.outcomes)) !== JSON.stringify(["YES", "NO"]) ||
+    list(t.outcomeCriteria).length !== 2
+  )
+    throw new Error("Binary factory markets use the outcomes YES and NO.");
+  list(t.outcomeCriteria).forEach(text);
+  text(t.question);
+  text(t.invalidCriteria);
+  text(t.evidenceRequirements);
+  evidence({
+    summary: t.question,
+    documentUri: t.rulesUri,
+    documentSha256: t.rulesHash,
+  });
+  const c = obj(t.collateral);
+  text(c.admin);
+  text(c.id);
+  if (!(Date.parse(text(t.closeAt)) > Date.now()))
+    throw new Error("Trading cutoff must be in the future.");
+  if (raw(t.priceTick) <= BigInt(0))
+    throw new Error("Price tick must be positive.");
+  if (integer(t.quantityLot) < BigInt(1))
+    throw new Error("Quantity lot must be positive.");
+  integer(t.resolutionDelaySeconds);
   return t;
 }
