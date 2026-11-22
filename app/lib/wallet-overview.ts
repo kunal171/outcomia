@@ -62,8 +62,7 @@ export interface SpotHolding extends MarketContext<MarketAccount> {
   address: PublicKey;
   balance: TraderBalanceAccount;
 }
-export interface PredictionHolding
-  extends MarketContext<PredictionMarketAccount> {
+export interface PredictionHolding extends MarketContext<PredictionMarketAccount> {
   address: PublicKey;
   balance: PredictionPositionAccount;
 }
@@ -260,15 +259,27 @@ async function readSpot(
     ...contexts.get(account.market.toBase58())!,
   }));
 }
+/** Whether a binary position still holds anything: cash, contracts or locks.
+ * Fully exited positions (for example from finished test markets) are hidden. */
+export function holdsPrediction(balance: PredictionPositionAccount) {
+  return [
+    balance.collateralFree,
+    balance.collateralLocked,
+    balance.yesFree,
+    balance.yesLocked,
+    balance.noFree,
+    balance.noLocked,
+  ].some((value) => !value.isZero());
+}
 async function readPredictions(
   connection: Connection,
   program: Program,
   owner: PublicKey,
 ): Promise<PredictionHolding[]> {
-  const records = await getOutcomiaAccounts(program).predictionPosition.all([
+  const all = await getOutcomiaAccounts(program).predictionPosition.all([
     { memcmp: { offset: 40, bytes: owner.toBase58() } },
   ]);
-  for (const { publicKey, account } of records) {
+  for (const { publicKey, account } of all) {
     if (
       !account.owner.equals(owner) ||
       !publicKey.equals(derivePredictionPositionPda(account.market, owner))
@@ -283,14 +294,19 @@ async function readPredictions(
       account.noLocked,
     ]);
   }
+  const records = all.filter(({ account }) => holdsPrediction(account));
   const contexts = await readContexts<PredictionMarketAccount>(
     connection,
     program,
     records.map((row) => row.account.market),
     "predictionMarket",
+    // Club markets share the layout; their positions are the wallet's too.
     (market, key) =>
       /^10*$/.test(market.payoutPerContract.toString()) &&
-      derivePredictionMarketPda(new Uint8Array(market.marketId)).equals(key),
+      (derivePredictionMarketPda(new Uint8Array(market.marketId)).equals(key) ||
+        deriveClubPredictionMarketPda(new Uint8Array(market.marketId)).equals(
+          key,
+        )),
   );
   return records.map(({ publicKey, account }) => ({
     address: publicKey,
@@ -412,36 +428,42 @@ export async function loadWalletOverview(
 ): Promise<WalletOverview> {
   const program = getOutcomiaReadProgram(connection);
   const [sol, tokens, catalog, spot, predictions, multi] = await Promise.all([
-    read(() => readWithRpcFallback(
-      `wallet:${owner}:sol`,
-      async () => {
-        const assets = await walletAssets(owner);
-        const sol = assets.find((asset) => asset.mint === "NATIVE_SOL");
-        if (!sol) throw new Error("SOL holdings are not indexed");
-        return new BN(sol.amount);
-      },
-      async () => {
-        const lamports = await connection.getBalance(owner, "confirmed");
-        if (!Number.isSafeInteger(lamports) || lamports < 0)
-          throw new Error("SOL balance exceeds the safe RPC number range");
-        return new BN(String(lamports));
-      },
-    )),
-    read(() => readWithRpcFallback(
-      `wallet:${owner}:tokens`,
-      async () => {
-        const assets = await walletAssets(owner);
-        return assets.filter((asset) => asset.mint !== "NATIVE_SOL").map((asset) => ({
-          mint: new PublicKey(asset.mint),
-          tokenProgram: new PublicKey(asset.tokenProgram),
-          decimals: asset.decimals,
-          amount: new BN(asset.amount),
-          frozen: new BN(asset.frozen),
-          accountCount: asset.accountCount,
-        }));
-      },
-      () => readTokens(connection, owner, TOKEN_PROGRAM_ID),
-    )),
+    read(() =>
+      readWithRpcFallback(
+        `wallet:${owner}:sol`,
+        async () => {
+          const assets = await walletAssets(owner);
+          const sol = assets.find((asset) => asset.mint === "NATIVE_SOL");
+          if (!sol) throw new Error("SOL holdings are not indexed");
+          return new BN(sol.amount);
+        },
+        async () => {
+          const lamports = await connection.getBalance(owner, "confirmed");
+          if (!Number.isSafeInteger(lamports) || lamports < 0)
+            throw new Error("SOL balance exceeds the safe RPC number range");
+          return new BN(String(lamports));
+        },
+      ),
+    ),
+    read(() =>
+      readWithRpcFallback(
+        `wallet:${owner}:tokens`,
+        async () => {
+          const assets = await walletAssets(owner);
+          return assets
+            .filter((asset) => asset.mint !== "NATIVE_SOL")
+            .map((asset) => ({
+              mint: new PublicKey(asset.mint),
+              tokenProgram: new PublicKey(asset.tokenProgram),
+              decimals: asset.decimals,
+              amount: new BN(asset.amount),
+              frozen: new BN(asset.frozen),
+              accountCount: asset.accountCount,
+            }));
+        },
+        () => readTokens(connection, owner, TOKEN_PROGRAM_ID),
+      ),
+    ),
     read(() => readCatalog(program)),
     read(() => readSpot(connection, program, owner)),
     read(() => readPredictions(connection, program, owner)),

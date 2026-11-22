@@ -371,10 +371,40 @@ const connection = {
       bump: 255,
     },
   );
+  // A fully exited position is not a holding and stays hidden.
+  const clubPosition = derive(
+    "prediction_position",
+    clubPred.toBuffer(),
+    owner.toBuffer(),
+  );
+  const emptyPosition = {
+    market: clubPred,
+    owner,
+    collateralFree: bn(0),
+    collateralLocked: bn(0),
+    yesFree: bn(0),
+    yesLocked: bn(0),
+    noFree: bn(0),
+    noLocked: bn(0),
+    bump: 255,
+  };
+  await put(clubPosition, "predictionPosition", emptyPosition);
   let result = await loadWalletOverview(connection, owner);
   assert.equal(result.sol.data.toString(), "2500000000");
   assert.equal(result.spot.data.length, 2);
   assert.equal(result.predictions.data.length, 1);
+  // Contracts in a club market are listed with their market details.
+  await put(clubPosition, "predictionPosition", {
+    ...emptyPosition,
+    yesFree: bn(2),
+  });
+  const withClub = await loadWalletOverview(connection, owner);
+  const club = withClub.predictions.data.find((h) =>
+    h.balance.market.equals(clubPred),
+  );
+  assert.ok(club && club.market && club.issue === null, "club position listed");
+  assert.equal(withClub.predictions.data.length, 2);
+  await put(clubPosition, "predictionPosition", emptyPosition);
   assert.ok(
     filtersSeen
       .filter((f) => f.some((x) => x.memcmp?.offset === 40))
