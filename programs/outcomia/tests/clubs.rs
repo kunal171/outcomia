@@ -4,7 +4,7 @@
 
 use anchor_lang::{
     prelude::Pubkey, solana_program::instruction::Instruction, solana_program::system_program,
-    AccountDeserialize, InstructionData, ToAccountMetas,
+    AccountDeserialize, AccountSerialize, InstructionData, ToAccountMetas,
 };
 use litesvm::LiteSVM;
 use outcomia::{constants::*, state::*};
@@ -671,5 +671,79 @@ fn a_departing_nominee_cancels_the_nomination() {
         &b,
         take_ownership(&f.club, &b.pubkey()),
         "InvalidClubMember",
+    );
+}
+
+fn fee_config_pda() -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_FEE_CONFIG_SEED], &outcomia::ID).0
+}
+fn protocol_config_pda() -> Pubkey {
+    Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &outcomia::ID).0
+}
+/// Stores a protocol config whose super-admin is `super_admin`.
+fn store_protocol_config(f: &mut Fixture, super_admin: Pubkey) {
+    let (address, bump) = Pubkey::find_program_address(&[PROTOCOL_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    ProtocolConfig {
+        super_admin,
+        taker_fee_bps: 0,
+        bump,
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let account = solana_account::Account {
+        lamports: f.svm.minimum_balance_for_rent_exemption(data.len()),
+        data,
+        owner: outcomia::ID,
+        executable: false,
+        rent_epoch: 0,
+    };
+    f.svm.set_account(address, account).unwrap();
+}
+fn set_fee_share(super_admin: &Pubkey, club_share_bps: u16) -> Instruction {
+    ix(
+        outcomia::accounts::SetClubFeeShare {
+            super_admin: *super_admin,
+            protocol_config: protocol_config_pda(),
+            club_fee_config: fee_config_pda(),
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::SetClubFeeShare { club_share_bps },
+    )
+}
+
+#[test]
+fn only_the_super_admin_sets_the_capped_club_fee_share() {
+    let mut f = Fixture::new();
+    let super_admin = f.wallet();
+    store_protocol_config(&mut f, super_admin.pubkey());
+    let owner = f.owner.insecure_clone();
+    // Owning a club grants no protocol authority.
+    f.fails(
+        &owner,
+        set_fee_share(&owner.pubkey(), 1_000),
+        "UnauthorizedSuperAdmin",
+    );
+    f.fails(
+        &super_admin,
+        set_fee_share(&super_admin.pubkey(), 5_001),
+        "ClubFeeShareTooHigh",
+    );
+    assert!(f.load::<ClubFeeConfig>(&fee_config_pda()).is_none());
+
+    f.ok(&super_admin, set_fee_share(&super_admin.pubkey(), 2_000));
+    assert_eq!(
+        f.load::<ClubFeeConfig>(&fee_config_pda())
+            .unwrap()
+            .club_share_bps,
+        2_000
+    );
+    f.ok(&super_admin, set_fee_share(&super_admin.pubkey(), 5_000));
+    f.ok(&super_admin, set_fee_share(&super_admin.pubkey(), 0));
+    assert_eq!(
+        f.load::<ClubFeeConfig>(&fee_config_pda())
+            .unwrap()
+            .club_share_bps,
+        0
     );
 }

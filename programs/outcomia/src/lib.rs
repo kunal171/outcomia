@@ -97,6 +97,11 @@ pub mod outcomia {
         crate::instructions::club_ownership::handle_accept_club_ownership(ctx)
     }
 
+    /// Lets the super-admin set the share of club-market taker fees paid to clubs.
+    pub fn set_club_fee_share(ctx: Context<SetClubFeeShare>, club_share_bps: u16) -> Result<()> {
+        crate::instructions::club_fees::handle_set_club_fee_share(ctx, club_share_bps)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
