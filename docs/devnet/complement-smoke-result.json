@@ -1,0 +1,155 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "startedAt": "2026-11-21T17:12:56.602Z",
+  "steps": [
+    {
+      "label": "fund temporary trader",
+      "signature": "5N3zuaWGZrpRpP9saLQ1bkfHND7pzVnpKkbBHj2nrBKWA9JMsjZpa7KCifwTCEzFHoa8BkYXP13CynXn9EqxDo5N"
+    },
+    {
+      "label": "cash for admin",
+      "signature": "41ztXf2hopgL4VRWs9cNXbmXLb7J6wkv9KgjnMJgo9eFtPdawpcxZLXc2pP1EfXZhe4A6b6tRbuKqVSoCEByehvQ"
+    },
+    {
+      "label": "cash for trader",
+      "signature": "4LaFMsYQyivZYyDBAiFrtN11oZBD15k4Pd4SRcGUXGvWUaxmi2VkKGoxS9QbpSxVwK6HyfyUqwRcBZELRCFA12g"
+    },
+    {
+      "label": "create binary market",
+      "signature": "31Jw1gUSxKEBXwpLatpaD2VCHhJyNYggX8CHKSG8DeKdoRyvtXpkFjYHqSGW6JQCc78FYQNnSU4ifGZbvSuXivJq"
+    },
+    {
+      "label": "open binary market with shared book",
+      "signature": "32NpwxB76XJmfAWrP4QT3yumB6VBQaotXvTPBK6tvCV6ETJNYo5Dh2hCxqjxGybtkHQZYonCPqUp1MoQYbvwfiXF"
+    },
+    {
+      "label": "binary position for admin",
+      "signature": "2RHNTUeEgi9mBuYd2Jxj3k3qke2YdRnjLez2xjti6AvPLgXQMgTY5Vc3Ca7iaP8dDKqPQMgRjgMSg4jG4vjTcUcq"
+    },
+    {
+      "label": "binary position for trader",
+      "signature": "2PF4RcQgppsz38v7d1w9a4cAqKw3VCTenzwN5XaKgX4ctT2eGxmzjDYq7xLHu85a9SU1Ykx4kE64Lp7GVuetNoqR"
+    },
+    {
+      "label": "admin rests NO bid 0.40 x3 plan",
+      "instructions": [
+        "placeSharedOrder"
+      ]
+    },
+    {
+      "label": "admin rests NO bid 0.40 x3",
+      "signature": "5Q9H9abQSo2vZKdAhrF3t9yqbfmRDGJ2858PWNGo4CNQEVU9BSVYdV11KbF4KS3ojgNRc9237svVCCBrUqEEqC7j"
+    },
+    {
+      "label": "trader buys YES 0.65 x2 (complement mint) plan",
+      "instructions": [
+        "matchSharedComplement"
+      ]
+    },
+    {
+      "label": "trader buys YES 0.65 x2 (complement mint)",
+      "signature": "24S4iMp7o21HDaw6B25Hsz81z1oHud65gxf7NPsAMsqueWqUsBSxRg7VugwZhdYyQ24EXggWBoZv7XdgqZdZK6zU"
+    },
+    {
+      "label": "check: after binary mint",
+      "supply": 2
+    },
+    {
+      "label": "admin rests NO ask 0.45 x1 plan",
+      "instructions": [
+        "placeSharedOrder"
+      ]
+    },
+    {
+      "label": "admin rests NO ask 0.45 x1",
+      "signature": "2Mjqr7WgaYRCiALyYToAaz1PAmDJRLMd6ex6zaZ2cWbpXd75KGKvhbcuEHQLVH312pScBohZqdg5cFco8YQvRokh"
+    },
+    {
+      "label": "trader sells YES 0.50 x1 (complement merge) plan",
+      "instructions": [
+        "matchSharedComplement"
+      ]
+    },
+    {
+      "label": "trader sells YES 0.50 x1 (complement merge)",
+      "signature": "c6yoRLiDVFofdEaqM9yrRUwRywxaBYaWhDCGq7TDV3JgzCghzKAkZZgSgsQpjLDAbTucm8xfNmsJgpY1oPVRbaB"
+    },
+    {
+      "label": "check: after binary merge",
+      "supply": 1
+    },
+    {
+      "label": "create multi-outcome market",
+      "signature": "5b6HiS5kxY3Phq9qeZjQeuEDdCj14fXxmdf2i7nSCgjDu4csdjpJPoDD5aUXZ96EpFUacvtvcmyMg4mvH4FYQccb"
+    },
+    {
+      "label": "open multi-outcome market and book",
+      "signature": "3ALYvbm1M3AYFvH7oKvviA7ia81UP4Ke5BCoZyyR8UyGm2n4UzBRd2mxhVfQZpTJCL6wRYfbxtKeBoSdD3ZjSiUc"
+    },
+    {
+      "label": "multi position for admin",
+      "signature": "52BZzwwkQiXTPTzWAj3rLErS9P9o1AGzEerkvP9ycwe5GqXbr71iE8B82rVzwcpuhehdXNMkQ4RrKfoMPxoe1NKv"
+    },
+    {
+      "label": "multi position for trader",
+      "signature": "3TpuyqL74sKKcbLTrN78KquE3xz8LHLB2cEE24FZ6cHWkEBPz4Gh1MKu6oXLikiTEeuMkoiQmaRZ76kzFQfxdDpY"
+    },
+    {
+      "label": "admin rests Beta bid 0.30 x3",
+      "signature": "2PbyjMVdqqZXTaERi8QTm7Qwj1fueBR2dsc5RHeDA98BQh55YfpkrXEu6ghBKgvrBAaG6enpRTZx2Kb5eUWb8n5z"
+    },
+    {
+      "label": "admin rests Gamma bid 0.25 x3",
+      "signature": "4TeH7HeVmDpvJBpzg16Mu6H7i6SYoHGo5aWsAix2vQNyeczYppZ5ZUuTVU1HNFQJhZpxVzVT2QwRdDKgdFY32Rj3"
+    },
+    {
+      "label": "trader buys Alpha 0.50 x3 (full-set mint)",
+      "signature": "2Zb8V9P81JA29zQgzd25M27khc4L91htLzqhghjJeH9otimS9959HvcYupbGbMRUr8jnVC8UwAS7mNpa2BYm1Gyc"
+    },
+    {
+      "label": "check: after full-set mint",
+      "supply": 3
+    },
+    {
+      "label": "create, fill and freeze market lookup table",
+      "signature": "NbAHG6yAcreZVgqPAvchvaJJXnL5EwMaufuCSy92voAz3TLZyGjtbHxDZnAiLiP7wr5ZrDx9jDLryUUF2fRkspd"
+    },
+    {
+      "label": "admin rests Beta ask 0.40 x3",
+      "signature": "4ujrPozJgQEeE37fBQ4tB8QCMsSQpRZzeCYecPGQf779kWDdvcd9AqPZoarvbfsc4xsV4GxuaDsBK6bFnvFcAD2B"
+    },
+    {
+      "label": "admin rests Gamma ask 0.35 x3",
+      "signature": "2dt7MqMXticsAeNvSEbHu5HkXi9EhqtGknbEMJoerCm5URdr4bmf52bpZbgkcQ4tMYgJ39iwxeij947T3oAEtrYs"
+    },
+    {
+      "label": "trader sells Alpha 0.20 x3 (full-set merge, v0)",
+      "signature": "CLSqFwa2jPY7bDY3VtR8bAiojT2H9MNTgWKUcyuRvYxk3JmhpmZd82eN4awVBQibZixr7e9SDFfu9fYKGkj21Ci",
+      "version": 0,
+      "bytes": 454
+    },
+    {
+      "label": "check: after v0 full-set merge",
+      "supply": 0
+    },
+    {
+      "label": "trader withdraws cash",
+      "signature": "5cfbWXRbn2yx3jQFQhXGZDYTFgeV1iozD3NnHqWyNy2q29KkrJmew9fHtGes6iGX7vDYwY9tPGA3EnfXARS5y7ET"
+    },
+    {
+      "label": "trader token account closed"
+    },
+    {
+      "label": "return trader SOL",
+      "signature": "5WzSpmYBSuueY4mrmAAyc9V5Z3RDkLyE7d1zA8NrB8mt9vRiRV9qgNzChBd58CJVMPLUpoPSkdY4uMUJoMmncf9N"
+    }
+  ],
+  "trader": "DksA3QMi6tbVMnVSrpcbjqth2imohiayVgHqUKkiv16B",
+  "collateralMint": "4g6gRUjcNJEApqrYzWxF71ZnaPvyvDShpEYAVxvHNsZi",
+  "binaryId": "f9993bae0ecbfad84635b39dea58951a9b07959ed1466b1b3ee09d46ab1e2501",
+  "binaryMarket": "ECxeTETJuskYCPszPsK7LrNo3J5KZ7F3BwSvTQbspus1",
+  "multiMarket": "FN3grpJFuVNezLkd76iEBsMv54tnLeM3vsAhTL2rfmKX",
+  "lookupTable": "37xtcigoYN2UaC4w4jovhTBKSM7JekaKfsG6iqLgMrrR",
+  "completedAt": "2026-11-21T17:14:12.777Z",
+  "result": "passed"
+}

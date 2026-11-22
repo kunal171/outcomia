@@ -49,6 +49,38 @@ predated that and stranded about 0.24 devnet SOL in unsaved wallets.
 Keep `NEXT_PUBLIC_CLUBS_ENABLED=false` on Vercel until the app with the club
 pages is deployed and checked.
 
+## Complementary matching: 21 November 2026
+
+Upgrades devnet to `master` at `ce636ba`: binary complementary matching
+(`match_shared_complement`), multi-outcome full sets
+(`match_multi_outcome_complement`) and the related placement guards.
+
+- SHA-256: `a32857d5d546359f645cfecb8731cd25bce319e108d7524d02c1864d00b790e8`
+  (dumped and compared with the local build); 1,816,760 bytes. ProgramData
+  auto-extended by 89,264 bytes (about 0.45 SOL, permanent).
+- Upgrade transaction:
+  `2eQUpAvXacQqPXQsmopsRMYvQDoAcz5jsRA6AXyb4ToAXHLrjEyRmnQaPRchkTkayT3UNt6ixTAV2KT82vMjEKxe`.
+- All 49 existing program accounts were hashed before and after; none changed,
+  appeared or disappeared.
+- [Smoke result](devnet/complement-smoke-result.json) from
+  `app/scripts/devnet-complement-smoke.mjs`, first dry-run on a local
+  validator with the same build.
+
+The smoke used a fresh valueless mint and a temporary trader on hidden
+"Smoke test - ..." markets: a binary complement mint and merge, a three-outcome
+full-set mint in which one maker held both other legs, and a frozen market
+lookup table created on devnet followed by a full-set merge sent as a 454-byte
+v0 transaction. Supplies, backing and real reserve tokens were checked after
+every fill; the trader's cash and SOL were returned. Both markets are hidden by
+name and address.
+
+The first upload stalled on public-RPC rate limits after ProgramData was
+extended; the live program stayed the previous release followed by zeros
+(verified by hash). Resuming the same buffer through the Helius RPC completed
+the upgrade. `NEXT_PUBLIC_COMPLEMENTARY_MATCHING_ENABLED=true` was then set for
+Vercel Production and Preview, production was redeployed from the same `master`
+build, and the live bundle was confirmed to compile the flag on.
+
 ## Release hardening and multi-outcome: 21 November 2026
 
 Upgrades devnet to the release-hardening build, which also carries the
@@ -143,7 +175,8 @@ solana program deploy target/deploy/outcomia.so \
 Afterwards, dump the program and compare the first `len(outcomia.so)` bytes
 with the local build's SHA-256, and compare program-account hashes taken
 before and after the upgrade. A failed upload can be resumed by rerunning the
-same command with the same buffer key.
+same command with the same buffer key. Prefer an authenticated RPC (pass it
+with `-u`); the public devnet endpoint rate-limits the write transactions.
 
 **Do not rely on `target/deploy/outcomia-keypair.json` in a fresh checkout.**
 `anchor build` generates a new random keypair when the file is missing, and
