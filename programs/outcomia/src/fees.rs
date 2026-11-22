@@ -55,9 +55,57 @@ pub fn calculate_taker_fee(quote_quantity: u64, fee_bps: u16) -> Result<u64> {
     u64::try_from(fee).map_err(|_| error!(fee::FeeCalculationOverflow))
 }
 
+/// Largest share of a club market's taker fee that may go to the club: 50%.
+pub const MAX_CLUB_FEE_SHARE_BPS: u16 = 5_000;
+
+/// Splits an already charged taker fee between the club and the protocol.
+///
+/// The trader's total fee is unchanged; only its destination is divided. The
+/// club share rounds down, so the protocol keeps any fractional atom and the
+/// two parts always add up to `fee`.
+///
+/// # Inputs
+/// `fee`: taker fee in collateral atoms; `share_bps`: club share with denominator 10,000.
+///
+/// # Errors
+/// `ClubFeeShareTooHigh` above `MAX_CLUB_FEE_SHARE_BPS`.
+///
+/// # Returns
+/// `Ok((club, protocol))` with `club + protocol == fee`.
+pub fn split_club_fee(fee: u64, share_bps: u16) -> Result<(u64, u64)> {
+    require!(
+        share_bps <= MAX_CLUB_FEE_SHARE_BPS,
+        crate::errors::club::ClubFeeShareTooHigh
+    );
+    // fee * 5_000 fits in u128, and the quotient is at most fee / 2.
+    let club = (u128::from(fee) * u128::from(share_bps) / BASIS_POINTS_DENOMINATOR) as u64;
+    Ok((club, fee - club))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn club_fee_split_rounds_toward_the_protocol_and_conserves_the_fee() {
+        assert_eq!(split_club_fee(0, 5_000).unwrap(), (0, 0));
+        assert_eq!(split_club_fee(1, 5_000).unwrap(), (0, 1));
+        assert_eq!(split_club_fee(3, 5_000).unwrap(), (1, 2));
+        assert_eq!(split_club_fee(10_000, 2_500).unwrap(), (2_500, 7_500));
+        assert_eq!(split_club_fee(999, 0).unwrap(), (0, 999));
+        assert_eq!(
+            split_club_fee(u64::MAX, 5_000).unwrap(),
+            (u64::MAX / 2, u64::MAX - u64::MAX / 2)
+        );
+        for fee in [1, 7, 9_999, 123_456_789, u64::MAX] {
+            for share in [1, 33, 2_500, MAX_CLUB_FEE_SHARE_BPS] {
+                let (club, protocol) = split_club_fee(fee, share).unwrap();
+                assert_eq!(club + protocol, fee);
+                assert!(club <= protocol);
+            }
+        }
+        assert!(split_club_fee(100, MAX_CLUB_FEE_SHARE_BPS + 1).is_err());
+    }
 
     #[test]
     fn zero_fee_rate_charges_nothing() {

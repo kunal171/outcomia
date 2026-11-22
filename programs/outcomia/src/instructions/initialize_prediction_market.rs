@@ -65,6 +65,21 @@ pub struct InitializePredictionMarket<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Requires a winning contract to pay exactly one whole collateral token.
+///
+/// # Errors
+/// `InvalidPredictionPayout` when the payout differs from `10^decimals`.
+pub(crate) fn validate_binary_payout(config: &PredictionMarketConfig, decimals: u8) -> Result<()> {
+    let expected_payout = 10_u64
+        .checked_pow(u32::from(decimals))
+        .ok_or(prediction::InvalidPredictionPayout)?;
+    require!(
+        config.payout_per_contract == expected_payout,
+        prediction::InvalidPredictionPayout
+    );
+    Ok(())
+}
+
 /// Creates a Draft and its single-collateral account graph.
 ///
 /// # Inputs
@@ -97,13 +112,7 @@ pub fn handle_initialize_prediction_market(
     // A winning whole contract pays exactly one collateral token. Token
     // decimals cannot silently change that meaning; zero-decimal mints also
     // fail the even-payout rule needed for exact Invalid half payouts.
-    let expected_payout = 10_u64
-        .checked_pow(u32::from(ctx.accounts.collateral_mint.decimals))
-        .ok_or(prediction::InvalidPredictionPayout)?;
-    require!(
-        config.payout_per_contract == expected_payout,
-        prediction::InvalidPredictionPayout
-    );
+    validate_binary_payout(&config, ctx.accounts.collateral_mint.decimals)?;
 
     let market_key = ctx.accounts.market.key();
     ctx.accounts.market.set_inner(PredictionMarket {

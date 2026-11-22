@@ -503,4 +503,10 @@ pub enum OutcomiaError {
     InvalidClubMember = 181,
     #[msg("Club member counters are inconsistent")]
     ClubCounterMismatch = 182,
+    #[msg("The club fee share cannot exceed 5,000 basis points (half of the taker fee)")]
+    ClubFeeShareTooHigh = 183,
+    #[msg("Club market terms or club binding are invalid")]
+    InvalidClubMarket = 184,
+    #[msg("Only current club members can do this in a members-only market")]
+    ClubMembershipRequired = 185,
 }

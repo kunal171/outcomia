@@ -97,6 +97,85 @@ pub mod outcomia {
         crate::instructions::club_ownership::handle_accept_club_ownership(ctx)
     }
 
+    /// Lets the super-admin set the share of club-market taker fees paid to clubs.
+    pub fn set_club_fee_share(ctx: Context<SetClubFeeShare>, club_share_bps: u16) -> Result<()> {
+        crate::instructions::club_fees::handle_set_club_fee_share(ctx, club_share_bps)
+    }
+
+    /// Creates a draft binary market in a club, members-only or public.
+    pub fn create_club_prediction_market(
+        ctx: Context<CreateClubPredictionMarket>,
+        market_id: [u8; 32],
+        config: crate::prediction_config::PredictionMarketConfig,
+        display_name: String,
+        collateral_symbol: String,
+        access: ClubMarketAccess,
+    ) -> Result<()> {
+        crate::instructions::club_markets::handle_create_club_prediction_market(
+            ctx,
+            market_id,
+            config,
+            display_name,
+            collateral_symbol,
+            access,
+        )
+    }
+
+    /// Opens a draft club market (club admin or its creator-member).
+    pub fn open_club_prediction_market(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+        crate::instructions::club_markets::handle_open_club_prediction_market(ctx)
+    }
+
+    /// Stops trading in a club market early (club admin or its creator-member).
+    pub fn close_club_trading(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+        crate::instructions::club_markets::handle_close_club_trading(ctx)
+    }
+
+    /// Creates the signer's empty position in a club market.
+    pub fn initialize_club_position(ctx: Context<InitializeClubPosition>) -> Result<()> {
+        crate::instructions::club_markets::handle_initialize_club_position(ctx)
+    }
+
+    /// Splits cash into pairs (members only in members-only markets) or merges pairs.
+    pub fn club_complete_set(
+        ctx: Context<ClubPredictionCustody>,
+        quantity: u64,
+        split: bool,
+    ) -> Result<()> {
+        crate::instructions::club_custody::handle_club_complete_set(ctx, quantity, split)
+    }
+
+    /// Redeems resolved club-market contracts; open to every holder.
+    pub fn redeem_club_prediction(
+        ctx: Context<ClubPredictionCustody>,
+        yes: u64,
+        no: u64,
+    ) -> Result<()> {
+        crate::instructions::club_custody::handle_redeem_club_prediction(ctx, yes, no)
+    }
+
+    /// Lets any current club admin propose or correct a club market's outcome.
+    pub fn propose_club_prediction(
+        ctx: Context<ProposeClubPrediction>,
+        outcome: PredictionResolution,
+        evidence_uri: String,
+        evidence_hash: [u8; 32],
+        correction: bool,
+    ) -> Result<()> {
+        crate::instructions::club_resolution::handle_propose_club_prediction(
+            ctx,
+            outcome,
+            evidence_uri,
+            evidence_hash,
+            correction,
+        )
+    }
+
+    /// Permissionlessly advances a club market's published resolution clock.
+    pub fn advance_club_prediction(ctx: Context<AdvanceClubPrediction>, action: u8) -> Result<()> {
+        crate::instructions::club_resolution::handle_advance_club_prediction(ctx, action)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
