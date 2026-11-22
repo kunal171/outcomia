@@ -1,7 +1,7 @@
 # Clubs and private markets (Solana design)
 
-Status: design agreed; clubs and membership (milestone 1) implemented, club
-markets not yet. This document records the product
+Status: design agreed; clubs and membership (milestone 1) and the club fee
+share (milestone 2) implemented, club markets not yet. This document records the product
 decisions and the on-chain model they imply. Implementation follows in small
 PRs (see [delivery plan](#delivery-plan)). The Canton note in
 `outcomia-canton/docs/clubs-private-markets.md` covers the same feature for
@@ -92,7 +92,11 @@ Every fill in a members-only market checks both taker and maker membership.
 `advance_club_prediction` and `redeem_club_prediction` (permissionless, as
 today).
 
-**Fees:** `set_club_fee_share` (super-admin), `withdraw_club_fees` (club owner).
+**Fees:** `set_club_fee_share` (super-admin; implemented), `withdraw_club_fees`
+(club owner). The share is stored in `ClubFeeConfig`, created on first use; until
+then it is zero. `split_club_fee` divides each fee: the club part rounds down, so
+the protocol keeps any fractional atom and the parts always sum to the fee the
+trader paid. A share change applies only to later fills.
 Each club fill splits the taker fee: the club share accrues in `ClubMarket`, the
 rest in the book as today. Both remain in the global asset vault, so
 
@@ -119,7 +123,8 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
 
 1. **Clubs and membership** (done): accounts, roles, invitations, leaving,
    removal, ownership transfer; `programs/outcomia/tests/clubs.rs`.
-2. **Club fee configuration:** `ClubFeeConfig` and its super-admin setter.
+2. **Club fee configuration** (done): `ClubFeeConfig`, its super-admin setter
+   and the fee split.
 3. **Club binary markets:** club namespace creation, opening, closing,
    resolution and redemption.
 4. **Club books and trading:** membership-checked placement, matching,
