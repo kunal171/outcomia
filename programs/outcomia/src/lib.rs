@@ -87,6 +87,16 @@ pub mod outcomia {
         crate::instructions::club_members::handle_leave_club(ctx)
     }
 
+    /// Lets the club owner nominate a member as the next owner (or cancel with itself).
+    pub fn nominate_club_owner(ctx: Context<NominateClubOwner>) -> Result<()> {
+        crate::instructions::club_ownership::handle_nominate_club_owner(ctx)
+    }
+
+    /// Lets the nominated member accept ownership of the club.
+    pub fn accept_club_ownership(ctx: Context<AcceptClubOwnership>) -> Result<()> {
+        crate::instructions::club_ownership::handle_accept_club_ownership(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

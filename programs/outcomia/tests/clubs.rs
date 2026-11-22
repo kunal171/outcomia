@@ -574,3 +574,102 @@ fn members_and_admins_leave_but_the_owner_cannot() {
         "AccountNotInitialized",
     );
 }
+
+fn nominate(club: &Pubkey, owner: &Pubkey, candidate: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::NominateClubOwner {
+            owner: *owner,
+            club: *club,
+            candidate_member: member_pda(club, candidate),
+        },
+        outcomia::instruction::NominateClubOwner {},
+    )
+}
+fn take_ownership(club: &Pubkey, candidate: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::AcceptClubOwnership {
+            candidate: *candidate,
+            club: *club,
+            candidate_member: member_pda(club, candidate),
+        },
+        outcomia::instruction::AcceptClubOwnership {},
+    )
+}
+
+#[test]
+fn ownership_moves_only_when_a_nominated_member_accepts() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (heir, other) = (f.join(), f.join());
+    let outsider = f.wallet();
+    f.fails(
+        &heir,
+        nominate(&f.club, &heir.pubkey(), &heir.pubkey()),
+        "UnauthorizedClubOwner",
+    );
+    f.fails(
+        &owner,
+        nominate(&f.club, &owner.pubkey(), &outsider.pubkey()),
+        "AccountNotInitialized",
+    );
+    f.fails(
+        &heir,
+        take_ownership(&f.club, &heir.pubkey()),
+        "InvalidClubMember",
+    );
+
+    f.ok(&owner, nominate(&f.club, &owner.pubkey(), &heir.pubkey()));
+    assert_eq!(f.club().pending_owner, Some(heir.pubkey()));
+    f.fails(
+        &other,
+        take_ownership(&f.club, &other.pubkey()),
+        "InvalidClubMember",
+    );
+    // Nominating the owner cancels.
+    f.ok(&owner, nominate(&f.club, &owner.pubkey(), &owner.pubkey()));
+    assert_eq!(f.club().pending_owner, None);
+    f.fails(
+        &heir,
+        take_ownership(&f.club, &heir.pubkey()),
+        "InvalidClubMember",
+    );
+
+    f.ok(&owner, nominate(&f.club, &owner.pubkey(), &heir.pubkey()));
+    f.ok(&heir, take_ownership(&f.club, &heir.pubkey()));
+    let club = f.club();
+    assert_eq!((club.owner, club.pending_owner), (heir.pubkey(), None));
+    assert_eq!((club.member_count, club.admin_count), (3, 2));
+    assert_eq!(f.member(&heir.pubkey()).unwrap().role, ClubRole::Admin);
+    assert_eq!(f.member(&owner.pubkey()).unwrap().role, ClubRole::Admin);
+
+    // The former owner lost owner powers and may now leave; the new owner cannot.
+    f.fails(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &other.pubkey(), ClubRole::Admin),
+        "UnauthorizedClubOwner",
+    );
+    f.fails(&heir, leave(&f.club, &heir.pubkey()), "ClubOwnerProtected");
+    f.ok(&owner, leave(&f.club, &owner.pubkey()));
+    assert_eq!((f.club().member_count, f.club().admin_count), (2, 1));
+}
+
+#[test]
+fn a_departing_nominee_cancels_the_nomination() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (a, b) = (f.join(), f.join());
+    f.ok(&owner, nominate(&f.club, &owner.pubkey(), &a.pubkey()));
+    f.ok(&a, leave(&f.club, &a.pubkey()));
+    assert_eq!(f.club().pending_owner, None);
+    f.ok(&owner, nominate(&f.club, &owner.pubkey(), &b.pubkey()));
+    f.ok(&owner, remove(&f.club, &owner.pubkey(), &b.pubkey()));
+    assert_eq!(f.club().pending_owner, None);
+    // Rejoining does not revive the old nomination.
+    f.ok(&owner, invite(&f.club, &owner.pubkey(), &b.pubkey()));
+    f.ok(&b, accept(&f.club, &b.pubkey(), &owner.pubkey()));
+    f.fails(
+        &b,
+        take_ownership(&f.club, &b.pubkey()),
+        "InvalidClubMember",
+    );
+}
