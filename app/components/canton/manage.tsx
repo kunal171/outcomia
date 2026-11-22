@@ -15,9 +15,13 @@ export function CantonManage() {
       Array.isArray(policy?.data.admins) && policy.data.admins.includes(party),
     assets =
       s.catalog?.contracts.filter((c) => c.kind === "AssetAdmission") ?? [],
+    // Club factories are managed on their club pages.
     factories =
-      s.catalog?.contracts.filter((c) => c.kind === "OutcomiaMarketFactory") ??
-      [];
+      s.catalog?.contracts.filter(
+        (c) =>
+          c.kind === "OutcomiaMarketFactory" &&
+          obj(c.data.policy).tag !== "ByPolicy",
+      ) ?? [];
   const fields: Field[] = [
     { name: "question", label: "Question", type: "textarea" },
     {
@@ -193,9 +197,7 @@ function FactoryManage({
     ref = obj(factory.data.ref),
     lists = s.owned.filter(
       (c) => c.kind === "InviteListPolicy" && c.data.manager === party,
-    ),
-    assets = list(factory.data.assets).map((a) => obj(obj(a).instrument));
-  const at = (v: string) => new Date(v).toISOString();
+    );
   return (
     <section className="canton-panel">
       <h2>
@@ -204,84 +206,16 @@ function FactoryManage({
       <p>
         {t("Who can create")}: {t(policyLabels[text(policy.tag)] ?? "Unknown")}
       </p>
-      <ActionForm
-        label="Create market"
-        fields={[
-          { name: "question", label: "Question", type: "textarea" },
-          {
-            name: "asset",
-            label: "Collateral",
-            options: assets.map((a, i) => ({
-              value: String(i),
-              label: text(a.id),
-            })),
-          },
-          { name: "yesCriteria", label: "YES criteria", type: "textarea" },
-          { name: "noCriteria", label: "NO criteria", type: "textarea" },
-          {
-            name: "invalidCriteria",
-            label: "Invalid criteria",
-            type: "textarea",
-          },
-          {
-            name: "evidenceRequirements",
-            label: "Evidence required",
-            type: "textarea",
-          },
-          { name: "documentUri", label: "Rules URL", type: "url" },
-          { name: "documentSha256", label: "SHA-256" },
-          { name: "closeAt", label: "Closes", type: "datetime-local" },
-          {
-            name: "earliestResolutionAt",
-            label: "Earliest resolution",
-            type: "datetime-local",
-            optional: true,
-          },
-          {
-            name: "resolutionDelaySeconds",
-            label: "Review delay (seconds)",
-            value: "3600",
-          },
-          { name: "priceTick", label: "Price increment", value: "0.01" },
-          { name: "quantityLot", label: "Contract lot", value: "1" },
-          {
-            name: "access",
-            label: "Who can trade",
-            options: [
-              { value: "public", label: "Anyone" },
-              ...lists.map((c) => ({
-                value: c.id,
-                label: `${t("Invite list")} ${text(obj(c.data.ref).policyId)}`,
-              })),
-            ],
-          },
-        ]}
+      <FactoryMarketForm
+        factory={factory}
         disabled={!party || !mayCreate(factory.data.policy, party)}
-        build={(v) => ({
-          action: "factoryCreate",
-          target: factory.id,
-          values: {
-            access: v.access === "public" ? "public" : "invite",
-            policy: v.access,
-            terms: {
-              question: v.question,
-              outcomes: ["YES", "NO"],
-              outcomeCriteria: [v.yesCriteria, v.noCriteria],
-              invalidCriteria: v.invalidCriteria,
-              evidenceRequirements: v.evidenceRequirements,
-              rulesUri: v.documentUri,
-              rulesHash: v.documentSha256,
-              collateral: assets[Number(v.asset)],
-              closeAt: at(v.closeAt),
-              earliestResolutionAt: v.earliestResolutionAt
-                ? at(v.earliestResolutionAt)
-                : null,
-              resolutionDelaySeconds: v.resolutionDelaySeconds,
-              priceTick: v.priceTick,
-              quantityLot: v.quantityLot,
-            },
-          },
-        })}
+        access={[
+          { value: "public", label: "Anyone" },
+          ...lists.map((c) => ({
+            value: c.id,
+            label: `${t("Invite list")} ${text(obj(c.data.ref).policyId)}`,
+          })),
+        ]}
       />
       <h3>{t("Invite lists")}</h3>
       <ActionForm
@@ -316,5 +250,96 @@ function FactoryManage({
         />
       ))}
     </section>
+  );
+}
+
+/** Market creation through one factory instance. `access` values are
+ * "public", "club" (members-only club market) or an invite list's ID. */
+export function FactoryMarketForm({
+  factory,
+  access,
+  disabled = false,
+}: {
+  factory: Contract;
+  access: { value: string; label: string }[];
+  disabled?: boolean;
+}) {
+  const assets = list(factory.data.assets).map((a) => obj(obj(a).instrument));
+  const at = (v: string) => new Date(v).toISOString();
+  return (
+    <ActionForm
+      label="Create market"
+      fields={[
+        { name: "question", label: "Question", type: "textarea" },
+        {
+          name: "asset",
+          label: "Collateral",
+          options: assets.map((a, i) => ({
+            value: String(i),
+            label: text(a.id),
+          })),
+        },
+        { name: "yesCriteria", label: "YES criteria", type: "textarea" },
+        { name: "noCriteria", label: "NO criteria", type: "textarea" },
+        {
+          name: "invalidCriteria",
+          label: "Invalid criteria",
+          type: "textarea",
+        },
+        {
+          name: "evidenceRequirements",
+          label: "Evidence required",
+          type: "textarea",
+        },
+        { name: "documentUri", label: "Rules URL", type: "url" },
+        { name: "documentSha256", label: "SHA-256" },
+        { name: "closeAt", label: "Closes", type: "datetime-local" },
+        {
+          name: "earliestResolutionAt",
+          label: "Earliest resolution",
+          type: "datetime-local",
+          optional: true,
+        },
+        {
+          name: "resolutionDelaySeconds",
+          label: "Review delay (seconds)",
+          value: "3600",
+        },
+        { name: "priceTick", label: "Price increment", value: "0.01" },
+        { name: "quantityLot", label: "Contract lot", value: "1" },
+        { name: "access", label: "Who can trade", options: access },
+      ]}
+      disabled={disabled}
+      build={(v) => ({
+        action: "factoryCreate",
+        target: factory.id,
+        values: {
+          access:
+            v.access === "public"
+              ? "public"
+              : v.access === "club"
+                ? "club"
+                : "invite",
+          policy: v.access,
+          terms: {
+            question: v.question,
+            outcomes: ["YES", "NO"],
+            outcomeCriteria: [v.yesCriteria, v.noCriteria],
+            invalidCriteria: v.invalidCriteria,
+            evidenceRequirements: v.evidenceRequirements,
+            rulesUri: v.documentUri,
+            rulesHash: v.documentSha256,
+            collateral: assets[Number(v.asset)],
+            closeAt: at(v.closeAt),
+            earliestResolutionAt: v.earliestResolutionAt
+              ? at(v.earliestResolutionAt)
+              : null,
+            resolutionDelaySeconds: v.resolutionDelaySeconds,
+            priceTick: v.priceTick,
+            quantityLot: v.quantityLot,
+          },
+        },
+      })}
+    />
   );
 }
