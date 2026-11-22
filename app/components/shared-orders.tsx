@@ -14,9 +14,12 @@ import {
   sharedOrderPda,
   readSharedBook,
   cancelShared,
+  clubBookPda,
+  type ClubTrading,
   type SharedOrder,
   type SharedSnapshot,
 } from "../lib/shared";
+import { clubMarketHref, ownerClubContext } from "../lib/clubs";
 import {
   getOutcomiaReadProgram,
   getOutcomiaProgram,
@@ -45,6 +48,7 @@ function OwnerOrders() {
         order: SharedOrder;
         book: SharedSnapshot | null;
         metadata: MarketMetadataAccount | null;
+        club: ClubTrading | null;
       }>
     >([]),
     [pending, setPending] = useState(true),
@@ -63,16 +67,24 @@ function OwnerOrders() {
       ]);
       const markets = [
         ...new Map(
-          owned.map((r) => [r.account.market.toBase58(), r.account.market]),
+          owned.map((r) => [r.account.market.toBase58(), r.account]),
         ).values(),
       ];
       const contexts = new Map<
         string,
-        { book: SharedSnapshot | null; metadata: MarketMetadataAccount | null }
+        {
+          book: SharedSnapshot | null;
+          metadata: MarketMetadataAccount | null;
+          club: ClubTrading | null;
+        }
       >();
       // Sequential per-market reads avoid a burst of account scans on free RPC plans.
-      for (const market of markets) {
-        const book = await readSharedBook(p, market);
+      for (const { market, book: bookKey } of markets) {
+        // Club orders live on the club book of a club market.
+        const club = bookKey.equals(clubBookPda(market))
+          ? await ownerClubContext(p, market)
+          : null;
+        const book = await readSharedBook(p, market, club);
         if (!book) {
           if (
             owned.some(
@@ -85,7 +97,7 @@ function OwnerOrders() {
         const metadata = await getOutcomiaAccounts(
           p,
         ).marketMetadata.fetchNullable(deriveMarketMetadataPda(market));
-        contexts.set(market.toBase58(), { book, metadata });
+        contexts.set(market.toBase58(), { book, metadata, club });
       }
       const next = [];
       for (const r of owned) {
@@ -115,16 +127,20 @@ function OwnerOrders() {
       dead = true;
     };
   }, [p, wallet.publicKey, revision]);
-  async function cancel(market: PublicKey, address: PublicKey) {
+  async function cancel(
+    market: PublicKey,
+    address: PublicKey,
+    club: ClubTrading | null,
+  ) {
     setBusy(true);
     setIssue(null);
     try {
       const signed = getOutcomiaProgram(connection, wallet),
-        current = await readSharedBook(signed, market);
+        current = await readSharedBook(signed, market, club);
       if (!current) throw new Error("Book unavailable");
       await (signed.provider as AnchorProvider).sendAndConfirm(
         new Transaction().add(
-          await cancelShared(signed, current, wallet.publicKey, address),
+          await cancelShared(signed, current, wallet.publicKey, address, club),
         ),
       );
       setRevision((v) => v + 1);
@@ -226,7 +242,11 @@ function OwnerOrders() {
                     <td>
                       <Link
                         className="orders-market-link"
-                        href={`/${prediction ? "predictions" : "markets"}/${r.order.market}`}
+                        href={
+                          r.club
+                            ? clubMarketHref(r.club.club, r.order.market)
+                            : `/${prediction ? "predictions" : "markets"}/${r.order.market}`
+                        }
                       >
                         {r.metadata?.displayName ??
                           `${r.order.market.toBase58().slice(0, 6)}…${r.order.market.toBase58().slice(-4)}`}
@@ -282,7 +302,9 @@ function OwnerOrders() {
                           className="text-button orders-cancel"
                           type="button"
                           disabled={busy}
-                          onClick={() => void cancel(r.order.market, r.address)}
+                          onClick={() =>
+                            void cancel(r.order.market, r.address, r.club)
+                          }
                         >
                           {busy ? t("Canceling…") : t("Cancel")}
                         </button>

@@ -79,6 +79,8 @@ const market = derive("market", base.toBuffer(), quote.toBuffer());
 const market2 = derive("market", base2.toBuffer(), quote.toBuffer());
 const listedMarket = derive("market", extraListed.toBuffer(), quote.toBuffer());
 const pred = derive("prediction_market", Buffer.alloc(32, 7));
+// Club markets share the layout under their own seed and must not break listing.
+const clubPred = derive("club_prediction_market", Buffer.alloc(32, 8));
 const metadata = (address) => derive("market_metadata", address.toBuffer());
 const records = new Map();
 const encoder = new Program(idl, {
@@ -280,6 +282,32 @@ const connection = {
     noSupply: bn(10),
     backingReserve: bn(10000000),
     openOrderCount: bn(1),
+    bump: 255,
+  });
+  await put(clubPred, "predictionMarket", {
+    marketId: [...Buffer.alloc(32, 8)],
+    authority: owner,
+    resolver: owner,
+    fallback: null,
+    collateralMint: quote,
+    collateralVault: key(26),
+    metadata: metadata(clubPred),
+    questionHash: [...Buffer.alloc(32, 1)],
+    rulesHash: [...Buffer.alloc(32, 2)],
+    rulesUri: "ar://club",
+    closeTs: bn(2000000000),
+    earliestResolutionTs: null,
+    resolutionDelaySeconds: bn(3600),
+    resolutionPhase: { primary: {} },
+    status: { open: {} },
+    proposal: null,
+    finalOutcome: null,
+    payoutPerContract: bn(1000000),
+    priceTick: bn(10000),
+    yesSupply: bn(0),
+    noSupply: bn(0),
+    backingReserve: bn(0),
+    openOrderCount: bn(0),
     bump: 255,
   });
   await put(metadata(pred), "marketMetadata", {

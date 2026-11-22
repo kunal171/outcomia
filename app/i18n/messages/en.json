@@ -977,5 +977,7 @@
   "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.",
   "After handover, the fallback resolver can correct a pending primary proposal.": "After handover, the fallback resolver can correct a pending primary proposal.",
   "If the fallback deadline passes with no proposal, the market stays unresolved.": "If the fallback deadline passes with no proposal, the market stays unresolved.",
-  "Only the operator can finalize a proposal once its review delay ends.": "Only the operator can finalize a proposal once its review delay ends."
+  "Only the operator can finalize a proposal once its review delay ends.": "Only the operator can finalize a proposal once its review delay ends.",
+  "This market belongs to a club.": "This market belongs to a club.",
+  "Open in club →": "Open in club →"
 }

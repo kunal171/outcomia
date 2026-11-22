@@ -246,6 +246,28 @@ export function clubTrading(
   };
 }
 
+/** Club context for an order owner's own actions (cancel, exits) in a club
+ * market, or null for a public market. Owner actions never depend on the
+ * member list, so it is left empty. */
+export async function ownerClubContext(
+  p: Program,
+  market: PublicKey,
+): Promise<ClubTrading | null> {
+  const clubMarket = clubMarketPda(market);
+  const binding = await clubAccounts(p).clubMarket.fetchNullable(clubMarket);
+  if (!binding) return null;
+  if (!binding.market.equals(market))
+    throw new Error("Club market binding mismatch");
+  return {
+    club: binding.club,
+    clubMarket,
+    membersOnly: membersOnly(binding),
+    members: new Set(),
+  };
+}
+export const clubMarketHref = (club: PublicKey, market: PublicKey) =>
+  `/clubs/${club.toBase58()}/markets/${market.toBase58()}`;
+
 // ----- Club administration -----
 const memberOf = (club: PublicKey, wallet: PublicKey) =>
   clubMemberPda(club, wallet);

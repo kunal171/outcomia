@@ -32,6 +32,7 @@ import {
   type TraderBalanceAccount,
 } from "./outcomia";
 import {
+  deriveClubPredictionMarketPda,
   derivePredictionMarketPda,
   derivePredictionPositionPda,
   type PredictionMarketAccount,
@@ -373,9 +374,12 @@ async function readCatalog(program: Program): Promise<ListedAsset[]> {
     );
   }
   for (const { publicKey, account: market } of predictions) {
+    const id = new Uint8Array(market.marketId);
+    // Club markets share the layout; their collateral is listed like any other.
     if (
-      !derivePredictionMarketPda(new Uint8Array(market.marketId)).equals(
-        publicKey,
+      !(
+        derivePredictionMarketPda(id).equals(publicKey) ||
+        deriveClubPredictionMarketPda(id).equals(publicKey)
       ) ||
       !/^10*$/.test(market.payoutPerContract.toString())
     )

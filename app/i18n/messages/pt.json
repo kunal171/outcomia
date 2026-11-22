@@ -977,5 +977,7 @@
   "The creator proposes after trading closes. Each correction restarts the review delay, until the review ends.": "O criador propõe após o fim da negociação. Cada correção reinicia o prazo de revisão, até a revisão terminar.",
   "After handover, the fallback resolver can correct a pending primary proposal.": "Após a passagem, o resolvedor reserva pode corrigir uma proposta principal pendente.",
   "If the fallback deadline passes with no proposal, the market stays unresolved.": "Se o prazo de reserva passar sem proposta, o mercado permanece sem resolução.",
-  "Only the operator can finalize a proposal once its review delay ends.": "Somente o operador pode finalizar uma proposta quando o prazo de revisão termina."
+  "Only the operator can finalize a proposal once its review delay ends.": "Somente o operador pode finalizar uma proposta quando o prazo de revisão termina.",
+  "This market belongs to a club.": "Este mercado pertence a um clube.",
+  "Open in club →": "Abrir no clube →"
 }

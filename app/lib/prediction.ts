@@ -1010,6 +1010,16 @@ export function derivePredictionMarketPda(marketId: Uint8Array) {
   )[0];
 }
 
+/** Club markets share the layout under a seed public instructions never derive. */
+export function deriveClubPredictionMarketPda(marketId: Uint8Array) {
+  if (marketId.length !== 32)
+    throw new Error("Market ID must contain 32 bytes");
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("club_prediction_market"), Buffer.from(marketId)],
+    PROGRAM_ID,
+  )[0];
+}
+
 /** Must match Rust's [prediction_position, market, owner] seed order. */
 export function derivePredictionPositionPda(
   market: PublicKey,
