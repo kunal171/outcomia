@@ -143,3 +143,7 @@ pub const CLUB_NAME_MAX_LENGTH: usize = 64;
 /// Invitations can be accepted for seven days after they are issued.
 #[constant]
 pub const CLUB_INVITE_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;
+
+/// Singleton club fee-share configuration: ["club_fee_config"].
+#[constant]
+pub const CLUB_FEE_CONFIG_SEED: &[u8] = b"club_fee_config";

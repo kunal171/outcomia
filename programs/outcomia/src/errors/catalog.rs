@@ -503,4 +503,6 @@ pub enum OutcomiaError {
     InvalidClubMember = 181,
     #[msg("Club member counters are inconsistent")]
     ClubCounterMismatch = 182,
+    #[msg("The club fee share cannot exceed 5,000 basis points (half of the taker fee)")]
+    ClubFeeShareTooHigh = 183,
 }

@@ -68,3 +68,14 @@ pub struct ClubInvite {
     pub expires_at: i64,
     pub bump: u8,
 }
+
+/// Protocol-wide share of club-market taker fees paid to the club.
+///
+/// PDA: ["club_fee_config"]. Until the super-admin creates it, the share is zero.
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubFeeConfig {
+    /// Basis points of each club-market taker fee credited to the club.
+    pub club_share_bps: u16,
+    pub bump: u8,
+}
