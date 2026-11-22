@@ -79,3 +79,28 @@ pub struct ClubFeeConfig {
     pub club_share_bps: u16,
     pub bump: u8,
 }
+
+/// Who may trade in a club market.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum ClubMarketAccess {
+    /// Placement, every fill and splitting require current membership.
+    MembersOnly,
+    /// Anyone may trade; the club curates and resolves.
+    Public,
+}
+
+/// Club binding of a binary market created in the club namespace.
+///
+/// PDA: ["club_market", market]. The market itself lives at
+/// ["club_prediction_market", market_id], which public instructions never derive.
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubMarket {
+    pub club: Pubkey,
+    pub market: Pubkey,
+    pub access: ClubMarketAccess,
+    pub creator: Pubkey,
+    /// Club share of taker fees, held in the global asset vault until withdrawn.
+    pub accrued_club_fees: u64,
+    pub bump: u8,
+}

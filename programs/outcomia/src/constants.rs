@@ -147,3 +147,11 @@ pub const CLUB_INVITE_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;
 /// Singleton club fee-share configuration: ["club_fee_config"].
 #[constant]
 pub const CLUB_FEE_CONFIG_SEED: &[u8] = b"club_fee_config";
+
+/// Binary market in the club namespace: ["club_prediction_market", market_id].
+#[constant]
+pub const CLUB_PREDICTION_MARKET_SEED: &[u8] = b"club_prediction_market";
+
+/// Club binding of a club market: ["club_market", market].
+#[constant]
+pub const CLUB_MARKET_SEED: &[u8] = b"club_market";
