@@ -1064,5 +1064,16 @@
   "No multi-outcome positions yet.": "No multi-outcome positions yet.",
   "Multi-outcome": "Multi-outcome",
   "Multi-outcome orders": "Multi-outcome orders",
-  "Manage →": "Manage →"
+  "Manage →": "Manage →",
+  "Factory": "Factory",
+  "Who can create": "Who can create",
+  "Invite list": "Invite list",
+  "Invite lists": "Invite lists",
+  "Invite only": "Invite only",
+  "Create invite list": "Create invite list",
+  "Update invite list": "Update invite list",
+  "Who can trade": "Who can trade",
+  "Anyone": "Anyone",
+  "Factory admins only": "Factory admins only",
+  "Listed creators": "Listed creators"
 }

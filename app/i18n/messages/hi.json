@@ -1064,5 +1064,16 @@
   "No multi-outcome positions yet.": "अभी कोई बहु-परिणाम पोज़िशन नहीं है।",
   "Multi-outcome": "बहु-परिणाम",
   "Multi-outcome orders": "बहु-परिणाम ऑर्डर",
-  "Manage →": "प्रबंधित करें →"
+  "Manage →": "प्रबंधित करें →",
+  "Factory": "फ़ैक्टरी",
+  "Who can create": "कौन बना सकता है",
+  "Invite list": "आमंत्रण सूची",
+  "Invite lists": "आमंत्रण सूचियाँ",
+  "Invite only": "केवल आमंत्रित",
+  "Create invite list": "आमंत्रण सूची बनाएँ",
+  "Update invite list": "आमंत्रण सूची अपडेट करें",
+  "Who can trade": "कौन ट्रेड कर सकता है",
+  "Anyone": "कोई भी",
+  "Factory admins only": "केवल फ़ैक्टरी एडमिन",
+  "Listed creators": "सूचीबद्ध निर्माता"
 }
