@@ -1,7 +1,9 @@
 # Clubs and private markets (Solana design)
 
-Status: the on-chain program for binary clubs is implemented (milestones
-1–4); app, indexer and multi-outcome club markets are not yet. This document records the product
+Status: binary clubs are implemented in the program and the app (milestones
+1–5); indexer replay of club trades and multi-outcome club markets are not
+yet. The app keeps clubs behind `NEXT_PUBLIC_CLUBS_ENABLED` until the program
+is deployed. This document records the product
 decisions and the on-chain model they imply. Implementation follows in small
 PRs (see [delivery plan](#delivery-plan)). The Canton note in
 `outcomia-canton/docs/clubs-private-markets.md` covers the same feature for
@@ -152,11 +154,34 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
 4. **Club books and trading** (done): membership-checked placement, matching,
    complement fills, cancellation (including permissionless non-member
    cancellation), fee split and withdrawals.
-5. **App:** club pages (create, invite, accept, members, roles), club market
-   creation with access choice, membership-aware trading, private markets
-   listed only inside their club, recovery views for former members.
+5. **App** (done): see [App](#app).
 6. **Indexer:** club accounts and club-book trade replay.
 7. **Multi-outcome club markets.**
+
+## App
+
+- **Pages:** `/clubs` (your clubs, invitations to accept, decline or clear,
+  club creation), `/clubs/[club]` (markets, members and, by role, invitations,
+  revocation, admin promotion, removal, the market policy, ownership transfer,
+  leaving and the owner's fee withdrawal), `/clubs/[club]/markets/new` (the
+  shared rules-upload creation flow with an access choice; create, open and
+  book in one transaction) and `/clubs/[club]/markets/[market]` (trading,
+  positions, exits and resolution).
+- **Trading:** `lib/shared.ts` takes an optional club context, so club books
+  use the same planner and cancellation code with the club instructions and
+  membership accounts. In members-only markets the planner refuses outsiders
+  and stops at a departed member's head order, and the orders view offers to
+  clear such orders (anyone may; funds return to the owner).
+- **Discovery:** club markets share the `PredictionMarket` layout, so public
+  lists include only markets at the public seed (`isPublicPredictionMarket`),
+  a public detail URL for a club market points to its club page, the wallet
+  catalog accepts club markets, and the orders page reads and cancels club
+  orders on their club book. Hiding a market is never a permission check.
+- **Checks:** `npm run test:clubs` (addresses, rules, encodings, packet size),
+  club cases in `npm run test:shared`, and
+  `node scripts/local-club-e2e.mjs` against a local validator (club, invites,
+  members-only market, fills with the fee split, removal and clearing,
+  resolution, redemption by a former member, fee withdrawal).
 
 ## Deployment notes
 
