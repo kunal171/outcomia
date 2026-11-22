@@ -31,10 +31,16 @@ export function deployment(env: NodeJS.ProcessEnv): Deployment | null {
     !env.CANTON_CATALOG_TOKEN
   )
     return null;
-  if (!/^[a-f0-9]{64}$/.test(packageId) || operator === vault)
+  const factoryPackageId = env.CANTON_FACTORY_PACKAGE_ID;
+  if (
+    !/^[a-f0-9]{64}$/.test(packageId) ||
+    operator === vault ||
+    (factoryPackageId !== undefined && !/^[a-f0-9]{64}$/.test(factoryPackageId))
+  )
     throw new Error("Invalid Canton deployment configuration.");
   return {
     packageId,
+    ...(factoryPackageId ? { factoryPackageId } : {}),
     operator,
     vault,
     namespace,
