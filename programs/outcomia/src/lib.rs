@@ -154,6 +154,28 @@ pub mod outcomia {
         crate::instructions::club_custody::handle_redeem_club_prediction(ctx, yes, no)
     }
 
+    /// Lets any current club admin propose or correct a club market's outcome.
+    pub fn propose_club_prediction(
+        ctx: Context<ProposeClubPrediction>,
+        outcome: PredictionResolution,
+        evidence_uri: String,
+        evidence_hash: [u8; 32],
+        correction: bool,
+    ) -> Result<()> {
+        crate::instructions::club_resolution::handle_propose_club_prediction(
+            ctx,
+            outcome,
+            evidence_uri,
+            evidence_hash,
+            correction,
+        )
+    }
+
+    /// Permissionlessly advances a club market's published resolution clock.
+    pub fn advance_club_prediction(ctx: Context<AdvanceClubPrediction>, action: u8) -> Result<()> {
+        crate::instructions::club_resolution::handle_advance_club_prediction(ctx, action)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

@@ -342,6 +342,43 @@ impl Fixture {
         )
     }
 
+    fn propose(
+        &self,
+        admin: &Pubkey,
+        outcome: PredictionResolution,
+        correction: bool,
+    ) -> Instruction {
+        let market = market_pda(&MARKET_ID);
+        ix(
+            outcomia::accounts::ProposeClubPrediction {
+                admin: *admin,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                admin_member: self.member_pda(admin),
+            },
+            outcomia::instruction::ProposeClubPrediction {
+                outcome,
+                evidence_uri: format!("ar://{}", "e".repeat(43)),
+                evidence_hash: [5; 32],
+                correction,
+            },
+        )
+    }
+    fn advance(&self, action: u8) -> Instruction {
+        ix(
+            outcomia::accounts::AdvanceClubPrediction {
+                market: market_pda(&MARKET_ID),
+            },
+            outcomia::instruction::AdvanceClubPrediction { action },
+        )
+    }
+    fn redeem(&self, owner: &Pubkey, yes: u64, no: u64) -> Instruction {
+        ix(
+            self.custody_accounts(owner, false),
+            outcomia::instruction::RedeemClubPrediction { yes, no },
+        )
+    }
+
     fn create_market(
         &self,
         creator: &Pubkey,
@@ -842,4 +879,176 @@ fn public_custody_cannot_touch_club_market_reserves() {
         },
     );
     f.fails(&owner, public, "ConstraintSeeds");
+}
+
+#[test]
+fn any_current_club_admin_resolves_within_the_published_schedule() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (admin, departing, member) = (f.join(true), f.join(true), f.join(false));
+    let outsider = f.wallet();
+    f.open_market(ClubMarketAccess::MembersOnly);
+    f.fails(
+        &admin,
+        f.propose(&admin.pubkey(), PredictionResolution::Yes, false),
+        "PredictionResolutionUnavailable",
+    );
+
+    f.set_clock(200);
+    f.fails(
+        &member,
+        f.propose(&member.pubkey(), PredictionResolution::Yes, false),
+        "UnauthorizedClubAdmin",
+    );
+    f.fails(
+        &outsider,
+        f.propose(&outsider.pubkey(), PredictionResolution::Yes, false),
+        "AccountNotInitialized",
+    );
+    // The admin who did not create the market proposes.
+    f.ok(
+        &departing,
+        f.propose(&departing.pubkey(), PredictionResolution::Yes, false),
+    );
+    let m = f.market();
+    assert_eq!(m.status, PredictionStatus::Proposed);
+    assert_eq!(
+        m.proposal.as_ref().map(|p| (p.outcome, p.proposed_at)),
+        Some((PredictionResolution::Yes, 200))
+    );
+    f.fails(
+        &admin,
+        f.propose(&admin.pubkey(), PredictionResolution::No, false),
+        "PredictionProposalUnavailable",
+    );
+
+    // A removed admin loses the power at once; another admin corrects.
+    f.remove(&departing.pubkey());
+    f.set_clock(205);
+    f.fails(
+        &departing,
+        f.propose(&departing.pubkey(), PredictionResolution::No, true),
+        "AccountNotInitialized",
+    );
+    f.ok(
+        &admin,
+        f.propose(&admin.pubkey(), PredictionResolution::No, true),
+    );
+    assert_eq!(f.market().proposal.unwrap().proposed_at, 205);
+
+    // The correction restarted the delay; nothing matures early.
+    f.set_clock(214);
+    f.fails(&outsider, f.advance(2), "PredictionProposalUnavailable");
+    f.fails(&outsider, f.advance(1), "PredictionFallbackUnavailable");
+    f.fails(&outsider, f.advance(3), "PredictionFallbackUnavailable");
+    f.set_clock(215);
+    f.ok(&outsider, f.advance(2));
+    let m = f.market();
+    assert_eq!(
+        (m.status, m.final_outcome),
+        (PredictionStatus::Resolved, Some(PredictionResolution::No))
+    );
+    f.fails(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::Yes, true),
+        "PredictionProposalUnavailable",
+    );
+}
+
+#[test]
+fn corrections_stop_at_the_correction_deadline() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    f.open_market(ClubMarketAccess::Public);
+    // Deadline = close 200 + 2 × delay 10 = 220.
+    f.set_clock(215);
+    f.ok(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::Yes, false),
+    );
+    f.set_clock(220);
+    f.fails(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::No, true),
+        "PredictionCorrectionWindowClosed",
+    );
+}
+
+#[test]
+fn holders_redeem_after_resolution_whether_or_not_they_are_still_members() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let member = f.join(false);
+    f.open_market(ClubMarketAccess::MembersOnly);
+    f.fund(&member, 5 * PAYOUT);
+    f.ok(&member, f.complete_set(&member.pubkey(), true, 5, true));
+    f.fails(
+        &member,
+        f.redeem(&member.pubkey(), 1, 0),
+        "PredictionNotResolved",
+    );
+    f.remove(&member.pubkey());
+
+    f.set_clock(200);
+    f.ok(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::Yes, false),
+    );
+    f.set_clock(210);
+    f.ok(&owner, f.advance(2));
+    f.ok(&member, f.redeem(&member.pubkey(), 5, 2));
+    assert_eq!(f.free_cash(&member.pubkey()), 5 * PAYOUT);
+    let p = f.position(&member.pubkey());
+    assert_eq!((p.yes_free, p.no_free), (0, 3));
+    let m = f.market();
+    assert_eq!((m.yes_supply, m.no_supply, m.backing_reserve), (0, 3, 0));
+    assert_eq!(f.token_amount(&f.market_vault()), 0);
+    // Nothing left to pay out: the transfer (before the ledger check) fails.
+    assert!(f.send(&member, f.redeem(&member.pubkey(), 1, 0)).is_err());
+}
+
+#[test]
+fn invalid_club_markets_pay_half_to_each_side() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    f.open_market(ClubMarketAccess::Public);
+    f.fund(&owner, 4 * PAYOUT);
+    f.ok(&owner, f.complete_set(&owner.pubkey(), true, 4, true));
+    f.set_clock(200);
+    f.ok(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::Invalid, false),
+    );
+    f.set_clock(210);
+    f.ok(&owner, f.advance(2));
+    f.ok(&owner, f.redeem(&owner.pubkey(), 4, 1));
+    assert_eq!(f.free_cash(&owner.pubkey()), 5 * PAYOUT / 2);
+    assert_eq!(f.market().backing_reserve, 3 * PAYOUT / 2);
+}
+
+#[test]
+fn club_markets_freeze_at_the_cutoff_and_the_creator_may_leave() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let creator = f.join(true);
+    f.ok(
+        &creator,
+        f.create_market(
+            &creator.pubkey(),
+            MARKET_ID,
+            config(&creator.pubkey()),
+            ClubMarketAccess::Public,
+        ),
+    );
+    f.ok(&creator, f.manage(&creator.pubkey(), true));
+    f.fails(&owner, f.advance(0), "PredictionResolutionUnavailable");
+    f.set_clock(200);
+    f.ok(&owner, f.advance(0));
+    assert_eq!(f.market().status, PredictionStatus::Frozen);
+    // The stored resolver leaving does not strand the market.
+    f.remove(&creator.pubkey());
+    f.ok(
+        &owner,
+        f.propose(&owner.pubkey(), PredictionResolution::Yes, false),
+    );
 }
