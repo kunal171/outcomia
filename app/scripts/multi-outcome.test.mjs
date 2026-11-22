@@ -203,6 +203,11 @@ test("smoke discovery filters preserve normal market questions", () => {
     visibility.visibleMarket("Ey5p8bBin49gfiaCuE7qHPdy8LdomzZX2tQEASbdo8ar"),
     false,
   );
+  for (const smoke of [
+    "ECxeTETJuskYCPszPsK7LrNo3J5KZ7F3BwSvTQbspus1",
+    "FN3grpJFuVNezLkd76iEBsMv54tnLeM3vsAhTL2rfmKX",
+  ])
+    assert.equal(visibility.visibleMarket(smoke), false, smoke);
 });
 
 test("resolution follows stored phase, earliest time, review maturity and exclusive fallback deadline", () => {

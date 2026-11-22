@@ -8,6 +8,9 @@ const smokeMarkets = new Set([
   // 2026-11-21 release smoke (multi-outcome); listed so it stays hidden even
   // if its metadata name cannot be read.
   "Ey5p8bBin49gfiaCuE7qHPdy8LdomzZX2tQEASbdo8ar",
+  // 2026-11-21 complementary-matching smoke (binary and multi-outcome).
+  "ECxeTETJuskYCPszPsK7LrNo3J5KZ7F3BwSvTQbspus1",
+  "FN3grpJFuVNezLkd76iEBsMv54tnLeM3vsAhTL2rfmKX",
 ]);
 
 export function visibleMarket(address: string, displayName = "") {
