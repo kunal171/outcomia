@@ -484,4 +484,23 @@ pub enum OutcomiaError {
     PredictionCorrectionWindowClosed = 172,
     #[msg("A complementary match needs the other outcome on the same side of a binary book")]
     InvalidComplementMatch = 173,
+
+    #[msg("Club names must be trimmed, nonempty and at most 64 bytes of UTF-8")]
+    InvalidClubName = 174,
+    #[msg("Only a current club admin can do this")]
+    UnauthorizedClubAdmin = 175,
+    #[msg("Only the club owner can do this")]
+    UnauthorizedClubOwner = 176,
+    #[msg("The wallet is already a member of this club")]
+    AlreadyClubMember = 177,
+    #[msg("The club invitation has expired")]
+    ClubInviteExpired = 178,
+    #[msg("The club invitation has not expired yet")]
+    ClubInviteNotExpired = 179,
+    #[msg("The club owner must transfer ownership before leaving or losing the admin role")]
+    ClubOwnerProtected = 180,
+    #[msg("Club member, invitation or nominee does not belong to this club and wallet")]
+    InvalidClubMember = 181,
+    #[msg("Club member counters are inconsistent")]
+    ClubCounterMismatch = 182,
 }
