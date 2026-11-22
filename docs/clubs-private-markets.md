@@ -1,7 +1,7 @@
 # Clubs and private markets (Solana design)
 
-Status: design agreed; clubs and membership, the club fee share and binary
-club markets (milestones 1–3) implemented; club books and trading not yet. This document records the product
+Status: the on-chain program for binary clubs is implemented (milestones
+1–4); app, indexer and multi-outcome club markets are not yet. This document records the product
 decisions and the on-chain model they imply. Implementation follows in small
 PRs (see [delivery plan](#delivery-plan)). The Canton note in
 `outcomia-canton/docs/clubs-private-markets.md` covers the same feature for
@@ -92,23 +92,34 @@ membership in members-only markets; merge never does) and
 `redeem_club_prediction` (never requires membership). Both reuse the public
 shared custody code through `shared_prediction::Custody`.
 
-**Trading** (milestone 4): `initialize_club_book`, `place_club_order`,
-`match_club_order`, `match_club_complement`, `cancel_club_order` (the owner
-always; anyone, when a members-only order's owner is no longer a member).
-Every fill in a members-only market checks both taker and maker membership.
+**Trading** (implemented): `initialize_club_book` (club admin or the
+creator-member) creates a shared-layout book at `["club_book", market]`;
+orders and levels use the shared order/level seeds under that book's address,
+so they never mix with public queues. `place_club_order` requires current
+membership in members-only markets. `match_club_order` and
+`match_club_complement` require both taker and maker to be current members in
+members-only markets, so a removed member's resting order cannot fill.
+`cancel_club_order` lets the owner always cancel, and anyone cancel once the
+owner has left a members-only market (the order owner's membership PDA must be
+empty); funds and level rent always return to the owner. All of these reuse
+the public placement, cancellation and fill code (`place_order`,
+`cancel_order`, `match_order`, `match_complement`) after the club checks.
 
 **Resolution** (implemented): `propose_club_prediction` (any current club
 admin, under the published window, review delay and correction deadline) and
 `advance_club_prediction` (permissionless freeze at cutoff and finalization;
 the fallback actions always fail because club markets have none).
 
-**Fees:** `set_club_fee_share` (super-admin; implemented), `withdraw_club_fees`
-(club owner). The share is stored in `ClubFeeConfig`, created on first use; until
-then it is zero. `split_club_fee` divides each fee: the club part rounds down, so
-the protocol keeps any fractional atom and the parts always sum to the fee the
-trader paid. A share change applies only to later fills.
-Each club fill splits the taker fee: the club share accrues in `ClubMarket`, the
-rest in the book as today. Both remain in the global asset vault, so
+**Fees** (implemented): `set_club_fee_share` (super-admin),
+`withdraw_club_fees` (club owner, from one club market's accrued share) and
+`withdraw_club_book_fees` (super-admin, the protocol's share from a club book;
+the public fee withdrawal cannot reach club books). The share is stored in
+`ClubFeeConfig`, created on first use; until then it is zero. Club fills read
+the config at its canonical address, so a taker cannot omit it.
+`split_club_fee` divides each fee: the club part rounds down, so the protocol
+keeps any fractional atom and the parts always sum to the fee the trader paid.
+A share change applies only to later fills. Both parts stay in the global asset
+vault until withdrawn, so
 
 ```text
 global vault = Σ free + locked claims + Σ book fees + Σ club fees
@@ -138,9 +149,9 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
 3. **Club binary markets** (done): club namespace creation, opening, closing,
    positions, complete sets, resolution and redemption;
    `programs/outcomia/tests/club_markets.rs`.
-4. **Club books and trading:** membership-checked placement, matching,
+4. **Club books and trading** (done): membership-checked placement, matching,
    complement fills, cancellation (including permissionless non-member
-   cancellation), fee split and owner withdrawal.
+   cancellation), fee split and withdrawals.
 5. **App:** club pages (create, invite, accept, members, roles), club market
    creation with access choice, membership-aware trading, private markets
    listed only inside their club, recovery views for former members.
@@ -151,6 +162,9 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
 
 - The IDL-driven indexer decodes club accounts and instructions once
   `app/idl/outcomia.json` is synced, which each milestone does.
-- The program grows with each milestone. After milestone 3 the SBF binary is
-  2,065,192 bytes against the 1,816,760 bytes allocated on devnet, so the next
-  upgrade must extend ProgramData by about 249 KB (roughly 1.7 SOL of rent).
+- The indexer decodes club instructions but does not yet replay club fills
+  into trade history (milestone 6).
+- The program grows with each milestone. After milestone 4 the SBF binary is
+  2,229,320 bytes against the 1,816,760 bytes allocated on devnet, so the next
+  upgrade must extend ProgramData by about 413 KB (roughly 2.9 SOL of rent).
+- Club books have no close instruction yet; a drained book simply stays.
