@@ -63,46 +63,98 @@ pub fn handle_match_shared_order(
     limit_price: u64,
     quantity: u64,
 ) -> Result<()> {
-    let book = &mut ctx.accounts.book;
-    rules::trading_open(book, &ctx.accounts.market.to_account_info())?;
+    rules::trading_open(&ctx.accounts.book, &ctx.accounts.market.to_account_info())?;
+    let accounts = &mut *ctx.accounts;
+    match_order(
+        &mut MatchAccounts {
+            taker: accounts.taker.key(),
+            taker_fee_bps: accounts.protocol_config.taker_fee_bps,
+            book: &mut accounts.book,
+            maker_order: &mut accounts.maker_order,
+            price_level: &mut accounts.price_level,
+            maker_base: &mut accounts.maker_base,
+            maker_quote: &mut accounts.maker_quote,
+            maker_position: &mut accounts.maker_position,
+            taker_base: &mut accounts.taker_base,
+            taker_quote: &mut accounts.taker_quote,
+            taker_position: &mut accounts.taker_position,
+            next_order: &mut accounts.next_order,
+            worse_level: &mut accounts.worse_level,
+            level_rent_recipient: &accounts.level_rent_recipient,
+        },
+        outcome,
+        taker_side,
+        limit_price,
+        quantity,
+    )
+    .map(|_| ())
+}
+
+/// Validated accounts of one direct fill, independent of the book's namespace.
+/// The caller has already checked that the book's market is trading.
+pub(crate) struct MatchAccounts<'a, 'info> {
+    pub taker: Pubkey,
+    pub taker_fee_bps: u16,
+    pub book: &'a mut Box<Account<'info, SharedBook>>,
+    pub maker_order: &'a mut Box<Account<'info, SharedOrder>>,
+    pub price_level: &'a mut Box<Account<'info, SharedPriceLevel>>,
+    pub maker_base: &'a mut Option<Box<Account<'info, AssetBalance>>>,
+    pub maker_quote: &'a mut Box<Account<'info, AssetBalance>>,
+    pub maker_position: &'a mut Option<Box<Account<'info, PredictionPosition>>>,
+    pub taker_base: &'a mut Option<Box<Account<'info, AssetBalance>>>,
+    pub taker_quote: &'a mut Box<Account<'info, AssetBalance>>,
+    pub taker_position: &'a mut Option<Box<Account<'info, PredictionPosition>>>,
+    pub next_order: &'a mut Option<Box<Account<'info, SharedOrder>>>,
+    pub worse_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+    pub level_rent_recipient: &'a Option<UncheckedAccount<'info>>,
+}
+
+/// Direct fill shared by public and club books; see [`handle_match_shared_order`].
+///
+/// # Returns
+/// The taker fee charged, which has been accrued to the book in full.
+pub(crate) fn match_order(
+    a: &mut MatchAccounts,
+    outcome: SharedOutcome,
+    taker_side: OrderSide,
+    limit_price: u64,
+    quantity: u64,
+) -> Result<u64> {
+    let book = &mut *a.book;
     let (slot, _) = rules::order_terms(book, outcome, taker_side, limit_price, quantity)?;
-    let maker = &ctx.accounts.maker_order;
+    let maker = &a.maker_order;
     rules::order(maker, book)?;
-    rules::level(&ctx.accounts.price_level, book)?;
-    require!(
-        maker.owner != ctx.accounts.taker.key(),
-        matching::SelfTradeNotAllowed
-    );
+    rules::level(a.price_level, book)?;
+    require!(maker.owner != a.taker, matching::SelfTradeNotAllowed);
     require!(
         maker.outcome == outcome
-            && maker.price_level == ctx.accounts.price_level.key()
-            && ctx.accounts.price_level.outcome == outcome
-            && ctx.accounts.price_level.side == maker.side
-            && ctx.accounts.price_level.price == maker.price,
+            && maker.price_level == a.price_level.key()
+            && a.price_level.outcome == outcome
+            && a.price_level.side == maker.side
+            && a.price_level.price == maker.price,
         shared::InvalidSharedNeighbor
     );
     require!(
-        book.best_prices[slot ^ 1] == Some(maker.price)
-            && ctx.accounts.price_level.better_price.is_none(),
+        book.best_prices[slot ^ 1] == Some(maker.price) && a.price_level.better_price.is_none(),
         matching::MakerNotAtBestPrice
     );
     require!(
-        ctx.accounts.price_level.first_order == Some(maker.key()) && maker.previous_order.is_none(),
+        a.price_level.first_order == Some(maker.key()) && maker.previous_order.is_none(),
         matching::MakerNotFifoHead
     );
     rules::trader(
         book,
         maker.owner,
-        ctx.accounts.maker_base.as_deref(),
-        &ctx.accounts.maker_quote,
-        ctx.accounts.maker_position.as_deref(),
+        a.maker_base.as_deref(),
+        a.maker_quote,
+        a.maker_position.as_deref(),
     )?;
     rules::trader(
         book,
-        ctx.accounts.taker.key(),
-        ctx.accounts.taker_base.as_deref(),
-        &ctx.accounts.taker_quote,
-        ctx.accounts.taker_position.as_deref(),
+        a.taker,
+        a.taker_base.as_deref(),
+        a.taker_quote,
+        a.taker_position.as_deref(),
     )?;
     let plan = calculate_settlement(
         taker_side,
@@ -114,10 +166,7 @@ pub fn handle_match_shared_order(
         maker.locked_collateral,
         book.base_decimals,
     )?;
-    let fee = calculate_taker_fee(
-        plan.fill.quote_quantity,
-        ctx.accounts.protocol_config.taker_fee_bps,
-    )?;
+    let fee = calculate_taker_fee(plan.fill.quote_quantity, a.taker_fee_bps)?;
     let accrued = book
         .accrued_quote_fees
         .checked_add(fee)
@@ -130,17 +179,14 @@ pub fn handle_match_shared_order(
         .locked_collateral
         .checked_sub(plan.maker_locked_debit)
         .ok_or(shared::InvalidSharedBook)?;
-    let total = ctx
-        .accounts
+    let total = a
         .price_level
         .total_remaining_quantity
         .checked_sub(plan.fill.base_quantity)
         .ok_or(shared::InvalidSharedBook)?;
     if !plan.maker_fully_filled {
         require!(
-            ctx.accounts.next_order.is_none()
-                && ctx.accounts.worse_level.is_none()
-                && ctx.accounts.level_rent_recipient.is_none(),
+            a.next_order.is_none() && a.worse_level.is_none() && a.level_rent_recipient.is_none(),
             shared::InvalidSharedNeighbor
         );
     }
@@ -149,14 +195,14 @@ pub fn handle_match_shared_order(
     let (maker_free, maker_locked) = rules::base_buckets(
         book.kind,
         outcome,
-        ctx.accounts.maker_base.as_deref_mut(),
-        ctx.accounts.maker_position.as_deref_mut(),
+        a.maker_base.as_deref_mut(),
+        a.maker_position.as_deref_mut(),
     )?;
     let (taker_free, _) = rules::base_buckets(
         book.kind,
         outcome,
-        ctx.accounts.taker_base.as_deref_mut(),
-        ctx.accounts.taker_position.as_deref_mut(),
+        a.taker_base.as_deref_mut(),
+        a.taker_position.as_deref_mut(),
     )?;
     match taker_side {
         OrderSide::Bid => {
@@ -165,14 +211,12 @@ pub fn handle_match_shared_order(
                 .quote_quantity
                 .checked_add(fee)
                 .ok_or(balance::FreeBalanceOverflow)?;
-            ctx.accounts.taker_quote.free = ctx
-                .accounts
+            a.taker_quote.free = a
                 .taker_quote
                 .free
                 .checked_sub(cost)
                 .ok_or(balance::InsufficientFreeBalance)?;
-            ctx.accounts.maker_quote.free = ctx
-                .accounts
+            a.maker_quote.free = a
                 .maker_quote
                 .free
                 .checked_add(plan.fill.quote_quantity)
@@ -196,20 +240,17 @@ pub fn handle_match_shared_order(
             *maker_free = maker_free
                 .checked_add(plan.fill.base_quantity)
                 .ok_or(balance::FreeBalanceOverflow)?;
-            ctx.accounts.taker_quote.free = ctx
-                .accounts
+            a.taker_quote.free = a
                 .taker_quote
                 .free
                 .checked_add(proceeds)
                 .ok_or(balance::FreeBalanceOverflow)?;
-            ctx.accounts.maker_quote.locked = ctx
-                .accounts
+            a.maker_quote.locked = a
                 .maker_quote
                 .locked
                 .checked_sub(plan.maker_locked_debit)
                 .ok_or(balance::LockedBalanceUnderflow)?;
-            ctx.accounts.maker_quote.free = ctx
-                .accounts
+            a.maker_quote.free = a
                 .maker_quote
                 .free
                 .checked_add(plan.maker_quote_refund)
@@ -221,23 +262,23 @@ pub fn handle_match_shared_order(
     if plan.maker_fully_filled {
         rules::remove_order(
             book,
-            &ctx.accounts.maker_order,
-            &mut ctx.accounts.price_level,
+            a.maker_order,
+            a.price_level,
             None,
-            ctx.accounts.next_order.as_deref_mut(),
+            a.next_order.as_deref_mut(),
             None,
-            ctx.accounts.worse_level.as_deref_mut(),
-            ctx.accounts.level_rent_recipient.as_ref(),
+            a.worse_level.as_deref_mut(),
+            a.level_rent_recipient.as_ref(),
         )?;
     } else {
-        ctx.accounts.price_level.total_remaining_quantity = total;
+        a.price_level.total_remaining_quantity = total;
     }
-    ctx.accounts.maker_order.remaining_quantity = remaining;
-    ctx.accounts.maker_order.locked_collateral = collateral;
+    a.maker_order.remaining_quantity = remaining;
+    a.maker_order.locked_collateral = collateral;
     if plan.maker_fully_filled {
-        ctx.accounts.maker_order.status = OrderStatus::Filled;
-        ctx.accounts.maker_order.previous_order = None;
-        ctx.accounts.maker_order.next_order = None;
+        a.maker_order.status = OrderStatus::Filled;
+        a.maker_order.previous_order = None;
+        a.maker_order.next_order = None;
     }
     book.accrued_quote_fees = accrued;
     msg!(
@@ -247,5 +288,5 @@ pub fn handle_match_shared_order(
         plan.fill.base_quantity,
         fee
     );
-    Ok(())
+    Ok(fee)
 }

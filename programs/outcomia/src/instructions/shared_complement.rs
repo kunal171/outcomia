@@ -64,50 +64,60 @@ pub struct MatchSharedComplement<'info> {
     pub level_rent_recipient: Option<UncheckedAccount<'info>>,
 }
 
-/// Moves `amount` collateral between the global vault and the question reserve.
-fn move_backing(
-    accounts: &MatchSharedComplement,
-    bumps: &MatchSharedComplementBumps,
-    amount: u64,
-    into_reserve: bool,
-) -> Result<()> {
-    let mint = accounts.mint.key();
-    let market = accounts.market.key();
-    let (from, to, authority, seed, key, bump) = if into_reserve {
-        (
-            accounts.asset_vault.to_account_info(),
-            accounts.market_vault.to_account_info(),
-            accounts.asset_authority.to_account_info(),
-            ASSET_AUTHORITY_SEED,
-            mint,
-            bumps.asset_authority,
+/// Global-vault and question-reserve custody of one binary market.
+pub(crate) struct Backing<'info> {
+    pub market: Pubkey,
+    pub mint: AccountInfo<'info>,
+    pub decimals: u8,
+    pub asset_authority: AccountInfo<'info>,
+    pub asset_authority_bump: u8,
+    pub asset_vault: AccountInfo<'info>,
+    pub market_authority: AccountInfo<'info>,
+    pub market_authority_bump: u8,
+    pub market_vault: AccountInfo<'info>,
+    pub token_program: Pubkey,
+}
+
+impl Backing<'_> {
+    /// Moves `amount` collateral between the global vault and the question reserve.
+    pub(crate) fn transfer(&self, amount: u64, into_reserve: bool) -> Result<()> {
+        let mint = self.mint.key();
+        let (from, to, authority, seed, key, bump) = if into_reserve {
+            (
+                self.asset_vault.clone(),
+                self.market_vault.clone(),
+                self.asset_authority.clone(),
+                ASSET_AUTHORITY_SEED,
+                mint,
+                self.asset_authority_bump,
+            )
+        } else {
+            (
+                self.market_vault.clone(),
+                self.asset_vault.clone(),
+                self.market_authority.clone(),
+                VAULT_AUTHORITY_SEED,
+                self.market,
+                self.market_authority_bump,
+            )
+        };
+        let bump_bytes = [bump];
+        let seeds: &[&[u8]] = &[seed, key.as_ref(), &bump_bytes];
+        token::transfer_checked(
+            CpiContext::new_with_signer(
+                self.token_program,
+                TransferChecked {
+                    from,
+                    mint: self.mint.clone(),
+                    to,
+                    authority,
+                },
+                &[seeds],
+            ),
+            amount,
+            self.decimals,
         )
-    } else {
-        (
-            accounts.market_vault.to_account_info(),
-            accounts.asset_vault.to_account_info(),
-            accounts.market_authority.to_account_info(),
-            VAULT_AUTHORITY_SEED,
-            market,
-            bumps.market_authority,
-        )
-    };
-    let bump_bytes = [bump];
-    let seeds: &[&[u8]] = &[seed, key.as_ref(), &bump_bytes];
-    token::transfer_checked(
-        CpiContext::new_with_signer(
-            accounts.token_program.key(),
-            TransferChecked {
-                from,
-                mint: accounts.mint.to_account_info(),
-                to,
-                authority,
-            },
-            &[seeds],
-        ),
-        amount,
-        accounts.mint.decimals,
-    )
+    }
 }
 
 /// Fills the best FIFO maker of the other outcome on the taker's side.
@@ -123,32 +133,97 @@ fn move_backing(
 /// `Ok(())` after minting (two buys) or merging (two sells) up to one maker's
 /// remaining contracts at the maker's price. Fees accrue to the shared book.
 pub fn handle_match_shared_complement(
-    mut ctx: Context<MatchSharedComplement>,
+    ctx: Context<MatchSharedComplement>,
     outcome: SharedOutcome,
     taker_side: OrderSide,
     limit_price: u64,
     quantity: u64,
 ) -> Result<()> {
-    let book = &ctx.accounts.book;
+    rules::trading_open(&ctx.accounts.book, &ctx.accounts.market.to_account_info())?;
+    let accounts = &mut *ctx.accounts;
+    let backing = Backing {
+        market: accounts.market.key(),
+        mint: accounts.mint.to_account_info(),
+        decimals: accounts.mint.decimals,
+        asset_authority: accounts.asset_authority.to_account_info(),
+        asset_authority_bump: ctx.bumps.asset_authority,
+        asset_vault: accounts.asset_vault.to_account_info(),
+        market_authority: accounts.market_authority.to_account_info(),
+        market_authority_bump: ctx.bumps.market_authority,
+        market_vault: accounts.market_vault.to_account_info(),
+        token_program: accounts.token_program.key(),
+    };
+    match_complement(
+        &mut ComplementAccounts {
+            taker: accounts.taker.key(),
+            taker_fee_bps: accounts.protocol_config.taker_fee_bps,
+            market: &mut accounts.market,
+            book: &mut accounts.book,
+            maker_order: &mut accounts.maker_order,
+            price_level: &mut accounts.price_level,
+            maker_quote: &mut accounts.maker_quote,
+            maker_position: &mut accounts.maker_position,
+            taker_quote: &mut accounts.taker_quote,
+            taker_position: &mut accounts.taker_position,
+            next_order: &mut accounts.next_order,
+            worse_level: &mut accounts.worse_level,
+            level_rent_recipient: &accounts.level_rent_recipient,
+            backing,
+        },
+        outcome,
+        taker_side,
+        limit_price,
+        quantity,
+    )
+    .map(|_| ())
+}
+
+/// Validated accounts of one complementary fill, independent of namespace.
+/// The caller has already checked that the book's market is trading.
+pub(crate) struct ComplementAccounts<'a, 'info> {
+    pub taker: Pubkey,
+    pub taker_fee_bps: u16,
+    pub market: &'a mut Box<Account<'info, PredictionMarket>>,
+    pub book: &'a mut Box<Account<'info, SharedBook>>,
+    pub maker_order: &'a mut Box<Account<'info, SharedOrder>>,
+    pub price_level: &'a mut Box<Account<'info, SharedPriceLevel>>,
+    pub maker_quote: &'a mut Box<Account<'info, AssetBalance>>,
+    pub maker_position: &'a mut Box<Account<'info, PredictionPosition>>,
+    pub taker_quote: &'a mut Box<Account<'info, AssetBalance>>,
+    pub taker_position: &'a mut Box<Account<'info, PredictionPosition>>,
+    pub next_order: &'a mut Option<Box<Account<'info, SharedOrder>>>,
+    pub worse_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+    pub level_rent_recipient: &'a Option<UncheckedAccount<'info>>,
+    pub backing: Backing<'info>,
+}
+
+/// Complementary fill shared by public and club books; see [`handle_match_shared_complement`].
+///
+/// # Returns
+/// The taker fee charged, which has been accrued to the book in full.
+pub(crate) fn match_complement(
+    a: &mut ComplementAccounts,
+    outcome: SharedOutcome,
+    taker_side: OrderSide,
+    limit_price: u64,
+    quantity: u64,
+) -> Result<u64> {
+    let book = &**a.book;
     require!(
         book.kind == MarketKind::Prediction,
         shared::SharedMarketKindMismatch
     );
-    rules::trading_open(book, &ctx.accounts.market.to_account_info())?;
     let maker_outcome = match outcome {
         SharedOutcome::Yes => SharedOutcome::No,
         SharedOutcome::No => SharedOutcome::Yes,
         SharedOutcome::Spot => return err!(matching::InvalidComplementMatch),
     };
     rules::order_terms(book, outcome, taker_side, limit_price, quantity)?;
-    let maker = &ctx.accounts.maker_order;
-    let level = &ctx.accounts.price_level;
+    let maker = &a.maker_order;
+    let level = &a.price_level;
     rules::order(maker, book)?;
     rules::level(level, book)?;
-    require!(
-        maker.owner != ctx.accounts.taker.key(),
-        matching::SelfTradeNotAllowed
-    );
+    require!(maker.owner != a.taker, matching::SelfTradeNotAllowed);
     require!(
         maker.outcome == maker_outcome && maker.side == taker_side,
         matching::InvalidComplementMatch
@@ -173,15 +248,15 @@ pub fn handle_match_shared_complement(
         book,
         maker.owner,
         None,
-        &ctx.accounts.maker_quote,
-        Some(&*ctx.accounts.maker_position),
+        a.maker_quote,
+        Some(&**a.maker_position),
     )?;
     rules::trader(
         book,
-        ctx.accounts.taker.key(),
+        a.taker,
         None,
-        &ctx.accounts.taker_quote,
-        Some(&*ctx.accounts.taker_position),
+        a.taker_quote,
+        Some(&**a.taker_position),
     )?;
     let plan = calculate_complement(
         taker_side,
@@ -193,10 +268,7 @@ pub fn handle_match_shared_complement(
         maker.locked_collateral,
         book.payout_per_contract,
     )?;
-    let fee = calculate_taker_fee(
-        plan.taker_amount,
-        ctx.accounts.protocol_config.taker_fee_bps,
-    )?;
+    let fee = calculate_taker_fee(plan.taker_amount, a.taker_fee_bps)?;
     let accrued = book
         .accrued_quote_fees
         .checked_add(fee)
@@ -215,18 +287,16 @@ pub fn handle_match_shared_complement(
         .ok_or(shared::InvalidSharedBook)?;
     if !plan.maker_fully_filled {
         require!(
-            ctx.accounts.next_order.is_none()
-                && ctx.accounts.worse_level.is_none()
-                && ctx.accounts.level_rent_recipient.is_none(),
+            a.next_order.is_none() && a.worse_level.is_none() && a.level_rent_recipient.is_none(),
             shared::InvalidSharedNeighbor
         );
     }
 
     let mint = taker_side == OrderSide::Bid;
     // Real tokens move first; every later ledger check rolls this back on failure.
-    move_backing(ctx.accounts, &ctx.bumps, plan.reserve_amount, mint)?;
+    a.backing.transfer(plan.reserve_amount, mint)?;
 
-    let accounts = &mut ctx.accounts;
+    let accounts = &mut *a;
     let m = &mut accounts.market;
     if mint {
         m.yes_supply = m
@@ -264,7 +334,7 @@ pub fn handle_match_shared_complement(
             MarketKind::Prediction,
             outcome,
             None,
-            Some(&mut *accounts.taker_position),
+            Some(&mut **accounts.taker_position),
         )?;
         *taker_free = taker_free
             .checked_add(plan.quantity)
@@ -273,7 +343,7 @@ pub fn handle_match_shared_complement(
             MarketKind::Prediction,
             maker_outcome,
             None,
-            Some(&mut *accounts.maker_position),
+            Some(&mut **accounts.maker_position),
         )?;
         *maker_free = maker_free
             .checked_add(plan.quantity)
@@ -295,7 +365,7 @@ pub fn handle_match_shared_complement(
             MarketKind::Prediction,
             outcome,
             None,
-            Some(&mut *accounts.taker_position),
+            Some(&mut **accounts.taker_position),
         )?;
         *taker_free = taker_free
             .checked_sub(plan.quantity)
@@ -304,7 +374,7 @@ pub fn handle_match_shared_complement(
             MarketKind::Prediction,
             maker_outcome,
             None,
-            Some(&mut *accounts.maker_position),
+            Some(&mut **accounts.maker_position),
         )?;
         *maker_locked = maker_locked
             .checked_sub(plan.maker_locked_debit)
@@ -327,9 +397,9 @@ pub fn handle_match_shared_complement(
 
     if plan.maker_fully_filled {
         rules::remove_order(
-            &mut accounts.book,
-            &accounts.maker_order,
-            &mut accounts.price_level,
+            accounts.book,
+            accounts.maker_order,
+            accounts.price_level,
             None,
             accounts.next_order.as_deref_mut(),
             None,
@@ -356,5 +426,5 @@ pub fn handle_match_shared_complement(
         plan.quantity,
         fee
     );
-    Ok(())
+    Ok(fee)
 }
