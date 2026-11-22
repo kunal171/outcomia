@@ -2186,3 +2186,27 @@ body:has(.prediction-guide[open]) {
   font-size: 9px;
   white-space: nowrap;
 }
+
+/* Clubs: compact member, invitation and market rows. */
+.club-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.club-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.club-list li:last-child {
+  border-bottom: 0;
+}
+.club-list small {
+  color: var(--muted);
+}
