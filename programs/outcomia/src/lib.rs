@@ -57,6 +57,21 @@ pub mod outcomia {
         crate::instructions::club_settings::handle_set_club_market_policy(ctx, policy)
     }
 
+    /// Lets a club admin invite a wallet; the invitation expires after seven days.
+    pub fn invite_club_member(ctx: Context<InviteClubMember>, wallet: Pubkey) -> Result<()> {
+        crate::instructions::club_invites::handle_invite_club_member(ctx, wallet)
+    }
+
+    /// Lets the invited wallet join the club before its invitation expires.
+    pub fn accept_club_invite(ctx: Context<AcceptClubInvite>) -> Result<()> {
+        crate::instructions::club_invites::handle_accept_club_invite(ctx)
+    }
+
+    /// Revokes (club admin), declines (invited wallet) or clears an expired invitation (anyone).
+    pub fn close_club_invite(ctx: Context<CloseClubInvite>) -> Result<()> {
+        crate::instructions::club_invites::handle_close_club_invite(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

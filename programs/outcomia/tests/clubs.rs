@@ -35,6 +35,13 @@ fn member_pda(club: &Pubkey, wallet: &Pubkey) -> Pubkey {
     )
     .0
 }
+fn invite_pda(club: &Pubkey, wallet: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[CLUB_INVITE_SEED, club.as_ref(), wallet.as_ref()],
+        &outcomia::ID,
+    )
+    .0
+}
 fn ix(accounts: impl ToAccountMetas, data: impl InstructionData) -> Instruction {
     Instruction::new_with_bytes(outcomia::ID, &data.data(), accounts.to_account_metas(None))
 }
@@ -102,6 +109,23 @@ impl Fixture {
             return None;
         }
         Some(T::try_deserialize(&mut account.data.as_slice()).unwrap())
+    }
+    fn lamports(&self, address: &Pubkey) -> u64 {
+        self.svm.get_account(address).map_or(0, |a| a.lamports)
+    }
+    /// Invites a fresh wallet and accepts as it, returning the new member.
+    fn join(&mut self) -> Keypair {
+        let owner = self.owner.insecure_clone();
+        let wallet = self.wallet();
+        self.ok(
+            &owner,
+            invite(&self.club, &owner.pubkey(), &wallet.pubkey()),
+        );
+        self.ok(
+            &wallet,
+            accept(&self.club, &wallet.pubkey(), &owner.pubkey()),
+        );
+        wallet
     }
     fn club(&self) -> Club {
         self.load(&self.club).unwrap()
@@ -189,4 +213,214 @@ fn only_club_admins_change_the_market_policy() {
         set_policy(&f.club, &owner.pubkey(), ClubMarketPolicy::AnyMember),
     );
     assert_eq!(f.club().market_policy, ClubMarketPolicy::AnyMember);
+}
+
+fn invite(club: &Pubkey, inviter: &Pubkey, wallet: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::InviteClubMember {
+            inviter: *inviter,
+            club: *club,
+            inviter_member: member_pda(club, inviter),
+            existing_member: member_pda(club, wallet),
+            invite: invite_pda(club, wallet),
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::InviteClubMember { wallet: *wallet },
+    )
+}
+fn accept(club: &Pubkey, wallet: &Pubkey, inviter: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::AcceptClubInvite {
+            wallet: *wallet,
+            club: *club,
+            invite: invite_pda(club, wallet),
+            inviter: *inviter,
+            member: member_pda(club, wallet),
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::AcceptClubInvite {},
+    )
+}
+fn close_invite(
+    club: &Pubkey,
+    wallet: &Pubkey,
+    inviter: &Pubkey,
+    closer: &Pubkey,
+    as_member: bool,
+) -> Instruction {
+    ix(
+        outcomia::accounts::CloseClubInvite {
+            closer: *closer,
+            invite: invite_pda(club, wallet),
+            inviter: *inviter,
+            closer_member: as_member.then(|| member_pda(club, closer)),
+        },
+        outcomia::instruction::CloseClubInvite {},
+    )
+}
+
+#[test]
+fn invited_wallet_joins_by_accepting_and_inviter_gets_rent_back() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let wallet = f.wallet();
+    f.ok(&owner, invite(&f.club, &owner.pubkey(), &wallet.pubkey()));
+    let stored: ClubInvite = f.load(&invite_pda(&f.club, &wallet.pubkey())).unwrap();
+    assert_eq!(stored.expires_at, 1_000_000 + CLUB_INVITE_TTL_SECONDS);
+    assert_eq!(
+        (stored.club, stored.wallet, stored.inviter),
+        (f.club, wallet.pubkey(), owner.pubkey())
+    );
+    assert_eq!(f.member(&wallet.pubkey()).map(|m| m.role), None);
+
+    let before = f.lamports(&owner.pubkey());
+    let rent = f.lamports(&invite_pda(&f.club, &wallet.pubkey()));
+    f.set_clock(1_000_000 + CLUB_INVITE_TTL_SECONDS - 1);
+    f.ok(&wallet, accept(&f.club, &wallet.pubkey(), &owner.pubkey()));
+    assert_eq!(f.lamports(&owner.pubkey()), before + rent);
+    assert_eq!(f.lamports(&invite_pda(&f.club, &wallet.pubkey())), 0);
+    let member = f.member(&wallet.pubkey()).unwrap();
+    assert_eq!(member.role, ClubRole::Member);
+    assert_eq!(member.joined_at, 1_000_000 + CLUB_INVITE_TTL_SECONDS - 1);
+    assert_eq!((f.club().member_count, f.club().admin_count), (2, 1));
+
+    // Accepting happens exactly once.
+    f.rejected(&wallet, accept(&f.club, &wallet.pubkey(), &owner.pubkey()));
+}
+
+#[test]
+fn only_admins_invite_and_never_existing_members_or_twice() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let member = f.join();
+    let outsider = f.wallet();
+    let target = f.wallet();
+    f.fails(
+        &member,
+        invite(&f.club, &member.pubkey(), &target.pubkey()),
+        "UnauthorizedClubAdmin",
+    );
+    f.fails(
+        &outsider,
+        invite(&f.club, &outsider.pubkey(), &target.pubkey()),
+        "AccountNotInitialized",
+    );
+    f.fails(
+        &owner,
+        invite(&f.club, &owner.pubkey(), &member.pubkey()),
+        "AlreadyClubMember",
+    );
+    f.fails(
+        &owner,
+        invite(&f.club, &owner.pubkey(), &owner.pubkey()),
+        "AlreadyClubMember",
+    );
+    f.ok(&owner, invite(&f.club, &owner.pubkey(), &target.pubkey()));
+    f.rejected(&owner, invite(&f.club, &owner.pubkey(), &target.pubkey()));
+}
+
+#[test]
+fn only_the_invited_wallet_accepts_and_only_before_expiry() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let wallet = f.wallet();
+    let thief = f.wallet();
+    f.ok(&owner, invite(&f.club, &owner.pubkey(), &wallet.pubkey()));
+    // Another wallet cannot use the invitation: its own invite PDA does not exist.
+    let mut stolen = accept(&f.club, &thief.pubkey(), &owner.pubkey());
+    stolen.accounts[2].pubkey = invite_pda(&f.club, &wallet.pubkey());
+    f.rejected(&thief, stolen);
+    // Rent cannot be redirected.
+    f.fails(
+        &wallet,
+        accept(&f.club, &wallet.pubkey(), &thief.pubkey()),
+        "InvalidClubMember",
+    );
+
+    f.set_clock(1_000_000 + CLUB_INVITE_TTL_SECONDS);
+    f.fails(
+        &wallet,
+        accept(&f.club, &wallet.pubkey(), &owner.pubkey()),
+        "ClubInviteExpired",
+    );
+    assert!(f.member(&wallet.pubkey()).is_none());
+}
+
+#[test]
+fn invitations_are_revoked_by_admins_declined_by_invitee_or_cleared_after_expiry() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let member = f.join();
+    let (a, b, c) = (f.wallet(), f.wallet(), f.wallet());
+    for w in [&a, &b, &c] {
+        f.ok(&owner, invite(&f.club, &owner.pubkey(), &w.pubkey()));
+    }
+    let rent = f.lamports(&invite_pda(&f.club, &a.pubkey()));
+
+    // Members who are not admins and outsiders cannot close an open invitation.
+    f.fails(
+        &member,
+        close_invite(
+            &f.club,
+            &a.pubkey(),
+            &owner.pubkey(),
+            &member.pubkey(),
+            true,
+        ),
+        "ClubInviteNotExpired",
+    );
+    f.fails(
+        &b,
+        close_invite(&f.club, &a.pubkey(), &owner.pubkey(), &b.pubkey(), false),
+        "ClubInviteNotExpired",
+    );
+    // Rent goes only to the inviter.
+    f.fails(
+        &a,
+        close_invite(&f.club, &a.pubkey(), &a.pubkey(), &a.pubkey(), false),
+        "InvalidClubMember",
+    );
+
+    let before = f.lamports(&owner.pubkey());
+    f.ok(
+        &a,
+        close_invite(&f.club, &a.pubkey(), &owner.pubkey(), &a.pubkey(), false),
+    );
+    assert_eq!(f.lamports(&owner.pubkey()), before + rent);
+    assert!(f
+        .svm
+        .get_account(&invite_pda(&f.club, &a.pubkey()))
+        .is_none_or(|x| x.data.is_empty()));
+
+    // Any club admin (here the owner) revokes.
+    f.ok(
+        &owner,
+        close_invite(&f.club, &b.pubkey(), &owner.pubkey(), &owner.pubkey(), true),
+    );
+    f.fails(
+        &b,
+        accept(&f.club, &b.pubkey(), &owner.pubkey()),
+        "AccountNotInitialized",
+    );
+
+    // An admin of another club has no say here.
+    let rival = f.wallet();
+    f.ok(&rival, create_club(&rival.pubkey(), [9; 32], "Rival"));
+    let mut foreign = close_invite(&f.club, &c.pubkey(), &owner.pubkey(), &rival.pubkey(), true);
+    foreign.accounts[3].pubkey = member_pda(&club_pda(&[9; 32]), &rival.pubkey());
+    f.fails(&rival, foreign, "ClubInviteNotExpired");
+
+    f.set_clock(1_000_000 + CLUB_INVITE_TTL_SECONDS);
+    f.ok(
+        &rival,
+        close_invite(
+            &f.club,
+            &c.pubkey(),
+            &owner.pubkey(),
+            &rival.pubkey(),
+            false,
+        ),
+    );
+    // A cleared invitation can be issued again.
+    f.ok(&owner, invite(&f.club, &owner.pubkey(), &c.pubkey()));
 }
