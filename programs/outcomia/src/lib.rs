@@ -176,6 +176,31 @@ pub mod outcomia {
         crate::instructions::club_resolution::handle_advance_club_prediction(ctx, action)
     }
 
+    /// Creates a club market's book (club admin or the creator-member).
+    pub fn initialize_club_book(ctx: Context<InitializeClubBook>) -> Result<()> {
+        crate::instructions::club_orders::handle_initialize_club_book(ctx)
+    }
+
+    /// Places a resting order on a club book; members only in members-only markets.
+    pub fn place_club_order(
+        ctx: Context<PlaceClubOrder>,
+        outcome: SharedOutcome,
+        side: OrderSide,
+        price: u64,
+        quantity: u64,
+        order_id: u64,
+    ) -> Result<()> {
+        crate::instructions::club_orders::handle_place_club_order(
+            ctx, outcome, side, price, quantity, order_id,
+        )
+    }
+
+    /// Cancels a club order: by its owner, or by anyone once the owner has left a
+    /// members-only market. Funds always return to the owner.
+    pub fn cancel_club_order(ctx: Context<CancelClubOrder>) -> Result<()> {
+        crate::instructions::club_orders::handle_cancel_club_order(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
