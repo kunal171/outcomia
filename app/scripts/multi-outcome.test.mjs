@@ -754,3 +754,20 @@ test("full-set quotes price each outcome through the others' best orders", () =>
   // Outcome 2 has no ask, so no full-set sell quote exists.
   assert.equal(m.fullSetQuote(f.market, f.book, 0, "ask", f.rows), null);
 });
+
+test("wallet lists only multi-outcome positions that hold contracts", () => {
+  const { holdsContracts } = loadTypeScript(
+    new URL("../lib/multi-outcome-wallet.ts", import.meta.url),
+  );
+  const { BN } = require("@anchor-lang/core");
+  const position = (free, locked) => ({
+    position: {
+      free: free.map((n) => new BN(n)),
+      locked: locked.map((n) => new BN(n)),
+    },
+  });
+  assert.equal(holdsContracts({ position: null }), false);
+  assert.equal(holdsContracts(position([0, 0, 0], [0, 0, 0])), false);
+  assert.equal(holdsContracts(position([0, 2, 0], [0, 0, 0])), true);
+  assert.equal(holdsContracts(position([0, 0, 0], [0, 0, 1])), true);
+});

@@ -1057,5 +1057,12 @@
   "Only club members can trade in this market": "Seuls les membres du club peuvent négocier sur ce marché",
   "A former member's order is first in this queue. Clear departed members' orders, then retry.": "Le premier ordre de cette file appartient à un ancien membre. Supprimez les ordres d'anciens membres, puis réessayez.",
   "Enter a valid wallet address": "Saisissez une adresse de portefeuille valide",
-  "Club markets have no fallback resolver; club admins resolve them": "Les marchés de club n'ont pas de résolveur de secours ; les administrateurs du club les résolvent"
+  "Club markets have no fallback resolver; club admins resolve them": "Les marchés de club n'ont pas de résolveur de secours ; les administrateurs du club les résolvent",
+  "Multi-outcome positions": "Positions multi-résultats",
+  "Multi-outcome positions could not be loaded.": "Impossible de charger les positions multi-résultats.",
+  "Loading multi-outcome positions…": "Chargement des positions multi-résultats…",
+  "No multi-outcome positions yet.": "Aucune position multi-résultats pour l'instant.",
+  "Multi-outcome": "Multi-résultats",
+  "Multi-outcome orders": "Ordres multi-résultats",
+  "Manage →": "Gérer →"
 }
