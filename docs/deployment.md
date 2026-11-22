@@ -46,8 +46,11 @@ signature provably expired without landing, and saves temporary keypairs
 before funding so interrupted runs can be swept. The first interrupted run
 predated that and stranded about 0.24 devnet SOL in unsaved wallets.
 
-Keep `NEXT_PUBLIC_CLUBS_ENABLED=false` on Vercel until the app with the club
-pages is deployed and checked.
+After the smoke test, `NEXT_PUBLIC_CLUBS_ENABLED=true` was set for Vercel
+Production and Preview. The production build already queued by the merge
+predated the variable, so production was redeployed; the live bundle was then
+confirmed to compile the flag on (no chunk reads the unset variable) and
+`/clubs`, `/wallet` and `/orders` respond.
 
 ## Complementary matching: 21 November 2026
 
