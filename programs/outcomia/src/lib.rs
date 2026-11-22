@@ -44,6 +44,19 @@ declare_id!("AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL");
 pub mod outcomia {
     use super::*;
 
+    /// Creates a club owned by the signer, who also becomes its first admin.
+    pub fn create_club(ctx: Context<CreateClub>, club_id: [u8; 32], name: String) -> Result<()> {
+        crate::instructions::club_settings::handle_create_club(ctx, club_id, name)
+    }
+
+    /// Lets a club admin choose who may create club markets.
+    pub fn set_club_market_policy(
+        ctx: Context<ManageClub>,
+        policy: ClubMarketPolicy,
+    ) -> Result<()> {
+        crate::instructions::club_settings::handle_set_club_market_policy(ctx, policy)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,
