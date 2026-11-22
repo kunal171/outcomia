@@ -72,6 +72,21 @@ pub mod outcomia {
         crate::instructions::club_invites::handle_close_club_invite(ctx)
     }
 
+    /// Lets the club owner promote a member to admin or demote an admin.
+    pub fn set_club_member_role(ctx: Context<SetClubMemberRole>, role: ClubRole) -> Result<()> {
+        crate::instructions::club_members::handle_set_club_member_role(ctx, role)
+    }
+
+    /// Lets a club admin remove a member; only the owner removes admins.
+    pub fn remove_club_member(ctx: Context<RemoveClubMember>) -> Result<()> {
+        crate::instructions::club_members::handle_remove_club_member(ctx)
+    }
+
+    /// Lets any member except the owner leave the club.
+    pub fn leave_club(ctx: Context<LeaveClub>) -> Result<()> {
+        crate::instructions::club_members::handle_leave_club(ctx)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

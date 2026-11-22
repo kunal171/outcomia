@@ -424,3 +424,153 @@ fn invitations_are_revoked_by_admins_declined_by_invitee_or_cleared_after_expiry
     // A cleared invitation can be issued again.
     f.ok(&owner, invite(&f.club, &owner.pubkey(), &c.pubkey()));
 }
+
+fn set_role(club: &Pubkey, owner: &Pubkey, wallet: &Pubkey, role: ClubRole) -> Instruction {
+    ix(
+        outcomia::accounts::SetClubMemberRole {
+            owner: *owner,
+            club: *club,
+            member: member_pda(club, wallet),
+        },
+        outcomia::instruction::SetClubMemberRole { role },
+    )
+}
+fn remove(club: &Pubkey, admin: &Pubkey, wallet: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::RemoveClubMember {
+            admin: *admin,
+            club: *club,
+            admin_member: member_pda(club, admin),
+            member: member_pda(club, wallet),
+            wallet: *wallet,
+        },
+        outcomia::instruction::RemoveClubMember {},
+    )
+}
+fn leave(club: &Pubkey, wallet: &Pubkey) -> Instruction {
+    ix(
+        outcomia::accounts::LeaveClub {
+            wallet: *wallet,
+            club: *club,
+            member: member_pda(club, wallet),
+        },
+        outcomia::instruction::LeaveClub {},
+    )
+}
+
+#[test]
+fn only_the_owner_promotes_and_demotes_admins() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (a, b) = (f.join(), f.join());
+    f.fails(
+        &a,
+        set_role(&f.club, &a.pubkey(), &b.pubkey(), ClubRole::Admin),
+        "UnauthorizedClubOwner",
+    );
+    f.ok(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &a.pubkey(), ClubRole::Admin),
+    );
+    assert_eq!(f.member(&a.pubkey()).unwrap().role, ClubRole::Admin);
+    assert_eq!((f.club().member_count, f.club().admin_count), (3, 2));
+    // Even an admin cannot promote; repeating the current role changes nothing.
+    f.fails(
+        &a,
+        set_role(&f.club, &a.pubkey(), &b.pubkey(), ClubRole::Admin),
+        "UnauthorizedClubOwner",
+    );
+    f.ok(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &a.pubkey(), ClubRole::Admin),
+    );
+    assert_eq!(f.club().admin_count, 2);
+    // The promoted admin can now invite.
+    let c = f.wallet();
+    f.ok(&a, invite(&f.club, &a.pubkey(), &c.pubkey()));
+    f.ok(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &a.pubkey(), ClubRole::Member),
+    );
+    assert_eq!(f.club().admin_count, 1);
+    f.fails(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &owner.pubkey(), ClubRole::Member),
+        "ClubOwnerProtected",
+    );
+}
+
+#[test]
+fn admins_remove_members_and_only_the_owner_removes_admins() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (admin, other_admin, member) = (f.join(), f.join(), f.join());
+    for w in [&admin, &other_admin] {
+        f.ok(
+            &owner,
+            set_role(&f.club, &owner.pubkey(), &w.pubkey(), ClubRole::Admin),
+        );
+    }
+    f.fails(
+        &member,
+        remove(&f.club, &member.pubkey(), &admin.pubkey()),
+        "UnauthorizedClubAdmin",
+    );
+    f.fails(
+        &admin,
+        remove(&f.club, &admin.pubkey(), &other_admin.pubkey()),
+        "UnauthorizedClubOwner",
+    );
+    f.fails(
+        &admin,
+        remove(&f.club, &admin.pubkey(), &owner.pubkey()),
+        "ClubOwnerProtected",
+    );
+
+    let before = f.lamports(&member.pubkey());
+    let rent = f.lamports(&member_pda(&f.club, &member.pubkey()));
+    f.ok(&admin, remove(&f.club, &admin.pubkey(), &member.pubkey()));
+    assert_eq!(f.lamports(&member.pubkey()), before + rent);
+    assert!(f.member(&member.pubkey()).is_none());
+    assert_eq!((f.club().member_count, f.club().admin_count), (3, 3));
+
+    f.ok(
+        &owner,
+        remove(&f.club, &owner.pubkey(), &other_admin.pubkey()),
+    );
+    assert_eq!((f.club().member_count, f.club().admin_count), (2, 2));
+    // A removed wallet holds no club powers and can be invited again.
+    f.fails(
+        &other_admin,
+        invite(&f.club, &other_admin.pubkey(), &member.pubkey()),
+        "AccountNotInitialized",
+    );
+    f.ok(&admin, invite(&f.club, &admin.pubkey(), &member.pubkey()));
+    f.ok(&member, accept(&f.club, &member.pubkey(), &admin.pubkey()));
+    assert_eq!(f.member(&member.pubkey()).unwrap().role, ClubRole::Member);
+}
+
+#[test]
+fn members_and_admins_leave_but_the_owner_cannot() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    let (admin, member) = (f.join(), f.join());
+    f.ok(
+        &owner,
+        set_role(&f.club, &owner.pubkey(), &admin.pubkey(), ClubRole::Admin),
+    );
+    f.fails(
+        &owner,
+        leave(&f.club, &owner.pubkey()),
+        "ClubOwnerProtected",
+    );
+    f.ok(&member, leave(&f.club, &member.pubkey()));
+    f.ok(&admin, leave(&f.club, &admin.pubkey()));
+    assert_eq!((f.club().member_count, f.club().admin_count), (1, 1));
+    let outsider = f.wallet();
+    f.fails(
+        &outsider,
+        leave(&f.club, &outsider.pubkey()),
+        "AccountNotInitialized",
+    );
+}
