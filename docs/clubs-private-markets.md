@@ -1,8 +1,7 @@
 # Clubs and private markets (Solana design)
 
-Status: binary clubs are implemented in the program and the app (milestones
-1–5); indexer replay of club trades and multi-outcome club markets are not
-yet. The app keeps clubs behind `NEXT_PUBLIC_CLUBS_ENABLED` until the program
+Status: binary clubs are implemented in the program, the app and the indexer
+(milestones 1–6); multi-outcome club markets are not yet. The app keeps clubs behind `NEXT_PUBLIC_CLUBS_ENABLED` until the program
 is deployed. This document records the product
 decisions and the on-chain model they imply. Implementation follows in small
 PRs (see [delivery plan](#delivery-plan)). The Canton note in
@@ -155,7 +154,10 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
    complement fills, cancellation (including permissionless non-member
    cancellation), fee split and withdrawals.
 5. **App** (done): see [App](#app).
-6. **Indexer:** club accounts and club-book trade replay.
+6. **Indexer** (done): club accounts decode through the IDL; club-book
+   placements, fills, complementary fills and cancellations replay into the
+   `SHARED_BINARY` trade history (a migration rebuilds instruction-derived
+   history once), and the club market page shows the indexed price chart.
 7. **Multi-outcome club markets.**
 
 ## App
@@ -187,8 +189,6 @@ global vault = Σ free + locked claims + Σ book fees + Σ club fees
 
 - The IDL-driven indexer decodes club accounts and instructions once
   `app/idl/outcomia.json` is synced, which each milestone does.
-- The indexer decodes club instructions but does not yet replay club fills
-  into trade history (milestone 6).
 - The program grows with each milestone. After milestone 4 the SBF binary is
   2,229,320 bytes against the 1,816,760 bytes allocated on devnet, so the next
   upgrade must extend ProgramData by about 413 KB (roughly 2.9 SOL of rent).
