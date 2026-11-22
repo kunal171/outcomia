@@ -60,53 +60,59 @@ pub fn terms(info: &AccountInfo<'_>, kind: MarketKind, trading: bool) -> Result<
                 payout: 0,
             })
         }
-        MarketKind::Prediction => {
-            let value = PredictionMarket::try_deserialize(&mut data.as_ref())?;
-            require_keys_eq!(
-                Pubkey::find_program_address(
-                    &[PREDICTION_MARKET_SEED, value.market_id.as_ref()],
-                    &crate::ID
-                )
-                .0,
-                *info.key,
-                shared::SharedMarketKindMismatch
-            );
-            if trading {
-                require!(
-                    value.status == PredictionStatus::Open
-                        && Clock::get()?.unix_timestamp < value.close_ts,
-                    prediction::PredictionOrderUnavailable
-                );
-            }
-            let precision = value
-                .payout_per_contract
-                .checked_ilog10()
-                .ok_or(prediction::InvalidPredictionPayout)?;
-            require!(
-                10_u64.checked_pow(precision) == Some(value.payout_per_contract),
-                prediction::InvalidPredictionPayout
-            );
-            Ok(SharedTerms {
-                authority: value.authority,
-                kind,
-                base_mint: Pubkey::default(),
-                quote_mint: value.collateral_mint,
-                base_decimals: 0,
-                quote_decimals: precision as u8,
-                tick: value.price_tick,
-                lot: 1,
-                payout: value.payout_per_contract,
-            })
-        }
+        MarketKind::Prediction => prediction_terms(info, PREDICTION_MARKET_SEED, trading),
         MarketKind::Other => err!(shared::SharedMarketKindMismatch),
     }
 }
 
-/// Inputs: root and underlying market. Errors: immutable bindings changed or trading closed.
-/// Returns: success only when this book uses the current market's economic terms.
-pub fn trading_open(book: &SharedBook, market: &AccountInfo<'_>) -> Result<()> {
-    require_keys_eq!(book.market, *market.key, shared::InvalidSharedBook);
-    let value = terms(market, book.kind, true)?;
+/// Inputs: program-owned binary market info, the namespace seed it must be
+/// canonical under, and whether trading must be open.
+/// Errors: wrong type/PDA, closed trading or malformed precision.
+/// Returns: the market's economic parameters. Public and club markets share the
+/// layout; the seed decides which instructions can reach which markets.
+fn prediction_terms(info: &AccountInfo<'_>, seed: &[u8], trading: bool) -> Result<SharedTerms> {
+    require_keys_eq!(*info.owner, crate::ID, shared::SharedMarketKindMismatch);
+    let data = info.try_borrow_data()?;
+    let value = PredictionMarket::try_deserialize(&mut data.as_ref())?;
+    require_keys_eq!(
+        Pubkey::find_program_address(&[seed, value.market_id.as_ref()], &crate::ID).0,
+        *info.key,
+        shared::SharedMarketKindMismatch
+    );
+    if trading {
+        require!(
+            value.status == PredictionStatus::Open && Clock::get()?.unix_timestamp < value.close_ts,
+            prediction::PredictionOrderUnavailable
+        );
+    }
+    let precision = value
+        .payout_per_contract
+        .checked_ilog10()
+        .ok_or(prediction::InvalidPredictionPayout)?;
+    require!(
+        10_u64.checked_pow(precision) == Some(value.payout_per_contract),
+        prediction::InvalidPredictionPayout
+    );
+    Ok(SharedTerms {
+        authority: value.authority,
+        kind: MarketKind::Prediction,
+        base_mint: Pubkey::default(),
+        quote_mint: value.collateral_mint,
+        base_decimals: 0,
+        quote_decimals: precision as u8,
+        tick: value.price_tick,
+        lot: 1,
+        payout: value.payout_per_contract,
+    })
+}
+
+/// Terms of a binary market in the club namespace; public markets are rejected.
+pub fn club_terms(info: &AccountInfo<'_>, trading: bool) -> Result<SharedTerms> {
+    prediction_terms(info, CLUB_PREDICTION_MARKET_SEED, trading)
+}
+
+/// Inputs: book and freshly read terms. Errors: any immutable binding changed.
+fn same_terms(book: &SharedBook, value: &SharedTerms) -> Result<()> {
     require!(
         book.authority == value.authority
             && book.base_mint == value.base_mint
@@ -119,6 +125,24 @@ pub fn trading_open(book: &SharedBook, market: &AccountInfo<'_>) -> Result<()> {
         shared::InvalidSharedBook
     );
     Ok(())
+}
+
+/// Club-book counterpart of [`trading_open`]: the market must be a club market.
+pub fn club_trading_open(book: &SharedBook, market: &AccountInfo<'_>) -> Result<()> {
+    require_keys_eq!(book.market, *market.key, shared::InvalidSharedBook);
+    require!(
+        book.kind == MarketKind::Prediction,
+        shared::SharedMarketKindMismatch
+    );
+    same_terms(book, &club_terms(market, true)?)
+}
+
+/// Inputs: root and underlying market. Errors: immutable bindings changed or trading closed.
+/// Returns: success only when this book uses the current market's economic terms.
+pub fn trading_open(book: &SharedBook, market: &AccountInfo<'_>) -> Result<()> {
+    require_keys_eq!(book.market, *market.key, shared::InvalidSharedBook);
+    let value = terms(market, book.kind, true)?;
+    same_terms(book, &value)
 }
 
 /// Inputs: book, outcome, side, raw price and quantity. Errors: wrong list/grid/range or zero units.
