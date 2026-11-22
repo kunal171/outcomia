@@ -8,6 +8,7 @@ import { CantonDeploymentNotice, CantonPageHeading } from "./workspace";
 import {
   amount,
   integer,
+  factoryRefKey,
   marketKey,
   obj,
   orderQuote,
@@ -19,7 +20,7 @@ import {
   type RecordValue,
 } from "../../lib/canton/model";
 import { assetRows } from "../../lib/canton/portfolio";
-import type { Intent } from "../../lib/canton/commands";
+import { mayCreate, type Intent } from "../../lib/canton/commands";
 import { walletError } from "../../lib/console-wallet";
 import { ResolutionPolicy } from "../resolution-policy";
 
@@ -213,8 +214,29 @@ export function marketLabel(contracts: Contract[], key: string) {
   );
   return market ? text(obj(marketRecord(market).terms).question) : "Market";
 }
+/** Route id of a market: protocol-root markets keep their number; factory
+ * markets are prefixed with their factory, since numbers repeat per factory. */
+export function marketRouteId(record: RecordValue): string {
+  const k = obj(record.key ?? record),
+    scope = record.key ? k.scope : record.factory,
+    id = text(k.marketId);
+  return scope
+    ? `f-${text(obj(scope).factoryId).replace(/[^A-Za-z0-9_]/g, "_")}-${id}`
+    : id;
+}
 export function marketLink(c: Contract) {
-  return `/canton/markets/${text(obj(marketRecord(c).key ?? marketRecord(c)).marketId)}`;
+  return `/canton/markets/${marketRouteId(marketRecord(c))}`;
+}
+/** The factory instance that issued a scoped market record, if any. */
+export function issuingFactory(contracts: Contract[], record: RecordValue) {
+  const scope = record.key ? obj(record.key).scope : record.factory;
+  if (!scope) return undefined;
+  const wanted = factoryRefKey(scope);
+  return contracts.find(
+    (c) =>
+      c.kind === "OutcomiaMarketFactory" &&
+      factoryRefKey(c.data.ref) === wanted,
+  );
 }
 export function MarketList() {
   const s = useCantonTrading(),
@@ -222,8 +244,14 @@ export function MarketList() {
     { t } = useI18n();
   const admin = s.catalog?.contracts.find((c) => c.kind === "Protocol")?.data
     .admins;
+  const party = wallet.session?.partyId;
   const canManage =
-    Array.isArray(admin) && admin.includes(wallet.session?.partyId);
+    (Array.isArray(admin) && admin.includes(party)) ||
+    (!!party &&
+      (s.catalog?.contracts ?? []).some(
+        (c) =>
+          c.kind === "OutcomiaMarketFactory" && mayCreate(c.data.policy, party),
+      ));
   return (
     <TradingFrame
       title="Predictions"
@@ -249,6 +277,7 @@ export function MarketList() {
                       : String(data.status),
                 )}{" "}
                 · {text(obj(terms.collateral).id)}
+                {data.access ? <> · {t("Invite only")}</> : null}
               </span>
             </Link>
           );
@@ -289,9 +318,7 @@ export function OrdersList() {
             {orders.map((c) => (
               <tr key={c.id}>
                 <td>
-                  <Link
-                    href={`/canton/markets/${text(obj(c.data.key).marketId)}`}
-                  >
+                  <Link href={`/canton/markets/${marketRouteId(c.data)}`}>
                     {marketLabel(s.catalog?.contracts ?? [], marketKey(c.data))}
                   </Link>
                 </td>
@@ -336,9 +363,7 @@ export function PositionsList() {
             no = lots.reduce((v, c) => v + integer(c.data.no), BigInt(0));
           return (
             <section className="canton-panel" key={key}>
-              <Link
-                href={`/canton/markets/${text(obj(lots[0].data.key).marketId)}`}
-              >
+              <Link href={`/canton/markets/${marketRouteId(lots[0].data)}`}>
                 {marketLabel(s.catalog?.contracts ?? [], key)}
               </Link>
               <p>
@@ -444,8 +469,7 @@ export function MarketDetail({ marketId }: { marketId: string }) {
     { t, locale } = useI18n(),
     [tab, setTab] = useState("Trade");
   const current = marketRecords(s.catalog?.contracts ?? []).find(
-    (c) =>
-      text(obj(marketRecord(c).key ?? marketRecord(c)).marketId) === marketId,
+    (c) => marketRouteId(marketRecord(c)) === marketId,
   );
   if (!current)
     return (
@@ -465,11 +489,20 @@ export function MarketDetail({ marketId }: { marketId: string }) {
     admins = policy?.data.admins;
   const admin = Array.isArray(admins) && admins.includes(party),
     operator = party === s.catalog?.deployment.operator;
+  // Factory markets are managed by the issuing factory's current admins only.
+  const factory = issuingFactory(s.catalog?.contracts ?? [], data),
+    scoped = Boolean(data.key ? obj(data.key).scope : data.factory),
+    factoryAdmin =
+      !!factory &&
+      Array.isArray(factory.data.admins) &&
+      factory.data.admins.includes(party);
   const manage =
     operator ||
-    (admin &&
-      (data.creator === party ||
-        (terms.fallback && obj(terms.fallback).resolver === party)));
+    (scoped
+      ? factoryAdmin
+      : admin &&
+        (data.creator === party ||
+          (terms.fallback && obj(terms.fallback).resolver === party)));
   const lots = s.owned.filter(
     (c) =>
       c.kind === "PositionLot" && c.data.owner === party && sameMarket(c, key),
@@ -660,7 +693,27 @@ export function MarketDetail({ marketId }: { marketId: string }) {
       ) : null}
       {tab === "Manage" && manage ? (
         <div className="canton-grid">
+          {current.kind === "BinaryMarket" && scoped && factoryAdmin ? (
+            <section className="canton-panel">
+              {data.status === "Open" ? (
+                <ActionForm
+                  label="Close market"
+                  fields={[{ name: "reason", label: "Reason" }]}
+                  build={(v) => ({
+                    action: "factoryClose",
+                    target: current.id,
+                    values: v,
+                  })}
+                />
+              ) : null}
+              {Date.now() >=
+              Date.parse(text(terms.earliestResolutionAt ?? terms.closeAt)) ? (
+                <ResolutionForm action="factoryPropose" target={current.id} />
+              ) : null}
+            </section>
+          ) : null}
           {current.kind === "BinaryMarket" &&
+          !scoped &&
           data.creator === party &&
           admin ? (
             <section className="canton-panel">
@@ -712,9 +765,9 @@ export function MarketDetail({ marketId }: { marketId: string }) {
               <p>
                 {t("Review ends")}: {text(data.finalizableAt)}
               </p>
-              {admin &&
-              party &&
-              resolverEligible(data, party) &&
+              {(scoped
+                ? factoryAdmin
+                : admin && party && resolverEligible(data, party)) &&
               Date.now() < Date.parse(text(data.finalizableAt)) ? (
                 <ResolutionForm action="correct" target={current.id} />
               ) : null}
@@ -728,6 +781,7 @@ export function MarketDetail({ marketId }: { marketId: string }) {
             </section>
           ) : null}
           {current.kind === "BinaryMarket" &&
+          !scoped &&
           data.creator !== party &&
           admin &&
           party &&
@@ -888,7 +942,7 @@ function ResolutionForm({
   action,
   target,
 }: {
-  action: "propose" | "fallbackPropose" | "correct";
+  action: "propose" | "fallbackPropose" | "factoryPropose" | "correct";
   target: string;
 }) {
   return (

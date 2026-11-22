@@ -16,6 +16,12 @@ export const templates = {
   LimitOrder: "Outcomia.Orders:LimitOrder",
   ResolutionProposal: "Outcomia.Resolution:ResolutionProposal",
   FinalResolution: "Outcomia.Resolution:FinalResolution",
+  OutcomiaMarketFactory: "Outcomia.Factory:OutcomiaMarketFactory",
+  InviteListPolicy: "Outcomia.Factory:InviteListPolicy",
+} as const;
+/** Interfaces of the open market-factory standard (separate package). */
+export const interfaces = {
+  MarketFactory: "Canton.MarketFactory:MarketFactory",
 } as const;
 export type Kind = keyof typeof templates;
 export type Contract = {
@@ -29,6 +35,8 @@ export type Contract = {
 export type Deployment = {
   network: string;
   packageId: string;
+  /** Package of the open market-factory standard (interface choices). */
+  factoryPackageId?: string;
   operator: string;
   vault: string;
   namespace: string;
@@ -59,6 +67,7 @@ export const publicKinds: Kind[] = [
   "OrderBook",
   "ResolutionProposal",
   "FinalResolution",
+  "OutcomiaMarketFactory",
 ];
 export function obj(value: unknown): RecordValue {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -100,12 +109,26 @@ export function integer(value: unknown): bigint {
     throw new Error("Invalid whole-contract quantity.");
   return BigInt(v);
 }
+/** Market identity, including the issuing factory scope: protocol-root market
+ * #1 and a factory's market #1 are different markets. Markets carry the scope
+ * as `factory`; reserves, books, orders and proposals carry it as `key.scope`. */
 export function marketKey(data: RecordValue): string {
   const k = obj(data.key ?? data);
+  const scope = data.key ? k.scope : data.factory;
   return JSON.stringify([
     text(k.operator),
     text(k.protocolName),
     integer(k.marketId).toString(),
+    scope ? factoryRefKey(scope) : null,
+  ]);
+}
+/** Stable text form of a standard FactoryRef or PolicyRef. */
+export function factoryRefKey(value: unknown): string {
+  const r = obj(value);
+  return JSON.stringify([
+    text(r.operator),
+    text(r.namespace),
+    text(r.factoryId ?? r.policyId),
   ]);
 }
 export function namespace(data: RecordValue): RecordValue {
@@ -118,6 +141,14 @@ export function belongs(data: RecordValue, deployment: Deployment): boolean {
     k.protocolName === deployment.namespace &&
     (data.vault === undefined || data.vault === deployment.vault)
   );
+}
+export function interfaceId(
+  d: Deployment,
+  name: keyof typeof interfaces,
+): string {
+  if (!d.factoryPackageId)
+    throw new Error("Market factory package is not configured.");
+  return `${d.factoryPackageId}:${interfaces[name]}`;
 }
 export function templateId(d: Deployment, kind: Kind): string {
   return `${d.packageId}:${templates[kind]}`;
@@ -156,7 +187,12 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
     if (seen.has(id)) throw new Error("Duplicate contract in ledger snapshot.");
     seen.add(id);
     const data = obj(e.createArgument);
-    const identity = kind === "FinalResolution" ? obj(data.proposal) : data;
+    const identity =
+      kind === "FinalResolution"
+        ? obj(data.proposal)
+        : kind === "InviteListPolicy"
+          ? { operator: data.operator, protocolName: obj(data.ref).namespace }
+          : data;
     if (
       kind === "AssetAdmission"
         ? data.operator !== d.operator
@@ -189,6 +225,16 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
       !["YesWins", "NoWins", "Invalid"].includes(String(data.outcome))
     )
       throw new Error("Invalid final outcome.");
+    if (kind === "OutcomiaMarketFactory") {
+      list(data.admins).forEach(text);
+      integer(data.nextNumber);
+      factoryRefKey(data.ref);
+    }
+    if (kind === "InviteListPolicy") {
+      text(data.manager);
+      list(data.parties).forEach(text);
+      factoryRefKey(data.ref);
+    }
     if (kind === "Protocol") {
       list(data.admins).forEach(text);
       integer(data.feeRevision);

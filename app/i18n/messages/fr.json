@@ -1064,5 +1064,16 @@
   "No multi-outcome positions yet.": "Aucune position multi-résultats pour l'instant.",
   "Multi-outcome": "Multi-résultats",
   "Multi-outcome orders": "Ordres multi-résultats",
-  "Manage →": "Gérer →"
+  "Manage →": "Gérer →",
+  "Factory": "Fabrique",
+  "Who can create": "Qui peut créer",
+  "Invite list": "Liste d'invités",
+  "Invite lists": "Listes d'invités",
+  "Invite only": "Sur invitation",
+  "Create invite list": "Créer une liste d'invités",
+  "Update invite list": "Mettre à jour la liste d'invités",
+  "Who can trade": "Qui peut négocier",
+  "Anyone": "Tout le monde",
+  "Factory admins only": "Administrateurs de la fabrique uniquement",
+  "Listed creators": "Créateurs listés"
 }

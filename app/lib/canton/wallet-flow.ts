@@ -47,7 +47,12 @@ export async function executeWallet(
     actAs: [session.partyId],
     readAs: [session.partyId],
     synchronizerId: d.synchronizerId,
-    packageIdSelectionPreference: [d.packageId],
+    // The factory standard's interface package is preferred alongside the
+    // implementation so interface choices resolve to this deployment.
+    packageIdSelectionPreference: [
+      d.packageId,
+      ...(d.factoryPackageId ? [d.factoryPackageId] : []),
+    ],
     disclosedContracts: disclosures,
   });
   const response = await send(request);
