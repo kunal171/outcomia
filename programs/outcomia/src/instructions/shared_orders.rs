@@ -57,14 +57,64 @@ pub fn handle_place_shared_order(
     quantity: u64,
     order_id: u64,
 ) -> Result<()> {
-    let book = &mut ctx.accounts.book;
-    rules::trading_open(book, &ctx.accounts.market.to_account_info())?;
+    rules::trading_open(&ctx.accounts.book, &ctx.accounts.market.to_account_info())?;
+    let accounts = &mut *ctx.accounts;
+    place_order(
+        &mut PlaceAccounts {
+            owner: accounts.owner.key(),
+            book: &mut accounts.book,
+            base_balance: &mut accounts.base_balance,
+            quote_balance: &mut accounts.quote_balance,
+            position: &mut accounts.position,
+            order: &mut accounts.order,
+            order_bump: ctx.bumps.order,
+            price_level: &mut accounts.price_level,
+            price_level_bump: ctx.bumps.price_level,
+            tail: &mut accounts.tail,
+            better_level: &mut accounts.better_level,
+            worse_level: &mut accounts.worse_level,
+        },
+        outcome,
+        side,
+        price,
+        quantity,
+        order_id,
+    )
+}
+
+/// Validated accounts of one placement, independent of the book's namespace.
+/// The caller has already checked that the book's market is trading.
+pub(crate) struct PlaceAccounts<'a, 'info> {
+    pub owner: Pubkey,
+    pub book: &'a mut Box<Account<'info, SharedBook>>,
+    pub base_balance: &'a mut Option<Box<Account<'info, AssetBalance>>>,
+    pub quote_balance: &'a mut Box<Account<'info, AssetBalance>>,
+    pub position: &'a mut Option<Box<Account<'info, PredictionPosition>>>,
+    pub order: &'a mut Box<Account<'info, SharedOrder>>,
+    pub order_bump: u8,
+    pub price_level: &'a mut Box<Account<'info, SharedPriceLevel>>,
+    pub price_level_bump: u8,
+    pub tail: &'a mut Option<Box<Account<'info, SharedOrder>>>,
+    pub better_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+    pub worse_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+}
+
+/// Placement shared by public and club books; see [`handle_place_shared_order`].
+pub(crate) fn place_order(
+    a: &mut PlaceAccounts,
+    outcome: SharedOutcome,
+    side: OrderSide,
+    price: u64,
+    quantity: u64,
+    order_id: u64,
+) -> Result<()> {
+    let book = &mut *a.book;
     rules::trader(
         book,
-        ctx.accounts.owner.key(),
-        ctx.accounts.base_balance.as_deref(),
-        &ctx.accounts.quote_balance,
-        ctx.accounts.position.as_deref(),
+        a.owner,
+        a.base_balance.as_deref(),
+        a.quote_balance,
+        a.position.as_deref(),
     )?;
     let (slot, amount) = rules::order_terms(book, outcome, side, price, quantity)?;
     require!(
@@ -91,8 +141,8 @@ pub fn handle_place_shared_order(
         .open_order_count
         .checked_add(1)
         .ok_or(shared::InvalidSharedBook)?;
-    let key = ctx.accounts.order.key();
-    let level = &mut ctx.accounts.price_level;
+    let key = a.order.key();
+    let level = &mut a.price_level;
     let is_new = level.market == Pubkey::default() && level.order_count == 0;
     let (previous, better_price, worse_price, level_count, level_total);
     if !is_new {
@@ -101,8 +151,8 @@ pub fn handle_place_shared_order(
             level.outcome == outcome
                 && level.side == side
                 && level.price == price
-                && ctx.accounts.better_level.is_none()
-                && ctx.accounts.worse_level.is_none(),
+                && a.better_level.is_none()
+                && a.worse_level.is_none(),
             shared::InvalidSharedNeighbor
         );
         let best = book.best_prices[slot].ok_or(shared::InvalidSharedBook)?;
@@ -114,11 +164,7 @@ pub fn handle_place_shared_order(
                 },
             shared::InvalidSharedNeighbor
         );
-        let tail = ctx
-            .accounts
-            .tail
-            .as_ref()
-            .ok_or(shared::InvalidSharedNeighbor)?;
+        let tail = a.tail.as_ref().ok_or(shared::InvalidSharedNeighbor)?;
         rules::order(tail, book)?;
         require!(
             level.last_order == Some(tail.key())
@@ -153,9 +199,9 @@ pub fn handle_place_shared_order(
             .checked_add(quantity)
             .ok_or(shared::InvalidSharedBook)?;
     } else {
-        require!(ctx.accounts.tail.is_none(), shared::InvalidSharedNeighbor);
-        let better = ctx.accounts.better_level.as_ref();
-        let worse = ctx.accounts.worse_level.as_ref();
+        require!(a.tail.is_none(), shared::InvalidSharedNeighbor);
+        let better = a.better_level.as_ref();
+        let worse = a.worse_level.as_ref();
         for value in [better, worse].into_iter().flatten() {
             rules::level(value, book)?;
             require!(
@@ -210,19 +256,19 @@ pub fn handle_place_shared_order(
         level_total = quantity;
     }
     if side == OrderSide::Bid {
-        let quote: &mut AssetBalance = &mut ctx.accounts.quote_balance;
+        let quote: &mut AssetBalance = a.quote_balance;
         rules::lock(&mut quote.free, &mut quote.locked, amount)?;
     } else {
         let (free, locked) = rules::base_buckets(
             book.kind,
             outcome,
-            ctx.accounts.base_balance.as_deref_mut(),
-            ctx.accounts.position.as_deref_mut(),
+            a.base_balance.as_deref_mut(),
+            a.position.as_deref_mut(),
         )?;
         rules::lock(free, locked, amount)?;
     }
     if is_new {
-        ctx.accounts.price_level.set_inner(SharedPriceLevel {
+        a.price_level.set_inner(SharedPriceLevel {
             book: book.key(),
             market: book.market,
             outcome,
@@ -234,43 +280,42 @@ pub fn handle_place_shared_order(
             last_order: Some(key),
             total_remaining_quantity: quantity,
             order_count: 1,
-            rent_payer: ctx.accounts.owner.key(),
-            bump: ctx.bumps.price_level,
+            rent_payer: a.owner,
+            bump: a.price_level_bump,
         });
-        if let Some(value) = ctx.accounts.better_level.as_mut() {
+        if let Some(value) = a.better_level.as_mut() {
             value.worse_price = Some(price);
         } else {
             book.best_prices[slot] = Some(price);
         }
-        if let Some(value) = ctx.accounts.worse_level.as_mut() {
+        if let Some(value) = a.worse_level.as_mut() {
             value.better_price = Some(price);
         }
     } else {
-        ctx.accounts
-            .tail
+        a.tail
             .as_mut()
             .ok_or(shared::InvalidSharedNeighbor)?
             .next_order = Some(key);
-        ctx.accounts.price_level.last_order = Some(key);
-        ctx.accounts.price_level.order_count = level_count;
-        ctx.accounts.price_level.total_remaining_quantity = level_total;
+        a.price_level.last_order = Some(key);
+        a.price_level.order_count = level_count;
+        a.price_level.total_remaining_quantity = level_total;
     }
-    ctx.accounts.order.set_inner(SharedOrder {
-        owner: ctx.accounts.owner.key(),
+    a.order.set_inner(SharedOrder {
+        owner: a.owner,
         market: book.market,
         book: book.key(),
         order_id,
         outcome,
         side,
         price,
-        price_level: ctx.accounts.price_level.key(),
+        price_level: a.price_level.key(),
         previous_order: previous,
         next_order: None,
         quantity,
         remaining_quantity: quantity,
         locked_collateral: amount,
         status: OrderStatus::Open,
-        bump: ctx.bumps.order,
+        bump: a.order_bump,
     });
     book.next_order_id = next_id;
     book.open_order_count = next_count;
@@ -314,25 +359,61 @@ pub struct CancelSharedOrder<'info> {
 /// # Returns
 /// `Ok(())` with free cash/contracts refunded and empty level rent returned to its original payer.
 pub fn handle_cancel_shared_order(ctx: Context<CancelSharedOrder>) -> Result<()> {
-    let book = &mut ctx.accounts.book;
+    let accounts = &mut *ctx.accounts;
+    cancel_order(&mut CancelAccounts {
+        owner: accounts.owner.key(),
+        book: &mut accounts.book,
+        base_balance: &mut accounts.base_balance,
+        quote_balance: &mut accounts.quote_balance,
+        position: &mut accounts.position,
+        order: &mut accounts.order,
+        price_level: &mut accounts.price_level,
+        previous_order: &mut accounts.previous_order,
+        next_order: &mut accounts.next_order,
+        better_level: &mut accounts.better_level,
+        worse_level: &mut accounts.worse_level,
+        level_rent_recipient: &accounts.level_rent_recipient,
+    })
+}
+
+/// Validated accounts of one cancellation. `owner` is the order's owner, whose
+/// claims receive the refund, whoever signed.
+pub(crate) struct CancelAccounts<'a, 'info> {
+    pub owner: Pubkey,
+    pub book: &'a mut Box<Account<'info, SharedBook>>,
+    pub base_balance: &'a mut Option<Box<Account<'info, AssetBalance>>>,
+    pub quote_balance: &'a mut Box<Account<'info, AssetBalance>>,
+    pub position: &'a mut Option<Box<Account<'info, PredictionPosition>>>,
+    pub order: &'a mut Box<Account<'info, SharedOrder>>,
+    pub price_level: &'a mut Box<Account<'info, SharedPriceLevel>>,
+    pub previous_order: &'a mut Option<Box<Account<'info, SharedOrder>>>,
+    pub next_order: &'a mut Option<Box<Account<'info, SharedOrder>>>,
+    pub better_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+    pub worse_level: &'a mut Option<Box<Account<'info, SharedPriceLevel>>>,
+    pub level_rent_recipient: &'a Option<UncheckedAccount<'info>>,
+}
+
+/// Cancellation shared by public and club books; see [`handle_cancel_shared_order`].
+pub(crate) fn cancel_order(a: &mut CancelAccounts) -> Result<()> {
+    let book = &mut *a.book;
     rules::trader(
         book,
-        ctx.accounts.owner.key(),
-        ctx.accounts.base_balance.as_deref(),
-        &ctx.accounts.quote_balance,
-        ctx.accounts.position.as_deref(),
+        a.owner,
+        a.base_balance.as_deref(),
+        a.quote_balance,
+        a.position.as_deref(),
     )?;
-    rules::order(&ctx.accounts.order, book)?;
-    let amount = ctx.accounts.order.locked_collateral;
-    let (free, locked) = if ctx.accounts.order.side == OrderSide::Bid {
-        let q: &mut AssetBalance = &mut ctx.accounts.quote_balance;
+    rules::order(a.order, book)?;
+    let amount = a.order.locked_collateral;
+    let (free, locked) = if a.order.side == OrderSide::Bid {
+        let q: &mut AssetBalance = a.quote_balance;
         (&mut q.free, &mut q.locked)
     } else {
         rules::base_buckets(
             book.kind,
-            ctx.accounts.order.outcome,
-            ctx.accounts.base_balance.as_deref_mut(),
-            ctx.accounts.position.as_deref_mut(),
+            a.order.outcome,
+            a.base_balance.as_deref_mut(),
+            a.position.as_deref_mut(),
         )?
     };
     let new_free = free
@@ -343,19 +424,19 @@ pub fn handle_cancel_shared_order(ctx: Context<CancelSharedOrder>) -> Result<()>
         .ok_or(balance::LockedBalanceUnderflow)?;
     rules::remove_order(
         book,
-        &ctx.accounts.order,
-        &mut ctx.accounts.price_level,
-        ctx.accounts.previous_order.as_deref_mut(),
-        ctx.accounts.next_order.as_deref_mut(),
-        ctx.accounts.better_level.as_deref_mut(),
-        ctx.accounts.worse_level.as_deref_mut(),
-        ctx.accounts.level_rent_recipient.as_ref(),
+        a.order,
+        a.price_level,
+        a.previous_order.as_deref_mut(),
+        a.next_order.as_deref_mut(),
+        a.better_level.as_deref_mut(),
+        a.worse_level.as_deref_mut(),
+        a.level_rent_recipient.as_ref(),
     )?;
     *free = new_free;
     *locked = new_locked;
-    ctx.accounts.order.status = OrderStatus::Canceled;
-    ctx.accounts.order.locked_collateral = 0;
-    ctx.accounts.order.previous_order = None;
-    ctx.accounts.order.next_order = None;
+    a.order.status = OrderStatus::Canceled;
+    a.order.locked_collateral = 0;
+    a.order.previous_order = None;
+    a.order.next_order = None;
     Ok(())
 }
