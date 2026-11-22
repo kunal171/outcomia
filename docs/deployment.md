@@ -8,9 +8,46 @@
 | Program ID                    | `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` |
 | ProgramData address           | `A4zPViwdWBgB7ttkEg5dGqumXJ7ZygogEwVHgUb3VBrY` |
 | Upgrade authority             | `BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq` |
-| Last verified deployment slot | `524674178`                                    |
+| Last verified deployment slot | `525062763`                                    |
 
 [Open the program in Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+
+## Clubs and private markets: 22 November 2026
+
+Upgrades devnet to the clubs build (milestones 1–5: clubs, membership, club
+fee share, binary club markets and club trading).
+
+- SHA-256: `7c4e706e98e1907dab2f92eba8aa0d56c74f335e770e85b72ba388347c0b1960`
+  (deployed bytes dumped and compared with the local build).
+- Length: 2,229,320 bytes; ProgramData was extended by 412,560 bytes (about
+  2.1 SOL, permanent). The buffer was closed and its rent refunded.
+- Upgrade transaction:
+  `NM9SfvSqAfWSP1z3CgfVmZmrWLU9Duhz5p3XjJpqpcbfEnStKMyedVr51oXbDSQtUFmuhAR7Leb5rPhvpv3iCjC`
+  (slot 525062763).
+- All 70 existing program accounts were hashed before and after the upgrade;
+  none changed, appeared or disappeared.
+- No governance setting changed: the taker fee stays at 10 bps and no club fee
+  share is configured (club fills credit the club nothing until the
+  super-admin sets one with `set_club_fee_share`).
+- [Club smoke result](devnet/club-smoke-result.json), produced by
+  `RPC=<url> WALLETS=<private path> RESULT=docs/devnet/club-smoke-result.json
+  node app/scripts/local-club-e2e.mjs <authority>`.
+
+The smoke used a fresh valueless mint and four temporary wallets funded by
+transfer, and created a club named "Smoke test - club" with a members-only
+market "Smoke test - club market". Club markets never appear in public
+discovery; the smoke club is visible only to its members.
+
+Devnet dropped and delayed transactions during the run. An early version of
+the script resent a removal whose first attempt had landed, which the program
+rejected (`AccountNotInitialized`): no state was double-applied. The script now
+signs once and rebroadcasts the same bytes, re-signing only after the
+signature provably expired without landing, and saves temporary keypairs
+before funding so interrupted runs can be swept. The first interrupted run
+predated that and stranded about 0.24 devnet SOL in unsaved wallets.
+
+Keep `NEXT_PUBLIC_CLUBS_ENABLED=false` on Vercel until the app with the club
+pages is deployed and checked.
 
 ## Release hardening and multi-outcome: 21 November 2026
 
