@@ -277,7 +277,10 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 .execute(&mut *tx)
                 .await?;
             }
-            "initialize_market" | "initialize_prediction_market" => {
+            // Club markets share the binary layout and payout rules.
+            "initialize_market"
+            | "initialize_prediction_market"
+            | "create_club_prediction_market" => {
                 // Binary payouts price complementary fills; spot has none.
                 let payout = if decimals.is_some() {
                     None
@@ -287,11 +290,14 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 sqlx::query("INSERT INTO execution_market_info(market,kind,base_decimals,payout_per_contract) VALUES($1,$2,$3,$4::text::numeric) ON CONFLICT DO NOTHING").bind(text(&accounts,"market")?).bind(if decimals.is_some(){"SPOT"}else{"BINARY"}).bind(decimals.unwrap_or(0)).bind(payout).execute(&mut *tx).await?;
             }
             "place_shared_order"
+            | "place_club_order"
             | "place_prediction_order"
             | "append_prediction_order"
             | "insert_prediction_order" => {
                 let selected = outcome(&args["outcome"])?;
-                let engine = if name == "place_shared_order" {
+                // Club books use the shared-book layout and rules, so their
+                // fills belong to the same SHARED_BINARY history and charts.
+                let engine = if matches!(name.as_str(), "place_shared_order" | "place_club_order") {
                     if selected == "spot" {
                         "SHARED_SPOT"
                     } else {
@@ -303,7 +309,7 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 sqlx::query("INSERT INTO execution_orders(address,market,engine,outcome,owner,side,price,remaining) VALUES($1,$2,$3,$4,$5,$6,$7::text::numeric,$8::text::numeric)")
                     .bind(text(&accounts,"order")?).bind(text(&accounts,"market")?).bind(engine).bind(selected).bind(text(&accounts,"owner")?).bind(variant(&args["side"])?).bind(text(&args,"price")?).bind(text(&args,"quantity")?).execute(&mut *tx).await?;
             }
-            "cancel_shared_order" | "cancel_prediction_order" => {
+            "cancel_shared_order" | "cancel_club_order" | "cancel_prediction_order" => {
                 let result =
                     sqlx::query("UPDATE execution_orders SET remaining=0 WHERE address=$1")
                         .bind(text(&accounts, "order")?)
@@ -313,7 +319,7 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                     return Err("historical cancellation is missing its order placement".into());
                 }
             }
-            "match_shared_order" | "match_prediction_order" => {
+            "match_shared_order" | "match_club_order" | "match_prediction_order" => {
                 if !state.get::<bool, _>("fee_known") {
                     return Err("historical fee configuration is missing".into());
                 }
@@ -359,7 +365,7 @@ async fn replay(pool: &PgPool, client: Arc<RpcClient>) -> Result<()> {
                 .execute(&mut *tx)
                 .await?;
             }
-            "match_shared_complement" => {
+            "match_shared_complement" | "match_club_complement" => {
                 // One complete-set fill trades both outcomes: the taker's at
                 // payout minus the maker price, the maker's at its own price.
                 if !state.get::<bool, _>("fee_known") {
@@ -731,6 +737,90 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap()
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn club_book_fills_replay_into_shared_binary_history(pool: PgPool) {
+        seed(
+            &pool,
+            vec![
+                ("initialize_protocol", json!({}), json!({})),
+                ("set_taker_fee", json!({"takerFeeBps":100}), json!({})),
+                (
+                    "create_club_prediction_market",
+                    json!({"config":{"payoutPerContract":"1000000"}}),
+                    json!({"market":"club-market"}),
+                ),
+                (
+                    "place_club_order",
+                    json!({"outcome":{"yes":{}},"side":{"ask":{}},"price":"600000","quantity":"2"}),
+                    json!({"market":"club-market","order":"yes-ask","owner":"alice"}),
+                ),
+                (
+                    "match_club_order",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"1"}),
+                    json!({"market":"club-market","makerOrder":"yes-ask","taker":"bob"}),
+                ),
+                (
+                    "place_club_order",
+                    json!({"outcome":{"no":{}},"side":{"bid":{}},"price":"300000","quantity":"2"}),
+                    json!({"market":"club-market","order":"no-bid","owner":"alice"}),
+                ),
+                (
+                    "match_club_complement",
+                    json!({"outcome":{"yes":{}},"takerSide":{"bid":{}},"quantity":"1"}),
+                    json!({"market":"club-market","makerOrder":"no-bid","taker":"bob"}),
+                ),
+                // A departed member's order cleared by someone else.
+                (
+                    "cancel_club_order",
+                    json!({}),
+                    json!({"order":"yes-ask","canceller":"carol"}),
+                ),
+            ],
+        )
+        .await;
+        let client = Arc::new(RpcClient::new("http://127.0.0.1:1"));
+        replay(&pool, Arc::clone(&client)).await.unwrap();
+        replay(&pool, client).await.unwrap();
+        let trades: Vec<(String, String, String, String, String, String)> = sqlx::query_as(
+            "SELECT execution_id,engine,outcome,price::text,quote_atoms::text,fee_atoms::text FROM indexed_trades ORDER BY transaction_index,execution_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let row = |id: &str, outcome: &str, price: &str, quote: &str, fee: &str| {
+            (
+                id.to_owned(),
+                "SHARED_BINARY".to_owned(),
+                outcome.to_owned(),
+                price.to_owned(),
+                quote.to_owned(),
+                fee.to_owned(),
+            )
+        };
+        // The club's fee share does not change what the taker paid.
+        assert_eq!(
+            trades,
+            vec![
+                row("signature-4:ix:0", "0", "600000", "600000", "6000"),
+                row("signature-6:ix:0", "0", "700000", "700000", "7000"),
+                row("signature-6:ix:0:maker", "1", "300000", "300000", "0"),
+            ]
+        );
+        let remaining: Vec<(String, String)> =
+            sqlx::query_as("SELECT address,remaining::text FROM execution_orders ORDER BY address")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            remaining,
+            vec![
+                ("no-bid".to_owned(), "1".to_owned()),
+                ("yes-ask".to_owned(), "0".to_owned()),
+            ]
         );
     }
 }
