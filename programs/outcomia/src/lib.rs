@@ -136,6 +136,24 @@ pub mod outcomia {
         crate::instructions::club_markets::handle_initialize_club_position(ctx)
     }
 
+    /// Splits cash into pairs (members only in members-only markets) or merges pairs.
+    pub fn club_complete_set(
+        ctx: Context<ClubPredictionCustody>,
+        quantity: u64,
+        split: bool,
+    ) -> Result<()> {
+        crate::instructions::club_custody::handle_club_complete_set(ctx, quantity, split)
+    }
+
+    /// Redeems resolved club-market contracts; open to every holder.
+    pub fn redeem_club_prediction(
+        ctx: Context<ClubPredictionCustody>,
+        yes: u64,
+        no: u64,
+    ) -> Result<()> {
+        crate::instructions::club_custody::handle_redeem_club_prediction(ctx, yes, no)
+    }
+
     /// Uploads a contiguous chunk for a large market's immutable terms.
     pub fn write_multi_outcome_terms(
         ctx: Context<WriteMultiOutcomeTerms>,

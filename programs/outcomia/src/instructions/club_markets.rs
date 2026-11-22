@@ -82,6 +82,30 @@ pub struct InitializeClubPosition<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Admits `wallet` to an entry action (split, placement, fill) in a club market.
+///
+/// Public markets admit everyone. Members-only markets require the wallet's
+/// current `ClubMember` record for the market's club. A record exists only
+/// while the wallet is a member, so removal takes effect immediately.
+///
+/// # Errors
+/// `ClubMembershipRequired` when the market is members-only and the record is
+/// missing or belongs to another club or wallet.
+pub(crate) fn require_club_access(
+    club_market: &ClubMarket,
+    member: Option<&ClubMember>,
+    wallet: Pubkey,
+) -> Result<()> {
+    if club_market.access == ClubMarketAccess::Public {
+        return Ok(());
+    }
+    require!(
+        member.is_some_and(|m| m.club == club_market.club && m.wallet == wallet),
+        club::ClubMembershipRequired
+    );
+    Ok(())
+}
+
 /// Creates a draft binary market owned by a club.
 ///
 /// # Inputs

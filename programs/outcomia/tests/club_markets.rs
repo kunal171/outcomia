@@ -8,7 +8,7 @@ use anchor_lang::{
     solana_program::{instruction::Instruction, program_pack::Pack, system_program},
     AccountDeserialize, InstructionData, ToAccountMetas,
 };
-use anchor_spl::token::spl_token::state::Mint;
+use anchor_spl::token::spl_token::state::{Account as TokenState, AccountState, Mint};
 use litesvm::LiteSVM;
 use outcomia::{constants::*, prediction_config::PredictionMarketConfig, state::*};
 use solana_account::Account;
@@ -214,6 +214,132 @@ impl Fixture {
     }
     fn market(&self) -> PredictionMarket {
         self.load(&market_pda(&MARKET_ID)).unwrap()
+    }
+
+    fn token_amount(&self, address: &Pubkey) -> u64 {
+        TokenState::unpack(&self.svm.get_account(address).unwrap().data)
+            .unwrap()
+            .amount
+    }
+    fn balance_pda(&self, owner: &Pubkey) -> Pubkey {
+        pda(ASSET_BALANCE_SEED, &[owner.as_ref(), self.mint.as_ref()])
+    }
+    fn free_cash(&self, owner: &Pubkey) -> u64 {
+        self.load::<AssetBalance>(&self.balance_pda(owner))
+            .unwrap()
+            .free
+    }
+    fn position(&self, owner: &Pubkey) -> PredictionPosition {
+        let market = market_pda(&MARKET_ID);
+        self.load(&pda(
+            PREDICTION_POSITION_SEED,
+            &[market.as_ref(), owner.as_ref()],
+        ))
+        .unwrap()
+    }
+    /// Deposits `amount` collateral atoms into the wallet's shared balance and
+    /// creates its club position.
+    fn fund(&mut self, wallet: &Keypair, amount: u64) {
+        let token = Pubkey::new_unique();
+        let state = TokenState {
+            mint: self.mint,
+            owner: wallet.pubkey(),
+            amount,
+            delegate: None.into(),
+            state: AccountState::Initialized,
+            is_native: None.into(),
+            delegated_amount: 0,
+            close_authority: None.into(),
+        };
+        let mut data = vec![0; TokenState::LEN];
+        TokenState::pack(state, &mut data).unwrap();
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len());
+        self.svm
+            .set_account(
+                token,
+                Account {
+                    lamports,
+                    data,
+                    owner: anchor_spl::token::ID,
+                    executable: false,
+                    rent_epoch: 0,
+                },
+            )
+            .unwrap();
+        let (owner, mint) = (wallet.pubkey(), self.mint);
+        let balance = self.balance_pda(&owner);
+        let authority = pda(ASSET_AUTHORITY_SEED, &[mint.as_ref()]);
+        let vault = pda(ASSET_VAULT_SEED, &[mint.as_ref()]);
+        self.ok(
+            wallet,
+            ix(
+                outcomia::accounts::InitializeAssetBalance {
+                    owner,
+                    mint,
+                    asset_balance: balance,
+                    vault_authority: authority,
+                    asset_vault: vault,
+                    token_program: anchor_spl::token::ID,
+                    system_program: system_program::ID,
+                },
+                outcomia::instruction::InitializeAssetBalance {},
+            ),
+        );
+        self.ok(
+            wallet,
+            ix(
+                outcomia::accounts::TransferAsset {
+                    owner,
+                    mint,
+                    asset_balance: balance,
+                    wallet_token: token,
+                    vault_authority: authority,
+                    asset_vault: vault,
+                    token_program: anchor_spl::token::ID,
+                },
+                outcomia::instruction::DepositAsset { amount },
+            ),
+        );
+        self.ok(wallet, self.init_position(&owner));
+    }
+    fn custody_accounts(
+        &self,
+        owner: &Pubkey,
+        with_member: bool,
+    ) -> outcomia::accounts::ClubPredictionCustody {
+        let market = market_pda(&MARKET_ID);
+        outcomia::accounts::ClubPredictionCustody {
+            owner: *owner,
+            market,
+            club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+            member: with_member.then(|| self.member_pda(owner)),
+            position: pda(PREDICTION_POSITION_SEED, &[market.as_ref(), owner.as_ref()]),
+            mint: self.mint,
+            asset_balance: self.balance_pda(owner),
+            asset_authority: pda(ASSET_AUTHORITY_SEED, &[self.mint.as_ref()]),
+            asset_vault: pda(ASSET_VAULT_SEED, &[self.mint.as_ref()]),
+            market_authority: pda(VAULT_AUTHORITY_SEED, &[market.as_ref()]),
+            market_vault: pda(VAULT_SEED, &[market.as_ref(), self.mint.as_ref()]),
+            token_program: anchor_spl::token::ID,
+        }
+    }
+    fn complete_set(
+        &self,
+        owner: &Pubkey,
+        with_member: bool,
+        quantity: u64,
+        split: bool,
+    ) -> Instruction {
+        ix(
+            self.custody_accounts(owner, with_member),
+            outcomia::instruction::ClubCompleteSet { quantity, split },
+        )
+    }
+    fn market_vault(&self) -> Pubkey {
+        pda(
+            VAULT_SEED,
+            &[market_pda(&MARKET_ID).as_ref(), self.mint.as_ref()],
+        )
     }
 
     fn create_market(
@@ -557,4 +683,163 @@ fn anyone_holds_a_club_position_but_public_instructions_cannot_reach_club_market
     );
     f.set_clock(200);
     f.fails(&owner, public_freeze, "ConstraintSeeds");
+}
+
+#[test]
+fn members_split_and_merge_with_exact_backing() {
+    let mut f = Fixture::new();
+    f.open_market(ClubMarketAccess::MembersOnly);
+    let member = f.join(false);
+    f.fund(&member, 10 * PAYOUT);
+    f.ok(&member, f.complete_set(&member.pubkey(), true, 4, true));
+    let p = f.position(&member.pubkey());
+    assert_eq!((p.yes_free, p.no_free), (4, 4));
+    let m = f.market();
+    assert_eq!(
+        (m.yes_supply, m.no_supply, m.backing_reserve),
+        (4, 4, 4 * PAYOUT)
+    );
+    assert_eq!(f.token_amount(&f.market_vault()), 4 * PAYOUT);
+    assert_eq!(f.free_cash(&member.pubkey()), 6 * PAYOUT);
+
+    f.ok(&member, f.complete_set(&member.pubkey(), false, 1, false));
+    assert_eq!(f.market().backing_reserve, 3 * PAYOUT);
+    assert_eq!(f.token_amount(&f.market_vault()), 3 * PAYOUT);
+    assert_eq!(f.free_cash(&member.pubkey()), 7 * PAYOUT);
+}
+
+#[test]
+fn members_only_splits_need_current_membership_but_merges_never_do() {
+    let mut f = Fixture::new();
+    f.open_market(ClubMarketAccess::MembersOnly);
+    let member = f.join(false);
+    let outsider = f.wallet();
+    f.fund(&member, 10 * PAYOUT);
+    f.fund(&outsider, 10 * PAYOUT);
+    f.fails(
+        &outsider,
+        f.complete_set(&outsider.pubkey(), false, 1, true),
+        "ClubMembershipRequired",
+    );
+    // Another wallet's membership is not a pass.
+    let mut borrowed = f.complete_set(&outsider.pubkey(), false, 1, true);
+    borrowed.accounts[3] = anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+        f.member_pda(&member.pubkey()),
+        false,
+    );
+    f.fails(&outsider, borrowed, "ClubMembershipRequired");
+    // Membership of a different club is not a pass either.
+    let rival = f.wallet();
+    let rival_club = pda(CLUB_SEED, &[&[9; 32]]);
+    f.ok(
+        &rival,
+        ix(
+            outcomia::accounts::CreateClub {
+                owner: rival.pubkey(),
+                club: rival_club,
+                owner_member: pda(
+                    CLUB_MEMBER_SEED,
+                    &[rival_club.as_ref(), rival.pubkey().as_ref()],
+                ),
+                system_program: system_program::ID,
+            },
+            outcomia::instruction::CreateClub {
+                club_id: [9; 32],
+                name: "Rival".into(),
+            },
+        ),
+    );
+    f.fund(&rival, PAYOUT);
+    let mut foreign = f.complete_set(&rival.pubkey(), false, 1, true);
+    foreign.accounts[3] = anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+        pda(
+            CLUB_MEMBER_SEED,
+            &[rival_club.as_ref(), rival.pubkey().as_ref()],
+        ),
+        false,
+    );
+    f.fails(&rival, foreign, "ClubMembershipRequired");
+
+    f.ok(&member, f.complete_set(&member.pubkey(), true, 3, true));
+    f.remove(&member.pubkey());
+    f.fails(
+        &member,
+        f.complete_set(&member.pubkey(), false, 1, true),
+        "ClubMembershipRequired",
+    );
+    // The former member still exits, with no membership account at all.
+    f.ok(&member, f.complete_set(&member.pubkey(), false, 3, false));
+    assert_eq!(f.free_cash(&member.pubkey()), 10 * PAYOUT);
+    assert_eq!(f.market().backing_reserve, 0);
+}
+
+#[test]
+fn public_club_markets_let_anyone_split() {
+    let mut f = Fixture::new();
+    f.open_market(ClubMarketAccess::Public);
+    let outsider = f.wallet();
+    f.fund(&outsider, 2 * PAYOUT);
+    f.ok(
+        &outsider,
+        f.complete_set(&outsider.pubkey(), false, 2, true),
+    );
+    assert_eq!(f.position(&outsider.pubkey()).yes_free, 2);
+}
+
+#[test]
+fn club_splits_follow_the_market_lifecycle() {
+    let mut f = Fixture::new();
+    let owner = f.owner.insecure_clone();
+    f.ok(
+        &owner,
+        f.create_market(
+            &owner.pubkey(),
+            MARKET_ID,
+            config(&owner.pubkey()),
+            ClubMarketAccess::Public,
+        ),
+    );
+    f.fund(&owner, 5 * PAYOUT);
+    f.fails(
+        &owner,
+        f.complete_set(&owner.pubkey(), true, 1, true),
+        "PredictionSplitUnavailable",
+    );
+    f.ok(&owner, f.manage(&owner.pubkey(), true));
+    f.ok(&owner, f.complete_set(&owner.pubkey(), true, 2, true));
+    f.ok(&owner, f.manage(&owner.pubkey(), false));
+    f.fails(
+        &owner,
+        f.complete_set(&owner.pubkey(), true, 1, true),
+        "PredictionSplitUnavailable",
+    );
+    f.ok(&owner, f.complete_set(&owner.pubkey(), true, 2, false));
+}
+
+#[test]
+fn public_custody_cannot_touch_club_market_reserves() {
+    let mut f = Fixture::new();
+    f.open_market(ClubMarketAccess::Public);
+    let owner = f.owner.insecure_clone();
+    f.fund(&owner, 5 * PAYOUT);
+    let c = f.custody_accounts(&owner.pubkey(), false);
+    let public = ix(
+        outcomia::accounts::SharedPredictionCustody {
+            owner: c.owner,
+            market: c.market,
+            position: c.position,
+            mint: c.mint,
+            asset_balance: c.asset_balance,
+            asset_authority: c.asset_authority,
+            asset_vault: c.asset_vault,
+            market_authority: c.market_authority,
+            market_vault: c.market_vault,
+            token_program: c.token_program,
+        },
+        outcomia::instruction::SharedCompleteSet {
+            quantity: 1,
+            split: true,
+        },
+    );
+    f.fails(&owner, public, "ConstraintSeeds");
 }
