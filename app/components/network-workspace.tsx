@@ -1,4 +1,5 @@
 "use client";
+import { APP_HOME } from "../lib/routes";
 
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -35,7 +36,18 @@ export function NetworkHeader() {
  * This is UI isolation, not authorization: each backend must enforce ownership.
  * A remembered URL cannot select a network or grant access to a workspace.
  */
+/** Routes rendered without a wallet: the landing page, the password gate and
+ * the design reference. */
+const PUBLIC_ROUTES = new Set(["/", "/unlock", "/design"]);
+export { APP_HOME };
+
 export function NetworkBoundary({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  if (PUBLIC_ROUTES.has(pathname)) return <>{children}</>;
+  return <WalletBoundary>{children}</WalletBoundary>;
+}
+
+function WalletBoundary({ children }: { children: ReactNode }) {
   const { chain, ready, busy } = useNetworkWallet();
   const pathname = usePathname();
   const router = useRouter();
@@ -46,13 +58,13 @@ export function NetworkBoundary({ children }: { children: ReactNode }) {
   const allowed =
     chain === "canton"
       ? cantonRoute
-      : chain === "solana" && !cantonRoute && pathname !== "/";
+      : chain === "solana" && !cantonRoute && pathname !== APP_HOME;
   useEffect(() => {
     if (!ready || busy) return;
     if (chain && !allowed) router.replace(destination);
-    else if (!chain && pathname !== "/") router.replace("/");
+    else if (!chain && pathname !== APP_HOME) router.replace(APP_HOME);
   }, [chain, ready, busy, allowed, destination, pathname, router]);
-  if (pathname === "/" && !chain) return <>{children}</>;
+  if (pathname === APP_HOME && !chain) return <>{children}</>;
   if (!ready || busy || !allowed)
     return (
       <main className="network-wait" role="status">

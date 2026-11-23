@@ -58,7 +58,7 @@
 }
 .wallet-summary strong {
   display: block;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-sans);
   font-size: clamp(25px, 3vw, 38px);
   margin: 16px 0 12px;
   color: var(--ink);
@@ -69,7 +69,7 @@
   color: var(--buy);
 }
 .wallet-summary strong small {
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   font-size: 13px;
   color: var(--muted);
   font-weight: 400;
