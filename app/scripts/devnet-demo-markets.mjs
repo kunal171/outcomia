@@ -419,9 +419,25 @@ async function seed() {
   async function send(label, ixs, signers) {
     if (done(label)) return console.log(`skip ${label}`);
     const tx = ixs instanceof Transaction ? ixs : new Transaction().add(...ixs);
-    const signature = await sendAndConfirmTransaction(conn, tx, signers, {
-      commitment: "confirmed",
-    });
+    let signature;
+    try {
+      signature = await sendAndConfirmTransaction(conn, tx, signers, {
+        commitment: "confirmed",
+      });
+    } catch (cause) {
+      // A transaction can land after the client's blockhash expires. Never
+      // resend a step that already succeeded on chain.
+      const sent = cause?.signature;
+      const status = sent
+        ? (
+            await conn.getSignatureStatus(sent, {
+              searchTransactionHistory: true,
+            })
+          ).value
+        : null;
+      if (!status || status.err) throw cause;
+      signature = sent;
+    }
     report.steps.push({ label, signature });
     save();
     console.log(`ok  ${label}`);
