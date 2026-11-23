@@ -501,32 +501,34 @@ export function WalletWorkspace() {
                         ) : (
                           <p className="wallet-incomplete">{item.issue}</p>
                         )}
-                        {market && labels && (
-                          <>
-                            <LegacyBalanceTransfer
-                              market={balance.market}
-                              mint={market.baseMint}
-                              amount={balance.baseFree}
-                              symbol={labels.base}
-                              kind="spot"
-                              onChanged={() => setRevision((v) => v + 1)}
-                            />
-                            <LegacyBalanceTransfer
-                              market={balance.market}
-                              mint={market.quoteMint}
-                              amount={balance.quoteFree}
-                              symbol={labels.quote}
-                              kind="spot"
-                              onChanged={() => setRevision((v) => v + 1)}
-                            />
-                          </>
-                        )}
-                        <Link
-                          className="market-open-link"
-                          href={`/markets/${balance.market.toBase58()}#balances`}
-                        >
-                          {t("Deposit / withdraw →")}
-                        </Link>
+                        <div className="market-card-actions wallet-card-actions">
+                          {market && labels && (
+                            <>
+                              <LegacyBalanceTransfer
+                                market={balance.market}
+                                mint={market.baseMint}
+                                amount={balance.baseFree}
+                                symbol={labels.base}
+                                kind="spot"
+                                onChanged={() => setRevision((v) => v + 1)}
+                              />
+                              <LegacyBalanceTransfer
+                                market={balance.market}
+                                mint={market.quoteMint}
+                                amount={balance.quoteFree}
+                                symbol={labels.quote}
+                                kind="spot"
+                                onChanged={() => setRevision((v) => v + 1)}
+                              />
+                            </>
+                          )}
+                          <Link
+                            className="market-open-link"
+                            href={`/markets/${balance.market.toBase58()}#balances`}
+                          >
+                            {t("Deposit / withdraw →")}
+                          </Link>
+                        </div>
                       </article>
                     );
                   })}
@@ -638,22 +640,24 @@ export function WalletWorkspace() {
                         ) : (
                           <p className="wallet-incomplete">{item.issue}</p>
                         )}
-                        {market && (
-                          <LegacyBalanceTransfer
-                            market={balance.market}
-                            mint={market.collateralMint}
-                            amount={balance.collateralFree}
-                            symbol={symbol}
-                            kind="prediction"
-                            onChanged={() => setRevision((v) => v + 1)}
-                          />
-                        )}
-                        <Link
-                          className="market-open-link"
-                          href={`/predictions/${balance.market.toBase58()}#position`}
-                        >
-                          {t("Manage position →")}
-                        </Link>
+                        <div className="market-card-actions wallet-card-actions">
+                          {market && (
+                            <LegacyBalanceTransfer
+                              market={balance.market}
+                              mint={market.collateralMint}
+                              amount={balance.collateralFree}
+                              symbol={symbol}
+                              kind="prediction"
+                              onChanged={() => setRevision((v) => v + 1)}
+                            />
+                          )}
+                          <Link
+                            className="market-open-link"
+                            href={`/predictions/${balance.market.toBase58()}#position`}
+                          >
+                            {t("Manage position →")}
+                          </Link>
+                        </div>
                       </article>
                     );
                   })}
