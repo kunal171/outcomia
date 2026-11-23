@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "question": "Which range will Ethereum's CoinGecko daily close for 31 December 2026 fall in?",
+  "description": "ETH traded near $1,820 on 22 November 2026.",
+  "resolutionSource": "CoinGecko daily USD price page for the asset (coingecko.com), cross-checked with Coinbase and Kraken spot prices.",
+  "resolutionRules": {
+    "outcomes": [
+      {
+        "label": "Below $1,500",
+        "criteria": "Daily close below $1,500.00."
+      },
+      {
+        "label": "$1,500-$2,000",
+        "criteria": "Daily close from $1,500.00 up to and including $2,000.00."
+      },
+      {
+        "label": "$2,000-$2,500",
+        "criteria": "Daily close above $2,000.00 up to and including $2,500.00."
+      },
+      {
+        "label": "Above $2,500",
+        "criteria": "Daily close above $2,500.00."
+      }
+    ],
+    "invalidRefund": "Each outcome contract refunds an equal share of one collateral token on Invalid; contract quantities must use the configured exact refund lot.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798754400,
+  "earliestResolutionTimestamp": 1798765200,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}
