@@ -134,6 +134,22 @@ export function factoryRefKey(value: unknown): string {
     text(r.factoryId ?? r.policyId),
   ]);
 }
+/** True when a market record was issued by a club factory (creation policy
+ * `ByPolicy`). Protocol-root markets and other factories are not club markets. */
+export function clubScoped(
+  contracts: Contract[],
+  record: RecordValue,
+): boolean {
+  const scope = record.key ? obj(record.key).scope : record.factory;
+  if (!scope) return false;
+  const wanted = factoryRefKey(scope);
+  const factory = contracts.find(
+    (c) =>
+      c.kind === "OutcomiaMarketFactory" &&
+      factoryRefKey(c.data.ref) === wanted,
+  );
+  return !!factory && obj(factory.data.policy).tag === "ByPolicy";
+}
 export function namespace(data: RecordValue): RecordValue {
   return obj(data.key ?? data);
 }
