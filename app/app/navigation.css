@@ -283,7 +283,7 @@ body:has(.sidebar-drawer[open]) {
 }
 .sidebar-brand-name {
   color: var(--ink);
-  font-family: "Space Grotesk", "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   font-size: 18px;
   font-weight: 700;
   text-decoration: none;

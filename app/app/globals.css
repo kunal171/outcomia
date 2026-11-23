@@ -1,7 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
-
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   color: var(--ink);
   background: var(--background);
   font-synthesis: none;
@@ -127,7 +125,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--muted);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -147,7 +145,7 @@ a {
   border-radius: 10px !important;
   background: var(--mint-dark) !important;
   color: var(--mint) !important;
-  font-family: "DM Sans", sans-serif !important;
+  font-family: var(--font-sans) !important;
   font-size: 13px !important;
 }
 
@@ -162,7 +160,7 @@ a {
 .wallet-adapter-modal-title,
 .wallet-adapter-modal-list .wallet-adapter-button {
   color: var(--ink);
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
 }
 .wallet-adapter-modal-button-close,
 .wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover,
@@ -181,7 +179,7 @@ a {
 .eyebrow,
 .card-label {
   color: var(--mint);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.1em;
@@ -211,7 +209,7 @@ a {
 .hero-meta {
   gap: 18px;
   margin-top: 34px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -290,7 +288,7 @@ a {
   background: transparent;
   color: var(--mint);
   cursor: pointer;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -330,7 +328,7 @@ footer {
   padding: 26px 0 34px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-transform: uppercase;
 }
@@ -343,7 +341,7 @@ footer {
   border-radius: 999px;
   background: rgb(var(--accent-rgb) / 0.09);
   color: var(--mint);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -526,7 +524,7 @@ footer {
   outline: none;
   background: var(--surface-inset);
   color: var(--ink);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   text-transform: none;
 }
@@ -692,13 +690,13 @@ footer {
 
 .admin-row strong {
   margin-right: 10px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
 .admin-row p {
   margin: 6px 0 0;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
 }
 
@@ -1025,7 +1023,7 @@ select:focus-visible {
 }
 
 .order-details strong {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   text-transform: none;
 }
@@ -1083,7 +1081,7 @@ select:focus-visible {
 
 .market-summary strong {
   color: var(--mint);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 30px;
 }
 
@@ -1127,7 +1125,7 @@ select:focus-visible {
 .market-card-heading strong {
   display: block;
   margin-top: 8px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
 }
 
 .market-address-caption,
@@ -1135,7 +1133,7 @@ select:focus-visible {
   display: block;
   margin-top: 6px;
   color: var(--muted);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
 }
 
@@ -1175,7 +1173,7 @@ select:focus-visible {
 
 .market-pair strong,
 .market-metadata dd {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1209,7 +1207,7 @@ select:focus-visible {
   display: inline-block;
   margin-top: 22px;
   color: var(--mint);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   text-underline-offset: 4px;
 }
@@ -1244,7 +1242,7 @@ select:focus-visible {
 .market-detail-back {
   margin-bottom: 28px;
   color: var(--mint);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1284,7 +1282,7 @@ select:focus-visible {
 .market-settings-address code {
   margin-left: 6px;
   color: var(--ink);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -1413,7 +1411,7 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px;
   gap: 12px;
   padding: 10px 18px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1521,7 +1519,7 @@ select:focus-visible {
 
 .market-detail-pair strong {
   overflow-wrap: anywhere;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1679,7 +1677,7 @@ h2,
 h3,
 .brand,
 .market-symbol-pair {
-  font-family: "Space Grotesk", "DM Sans", sans-serif;
+  font-family: var(--font-sans);
 }
 button,
 input,
@@ -1774,7 +1772,7 @@ textarea {
 .market-create-form input,
 .market-create-form select,
 .market-create-form textarea {
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   font-size: 15px;
 }
 .rules-editor {

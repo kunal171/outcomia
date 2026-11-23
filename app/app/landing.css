@@ -553,7 +553,7 @@
 }
 .journey-step > span {
   color: var(--accent);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 .journey-step h3 {
