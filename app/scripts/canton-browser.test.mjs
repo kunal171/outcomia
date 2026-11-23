@@ -198,7 +198,8 @@ try {
   );
   assert.deepEqual(commands[0].actAs, [party]);
   await page.getByRole("link", { name: "Positions", exact: true }).click();
-  await page.getByText("YES 5 · NO 5").waitFor();
+  await page.getByText("YES 5", { exact: true }).waitFor();
+  await page.getByText("NO 5", { exact: true }).waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: join(output, "positions-mobile.png"),

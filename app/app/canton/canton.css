@@ -1,5 +1,6 @@
-/* Canton uses the same Outcomia palette and typography, with an independent
-   shell so switching networks cannot retain the Solana sidebar's layout state. */
+/* Canton workspace on the Outcomia design system (docs/design-system.md). An
+   independent shell, so switching networks cannot retain the Solana sidebar's
+   layout state. */
 body:has(.canton-shell) {
   padding-left: 0;
 }
@@ -17,15 +18,21 @@ body:has(.canton-shell) {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 30px 16px 24px;
+  padding: var(--space-5) var(--space-3);
   border-right: 1px solid var(--line);
+  background: linear-gradient(
+    180deg,
+    rgb(var(--surface-rgb) / 0.7),
+    rgb(var(--surface-rgb) / 0.2)
+  );
 }
 .canton-brand-row {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 42px;
-  margin-bottom: 40px;
+  margin-bottom: var(--space-7);
+  padding-inline: var(--space-2);
 }
 .canton-brand-toggle {
   display: grid;
@@ -38,27 +45,32 @@ body:has(.canton-shell) {
   cursor: pointer;
 }
 .canton-brand-name {
+  color: var(--ink);
   text-decoration: none;
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
 }
 .canton-nav {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--space-1);
 }
 .canton-nav a {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 46px;
-  padding: 12px;
-  border-radius: 9px;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
   color: var(--muted);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
 }
 .canton-nav a > svg {
   flex-shrink: 0;
@@ -69,8 +81,23 @@ body:has(.canton-shell) {
   background: rgb(var(--accent-rgb) / 0.07);
 }
 .canton-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.canton-nav a[aria-current="page"] > svg {
   color: var(--accent);
-  background: rgb(var(--accent-rgb) / 0.12);
+}
+.canton-sidebar .canton-nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-3));
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
 }
 .canton-sidebar-footer {
   display: flex;
@@ -90,7 +117,7 @@ body:has(.canton-shell) {
   display: none;
 }
 .canton-content {
-  width: min(1180px, calc(100% - 80px));
+  width: min(var(--page-width), calc(100% - 64px));
   min-width: 0;
   margin: 0 auto;
 }
@@ -98,8 +125,8 @@ body:has(.canton-shell) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 100px;
+  gap: var(--space-4);
+  min-height: 72px;
   border-bottom: 1px solid var(--line);
 }
 .canton-mobile-brand,
@@ -113,7 +140,11 @@ body:has(.canton-shell) {
   min-width: 0;
 }
 .canton-party-link {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
   color: var(--muted);
+  font-family: var(--font-mono);
   font-size: 12px;
   text-decoration: none;
 }
@@ -126,21 +157,24 @@ body:has(.canton-shell) {
   padding: 8px 10px;
 }
 .canton-main {
-  padding: 54px 0 64px;
+  padding: var(--space-7) 0 var(--space-9);
+  animation: lp-rise 500ms var(--ease-out) both;
 }
 .canton-page-heading {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 32px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 .canton-page-heading h1 {
   margin: 0;
-  font-size: clamp(34px, 4.2vw, 54px);
+  font-size: var(--text-h1);
   font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 1.1;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 .canton-deployment-note {
   display: flex;
@@ -593,108 +627,250 @@ body:has(.canton-shell) {
 .canton-tabs {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-2);
   flex-wrap: wrap;
+}
+.canton-toolbar a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 550;
+  text-decoration: none;
+}
+.canton-toolbar a:hover {
+  color: var(--ink);
+  background: rgb(var(--ink-rgb) / 0.06);
 }
 .canton-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 24px;
-  margin-block: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-5);
+  align-items: start;
+  margin-block: var(--space-5);
 }
 .canton-panel {
-  padding: 24px;
+  padding: var(--space-5);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgb(var(--ink-rgb) / 0.025), transparent 40%),
+    var(--surface-1);
   min-width: 0;
 }
 .canton-panel h2 {
-  font-size: 1.15rem;
-  margin: 0 0 18px;
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.canton-panel h3 {
+  margin: var(--space-5) 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .canton-message {
-  padding: 14px 18px;
-  border-inline-start: 3px solid var(--accent);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 2px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgb(var(--accent-rgb) / 0.06);
   overflow-wrap: anywhere;
+}
+.canton-message[role="alert"] {
+  border-color: var(--no);
+  background: rgb(var(--no-rgb) / 0.07);
 }
 .canton-market-list {
   display: grid;
-  gap: 16px;
+  border-top: 1px solid var(--line);
 }
 .canton-market-row {
-  padding: 22px 0;
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-7) var(--space-4) var(--space-3);
+  margin-inline: calc(-1 * var(--space-3));
   border-bottom: 1px solid var(--line);
-  display: block;
+  border-radius: var(--radius-md);
   color: inherit;
   text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out);
 }
-.canton-market-row:hover h2 {
-  text-decoration: underline;
+.canton-market-row::after {
+  content: "→";
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--muted);
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.canton-market-row:hover {
+  background: rgb(var(--accent-rgb) / 0.06);
+}
+.canton-market-row:hover::after {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+.canton-market-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .canton-market-row h2 {
-  font-size: 1.25rem;
-  margin: 0 0 12px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.canton-market-row > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-small);
 }
 .canton-market-meta {
-  margin-block: 16px;
+  margin-block: 0 var(--space-5);
   color: var(--muted);
 }
+.canton-market-meta > * {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 550;
+}
 .canton-tabs {
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 24px;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-1);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+  overflow-x: auto;
 }
 .canton-tabs button {
-  background: none;
+  min-height: 36px;
+  padding: 0 var(--space-4);
   border: 0;
-  padding: 14px 6px;
-  color: inherit;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 550;
+  white-space: nowrap;
   cursor: pointer;
 }
+.canton-tabs button:hover {
+  color: var(--ink);
+}
 .canton-tabs button[aria-pressed="true"] {
-  border-color: var(--accent);
-  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.canton-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .canton-form fieldset {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--space-4);
   border: 0;
   padding: 0;
-  margin: 16px 0;
+  margin: var(--space-4) 0;
+  min-width: 0;
 }
 .canton-form label {
   display: grid;
-  gap: 8px;
-  font-size: 0.9rem;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-small);
 }
 .canton-form input,
 .canton-form select,
 .canton-form textarea {
   width: 100%;
-  padding: 12px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-inset);
-  color: inherit;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  color: var(--ink);
   font: inherit;
   min-width: 0;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.canton-form input:hover,
+.canton-form select:hover,
+.canton-form textarea:hover {
+  border-color: var(--line-strong);
+}
+.canton-form input:focus-visible,
+.canton-form select:focus-visible,
+.canton-form textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.canton-form input[inputmode="decimal"],
+.canton-form input[inputmode="numeric"],
+.canton-form input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 .canton-form textarea {
   resize: vertical;
-  min-height: 100px;
+  min-height: 96px;
+  padding-block: var(--space-3);
 }
 .canton-action {
-  padding: 12px 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: var(--accent);
   color: var(--accent-ink);
   font: inherit;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  margin: 4px 8px 4px 0;
+  margin: var(--space-1) var(--space-2) var(--space-1) 0;
   align-self: end;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.canton-action:hover:enabled {
+  background: var(--accent-strong);
+}
+.canton-action:active:enabled {
+  transform: translateY(1px);
+}
+.canton-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .canton-action:disabled,
 .canton-form fieldset:disabled {
@@ -711,14 +887,25 @@ body:has(.canton-shell) {
 }
 .canton-main th,
 .canton-main td {
-  padding: 14px 12px;
+  padding: var(--space-3);
   border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
+.canton-main td {
+  font-variant-numeric: tabular-nums;
+}
 .canton-main th {
-  font-size: 0.8rem;
   color: var(--muted);
-  font-weight: 500;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.canton-main tbody tr {
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.canton-main tbody tr:hover {
+  background: rgb(var(--ink-rgb) / 0.03);
 }
 .canton-panel dl div {
   padding: 14px 0;
@@ -751,15 +938,19 @@ body:has(.canton-shell) {
 }
 
 .canton-refresh {
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--ink);
-  padding: 9px 14px;
+  font: inherit;
+  font-size: var(--text-small);
+  font-weight: 550;
   cursor: pointer;
 }
 .canton-refresh:hover:enabled {
-  border-color: var(--accent);
+  background: rgb(var(--ink-rgb) / 0.06);
 }
 .canton-refresh:disabled {
   opacity: 0.5;
@@ -772,5 +963,229 @@ body:has(.canton-shell) {
 }
 .canton-form fieldset > .canton-action {
   grid-column: 1 / -1;
+  min-height: 48px;
   margin: 0;
+  font-size: 15px;
+}
+
+/* ---------- Trade view: flat book beside a raised ticket ---------- */
+.canton-trade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--space-6);
+  align-items: start;
+}
+.canton-trade > form,
+.canton-trade > .canton-closed {
+  position: sticky;
+  top: var(--space-5);
+  order: 2;
+}
+.canton-book h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-h3);
+  font-weight: 600;
+}
+.canton-empty {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  text-align: center;
+}
+.canton-ticket {
+  box-shadow: var(--glow);
+  border-color: transparent;
+}
+.canton-closed {
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+}
+.canton-segment {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+}
+.canton-segment label {
+  position: relative;
+  display: block;
+  color: var(--muted);
+}
+.canton-segment input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.canton-segment span {
+  display: grid;
+  place-items: center;
+  min-height: 38px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.canton-segment input:checked + span {
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.canton-segment input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.canton-segment-outcome span {
+  min-height: 46px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.canton-segment-outcome [data-outcome="Yes"] input:checked + span {
+  background: var(--yes);
+  color: var(--outcome-ink);
+  box-shadow: none;
+}
+.canton-segment-outcome [data-outcome="No"] input:checked + span {
+  background: var(--no);
+  color: var(--outcome-ink);
+  box-shadow: none;
+}
+.canton-ticket .canton-action[data-outcome="Yes"] {
+  background: var(--yes);
+  color: var(--outcome-ink);
+}
+.canton-ticket .canton-action[data-outcome="No"] {
+  background: var(--no);
+  color: var(--outcome-ink);
+}
+.canton-ticket .canton-action:hover:enabled {
+  filter: brightness(1.06);
+}
+.canton-order-summary {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.canton-order-summary strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+@media (max-width: 960px) {
+  .canton-trade {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .canton-trade > form,
+  .canton-trade > .canton-closed {
+    position: static;
+    order: -1;
+  }
+}
+
+/* ---------- Embedded section titles and balances ---------- */
+.canton-section-heading-row {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.canton-section-heading-row h2 {
+  margin: 0;
+  font-size: var(--text-h2);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.canton-balances {
+  display: grid;
+  gap: var(--space-4);
+}
+.canton-balance-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.canton-balance-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.canton-balance-head .ui-stat {
+  text-align: right;
+}
+.canton-balance-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-5);
+}
+.canton-balance-actions .canton-form fieldset {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---------- Form layout ---------- */
+.canton-form label {
+  align-content: start;
+}
+.canton-form label:has(textarea) {
+  grid-column: span 2;
+}
+@media (max-width: 720px) {
+  .canton-form label:has(textarea) {
+    grid-column: auto;
+  }
+}
+
+/* ---------- Positions: one row per market ---------- */
+.canton-position {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+.canton-position-main {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.canton-position-title {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 550;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.canton-position-title:hover {
+  color: var(--accent);
+}
+.canton-position-holdings,
+.canton-position-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.canton-position-action .ui-stat {
+  text-align: right;
+}
+.canton-position-action .ui-stat strong {
+  font-size: 18px;
 }

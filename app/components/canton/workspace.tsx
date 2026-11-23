@@ -57,7 +57,11 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
           href={href}
           title={t(label)}
           aria-label={t(label)}
-          aria-current={pathname === href ? "page" : undefined}
+          aria-current={
+            pathname === href || pathname.startsWith(`${href}/`)
+              ? "page"
+              : undefined
+          }
         >
           <svg
             width="20"
@@ -135,17 +139,23 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
   );
 }
 
+/** Page title (level 1) or the title of a section embedded in another page
+ * (level 2), so each page keeps a single h1. */
 export function CantonPageHeading({
   title,
   children,
+  level = 1,
 }: {
   title: string;
   children?: ReactNode;
+  level?: 1 | 2;
 }) {
   const { t } = useI18n();
   return (
-    <div className="canton-page-heading">
-      <h1>{t(title)}</h1>
+    <div
+      className={`canton-page-heading${level === 2 ? " canton-section-heading-row" : ""}`}
+    >
+      {level === 1 ? <h1>{t(title)}</h1> : <h2>{t(title)}</h2>}
       {children}
     </div>
   );
