@@ -463,3 +463,127 @@ textarea.ui-input {
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
 }
+
+/* ---------- Rules document dialog ---------- */
+.rules-dialog {
+  width: min(720px, calc(100% - 2 * var(--space-4)));
+  max-height: min(86vh, 900px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+}
+.rules-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: lp-rise 320ms var(--ease-out) both;
+}
+.rules-dialog::backdrop {
+  background: rgb(var(--background-rgb) / 0.6);
+  backdrop-filter: blur(4px);
+}
+.rules-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.rules-dialog-head h2 {
+  margin: 0;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.rules-dialog-head .ui-eyebrow {
+  margin-bottom: var(--space-2);
+}
+.rules-dialog-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rules-dialog-close:hover {
+  color: var(--ink);
+}
+.rules-dialog-body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+.rules-dialog-body > .ui-badge {
+  justify-self: start;
+  margin: 0;
+}
+.rules-dialog-lead {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.rules-dialog-outcomes {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: outcome;
+}
+.rules-dialog-outcomes li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
+}
+.rules-dialog-outcomes span {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.rules-dialog .ui-dl {
+  display: block;
+}
+.rules-dialog-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) 1fr;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.rules-dialog-row dt,
+.rules-dialog-row dd {
+  padding: 0;
+  border: 0;
+}
+.rules-dialog-row dd {
+  line-height: 1.5;
+}
+.rules-dialog-foot {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-small);
+}
+.rules-dialog-foot a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.rules-dialog-foot a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 600px) {
+  .rules-dialog-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+}

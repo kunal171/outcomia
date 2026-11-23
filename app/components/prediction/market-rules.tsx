@@ -3,6 +3,7 @@ import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
 import type { ReactNode } from "react";
+import { RulesDocumentDialog } from "../rules-document-dialog";
 import type { PredictionMarketAccount } from "../../lib/prediction";
 import {
   predictionCloseLabel,
@@ -32,9 +33,10 @@ export function PredictionMarketRules({
         <div className="prediction-section-title">
           <h2 id="prediction-rules-heading">{t("Rules")}</h2>
           {documentUrl && (
-            <a href={documentUrl} target="_blank" rel="noreferrer">
-              {t("Published document ↗")}
-            </a>
+            <RulesDocumentDialog
+              uri={market.rulesUri}
+              rulesHash={market.rulesHash}
+            />
           )}
         </div>
         {!documentUrl && (
