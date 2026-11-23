@@ -8,6 +8,17 @@ This feature is verified locally. It does not deploy the DAR, configure public
 participants, enable Vercel transactions or perform a live wallet smoke test.
 Keep `CANTON_TRADING_ENABLED=false` until those checks pass.
 
+## Complementary matching
+
+As on Solana, YES and NO orders on the same side also trade through the
+complete set. The operator's **Match YES + NO** action pairs the best YES and
+NO buys (minting a pair when their prices sum to at least 1) or the best YES
+and NO sells (merging one when they sum to at most 1). The maker keeps its
+price and the taker pays or receives 1 minus it. The order book shows this
+liquidity as implied rows, e.g. a NO buy at 0.40 appears as "Sell via NO" at
+0.60 on YES. Contract rules: `docs/binary-complementary-matching.md` in
+`outcomia-canton`.
+
 ## Data and wallet boundaries
 
 - `/api/canton/catalog` reads a fixed operator party from the configured JSON

@@ -306,6 +306,20 @@ export function sameMarket(c: Contract, key: string): boolean {
     return false;
   }
 }
+/** Complete-set liquidity as the other outcome's book sees it: a NO buy at q
+ * acts as a YES sell at 1 − q (two buys mint a pair), and a NO sell at q as a
+ * YES buy at 1 − q (two sells merge one). `via` names the resting outcome.
+ * Example: NO buy 0.4 × 5 → YES sell 0.6 × 5 via NO.
+ */
+export function impliedQuotes(quotes: Catalog["quotes"]) {
+  return quotes.map((q) => ({
+    ...q,
+    outcome: q.outcome === "Yes" ? "No" : "Yes",
+    side: q.side === "Buy" ? "Sell" : "Buy",
+    price: amount(scale - raw(q.price)),
+    via: q.outcome,
+  }));
+}
 /** Exact maximum funding, not a promise that the order fills at its limit.
  * Example: 3 contracts at 0.40 and 25 bps with 6-decimal collateral need 1.203.
  * Fees round down once to the collateral quantum, matching the ledger policy.

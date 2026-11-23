@@ -1304,5 +1304,8 @@
   "Pagination": "Paginação",
   "{from}–{to} of {total}": "{from}–{to} de {total}",
   "← Previous": "← Anterior",
-  "Next →": "Próximo →"
+  "Next →": "Próximo →",
+  "Match YES + NO": "Cruzar SIM + NÃO",
+  "Buys: mint pairs": "Compras: criar pares",
+  "Sells: merge pairs": "Vendas: fundir pares"
 }

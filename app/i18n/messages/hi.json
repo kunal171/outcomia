@@ -1304,5 +1304,8 @@
   "Pagination": "पृष्ठ",
   "{from}–{to} of {total}": "{total} में से {from}–{to}",
   "← Previous": "← पिछला",
-  "Next →": "अगला →"
+  "Next →": "अगला →",
+  "Match YES + NO": "हाँ + नहीं मिलान",
+  "Buys: mint pairs": "खरीद: जोड़े बनाएँ",
+  "Sells: merge pairs": "बिक्री: जोड़े मिलाएँ"
 }

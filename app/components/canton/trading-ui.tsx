@@ -12,6 +12,7 @@ import {
   factoryRefKey,
   marketKey,
   obj,
+  impliedQuotes,
   orderQuote,
   raw,
   resolverEligible,
@@ -597,7 +598,13 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {s.catalog?.quotes
+                {[
+                  ...(s.catalog?.quotes ?? []).map((q) => ({
+                    ...q,
+                    via: "",
+                  })),
+                  ...impliedQuotes(s.catalog?.quotes ?? []),
+                ]
                   .filter((q) => q.market === key)
                   .sort((a, b) =>
                     raw(a.price) === raw(b.price)
@@ -607,7 +614,7 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                         : 1,
                   )
                   .map((q) => (
-                    <tr key={q.orderId}>
+                    <tr key={`${q.orderId}-${q.via}`}>
                       <td>
                         <span
                           className={`ui-badge ${q.outcome === "Yes" ? "ui-badge-yes" : "ui-badge-no"}`}
@@ -615,7 +622,14 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                           {t(q.outcome)}
                         </span>
                       </td>
-                      <td>{t(q.side === "Buy" ? "Buy" : "Sell")}</td>
+                      <td>
+                        {q.via
+                          ? t("{value0} via {value1}", {
+                              value0: t(q.side === "Buy" ? "Buy" : "Sell"),
+                              value1: t(q.via),
+                            })
+                          : t(q.side === "Buy" ? "Buy" : "Sell")}
+                      </td>
                       <td className="ui-num">{q.price}</td>
                       <td className="ui-num">{q.quantity}</td>
                     </tr>
@@ -860,6 +874,24 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                   },
                 ]}
                 build={(v) => ({ action: "match", target: book.id, values: v })}
+              />
+              <ActionForm
+                label="Match YES + NO"
+                fields={[
+                  {
+                    name: "side",
+                    label: "Side",
+                    options: [
+                      { value: "Buy", label: "Buys: mint pairs" },
+                      { value: "Sell", label: "Sells: merge pairs" },
+                    ],
+                  },
+                ]}
+                build={(v) => ({
+                  action: "matchComplement",
+                  target: book.id,
+                  values: v,
+                })}
               />
               <p>
                 {t("Earned fees")}: {text(obj(book.data.fees).amount)}

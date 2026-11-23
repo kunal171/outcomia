@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildPlan } from "../lib/canton/commands.ts";
 import {
   decodeContracts,
+  impliedQuotes,
   orderQuote,
   marketKey,
   obj,
@@ -510,6 +511,129 @@ test("operator matching chooses price and FIFO and supplies both owner balances"
         { action: "match", target: "book" },
       ),
     /Incomplete/,
+  );
+});
+
+test("complementary matching pairs the YES and NO heads of one side", () => {
+  const order = (id, owner, outcome, side, price, orderId) =>
+    c("LimitOrder", id, {
+      key,
+      owner,
+      outcome,
+      side,
+      price,
+      quantity: "2",
+      orderId,
+    });
+  const orders = [
+    order("yes-bid", "alice", "Yes", "Buy", "0.65", "3"),
+    order("no-bid-low", "carol", "No", "Buy", "0.3", "1"),
+    order("no-bid", "bob", "No", "Buy", "0.4", "2"),
+    order("yes-ask", "carol", "Yes", "Sell", "0.7", "4"),
+  ];
+  const b = {
+    ...book,
+    data: { ...book.data, orders: orders.map((o) => ({ order: o.id })) },
+  };
+  const reserve = c("MarketReserve", "reserve", {
+    key,
+    vault: d.vault,
+    creator: "alice",
+    terms,
+    factory: "factory",
+    assetDecimals: "6",
+  });
+  const accounts = [
+    balance,
+    ...["bob", "carol"].map((owner) =>
+      c("AssetBalance", owner + "-balance", { ...balance.data, owner }),
+    ),
+  ];
+  const view = { ...snapshot, contracts: [policy, market, b, reserve] };
+  const plan = buildPlan("operator", view, [...orders, ...accounts], {
+    action: "matchComplement",
+    target: "book",
+    values: { side: "Buy" },
+  });
+  const args = plan.command.ExerciseCommand.choiceArgument;
+  assert.equal(
+    plan.command.ExerciseCommand.choice,
+    "OrderBook_MatchComplement",
+  );
+  assert.equal(args.side, "Buy");
+  assert.equal(args.reserve, "reserve");
+  // Best NO buy is bob's 0.4 (0.65 + 0.4 >= 1), not carol's 0.3.
+  assert.equal(args.yesBalance, "balance");
+  assert.equal(args.noBalance, "bob-balance");
+  assert.ok(plan.dependencies.includes("reserve"));
+  // Sells only cross when their prices sum to at most 1; here only a YES sell rests.
+  assert.throws(
+    () =>
+      buildPlan("operator", view, [...orders, ...accounts], {
+        action: "matchComplement",
+        target: "book",
+        values: { side: "Sell" },
+      }),
+    /No complementary orders/,
+  );
+  assert.throws(
+    () =>
+      buildPlan("alice", view, [...orders, ...accounts], {
+        action: "matchComplement",
+        target: "book",
+        values: { side: "Buy" },
+      }),
+    /Operator wallet required/,
+  );
+  const low = orders.filter((o) => o.id !== "no-bid");
+  assert.throws(
+    () =>
+      buildPlan(
+        "operator",
+        {
+          ...view,
+          contracts: [
+            policy,
+            market,
+            {
+              ...b,
+              data: { ...b.data, orders: low.map((o) => ({ order: o.id })) },
+            },
+            reserve,
+          ],
+        },
+        [...low, ...accounts],
+        { action: "matchComplement", target: "book", values: { side: "Buy" } },
+      ),
+    /No complementary orders/,
+  );
+});
+
+test("implied quotes show the other outcome's same-side orders at 1 minus their price", () => {
+  const rows = impliedQuotes([
+    {
+      market: "m",
+      side: "Buy",
+      outcome: "No",
+      price: "0.4",
+      quantity: "5",
+      orderId: "1",
+    },
+    {
+      market: "m",
+      side: "Sell",
+      outcome: "Yes",
+      price: "0.45",
+      quantity: "3",
+      orderId: "2",
+    },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => [r.outcome, r.side, r.price, r.quantity, r.via]),
+    [
+      ["Yes", "Sell", "0.6", "5", "No"],
+      ["No", "Buy", "0.55", "3", "Yes"],
+    ],
   );
 });
 
