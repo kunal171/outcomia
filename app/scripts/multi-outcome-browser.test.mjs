@@ -200,14 +200,15 @@ try {
         .getByRole("heading", { name: "Multi-outcome positions", exact: true })
         .waitFor({ timeout: 120000 });
       await page
-        .getByRole("link", { name: "Manage positions in market →" })
+        .getByRole("link", { name: "Manage position →" })
         .waitFor();
       await page.goto(new URL("/orders", base).href);
       await page
         .getByRole("heading", { name: "Multi-outcome orders", exact: true })
         .waitFor();
       await page
-        .getByRole("link", { name: "Manage orders in market →" })
+        .getByRole("link", { name: /Which colour wins/ })
+        .first()
         .waitFor();
       await page.goto(new URL("/predictions/multi", base).href);
       await page

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../preferences-provider";
 import Link from "next/link";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import {
@@ -37,6 +38,7 @@ import {
 } from "../../lib/multi-outcome-creation";
 import { TermsRecovery } from "./terms-recovery";
 export function CreateMultiOutcome() {
+  const { t } = useI18n();
   const { connection } = useConnection(),
     wallet = useAnchorWallet(),
     { role, loading, error: roleError } = useProtocolRole();
@@ -111,25 +113,28 @@ export function CreateMultiOutcome() {
       <AppHeader />
       <main className="route-shell route-shell-narrow">
         <Link className="market-type-back" href="/markets/new">
-          ← Change market type
+          ← {t("Change market type")}
         </Link>
         <div className="route-heading">
-          <h1>Create a multi-outcome market</h1>
+          <h1>{t("Create a multi-outcome market")}</h1>
         </div>
         {!MULTI_OUTCOME_ENABLED && (
           <div className="access-card" role="status">
-            Creation is disabled until the matching program deployment is
-            verified.
+            {t(
+              "Creation is disabled until the matching program deployment is verified.",
+            )}
           </div>
         )}
         {!wallet ? (
-          <div className="access-card">Connect your administrator wallet.</div>
+          <div className="access-card">
+            {t("Connect your administrator wallet.")}
+          </div>
         ) : loading ? (
-          <div className="access-card">Checking role…</div>
+          <div className="access-card">{t("Checking role…")}</div>
         ) : (
           !admin && (
             <div className="access-card">
-              An active administrator role is required.
+              {t("An active administrator role is required.")}
             </div>
           )
         )}
@@ -349,11 +354,11 @@ export function CreateMultiOutcome() {
                 01
               </span>
               <div>
-                <h2>Market details</h2>
+                <h2>{t("Market details")}</h2>
               </div>
             </div>
             <label>
-              Short display name
+              {t("Short display name")}
               <input
                 disabled={busy}
                 required
@@ -363,7 +368,7 @@ export function CreateMultiOutcome() {
               />
             </label>
             <label>
-              Outcomes (one per line, 2–8)
+              {t("Outcomes (one per line, 2–8)")}
               <textarea
                 disabled={busy}
                 required
@@ -372,7 +377,7 @@ export function CreateMultiOutcome() {
               />
             </label>
             <label>
-              Collateral mint
+              {t("Collateral mint")}
               <input
                 disabled={busy}
                 required
@@ -381,7 +386,7 @@ export function CreateMultiOutcome() {
               />
             </label>
             <label>
-              Collateral symbol
+              {t("Collateral symbol")}
               <input
                 disabled={busy}
                 required
@@ -391,7 +396,7 @@ export function CreateMultiOutcome() {
               />
             </label>
             <label>
-              Price increment per contract
+              {t("Price increment per contract")}
               <input
                 disabled={busy}
                 required
@@ -401,9 +406,9 @@ export function CreateMultiOutcome() {
               />
             </label>
             <details className="inline-explainer">
-              <summary>Advanced trading settings</summary>
+              <summary>{t("Advanced trading settings")}</summary>
               <label>
-                Contract lot
+                {t("Contract lot")}
                 <input
                   disabled={busy}
                   inputMode="numeric"
@@ -411,16 +416,18 @@ export function CreateMultiOutcome() {
                   onChange={(e) => setLot(e.target.value)}
                 />
                 <small>
-                  Optional; defaults to the smallest lot that permits exact
-                  equal Invalid refunds.
+                  {t(
+                    "Optional; defaults to the smallest lot that permits exact equal Invalid refunds.",
+                  )}
                 </small>
               </label>
             </details>
             <details className="inline-explainer">
-              <summary>How does the price increment work?</summary>
+              <summary>{t("How does the price increment work?")}</summary>
               <p>
-                For example, a 0.01 increment allows prices of 0.50 or 0.51, but
-                not 0.505.
+                {t(
+                  "For example, a 0.01 increment allows prices of 0.50 or 0.51, but not 0.505.",
+                )}
               </p>
             </details>
             <PredictionRulesEditor
@@ -437,11 +444,16 @@ export function CreateMultiOutcome() {
                 <>
                   {outcomeLabels.map((label, index) => (
                     <label key={index}>
-                      Outcome {index + 1} criteria — {label}
+                      {t("Outcome {number} criteria — {label}", {
+                        number: index + 1,
+                        label,
+                      })}
                       <textarea
                         required
                         rows={3}
-                        aria-label={`Outcome ${index + 1} criteria`}
+                        aria-label={t("Outcome {number} criteria", {
+                          number: index + 1,
+                        })}
                         value={
                           typeof criteria[label] === "string"
                             ? criteria[label]
@@ -457,14 +469,16 @@ export function CreateMultiOutcome() {
                     </label>
                   ))}
                   <p className="rules-help">
-                    One outcome wins and pays one collateral token per contract.{" "}
+                    {t(
+                      "One outcome wins and pays one collateral token per contract.",
+                    )}{" "}
                     {MULTI_INVALID_REFUND}
                   </p>
                 </>
               }
             />
             <details className="inline-explainer">
-              <summary>Already published these rules?</summary>
+              <summary>{t("Already published these rules?")}</summary>
               <label className="rules-checkbox">
                 <input
                   disabled={busy}
@@ -472,30 +486,32 @@ export function CreateMultiOutcome() {
                   checked={externalRules}
                   onChange={(e) => setExternalRules(e.target.checked)}
                 />
-                Use an existing rules document
+                {t("Use an existing rules document")}
               </label>
               {externalRules && (
                 <label>
-                  Published rules URI
+                  {t("Published rules URI")}
                   <input
                     disabled={busy}
                     required
-                    aria-label="Published rules URI"
+                    aria-label={t("Published rules URI")}
                     value={uri}
                     maxLength={200}
                     onChange={(e) => setUri(e.target.value)}
                   />
                   <small>
-                    The published bytes must exactly match the generated JSON,
-                    including its final newline.
+                    {t(
+                      "The published bytes must exactly match the generated JSON, including its final newline.",
+                    )}
                   </small>
                 </label>
               )}
             </details>
             {!externalRules && !signMessage && (
               <p className="access-denied" role="alert">
-                This wallet does not support message signing. Choose a wallet
-                with message signing to upload the rules.
+                {t(
+                  "This wallet does not support message signing. Choose a wallet with message signing to upload the rules.",
+                )}
               </p>
             )}
             <label className="rules-checkbox rules-review">
@@ -508,21 +524,25 @@ export function CreateMultiOutcome() {
                   setReviewed(e.target.checked);
                 }}
               />
-              {externalRules
-                ? "I reviewed the immutable outcomes, collateral, rules and resolution terms."
-                : "I reviewed these rules and authorize their public, permanent upload. Turbo may use existing storage credits; this app never tops up or sends SOL for storage."}
+              {t(
+                externalRules
+                  ? "I reviewed the immutable outcomes, collateral, rules and resolution terms."
+                  : "I reviewed these rules and authorize their public, permanent upload. Turbo may use existing storage credits; this app never tops up or sends SOL for storage.",
+              )}
             </label>
             <p className="rules-help">
-              Rules upload is permanent, even if market creation is canceled.
-              Retrying unchanged rules reuses the upload.
+              {t(
+                "Rules upload is permanent, even if market creation is canceled. Retrying unchanged rules reuses the upload.",
+              )}
             </p>
             <p className="rules-help">
-              Large terms may require several wallet approvals. Partial terms
-              uploads create no market, and their rent can be recovered below.
+              {t(
+                "Large terms may require several wallet approvals. Partial terms uploads create no market, and their rent can be recovered below.",
+              )}
             </p>
             {stage && (
               <p className="rules-progress" role="status">
-                {stage}
+                {t(stage)}
               </p>
             )}
             <button
@@ -540,28 +560,32 @@ export function CreateMultiOutcome() {
                 !!created
               }
             >
-              {busy
-                ? "Creating draft…"
-                : externalRules
-                  ? "Review creation in wallet"
-                  : "Upload rules & create draft"}
+              {t(
+                busy
+                  ? "Creating draft…"
+                  : externalRules
+                    ? "Review creation in wallet"
+                    : "Upload rules & create draft",
+              )}
             </button>
           </form>
         )}
         {uploaded && (
           <div className="access-card rules-upload-receipt">
-            <h2>Rules upload saved</h2>
+            <h2>{t("Rules upload saved")}</h2>
             <p>
-              {uploaded.content === preview.json && uploaded.owner === creator
-                ? "This upload can be reused for the current rules."
-                : "The rules or creator changed. Creation will require a new upload."}
+              {t(
+                uploaded.content === preview.json && uploaded.owner === creator
+                  ? "This upload can be reused for the current rules."
+                  : "The rules or creator changed. Creation will require a new upload.",
+              )}
             </p>
             <a
               href={`${RULES_GATEWAY}${uploaded.id}`}
               target="_blank"
               rel="noreferrer"
             >
-              View uploaded JSON ↗
+              {t("View uploaded JSON ↗")}
             </a>
             <code>{uploaded.uri}</code>
             <button
@@ -580,7 +604,7 @@ export function CreateMultiOutcome() {
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
               }}
             >
-              Download upload receipt
+              {t("Download upload receipt")}
             </button>
           </div>
         )}
@@ -598,7 +622,7 @@ export function CreateMultiOutcome() {
         {created && (
           <p>
             <Link href={`/predictions/multi/${created}`}>
-              Open created market →
+              {t("Open created market →")}
             </Link>
           </p>
         )}

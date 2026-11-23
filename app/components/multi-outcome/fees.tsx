@@ -15,20 +15,26 @@ import { assetAuthorityPda, assetVaultPda } from "../../lib/shared";
 import { multiBookPda } from "../../lib/multi-outcome";
 import { useProtocolRole } from "../protocol-role-provider";
 import type { MultiSession } from "./use-market";
+import { useI18n } from "../preferences-provider";
 /** Fees are book-owned claims, never presented as a user's spendable cash. */
 export function MultiFees({ session: s }: { session: MultiSession }) {
   const { role } = useProtocolRole(),
-    [amount, setAmount] = useState("");
+    [amount, setAmount] = useState(""),
+    { t } = useI18n();
   const d = s.data;
   if (role !== "super-admin" || !d?.book) return null;
   const fees = d.book.book.accruedCollateralFees;
   return (
     <details>
-      <summary>Protocol fees</summary>
+      <summary>{t("Protocol fees")}</summary>
       <p>
-        Earned fees: {readableAmount(fees, d.decimals)}{" "}
-        {d.metadata?.quoteSymbol ?? "collateral"}. Withdrawal goes to your
-        wallet's associated token account.
+        {t(
+          "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.",
+          {
+            amount: readableAmount(fees, d.decimals),
+            symbol: d.metadata?.quoteSymbol ?? t("collateral"),
+          },
+        )}
       </p>
       <form
         onSubmit={(e) => {
@@ -74,7 +80,9 @@ export function MultiFees({ session: s }: { session: MultiSession }) {
         }}
       >
         <label>
-          Fee withdrawal ({d.metadata?.quoteSymbol ?? "collateral"})
+          {t("Fee withdrawal ({symbol})", {
+            symbol: d.metadata?.quoteSymbol ?? t("collateral"),
+          })}
           <input
             required
             inputMode="decimal"
@@ -84,7 +92,7 @@ export function MultiFees({ session: s }: { session: MultiSession }) {
           />
         </label>
         <button disabled={s.busy || s.loading || fees.isZero()}>
-          Withdraw earned fees
+          {t("Withdraw earned fees")}
         </button>
       </form>
     </details>

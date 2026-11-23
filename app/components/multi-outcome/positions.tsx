@@ -4,9 +4,11 @@ import { Transaction } from "@solana/web3.js";
 import { custody, whole } from "../../lib/multi-outcome";
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
+import { useI18n } from "../preferences-provider";
 export function MultiPositions({ session: s }: { session: MultiSession }) {
   const [quantity, setQuantity] = useState("");
-  const now = useMarketClock();
+  const now = useMarketClock(),
+    { t } = useI18n();
   const d = s.data;
   if (!d) return null;
   const ready =
@@ -21,15 +23,15 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
   const winner = d.market.finalOutcome?.winner?.[0][0];
   return (
     <section aria-labelledby="multi-positions">
-      <h2 id="multi-positions">Your positions</h2>
+      <h2 id="multi-positions">{t("Your positions")}</h2>
       <div className="multi-scroll">
         <table>
           <thead>
             <tr>
-              <th>Outcome</th>
-              <th>Available</th>
-              <th>Locked</th>
-              <th>Final payout</th>
+              <th>{t("Outcome")}</th>
+              <th>{t("Available")}</th>
+              <th>{t("Locked")}</th>
+              <th>{t("Final payout")}</th>
             </tr>
           </thead>
           <tbody>
@@ -40,12 +42,14 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
                 <td>{d.position?.locked[i].toString() ?? "—"}</td>
                 <td>
                   {!resolved
-                    ? "Pending"
+                    ? t("Pending")
                     : winner === i
-                      ? "1 collateral token"
+                      ? t("1 collateral token")
                       : winner !== undefined
                         ? "0"
-                        : `1/${d.market.terms.outcomeLabels.length} collateral token`}
+                        : t("1/{count} collateral token", {
+                            count: d.market.terms.outcomeLabels.length,
+                          })}
                 </td>
               </tr>
             ))}
@@ -53,8 +57,9 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
         </table>
       </div>
       <p>
-        Cancel sell orders to release locked contracts before merging or
-        redeeming. Claims credit your shared wallet balance.
+        {t(
+          "Cancel sell orders to release locked contracts before merging or redeeming. Claims credit your shared wallet balance.",
+        )}
       </p>
       {resolved ? (
         <button
@@ -74,18 +79,19 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
             })
           }
         >
-          Redeem available contracts
+          {t("Redeem available contracts")}
         </button>
       ) : (
         <details>
-          <summary>Create or merge complete sets</summary>
+          <summary>{t("Create or merge complete sets")}</summary>
           <p>
-            One complete set contains one contract of every outcome. Splitting
-            locks one collateral token per set; merging returns it. The minimum
-            lot is {d.market.terms.quantityLot.toString()}.
+            {t(
+              "One complete set contains one contract of every outcome. Splitting locks one collateral token per set; merging returns it. The minimum lot is {lot}.",
+              { lot: d.market.terms.quantityLot.toString() },
+            )}
           </p>
           <label>
-            Complete sets
+            {t("Complete sets")}
             <input
               inputMode="numeric"
               value={quantity}
@@ -130,7 +136,7 @@ export function MultiPositions({ session: s }: { session: MultiSession }) {
                   })
                 }
               >
-                {split ? "Create complete sets" : "Merge complete sets"}
+                {t(split ? "Create complete sets" : "Merge complete sets")}
               </button>
             ))}
           </div>

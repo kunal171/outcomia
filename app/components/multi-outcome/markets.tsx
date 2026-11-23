@@ -12,14 +12,16 @@ import {
   MULTI_OUTCOME_ENABLED,
   multiAccounts,
   multiMarketPda,
-  statusOf,
+  statusLabel,
   type MultiMarket,
 } from "../../lib/multi-outcome";
 import { visibleMarket } from "../../lib/market-visibility";
+import { useI18n } from "../preferences-provider";
 import "./multi-outcome.css";
 
 export function MultiOutcomeMarkets() {
-  const { connection } = useConnection();
+  const { connection } = useConnection(),
+    { t } = useI18n();
   const p = useMemo(() => getOutcomiaReadProgram(connection), [connection]);
   const [rows, setRows] = useState<
     { address: string; name: string; market: MultiMarket }[]
@@ -57,9 +59,7 @@ export function MultiOutcomeMarkets() {
           }),
         );
         if (active)
-          setRows(
-            result.filter((r) => visibleMarket(r.address, r.name)),
-          );
+          setRows(result.filter((r) => visibleMarket(r.address, r.name)));
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -74,33 +74,35 @@ export function MultiOutcomeMarkets() {
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell multi-outcome">
-        <Link href="/predictions">← Binary prediction markets</Link>
+        <Link href="/predictions">← {t("Binary prediction markets")}</Link>
         <div className="route-heading">
-          <h1>Multi-outcome markets</h1>
+          <h1>{t("Multi-outcome markets")}</h1>
           <p>
-            2–8 named outcomes. One winner. One collateral token backs each
-            complete set.
+            {t(
+              "2–8 named outcomes. One winner. One collateral token backs each complete set.",
+            )}
           </p>
         </div>
         <div className="multi-actions">
-          <Link href="/predictions/multi/new">Create a market</Link>
+          <Link href="/predictions/multi/new">{t("Create a market")}</Link>
           <button
             onClick={() => setRevision((v) => v + 1)}
             disabled={loading || !MULTI_OUTCOME_ENABLED}
           >
-            Refresh
+            {t("Refresh")}
           </button>
         </div>
         {!MULTI_OUTCOME_ENABLED && (
           <p role="status">
-            Multi-outcome trading is awaiting deployment verification on devnet.
-            Creation and trading are disabled.
+            {t(
+              "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.",
+            )}
           </p>
         )}
-        {loading && <p role="status">Loading markets…</p>}
+        {loading && <p role="status">{t("Loading markets…")}</p>}
         {error && <p role="alert">{error}</p>}
         {!loading && !error && MULTI_OUTCOME_ENABLED && rows.length === 0 && (
-          <p>No multi-outcome markets found.</p>
+          <p>{t("No multi-outcome markets found.")}</p>
         )}
         <div className="multi-grid">
           {rows.map((r) => (
@@ -112,8 +114,10 @@ export function MultiOutcomeMarkets() {
               <h2>{r.name}</h2>
               <p>{r.market.terms.outcomeLabels.join(" · ")}</p>
               <p>
-                {statusOf(r.market)} · Minimum{" "}
-                {r.market.terms.quantityLot.toString()} contracts
+                {t(statusLabel(r.market))} ·{" "}
+                {t("Minimum {count} contracts", {
+                  count: r.market.terms.quantityLot.toString(),
+                })}
               </p>
             </Link>
           ))}

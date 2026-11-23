@@ -9,6 +9,7 @@ import {
 } from "../../lib/multi-outcome";
 import { getOutcomiaReadProgram } from "../../lib/outcomia";
 import { termsBufferPda } from "../../lib/multi-outcome-creation";
+import { useI18n } from "../preferences-provider";
 /** Discover abandoned uploads on-ledger, so reloads and storage loss cannot hide rent recovery. */
 export function TermsRecovery({
   program,
@@ -24,7 +25,8 @@ export function TermsRecovery({
   const [buffers, setBuffers] = useState<PublicKey[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [refresh, setRefresh] = useState(0);
+    [refresh, setRefresh] = useState(0),
+    { t } = useI18n();
   const identity = owner?.toBase58() ?? "";
   const live = useRef(identity),
     mounted = useRef(false),
@@ -70,10 +72,11 @@ export function TermsRecovery({
   if (!buffers.length && !error) return null;
   return (
     <details className="access-card inline-explainer">
-      <summary>Recover uploaded-term rent</summary>
+      <summary>{t("Recover uploaded-term rent")}</summary>
       <p>
-        Closing a buffer discards only uploaded draft terms. A created market
-        keeps its immutable terms.
+        {t(
+          "Closing a buffer discards only uploaded draft terms. A created market keeps its immutable terms.",
+        )}
       </p>
       {error && <p role="alert">{error}</p>}
       {buffers.map((buffer) => (
@@ -112,7 +115,7 @@ export function TermsRecovery({
               })();
             }}
           >
-            Close upload and recover rent
+            {t("Close upload and recover rent")}
           </button>
         </p>
       ))}

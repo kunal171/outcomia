@@ -7,11 +7,13 @@ import { useProtocolRole } from "../protocol-role-provider";
 import { resolutionAvailability } from "../../lib/multi-outcome-lifecycle";
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
+import { useI18n } from "../preferences-provider";
 export function MultiResolution({ session: s }: { session: MultiSession }) {
   const [result, setResult] = useState("invalid"),
     [uri, setUri] = useState(""),
     [hash, setHash] = useState("");
-  const now = useMarketClock();
+  const now = useMarketClock(),
+    { t } = useI18n();
   const { role } = useProtocolRole(),
     d = s.data;
   if (!d) return null;
@@ -67,37 +69,41 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
   const outcomeText = (o: NonNullable<typeof proposed>["outcome"]) =>
     o.winner
       ? d.market.terms.outcomeLabels[o.winner[0][0]]
-      : "Invalid (equal refunds)";
+      : t("Invalid (equal refunds)");
   return (
     <section aria-labelledby="multi-resolution">
-      <h2 id="multi-resolution">Rules & outcome</h2>
+      <h2 id="multi-resolution">{t("Rules & outcome")}</h2>
       <p>
-        Published rules:{" "}
+        {t("Published rules")}:{" "}
         <a href={d.market.terms.rulesUri} target="_blank" rel="noreferrer">
           {d.market.terms.rulesUri}
         </a>
       </p>
       <p>
-        Rules SHA-256:{" "}
+        {t("Rules SHA-256")}:{" "}
         <code>{Buffer.from(d.market.terms.rulesHash).toString("hex")}</code>
       </p>
       {d.market.finalOutcome && (
-        <p>Final outcome: {outcomeText(d.market.finalOutcome)}</p>
+        <p>
+          {t("Final outcome")}: {outcomeText(d.market.finalOutcome)}
+        </p>
       )}
       {proposed && (
         <>
           <p>
-            Proposed: {outcomeText(proposed.outcome)}. Review ends{" "}
-            {new Date(readyAt! * 1000).toLocaleString()}.
+            {t("Proposed: {outcome}. Review ends {time}.", {
+              outcome: outcomeText(proposed.outcome),
+              time: new Date(readyAt! * 1000).toLocaleString(),
+            })}
           </p>
           <p>
-            Evidence:{" "}
+            {t("Evidence")}:{" "}
             <a href={proposed.evidenceUri} target="_blank" rel="noreferrer">
               {proposed.evidenceUri}
             </a>
           </p>
           <p>
-            Evidence SHA-256:{" "}
+            {t("Evidence SHA-256")}:{" "}
             <code>{Buffer.from(proposed.evidenceHash).toString("hex")}</code>
           </p>
         </>
@@ -105,28 +111,28 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
       <div className="multi-actions">
         {availability.canFreeze && (
           <button disabled={!ready} onClick={() => advance(0)}>
-            Freeze at cutoff
+            {t("Freeze at cutoff")}
           </button>
         )}
         {availability.canActivateFallback && (
           <button disabled={!ready} onClick={() => advance(1)}>
-            Activate fallback
+            {t("Activate fallback")}
           </button>
         )}
         {availability.canFinalize && (
           <button disabled={!ready} onClick={() => advance(2)}>
-            Finalize outcome
+            {t("Finalize outcome")}
           </button>
         )}
         {availability.canTimeout && (
           <button disabled={!ready} onClick={() => advance(3)}>
-            Finalize timeout as Invalid
+            {t("Finalize timeout as Invalid")}
           </button>
         )}
       </div>
       {availability.canPropose && (
         <form
-          aria-label="Resolution proposal"
+          aria-label={t("Resolution proposal")}
           onSubmit={(e) => {
             e.preventDefault();
             void s.send(async () => {
@@ -160,11 +166,11 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
             });
           }}
         >
-          <h3>{proposed ? "Correct proposal" : "Propose outcome"}</h3>
+          <h3>{t(proposed ? "Correct proposal" : "Propose outcome")}</h3>
           <label>
-            Outcome
+            {t("Outcome")}
             <select value={result} onChange={(e) => setResult(e.target.value)}>
-              <option value="invalid">Invalid — equal refunds</option>
+              <option value="invalid">{t("Invalid — equal refunds")}</option>
               {d.market.terms.outcomeLabels.map((v, i) => (
                 <option key={i} value={i}>
                   {v}
@@ -173,7 +179,7 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
             </select>
           </label>
           <label>
-            Evidence URI
+            {t("Evidence URI")}
             <input
               type="url"
               required
@@ -183,7 +189,7 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
             />
           </label>
           <label>
-            Evidence SHA-256
+            {t("Evidence SHA-256")}
             <input
               required
               pattern="[a-fA-F0-9]{64}"
@@ -191,20 +197,20 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
               onChange={(e) => setHash(e.target.value)}
             />
           </label>
-          <p>Corrections restart the full review delay.</p>
-          <button disabled={!ready}>Review proposal in wallet</button>
+          <p>{t("Corrections restart the full review delay.")}</p>
+          <button disabled={!ready}>{t("Review proposal in wallet")}</button>
         </form>
       )}
       {creator && (
         <details>
-          <summary>Manage market</summary>
+          <summary>{t("Manage market")}</summary>
           <div className="multi-actions">
             {!d.book && (
               <button
                 disabled={!ready || closed}
                 onClick={() => manage("book")}
               >
-                Initialize order book
+                {t("Initialize order book")}
               </button>
             )}
             {"draft" in d.market.status && (
@@ -212,12 +218,12 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
                 disabled={!ready || closed || !d.book}
                 onClick={() => manage("open")}
               >
-                Open trading
+                {t("Open trading")}
               </button>
             )}
             {"open" in d.market.status && (
               <button disabled={!ready} onClick={() => manage("close")}>
-                Close trading
+                {t("Close trading")}
               </button>
             )}
           </div>
