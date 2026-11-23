@@ -210,36 +210,34 @@ body:has(.prediction-workspace) {
   font-weight: 400;
 }
 
-/* Navigation is a text row with one active underline, rather than another card. */
+/* Section navigation is a segmented control (design system tabs). */
 .prediction-task-tabs {
-  display: flex;
-  gap: 28px;
-  margin: 32px 0;
-  border-bottom: 1px solid var(--line);
+  display: inline-flex;
+  gap: var(--space-1);
+  max-width: 100%;
+  margin: var(--space-6) 0;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
   overflow-x: auto;
 }
 .prediction-task-tabs button {
-  position: relative;
   flex: 0 0 auto;
-  min-height: 48px;
-  padding: 12px 0;
+  min-height: 36px;
+  padding: 0 var(--space-4);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-small);
+  font-weight: 550;
+  white-space: nowrap;
 }
 .prediction-task-tabs button[aria-selected="true"] {
+  background: var(--surface-2);
   color: var(--ink);
-}
-.prediction-task-tabs button[aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .prediction-task-tabs button:hover {
   color: var(--ink);
@@ -338,10 +336,11 @@ body:has(.prediction-workspace) {
   position: sticky;
   top: 24px;
   min-width: 0;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--prediction-surface);
+  padding: var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  box-shadow: var(--glow);
 }
 .prediction-ticket h2 {
   font-size: 17px;
@@ -382,24 +381,29 @@ body:has(.prediction-workspace) {
   background: rgb(var(--sell-rgb) / 0.05);
 }
 .prediction-action-choice {
-  display: flex;
-  gap: 24px;
-  margin: 0 0 20px;
-  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-5);
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-0);
 }
 .prediction-action-choice button {
-  min-height: 40px;
-  padding: 8px 0;
+  min-height: 38px;
+  padding: 0;
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .prediction-action-choice button[aria-pressed="true"] {
+  background: var(--surface-2);
   color: var(--ink);
-  border-bottom-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .prediction-entry-fields {
   display: grid;
@@ -468,7 +472,7 @@ body:has(.prediction-workspace) {
   width: 100%;
   min-height: 48px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--buy);
   color: var(--outcome-ink);
   font-weight: 600 !important;
@@ -764,11 +768,7 @@ body:has(.prediction-workspace) {
     flex-basis: 100%;
   }
   .prediction-task-tabs {
-    gap: 24px;
-    margin: 24px 0;
-  }
-  .prediction-task-tabs button {
-    font-size: 12px;
+    margin: var(--space-5) 0;
   }
   .prediction-ticket {
     padding: 20px;
