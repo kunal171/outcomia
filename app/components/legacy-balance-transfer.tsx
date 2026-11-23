@@ -94,7 +94,7 @@ export function LegacyBalanceTransfer({
     }
   }
   return (
-    <div>
+    <div className="legacy-transfer">
       <button
         className="market-open-link"
         type="button"

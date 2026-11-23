@@ -72,8 +72,9 @@ export function Markets() {
       if (sharedRead.status === "rejected") throw sharedRead.reason;
       const books = new Map<string, SharedBook>();
       for (const r of sharedRead.value) {
-        if (!sharedBookPda(r.account.market).equals(r.publicKey))
-          throw new Error("Invalid shared book identity");
+        // Club books are SharedBook accounts under club seeds; they belong on
+        // club pages, not in the public spot list.
+        if (!sharedBookPda(r.account.market).equals(r.publicKey)) continue;
         books.set(r.account.market.toBase58(), r.account);
       }
       setSharedBooks(books);

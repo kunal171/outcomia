@@ -477,9 +477,6 @@ body {
   height: 34px;
   flex-shrink: 0;
 }
-.market-open-link {
-  border-radius: 999px;
-}
 .admin-card {
   box-shadow: none;
 }
