@@ -23,7 +23,7 @@ const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ?? "playwright"
 );
 const base = new URL(
-  process.env.MULTI_BROWSER_BASE_URL ?? "http://127.0.0.1:3017",
+  process.env.MULTI_BROWSER_BASE_URL ?? "http://localhost:3017",
 );
 if (!["localhost", "127.0.0.1"].includes(base.hostname))
   throw new Error("Local fixtures only.");
