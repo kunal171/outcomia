@@ -88,25 +88,33 @@ export function ClubsHome() {
   return (
     <div className="app-shell">
       <AppHeader />
-      <main className="route-shell">
-        <div className="route-heading">
-          <h1>{t("Clubs")}</h1>
-          <p>
-            {t(
-              "Clubs run their own markets. Members-only markets admit only current members; anyone can always exit a position.",
-            )}
-          </p>
-        </div>
+      <main className="route-shell club-page">
+        <header className="ui-page-head">
+          <div>
+            <p className="ui-eyebrow">{t("Clubs")}</p>
+            <h1 className="ui-title">{t("Clubs")}</h1>
+            <p className="ui-lead">
+              {t(
+                "Clubs run their own markets. Members-only markets admit only current members; anyone can always exit a position.",
+              )}
+            </p>
+          </div>
+        </header>
+        {!CLUBS_ENABLED && (
+          <div className="ui-notice">
+            {t("Clubs are not enabled in this app configuration.")}
+          </div>
+        )}
         {CLUBS_ENABLED && (
-          <section className="club-discovery" aria-labelledby="discover-clubs">
-            <div className="section-heading">
+          <section className="ui-section" aria-labelledby="discover-clubs">
+            <div className="ui-section-head">
               <h2 id="discover-clubs">{t("Discover clubs")}</h2>
             </div>
-            {!listings && <p>{t("Loading clubs…")}</p>}
+            {!listings && <p className="club-muted">{t("Loading clubs…")}</p>}
             {listings?.length === 0 && (
-              <p className="wallet-empty">{t("No public clubs yet.")}</p>
+              <div className="ui-empty">{t("No public clubs yet.")}</div>
             )}
-            <div className="club-discovery-grid">
+            <div className="ui-grid">
               {listings?.map(({ address, club, listing }) => {
                 const key = address.toBase58();
                 const member = data?.clubs.some((c) =>
@@ -117,31 +125,47 @@ export function ClubsHome() {
                 );
                 const open = isOpenListing(listing);
                 return (
-                  <article className="club-discovery-card" key={key}>
-                    <div className="club-discovery-head">
+                  <article className="ui-card club-card" key={key}>
+                    <div className="club-badges">
                       <span
-                        className={`role-badge ${open ? "club-open" : "club-public"}`}
+                        className={`ui-badge ${open ? "ui-badge-yes" : "ui-badge-accent"}`}
                       >
                         {t(open ? "Open" : "Public")}
                       </span>
-                      <small>{listing.topic}</small>
+                      {listing.topic && (
+                        <span className="ui-badge">{listing.topic}</span>
+                      )}
                     </div>
-                    <Link href={`/clubs/${key}`}>
-                      <h3>{club.name}</h3>
-                    </Link>
-                    {listing.description && <p>{listing.description}</p>}
-                    <div className="market-card-actions wallet-card-actions">
-                      <small>
+                    <h3 className="club-card-title">
+                      <Link href={`/clubs/${key}`}>{club.name}</Link>
+                    </h3>
+                    {listing.description && (
+                      <p className="club-card-text">{listing.description}</p>
+                    )}
+                    <div className="club-card-foot">
+                      <span className="club-muted">
                         {t("{value0} members", {
                           value0: String(club.memberCount),
                         })}
-                      </small>
-                      {!wallet ? null : member ? (
-                        <span className="role-badge">{t("Member")}</span>
+                      </span>
+                      {!wallet ? (
+                        <Link
+                          className="ui-btn ui-btn-sm"
+                          href={`/clubs/${key}`}
+                        >
+                          {t("View club")}
+                        </Link>
+                      ) : member ? (
+                        <Link
+                          className="ui-btn ui-btn-sm"
+                          href={`/clubs/${key}`}
+                        >
+                          {t("Member")} →
+                        </Link>
                       ) : requested ? (
                         <button
                           type="button"
-                          className="admin-action-button"
+                          className="ui-btn ui-btn-sm"
                           disabled={tx.pending}
                           onClick={() =>
                             void tx.run(async (p, signer) => [
@@ -160,7 +184,7 @@ export function ClubsHome() {
                       ) : (
                         <button
                           type="button"
-                          className="market-open-link"
+                          className="ui-btn ui-btn-sm ui-btn-primary"
                           disabled={tx.pending}
                           onClick={() =>
                             void tx.run(async (p, signer) => [
@@ -189,134 +213,183 @@ export function ClubsHome() {
             </div>
           </section>
         )}
-        {!CLUBS_ENABLED ? (
-          <div className="access-card">
-            {t("Clubs are not enabled in this app configuration.")}
-          </div>
-        ) : !wallet ? (
-          <div className="access-card">
-            {t("Connect a wallet to see your clubs.")}
-          </div>
-        ) : (
-          <div className="admin-layout">
-            <section className="admin-card admin-list-card">
-              <div className="card-label">{t("Your clubs")}</div>
-              {loadIssue && (
-                <p className="access-denied" role="alert">
-                  {t(loadIssue)}
-                </p>
-              )}
-              {!data && !loadIssue && <p>{t("Loading clubs…")}</p>}
-              {data?.clubs.length === 0 && (
-                <p>{t("You are not in any club yet.")}</p>
-              )}
-              <ul className="club-list">
-                {data?.clubs.map(({ address, club, member }) => (
-                  <li key={address.toBase58()}>
-                    <Link href={`/clubs/${address.toBase58()}`}>
-                      {club.name}
-                    </Link>
-                    <small>
-                      {t(roleLabel(clubRole(club, member)))} ·{" "}
-                      {t("{value0} members", {
-                        value0: String(club.memberCount),
-                      })}
-                    </small>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="admin-card">
-              <div className="card-label">{t("Invitations")}</div>
-              {data?.invites.length === 0 && (
-                <p>{t("No pending invitations.")}</p>
-              )}
-              <ul className="club-list">
-                {data?.invites.map(({ address, invite, club }) => {
-                  const expired = inviteExpired(invite, now);
-                  return (
-                    <li key={address.toBase58()}>
-                      <strong>{club.name}</strong>
-                      <small>
-                        {expired
-                          ? t("Expired")
-                          : t("Expires {value0}", {
-                              value0: new Date(
-                                invite.expiresAt.toNumber() * 1000,
-                              ).toLocaleString(),
-                            })}
-                      </small>
-                      <div className="admin-actions">
-                        {!expired && (
-                          <button
-                            type="button"
-                            className="primary-button"
-                            disabled={tx.pending}
-                            onClick={() =>
-                              void tx.run(async (p, signer) => [
-                                await acceptClubInviteInstruction(
-                                  p,
-                                  signer,
-                                  invite,
-                                ),
-                              ])
-                            }
-                          >
-                            {t("Accept")}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="admin-action-button"
-                          disabled={tx.pending}
-                          onClick={() =>
-                            void tx.run(async (p, signer) => [
-                              await closeClubInviteInstruction(
-                                p,
-                                signer,
-                                invite,
-                                false,
-                              ),
-                            ])
-                          }
-                        >
-                          {expired ? t("Clear") : t("Decline")}
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-            <section className="admin-card">
-              <div className="card-label">{t("Create a club")}</div>
-              <form className="admin-form" onSubmit={(e) => void create(e)}>
-                <label>
-                  {t("Club name")}
-                  <input
-                    required
-                    value={name}
-                    disabled={tx.pending}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </label>
-                <p>
-                  {t(
-                    "You become the owner and pay the account rent. Your wallet's club roles never grant protocol administration.",
-                  )}
-                </p>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={tx.pending || !name}
-                >
-                  {t("Create club")}
-                </button>
-              </form>
-            </section>
-            <ClubFeedback issue={tx.issue} signature={tx.signature} />
-          </div>
+        {CLUBS_ENABLED && !wallet && (
+          <section className="ui-section">
+            <div className="ui-notice">
+              {t("Connect a wallet to see your clubs.")}
+            </div>
+          </section>
         )}
+        {CLUBS_ENABLED && wallet && (
+          <section className="ui-section club-layout">
+            <div className="club-main">
+              <section className="ui-card">
+                <div className="club-card-head">
+                  <h2 className="ui-h3">{t("Your clubs")}</h2>
+                  {data && data.clubs.length > 0 && (
+                    <span className="ui-badge">
+                      {String(data.clubs.length)}
+                    </span>
+                  )}
+                </div>
+                {loadIssue && (
+                  <p className="ui-notice" role="alert">
+                    {t(loadIssue)}
+                  </p>
+                )}
+                {!data && !loadIssue && (
+                  <p className="club-muted">{t("Loading clubs…")}</p>
+                )}
+                {data?.clubs.length === 0 && (
+                  <p className="club-muted">
+                    {t("You are not in any club yet.")}
+                  </p>
+                )}
+                {data && data.clubs.length > 0 && (
+                  <ul className="ui-list">
+                    {data.clubs.map(({ address, club, member }) => {
+                      const r = clubRole(club, member);
+                      return (
+                        <li key={address.toBase58()}>
+                          <Link
+                            className="ui-row"
+                            href={`/clubs/${address.toBase58()}`}
+                          >
+                            <div>
+                              <p className="ui-row-title">{club.name}</p>
+                              <p className="ui-row-meta">
+                                {t("{value0} members", {
+                                  value0: String(club.memberCount),
+                                })}
+                              </p>
+                            </div>
+                            <div className="club-badges">
+                              <span
+                                className={`ui-badge ${r === "owner" ? "ui-badge-accent" : r === "admin" ? "ui-badge-yes" : ""}`}
+                              >
+                                {t(roleLabel(r))}
+                              </span>
+                              <span
+                                className="club-row-arrow"
+                                aria-hidden="true"
+                              >
+                                →
+                              </span>
+                            </div>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+              <section className="ui-card">
+                <div className="club-card-head">
+                  <h2 className="ui-h3">{t("Invitations")}</h2>
+                  {data && data.invites.length > 0 && (
+                    <span className="ui-badge ui-badge-warn">
+                      {String(data.invites.length)}
+                    </span>
+                  )}
+                </div>
+                {data?.invites.length === 0 && (
+                  <p className="club-muted">{t("No pending invitations.")}</p>
+                )}
+                {data && data.invites.length > 0 && (
+                  <ul className="ui-list">
+                    {data.invites.map(({ address, invite, club }) => {
+                      const expired = inviteExpired(invite, now);
+                      return (
+                        <li className="ui-row" key={address.toBase58()}>
+                          <div>
+                            <p className="ui-row-title">{club.name}</p>
+                            <p className="ui-row-meta">
+                              {expired
+                                ? t("Expired")
+                                : t("Expires {value0}", {
+                                    value0: new Date(
+                                      invite.expiresAt.toNumber() * 1000,
+                                    ).toLocaleString(),
+                                  })}
+                            </p>
+                          </div>
+                          <div className="club-row-actions">
+                            {!expired && (
+                              <button
+                                type="button"
+                                className="ui-btn ui-btn-sm ui-btn-primary"
+                                disabled={tx.pending}
+                                onClick={() =>
+                                  void tx.run(async (p, signer) => [
+                                    await acceptClubInviteInstruction(
+                                      p,
+                                      signer,
+                                      invite,
+                                    ),
+                                  ])
+                                }
+                              >
+                                {t("Accept")}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-sm"
+                              disabled={tx.pending}
+                              onClick={() =>
+                                void tx.run(async (p, signer) => [
+                                  await closeClubInviteInstruction(
+                                    p,
+                                    signer,
+                                    invite,
+                                    false,
+                                  ),
+                                ])
+                              }
+                            >
+                              {expired ? t("Clear") : t("Decline")}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            </div>
+            <aside className="club-side">
+              <section className="ui-card">
+                <h2 className="ui-h3">{t("Create a club")}</h2>
+                <form className="club-form" onSubmit={(e) => void create(e)}>
+                  <label className="ui-field">
+                    <span>{t("Club name")}</span>
+                    <input
+                      className="ui-input"
+                      required
+                      value={name}
+                      maxLength={64}
+                      disabled={tx.pending}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </label>
+                  <p className="club-help">
+                    {t(
+                      "You become the owner and pay the account rent. Your wallet's club roles never grant protocol administration.",
+                    )}
+                  </p>
+                  <button
+                    className="ui-btn ui-btn-primary ui-btn-block"
+                    type="submit"
+                    disabled={tx.pending || !name}
+                  >
+                    {t("Create club")}
+                  </button>
+                </form>
+              </section>
+            </aside>
+          </section>
+        )}
+        <ClubFeedback issue={tx.issue} signature={tx.signature} />
       </main>
     </div>
   );
