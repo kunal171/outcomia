@@ -4,7 +4,8 @@ import { TradingChart } from "../trading-chart";
 import { AppHeader } from "../app-header";
 import { transactionExplorerUrl } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
-import { MULTI_OUTCOME_ENABLED, statusOf } from "../../lib/multi-outcome";
+import { MULTI_OUTCOME_ENABLED, statusLabel } from "../../lib/multi-outcome";
+import { useI18n } from "../preferences-provider";
 import { useMultiMarket } from "./use-market";
 import { SharedAssetFunds } from "../shared-wallet";
 import { MultiTrading } from "./trading";
@@ -14,45 +15,61 @@ import { MultiResolution } from "./resolution";
 import "./multi-outcome.css";
 export function MultiOutcomeDetail({ address }: { address: string }) {
   const s = useMultiMarket(address),
-    d = s.data;
+    d = s.data,
+    { t } = useI18n();
   return (
     <div className="app-shell">
       <AppHeader />
       <main className="route-shell multi-outcome">
-        <Link href="/predictions/multi">← Multi-outcome markets</Link>
-        <h1>{d?.metadata?.displayName ?? "Multi-outcome market"}</h1>
+        <Link href="/predictions/multi">← {t("Multi-outcome markets")}</Link>
+        <h1>{d?.metadata?.displayName ?? t("Multi-outcome market")}</h1>
         {!MULTI_OUTCOME_ENABLED && (
           <p role="status">
-            Multi-outcome trading is awaiting deployment verification on devnet.
+            {t(
+              "Multi-outcome trading is awaiting deployment verification on devnet.",
+            )}
           </p>
         )}
         <button
           onClick={() => void s.refresh()}
           disabled={!MULTI_OUTCOME_ENABLED || s.busy || s.loading}
         >
-          Refresh
+          {t("Refresh")}
         </button>
-        {s.loading && <p role="status">Refreshing market…</p>}
+        {s.loading && <p role="status">{t("Refreshing market…")}</p>}
         {s.error && <p role="alert">{s.error}</p>}
         {s.signature && (
           <p role="status">
-            Confirmed:{" "}
+            {t("Confirmed")}:{" "}
             <a
               href={transactionExplorerUrl(s.signature)}
               target="_blank"
               rel="noreferrer"
             >
-              View transaction
+              {t("View transaction")}
             </a>
           </p>
         )}
         {d && (
           <>
-            <p>
-              {statusOf(d.market)} · Face payout{" "}
-              {readableAmount(d.market.terms.payoutPerContract, d.decimals)}{" "}
-              {d.metadata?.quoteSymbol} · Minimum{" "}
-              {d.market.terms.quantityLot.toString()} contracts
+            <p className="multi-actions">
+              <span className="ui-badge ui-badge-accent">
+                {t(statusLabel(d.market))}
+              </span>
+              <span>
+                {t("Face payout {amount} {symbol}", {
+                  amount: readableAmount(
+                    d.market.terms.payoutPerContract,
+                    d.decimals,
+                  ),
+                  symbol: d.metadata?.quoteSymbol ?? "",
+                })}
+              </span>
+              <span>
+                {t("Minimum {count} contracts", {
+                  count: d.market.terms.quantityLot.toString(),
+                })}
+              </span>
             </p>
             <TradingChart
               market={address}
@@ -63,7 +80,7 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
             />
             <MultiTrading session={s} />
             <details>
-              <summary>Deposit or withdraw collateral</summary>
+              <summary>{t("Deposit or withdraw collateral")}</summary>
               <SharedAssetFunds
                 mint={d.market.collateralMint}
                 decimals={d.decimals}
@@ -75,25 +92,28 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
             <MultiResolution session={s} />
             <MultiFees session={s} />
             <details>
-              <summary>Market details</summary>
+              <summary>{t("Market details")}</summary>
               <p>
-                Market: <code>{address}</code>
+                {t("Market")}: <code>{address}</code>
               </p>
               <p>
-                Resolver: <code>{d.market.terms.resolver.toBase58()}</code>
+                {t("Resolver")}:{" "}
+                <code>{d.market.terms.resolver.toBase58()}</code>
               </p>
               <p>
-                Close:{" "}
+                {t("Closes")}:{" "}
                 {new Date(
                   d.market.terms.closeTs.toNumber() * 1000,
                 ).toLocaleString()}
               </p>
               <p>
-                Review delay: {d.market.terms.resolutionDelaySeconds.toString()}{" "}
-                seconds
+                {t("Review delay: {seconds} seconds", {
+                  seconds: d.market.terms.resolutionDelaySeconds.toString(),
+                })}
               </p>
               <p>
-                Reserve: {readableAmount(d.market.backingReserve, d.decimals)}
+                {t("Reserve")}:{" "}
+                {readableAmount(d.market.backingReserve, d.decimals)}
               </p>
             </details>
           </>

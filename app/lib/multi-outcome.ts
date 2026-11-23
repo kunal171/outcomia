@@ -137,6 +137,16 @@ export const multiOrderPda = (book: PublicKey, id: BN) =>
 export const sideOf = (o: Pick<Order, "side">): Side =>
   "bid" in o.side ? "bid" : "ask";
 export const statusOf = (m: MultiMarket) => Object.keys(m.status)[0];
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  open: "Open",
+  frozen: "Frozen",
+  proposed: "Proposed",
+  resolved: "Resolved",
+};
+/** English catalog key for a market status; pass it through `t()`. */
+export const statusLabel = (m: MultiMarket) =>
+  STATUS_LABELS[statusOf(m)] ?? statusOf(m);
 export const slot = (outcome: number, side: Side) =>
   outcome * 2 + (side === "ask" ? 1 : 0);
 export const enumSide = (side: Side) => ({ [side]: {} });

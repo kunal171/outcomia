@@ -32,13 +32,15 @@ import {
 } from "../../lib/multi-outcome";
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
+import { useI18n } from "../preferences-provider";
 export function MultiTrading({ session: s }: { session: MultiSession }) {
   const [outcome, setOutcome] = useState(0),
     [side, setSide] = useState<Side>("bid"),
     [price, setPrice] = useState(""),
     [quantity, setQuantity] = useState(""),
     [left, setLeft] = useState("");
-  const now = useMarketClock();
+  const now = useMarketClock(),
+    { t } = useI18n();
   // Large full sets need the market's frozen lookup table (see
   // lib/market-lookup-table.ts). Only markets with six or more outcomes look.
   const [table, setTable] = useState<AddressLookupTableAccount | null>(null),
@@ -108,7 +110,15 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               d.book!.rows,
             );
             return quote
-              ? `${q === "bid" ? "Buy" : "Sell"} via other outcomes: ${readableAmount(quote.price, d.decimals)} × ${quote.quantity.toString()}`
+              ? t(
+                  q === "bid"
+                    ? "Buy via other outcomes: {price} × {quantity}"
+                    : "Sell via other outcomes: {price} × {quantity}",
+                  {
+                    price: readableAmount(quote.price, d.decimals),
+                    quantity: quote.quantity.toString(),
+                  },
+                )
               : null;
           })
           .filter(Boolean)
@@ -116,9 +126,9 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       : "";
   return (
     <section aria-labelledby="multi-trade">
-      <h2 id="multi-trade">Trade</h2>
+      <h2 id="multi-trade">{t("Trade")}</h2>
       <label>
-        Outcome
+        {t("Outcome")}
         <select
           disabled={s.busy}
           value={outcome}
@@ -133,20 +143,20 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       </label>
       <div className="multi-grid">
         <div className="multi-card">
-          <h3>Order book</h3>
+          <h3>{t("Order book")}</h3>
           <div className="multi-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>Side</th>
-                  <th>Price</th>
-                  <th>Contracts</th>
+                  <th>{t("Side")}</th>
+                  <th>{t("Price")}</th>
+                  <th>{t("Contracts")}</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((r) => (
                   <tr key={r.publicKey.toBase58()}>
-                    <td>{sideOf(r.account) === "bid" ? "Buy" : "Sell"}</td>
+                    <td>{t(sideOf(r.account) === "bid" ? "Buy" : "Sell")}</td>
                     <td>{readableAmount(r.account.price, d.decimals)}</td>
                     <td>{r.account.remainingQuantity.toString()}</td>
                   </tr>
@@ -154,12 +164,15 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               </tbody>
             </table>
           </div>
-          {rows.length === 0 && <p>No resting orders for this outcome.</p>}
+          {rows.length === 0 && (
+            <p>{t("No resting orders for this outcome.")}</p>
+          )}
           {fullSetText && <p className="multi-full-set">{fullSetText}</p>}
           {tableState === "missing" && (
             <p className="multi-full-set">
-              Full sets across this many outcomes need a one-time lookup table
-              for this market (about 0.003 SOL rent, never refunded).{" "}
+              {t(
+                "Full sets across this many outcomes need a one-time lookup table for this market (about 0.003 SOL rent, never refunded).",
+              )}{" "}
               <button
                 type="button"
                 disabled={s.busy || !s.wallet}
@@ -179,13 +192,13 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                     .then((ok) => ok && setTableRevision((v) => v + 1))
                 }
               >
-                Enable large full-set fills
+                {t("Enable large full-set fills")}
               </button>
             </p>
           )}
         </div>
         <div className="multi-card">
-          <h3>Limit order</h3>
+          <h3>{t("Limit order")}</h3>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -228,7 +241,10 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                   setQuantity(unsubmitted);
                   setLeft(
                     unsubmitted
-                      ? `${unsubmitted} contracts remain unsubmitted. Refresh and explicitly retry.`
+                      ? t(
+                          "{count} contracts remain unsubmitted. Refresh and explicitly retry.",
+                          { count: unsubmitted },
+                        )
                       : "",
                   );
                 }
@@ -236,18 +252,20 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
             }}
           >
             <label>
-              Side
+              {t("Side")}
               <select
                 disabled={s.busy}
                 value={side}
                 onChange={(e) => setSide(e.target.value as Side)}
               >
-                <option value="bid">Buy</option>
-                <option value="ask">Sell</option>
+                <option value="bid">{t("Buy")}</option>
+                <option value="ask">{t("Sell")}</option>
               </select>
             </label>
             <label>
-              Limit price ({d.metadata?.quoteSymbol ?? "collateral"})
+              {t("Limit price ({symbol})", {
+                symbol: d.metadata?.quoteSymbol ?? t("collateral"),
+              })}
               <input
                 required
                 inputMode="decimal"
@@ -257,7 +275,9 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               />
             </label>
             <label>
-              Contracts (multiples of {d.market.terms.quantityLot.toString()})
+              {t("Contracts (multiples of {lot})", {
+                lot: d.market.terms.quantityLot.toString(),
+              })}
               <input
                 required
                 inputMode="numeric"
@@ -267,24 +287,26 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               />
             </label>
             <p>
-              Taker fee: {d.feeBps / 100}%. Maker orders pay no fee. Fills
-              execute at maker prices; any safe remainder rests at your limit.
+              {t(
+                "Taker fee: {fee}%. Maker orders pay no fee. Fills execute at maker prices; any safe remainder rests at your limit.",
+                { fee: d.feeBps / 100 },
+              )}
             </p>
             <button
               disabled={!ready || !trading || !d.book || !d.position || !d.cash}
             >
-              Review in wallet
+              {t("Review in wallet")}
             </button>
             {left && s.signature && <p role="status">{left}</p>}
           </form>
         </div>
       </div>
       <p>
-        Available collateral:{" "}
+        {t("Available collateral")}:{" "}
         {d.cash
           ? readableAmount(d.cash.free, d.decimals)
-          : "Account not initialized"}
-        . <Link href="/wallet">Deposit or withdraw in Wallet →</Link>
+          : t("Account not initialized")}
+        . <Link href="/wallet">{t("Deposit or withdraw in Wallet →")}</Link>
       </p>
       {(!d.position || !d.cash) && (
         <button
@@ -321,19 +343,25 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
             })
           }
         >
-          Initialize trading accounts
+          {t("Initialize trading accounts")}
         </button>
       )}
-      <h3>Your open orders</h3>
+      <h3>{t("Your open orders")}</h3>
       {rows
         .filter((r) =>
           r.account.owner.equals(s.wallet?.publicKey ?? PROGRAM_ID),
         )
         .map((r) => (
           <p key={r.publicKey.toBase58()}>
-            {sideOf(r.account) === "bid" ? "Buy" : "Sell"}{" "}
-            {r.account.remainingQuantity.toString()} at{" "}
-            {readableAmount(r.account.price, d.decimals)}{" "}
+            {t(
+              sideOf(r.account) === "bid"
+                ? "Buy {quantity} at {price}"
+                : "Sell {quantity} at {price}",
+              {
+                quantity: r.account.remainingQuantity.toString(),
+                price: readableAmount(r.account.price, d.decimals),
+              },
+            )}{" "}
             <button
               disabled={!ready}
               onClick={() =>
@@ -361,7 +389,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                 })
               }
             >
-              Cancel
+              {t("Cancel")}
             </button>
           </p>
         ))}
