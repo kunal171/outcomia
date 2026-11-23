@@ -1,53 +1,159 @@
+/* Multi-outcome markets on the Outcomia design system (docs/design-system.md).
+ * These pages use bare elements, so this file maps them onto the shared
+ * tokens: sections, cards, fields, buttons, tables and disclosures. */
 .multi-outcome {
-  max-width: 1120px;
+  max-width: var(--page-width);
+}
+.multi-outcome h1 {
+  margin: var(--space-2) 0 var(--space-4);
+  font-size: var(--text-h1);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+.multi-outcome h2 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-h2);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.multi-outcome h3 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-h3);
+  font-weight: 600;
+}
+.multi-outcome section {
+  margin: 0;
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--line);
+}
+.multi-outcome p {
+  line-height: 1.55;
+}
+.multi-outcome a {
+  color: var(--accent);
+  text-underline-offset: 3px;
 }
 .multi-outcome .multi-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: center;
-  margin: 1rem 0;
+  margin: var(--space-4) 0;
+  color: var(--muted);
 }
 .multi-outcome .multi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+  gap: var(--space-5);
+  align-items: start;
 }
 .multi-outcome .multi-card {
-  padding: 1.2rem;
+  padding: var(--space-5);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgb(var(--ink-rgb) / 0.025), transparent 40%),
+    var(--surface-1);
   overflow-wrap: anywhere;
+  min-width: 0;
+}
+/* The order entry card is the one actionable surface in the trade section. */
+.multi-outcome .multi-grid > .multi-card:last-child:has(form) {
+  box-shadow: var(--glow);
+  border-color: transparent;
 }
 .multi-outcome form {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-4);
   max-width: 680px;
 }
 .multi-outcome label {
   display: grid;
-  gap: 0.35rem;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-small);
 }
 .multi-outcome input,
 .multi-outcome select,
 .multi-outcome textarea {
   width: 100%;
-  padding: 0.65rem;
+  min-height: 44px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
   color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.multi-outcome input:hover,
+.multi-outcome select:hover,
+.multi-outcome textarea:hover {
+  border-color: var(--line-strong);
+}
+.multi-outcome input[inputmode="decimal"],
+.multi-outcome input[inputmode="numeric"],
+.multi-outcome input[type="number"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 .multi-outcome textarea {
   min-height: 7rem;
+  padding-block: var(--space-3);
 }
 .multi-outcome button {
-  padding: 0.6rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
   cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.multi-outcome button:hover:enabled {
+  background: rgb(var(--ink-rgb) / 0.06);
+}
+.multi-outcome button:active:enabled {
+  transform: translateY(1px);
+}
+/* Submit buttons are the primary action of their form. */
+.multi-outcome form button[type="submit"],
+.multi-outcome form button:not([type]) {
+  min-height: 48px;
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+.multi-outcome form button[type="submit"]:hover:enabled,
+.multi-outcome form button:not([type]):hover:enabled {
+  background: var(--accent-strong);
 }
 .multi-outcome button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+}
+.multi-outcome button:focus-visible,
+.multi-outcome input:focus-visible,
+.multi-outcome select:focus-visible,
+.multi-outcome textarea:focus-visible,
+.multi-outcome summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .multi-outcome table {
   width: 100%;
@@ -55,30 +161,88 @@
 }
 .multi-outcome th,
 .multi-outcome td {
-  padding: 0.65rem;
+  padding: var(--space-3);
   text-align: left;
-  border-bottom: 1px solid #80808044;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.multi-outcome th {
+  color: var(--muted);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.multi-outcome tbody th {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.multi-outcome tbody tr:hover {
+  background: rgb(var(--ink-rgb) / 0.03);
 }
 .multi-outcome .multi-scroll {
   overflow-x: auto;
 }
-.multi-outcome section {
-  margin: 1.5rem 0;
+.multi-outcome details {
+  margin: var(--space-3) 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+.multi-outcome summary {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 550;
+  cursor: pointer;
+}
+.multi-outcome summary:hover {
+  background: rgb(var(--ink-rgb) / 0.04);
+}
+.multi-outcome details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.multi-outcome details > :not(summary) {
+  margin-inline: var(--space-4);
+}
+.multi-outcome details > :last-child:not(summary) {
+  margin-bottom: var(--space-4);
 }
 .multi-outcome [role="alert"] {
-  color: var(--danger, #b42318);
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: 2px solid var(--no);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgb(var(--no-rgb) / 0.07);
+  color: var(--ink);
   white-space: pre-wrap;
 }
+.multi-outcome .multi-full-set {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
 .multi-outcome code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
   overflow-wrap: anywhere;
 }
 
 .multi-outcome label:has(input[type="checkbox"]) {
   display: flex;
   align-items: flex-start;
-  gap: 0.65rem;
+  gap: var(--space-3);
+  color: var(--ink);
 }
 .multi-outcome input[type="checkbox"] {
   width: auto;
+  min-height: 0;
   margin-top: 0.2rem;
+  accent-color: var(--accent);
+}
+@media (max-width: 900px) {
+  .multi-outcome .multi-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
