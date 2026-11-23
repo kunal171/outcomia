@@ -706,7 +706,7 @@
   "Trading close time must be in the future": "ट्रेडिंग बंद होने का समय भविष्य में होना चाहिए",
   "Trading close time passed during upload. Update the rules before creating the market.": "अपलोड के दौरान बंद होने का समय बीत गया। बाज़ार बनाने से पहले नियम अपडेट करें।",
   "Trading closed": "ट्रेडिंग बंद",
-  "Trading closes {value0}. Collateral: {value1}.": "ट्रेडिंग बंद {value0}। गारंटी: {value1}।",
+  "Trading closes {value0}.": "ट्रेडिंग बंद {value0}।",
   "Trading closes {value0}. Earliest outcome proposal: {value1}.": "ट्रेडिंग बंद {value0}। सबसे शुरुआती प्रस्ताव: {value1}।",
   "Trading fees": "ट्रेडिंग शुल्क",
   "Trading has closed. You can still cancel open orders.": "ट्रेडिंग बंद हो गई। खुले ऑर्डर अभी भी रद्द कर सकते हैं।",

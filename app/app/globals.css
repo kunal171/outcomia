@@ -2391,3 +2391,23 @@ body:has(.prediction-guide[open]) {
   margin: 0;
   font-size: var(--text-small);
 }
+
+/* Collateral symbol with its coin mark */
+.token-symbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.token-icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+}
+.market-card-terms .token-symbol {
+  display: flex;
+  width: fit-content;
+  margin-top: 6px;
+}

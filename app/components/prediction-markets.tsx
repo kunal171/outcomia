@@ -1,4 +1,5 @@
 "use client";
+import { TokenSymbol } from "./token-symbol";
 import { useIndexerUpdates } from "./use-indexer-updates";
 import { TradingChart } from "./trading-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
@@ -457,13 +458,16 @@ export function PredictionMarkets({ address }: { address?: string }) {
                     <span className="role-badge">{t(status ?? "")}</span>
                   </div>
                   <p className="market-address-caption">{key.toBase58()}</p>
-                  <p>
-                    {t("Trading closes {value0}. Collateral: {value1}.", {
+                  <p className="market-card-terms">
+                    {t("Trading closes {value0}.", {
                       value0: predictionTime(market.closeTs),
-                      value1:
+                    })}{" "}
+                    <TokenSymbol
+                      symbol={
                         metadata?.quoteSymbol ??
-                        market.collateralMint.toBase58(),
-                    })}
+                        market.collateralMint.toBase58()
+                      }
+                    />
                   </p>
                   <div className="market-card-actions">
                     {!address && (
