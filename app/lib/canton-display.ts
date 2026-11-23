@@ -24,47 +24,6 @@ export function canonicalAmount(value: string): string {
   return fraction ? `${integer}.${fraction}` : integer;
 }
 
-/** Validate the wallet boundary, including duplicate assets and wrong-network
- * responses. Symbols are display labels; token ID remains the list identity.
- */
-export function parseWalletAssets(
-  value: unknown,
-  network: CantonNetwork,
-): CantonWalletAsset[] {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    !("tokens" in value) ||
-    !Array.isArray(value.tokens)
-  )
-    throw new Error("Wallet returned an invalid balance response.");
-  const seen = new Set<string>();
-  return value.tokens.map((token: unknown) => {
-    if (!token || typeof token !== "object")
-      throw new Error("Wallet returned an invalid asset.");
-    const item = token as Record<string, unknown>;
-    if (item.network !== walletNetworks[network])
-      throw new Error("Wallet returned assets for another network.");
-    if (
-      typeof item.id !== "string" ||
-      !item.id.trim() ||
-      seen.has(item.id) ||
-      typeof item.symbol !== "string" ||
-      !item.symbol.trim() ||
-      typeof item.name !== "string" ||
-      typeof item.balance !== "string"
-    )
-      throw new Error("Wallet returned an invalid asset.");
-    seen.add(item.id);
-    return {
-      id: item.id,
-      symbol: item.symbol,
-      name: item.name,
-      amount: canonicalAmount(item.balance),
-    };
-  });
-}
-
 /** Group the integer using the selected locale, preserving every fractional
  * digit. The only floating-point value is a constant for the decimal separator.
  */
@@ -102,42 +61,78 @@ export function previewCantonOrder(
   );
 }
 
-/** Loop holdings use (instrument admin, instrument ID) as identity. Preserve
- * unlocked and locked amounts separately; neither symbols nor floats are keys.
+/** Display labels for well-known instruments; others show their instrument ID. */
+const KNOWN_INSTRUMENTS: Record<string, { symbol: string; name: string }> = {
+  Amulet: { symbol: "CC", name: "Canton Coin" },
+};
+
+const HOLDING_VIEW = ":Splice.Api.Token.HoldingV2:Holding";
+const SCALE = BigInt(10) ** BigInt(10);
+const atoms = (value: string) => {
+  const [whole, fraction = ""] = canonicalAmount(value).split(".");
+  if (fraction.length > 10) throw new Error("Invalid wallet amount.");
+  return BigInt(whole) * SCALE + BigInt(fraction.padEnd(10, "0"));
+};
+const decimalText = (value: bigint) =>
+  canonicalAmount(
+    `${value / SCALE}.${(value % SCALE).toString().padStart(10, "0")}`,
+  );
+
+/**
+ * Wallet balances from Token Standard `Holding` interface views, as read
+ * through CIP-0103 `ledgerApi`. Groups the party's own holdings by instrument
+ * (admin, ID) and keeps unlocked and locked totals apart, in exact decimals.
+ * Example: holdings of 2.5 and 1 Amulet, plus 0.5 locked → CC 3.5, locked 0.5.
  */
-export function parseLoopAssets(value: unknown): CantonWalletAsset[] {
-  if (!Array.isArray(value))
+export function parseHoldingAssets(
+  response: unknown,
+  party: string,
+): CantonWalletAsset[] {
+  const rows = Array.isArray(response)
+    ? response
+    : response && typeof response === "object" && "items" in response
+      ? (response as { items: unknown }).items
+      : null;
+  if (!Array.isArray(rows))
     throw new Error("Wallet returned an invalid balance response.");
-  const seen = new Set<string>();
-  return value.map((holding: unknown) => {
-    if (!holding || typeof holding !== "object")
-      throw new Error("Wallet returned an invalid asset.");
-    const item = holding as Record<string, unknown>;
-    const instrument = item.instrument_id as
-      | Record<string, unknown>
-      | undefined;
-    if (
-      !instrument ||
-      typeof instrument.admin !== "string" ||
-      !instrument.admin.trim() ||
-      typeof instrument.id !== "string" ||
-      !instrument.id.trim() ||
-      typeof item.symbol !== "string" ||
-      !item.symbol.trim() ||
-      typeof item.org_name !== "string" ||
-      typeof item.total_unlocked_coin !== "string" ||
-      typeof item.total_locked_coin !== "string"
-    )
-      throw new Error("Wallet returned an invalid asset.");
-    const id = JSON.stringify([instrument.admin, instrument.id]);
-    if (seen.has(id)) throw new Error("Wallet returned an invalid asset.");
-    seen.add(id);
-    return {
-      id,
-      symbol: item.symbol,
-      name: item.org_name,
-      amount: canonicalAmount(item.total_unlocked_coin),
-      locked: canonicalAmount(item.total_locked_coin),
-    };
-  });
+  const totals = new Map<
+    string,
+    { admin: string; id: string; free: bigint; locked: bigint }
+  >();
+  for (const row of rows) {
+    const r = (row ?? {}) as Record<string, any>;
+    const entry = r.contractEntry ?? r,
+      active = entry.JsActiveContract ?? entry.activeContract ?? entry,
+      views = active?.createdEvent?.interfaceViews;
+    if (!Array.isArray(views)) continue;
+    for (const v of views) {
+      if (!String(v?.interfaceId).endsWith(HOLDING_VIEW)) continue;
+      const data = (v.viewValue ?? {}) as Record<string, any>,
+        instrument = data.instrumentId ?? {};
+      if (data.account?.owner !== party) continue;
+      if (
+        typeof instrument.admin !== "string" ||
+        typeof instrument.id !== "string" ||
+        typeof data.amount !== "string"
+      )
+        throw new Error("Wallet returned an invalid asset.");
+      const key = JSON.stringify([instrument.admin, instrument.id]),
+        total = totals.get(key) ?? {
+          admin: instrument.admin,
+          id: instrument.id,
+          free: BigInt(0),
+          locked: BigInt(0),
+        };
+      if (data.lock) total.locked += atoms(data.amount);
+      else total.free += atoms(data.amount);
+      totals.set(key, total);
+    }
+  }
+  return [...totals.entries()].map(([key, t]) => ({
+    id: key,
+    symbol: KNOWN_INSTRUMENTS[t.id]?.symbol ?? t.id,
+    name: KNOWN_INSTRUMENTS[t.id]?.name ?? t.id,
+    amount: decimalText(t.free),
+    locked: decimalText(t.locked),
+  }));
 }

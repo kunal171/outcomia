@@ -116,26 +116,41 @@ try {
           case "GET_ACTIVE_NETWORK":
             data = { networkId: "canton:testnet" };
             break;
-          case "GET_ACTIVE_CONTRACTS":
-            data = {
-              items: window.__private.map((x) => ({
-                contractEntry: {
-                  JsActiveContract: {
-                    createdEvent: {
-                      contractId: x.id,
-                      templateId: x.templateId,
-                      createArgument: x.data,
-                      createdEventBlob: x.blob,
-                    },
-                  },
-                },
-              })),
-            };
+          // CIP-0103 ledgerApi: Console needs a transient token per call.
+          case "LEDGER_AUTH":
+            data = { accessToken: "mock-token" };
             break;
-          case "GET_COINS_BALANCE":
-            data = { tokens: [] };
+          case "LEDGER_API": {
+            const body = m.body ? JSON.parse(m.body) : null;
+            const filters = body
+              ? Object.values(body.eventFormat.filtersByParty)[0].cumulative
+              : [];
+            const holdings = filters.some(
+              (f) => f.identifierFilter.InterfaceFilter,
+            );
+            const result =
+              m.resource === "/v2/state/ledger-end"
+                ? { offset: 1 }
+                : holdings
+                  ? []
+                  : window.__private.map((x) => ({
+                      contractEntry: {
+                        JsActiveContract: {
+                          createdEvent: {
+                            contractId: x.id,
+                            templateId: x.templateId,
+                            createArgument: x.data,
+                            createdEventBlob: x.blob,
+                          },
+                        },
+                      },
+                    }));
+            data = { response: JSON.stringify(result) };
             break;
-          case "EXECUTE_AND_WAIT":
+          }
+          // CIP-0103 prepareExecute: returns nothing; the result arrives as a
+          // txChanged event (Console's transaction trigger message).
+          case "EXECUTE": {
             window.__commands.push(m);
             const choice = m.commands[0].ExerciseCommand.choice;
             window.__private = window.__private.filter((c) =>
@@ -143,14 +158,32 @@ try {
                 ? c.kind !== "PositionLot"
                 : c.id !== "cancel-me",
             );
-            data = {
-              tx: {
-                status: "executed",
-                commandId: m.commandId,
-                payload: { updateId: "mock-update" },
-              },
-            };
+            data = null;
+            for (const [delay, event] of [
+              [5, { status: "pending", commandId: m.commandId }],
+              [
+                10,
+                {
+                  status: "executed",
+                  commandId: m.commandId,
+                  payload: { updateId: "mock-update", completionOffset: 2 },
+                },
+              ],
+            ])
+              setTimeout(
+                () =>
+                  window.postMessage(
+                    {
+                      target: m.target,
+                      type: "GET_TRANSFER_DETAILS_TRIGGER",
+                      data: event,
+                    },
+                    "*",
+                  ),
+                delay,
+              );
             break;
+          }
           default:
             return;
         }

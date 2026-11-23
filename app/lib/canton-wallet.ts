@@ -1,29 +1,10 @@
 import type { CantonSession } from "./canton-session";
-import { readSession } from "./console-wallet";
-import { parseWalletAssets, walletNetworks } from "./canton-display";
+import { parseHoldingAssets } from "./canton-display";
+import { holdingContracts } from "./canton/transport";
 
-/** Read-only SDK request. Reverify both sides of the await so a party/network
- * switch cannot attach someone else's response to the visible wallet session.
- * Signing material and the SDK's optional network access tokens are not retained.
- */
+/** Wallet balances from the party's Token Standard holdings, read through the
+ * wallet's CIP-0103 `ledgerApi` with identity checked around the read. The
+ * same path serves every wallet; no vendor balance endpoint is used. */
 export async function readCantonWalletAssets(session: CantonSession) {
-  if (session.wallet === "loop")
-    return (await import("./loop-wallet")).readLoopAssets(session);
-  const sdk = await import("@console-wallet/dapp-sdk");
-  const wallet = sdk.consoleWallet;
-  const verify = async () => {
-    const current = await readSession(wallet);
-    if (
-      current.partyId !== session.partyId ||
-      current.networkId !== session.networkId
-    )
-      throw new Error("Wallet changed. Refresh balances.");
-  };
-  await verify();
-  const response = await wallet.getBalance({
-    party: session.partyId,
-    network: sdk.CANTON_NETWORK_VARIANTS[walletNetworks[session.networkId]],
-  });
-  await verify();
-  return parseWalletAssets(response, session.networkId);
+  return parseHoldingAssets(await holdingContracts(session), session.partyId);
 }

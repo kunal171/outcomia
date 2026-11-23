@@ -74,10 +74,11 @@ reader dependency.
 - `/canton/wallet`: read-only assets from Loop or Console Wallet, with exact amounts,
   token IDs, refresh, an empty-asset filter and a copyable party ID.
 
-Console uses SDK 3.0.0's `getBalance`; Loop uses SDK 0.16.0's authenticated
-`getHolding`. Loop verifies account metadata and provider network health through
-its native CIP-0103 bridge. Its assets are keyed by instrument admin and ID, with
-available and locked amounts shown separately. A shared symbol never merges
+Both wallets read the party's Token Standard holdings through the CIP-0103
+`ledgerApi` method (see `docs/canton-trading.md#cip-0103-wallets`). Loop verifies
+account metadata and provider network health through its native CIP-0103
+provider; Console's SDK is adapted to the same provider. Assets are keyed by
+instrument admin and ID, with available and locked amounts shown separately. A shared symbol never merges
 instruments from different issuers.
 It rechecks the live session before and after the request. Account changes
 unmount financial children; late responses are ignored. Responses with duplicate

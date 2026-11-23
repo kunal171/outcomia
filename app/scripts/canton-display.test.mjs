@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import {
   canonicalAmount,
   formatCantonAmount,
-  parseWalletAssets,
-  parseLoopAssets,
+  parseHoldingAssets,
   previewCantonOrder,
 } from "../lib/canton-display.ts";
 
@@ -33,32 +32,6 @@ test("wallet amounts retain exact integers and fractional digits in every locale
     assert.throws(() => canonicalAmount(value));
 });
 
-test("wallet responses reject invalid, duplicate and cross-network assets", () => {
-  assert.deepEqual(parseWalletAssets({ tokens: [token] }, "canton:devnet"), [
-    {
-      id: token.id,
-      symbol: "USD",
-      name: "Test dollar",
-      amount: "18446744073709551615.123456789",
-    },
-  ]);
-  assert.deepEqual(parseWalletAssets({ tokens: [] }, "canton:devnet"), []);
-  for (const response of [
-    null,
-    {},
-    { tokens: "invalid" },
-    { tokens: [null] },
-    { tokens: [token, token] },
-    { tokens: [{ ...token, balance: "NaN" }] },
-    { tokens: [{ ...token, id: "" }] },
-  ])
-    assert.throws(() => parseWalletAssets(response, "canton:devnet"));
-  assert.throws(
-    () => parseWalletAssets({ tokens: [token] }, "canton:mainnet"),
-    /another network/,
-  );
-});
-
 test("order preview uses exact Daml Decimal arithmetic and Int bounds", () => {
   assert.equal(previewCantonOrder("0.40", "3"), "1.2");
   assert.equal(previewCantonOrder("0.0000000001", "1"), "0.0000000001");
@@ -80,38 +53,60 @@ test("order preview uses exact Daml Decimal arithmetic and Int bounds", () => {
     assert.equal(previewCantonOrder(price, quantity), null);
 });
 
-test("Loop holdings preserve exact unlocked/locked balances and instrument identity", () => {
-  const holding = {
-    instrument_id: { admin: "issuer::1220", id: "USD" },
-    symbol: "USD",
-    org_name: "Dollar",
-    total_unlocked_coin: "18446744073709551615.1234567890",
-    total_locked_coin: "0.0020",
-  };
-  assert.deepEqual(parseLoopAssets([holding]), [
+test("Token Standard holdings group by instrument with exact unlocked and locked totals", () => {
+  const holding = (amount, instrument, owner = "alice::1", lock = null) => ({
+    contractEntry: {
+      JsActiveContract: {
+        createdEvent: {
+          interfaceViews: [
+            {
+              interfaceId: "pkg:Splice.Api.Token.HoldingV2:Holding",
+              viewValue: {
+                owner,
+                account: { owner, provider: null, id: "" },
+                instrumentId: instrument,
+                amount,
+                lock,
+              },
+            },
+          ],
+        },
+      },
+    },
+  });
+  const amulet = { admin: "dso::1220", id: "Amulet" },
+    usd = { admin: "issuer::1220", id: "USD" };
+  const assets = parseHoldingAssets(
+    [
+      holding("18446744073709551615.1234567890", usd),
+      holding("2.5", amulet),
+      holding("1", amulet),
+      holding("0.5", amulet, "alice::1", { holders: [] }),
+      holding("9", amulet, "bob::2"),
+    ],
+    "alice::1",
+  );
+  assert.deepEqual(assets, [
     {
       id: JSON.stringify(["issuer::1220", "USD"]),
       symbol: "USD",
-      name: "Dollar",
+      name: "USD",
       amount: "18446744073709551615.123456789",
-      locked: "0.002",
+      locked: "0",
+    },
+    {
+      id: JSON.stringify(["dso::1220", "Amulet"]),
+      symbol: "CC",
+      name: "Canton Coin",
+      amount: "3.5",
+      locked: "0.5",
     },
   ]);
-  assert.equal(
-    parseLoopAssets([
-      holding,
-      { ...holding, instrument_id: { admin: "another", id: "USD" } },
-    ]).length,
-    2,
+  assert.deepEqual(parseHoldingAssets({ items: [] }, "alice::1"), []);
+  for (const bad of [null, {}, { items: "x" }])
+    assert.throws(() => parseHoldingAssets(bad, "alice::1"));
+  assert.throws(() => parseHoldingAssets([holding("NaN", usd)], "alice::1"));
+  assert.throws(() =>
+    parseHoldingAssets([holding("1", { admin: 1, id: "USD" })], "alice::1"),
   );
-  for (const bad of [
-    null,
-    {},
-    [null],
-    [holding, holding],
-    [{ ...holding, instrument_id: null }],
-    [{ ...holding, total_unlocked_coin: 1 }],
-    [{ ...holding, total_locked_coin: "-1" }],
-  ])
-    assert.throws(() => parseLoopAssets(bad));
 });
