@@ -144,6 +144,23 @@ pub const CLUB_NAME_MAX_LENGTH: usize = 64;
 #[constant]
 pub const CLUB_INVITE_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;
 
+/// Public listing of a club: ["club_listing", club].
+#[constant]
+pub const CLUB_LISTING_SEED: &[u8] = b"club_listing";
+
+/// Pending request to join a public club: ["club_join_request", club, wallet].
+#[constant]
+pub const CLUB_JOIN_REQUEST_SEED: &[u8] = b"club_join_request";
+
+/// Join requests can be approved for seven days after they are made.
+#[constant]
+pub const CLUB_JOIN_REQUEST_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;
+
+/// Maximum UTF-8 byte lengths of listing and request text.
+pub const CLUB_TOPIC_MAX_LENGTH: usize = 32;
+pub const CLUB_DESCRIPTION_MAX_LENGTH: usize = 280;
+pub const CLUB_REQUEST_NOTE_MAX_LENGTH: usize = 140;
+
 /// Singleton club fee-share configuration: ["club_fee_config"].
 #[constant]
 pub const CLUB_FEE_CONFIG_SEED: &[u8] = b"club_fee_config";
