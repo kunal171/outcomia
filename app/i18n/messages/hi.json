@@ -1300,5 +1300,9 @@
   "View club": "क्लब देखें",
   "Manage club": "क्लब प्रबंधित करें",
   "Market creation": "मार्केट निर्माण",
-  "Binary": "बाइनरी"
+  "Binary": "बाइनरी",
+  "Pagination": "पृष्ठ",
+  "{from}–{to} of {total}": "{total} में से {from}–{to}",
+  "← Previous": "← पिछला",
+  "Next →": "अगला →"
 }
