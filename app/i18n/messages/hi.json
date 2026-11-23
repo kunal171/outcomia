@@ -1244,5 +1244,7 @@
   "Approve market creation": "मार्केट निर्माण स्वीकृत करें",
   "Recover terms buffer rent": "शर्त बफ़र का रेंट वापस लें",
   "Frozen": "फ़्रीज़",
-  "Proposed": "प्रस्तावित"
+  "Proposed": "प्रस्तावित",
+  "Connect a Solana wallet": "Solana वॉलेट कनेक्ट करें",
+  "Connect a Canton wallet": "Canton वॉलेट कनेक्ट करें"
 }

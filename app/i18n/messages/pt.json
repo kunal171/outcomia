@@ -1244,5 +1244,7 @@
   "Approve market creation": "Aprovar a criação do mercado",
   "Recover terms buffer rent": "Recuperar o aluguel do buffer de termos",
   "Frozen": "Congelado",
-  "Proposed": "Proposto"
+  "Proposed": "Proposto",
+  "Connect a Solana wallet": "Conectar uma carteira Solana",
+  "Connect a Canton wallet": "Conectar uma carteira Canton"
 }

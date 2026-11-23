@@ -22,6 +22,8 @@ type Selection = {
   busy: boolean;
   error: string | null;
   disconnect: () => Promise<void>;
+  /** Opens the wallet picker, optionally limited to one network's wallets. */
+  openPicker: (network?: Chain) => void;
 };
 const Context = createContext<Selection | null>(null);
 const key = "outcomia:active-chain";
@@ -42,6 +44,11 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
   const [pendingName, setPendingName] = useState<string | null>(null);
   const operation = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
+  const [network, setNetwork] = useState<Chain | null>(null);
+  const openPicker = (only?: Chain) => {
+    setNetwork(only ?? null);
+    setVisible(true);
+  };
 
   function remember(chain: Chain | null) {
     setIntent(chain);
@@ -116,7 +123,10 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (visible) dialog.current?.showModal();
-    else dialog.current?.close();
+    else {
+      dialog.current?.close();
+      setNetwork(null);
+    }
   }, [visible]);
 
   async function disconnect() {
@@ -219,7 +229,14 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
 
   return (
     <Context.Provider
-      value={{ chain, ready, busy: locked, error: diagnostic, disconnect }}
+      value={{
+        chain,
+        ready,
+        busy: locked,
+        error: diagnostic,
+        disconnect,
+        openPicker,
+      }}
     >
       {children}
       <dialog
@@ -229,7 +246,15 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
         onClose={() => setVisible(false)}
       >
         <div className="preferences-heading">
-          <h2 id="network-wallet-title">{t("Connect wallet")}</h2>
+          <h2 id="network-wallet-title">
+            {t(
+              network === "solana"
+                ? "Connect a Solana wallet"
+                : network === "canton"
+                  ? "Connect a Canton wallet"
+                  : "Connect wallet",
+            )}
+          </h2>
           <button
             type="button"
             aria-label={t("Close wallet selector")}
@@ -239,59 +264,72 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
           </button>
         </div>
         <ul>
-          <li>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => void choose("canton", "loop")}
-            >
-              <span className="chain-wallet-icon" aria-hidden="true">
-                L
-              </span>
-              <span>
-                Loop Wallet <small>Canton</small>
-              </span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              disabled={locked}
-              onClick={() => void choose("canton")}
-            >
-              <span className="chain-wallet-icon" aria-hidden="true">
-                C
-              </span>
-              <span>
-                Console Wallet <small>Canton</small>
-              </span>
-            </button>
-          </li>
-          {available.map(({ adapter }) => (
-            <li key={adapter.name}>
-              <button
-                type="button"
-                disabled={locked}
-                onClick={() => void choose("solana", adapter.name)}
-              >
-                <img src={adapter.icon} width="28" height="28" alt="" />
-                <span>
-                  {adapter.name}
-                  <small>Solana</small>
-                </span>
-              </button>
-            </li>
-          ))}
+          {network !== "solana" && (
+            <>
+              <li>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => void choose("canton", "loop")}
+                >
+                  <span className="chain-wallet-icon" aria-hidden="true">
+                    L
+                  </span>
+                  <span>
+                    Loop Wallet <small>Canton</small>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => void choose("canton")}
+                >
+                  <span className="chain-wallet-icon" aria-hidden="true">
+                    C
+                  </span>
+                  <span>
+                    Console Wallet <small>Canton</small>
+                  </span>
+                </button>
+              </li>
+            </>
+          )}
+          {network !== "canton" &&
+            available.map(({ adapter }) => (
+              <li key={adapter.name}>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => void choose("solana", adapter.name)}
+                >
+                  <img src={adapter.icon} width="28" height="28" alt="" />
+                  <span>
+                    {adapter.name}
+                    <small>Solana</small>
+                  </span>
+                </button>
+              </li>
+            ))}
         </ul>
-        {!available.length && (
+        {network !== "canton" && !available.length && (
           <p>{t("Install a compatible Solana wallet to continue.")}</p>
         )}
-        <a href="https://looptech.io/" target="_blank" rel="noreferrer">
-          Loop Wallet ↗
-        </a>
-        <a href="https://consolewallet.io/" target="_blank" rel="noreferrer">
-          {t("Get Console Wallet")} ↗
-        </a>
+        {network !== "solana" && (
+          <>
+            <a href="https://looptech.io/" target="_blank" rel="noreferrer">
+              Loop Wallet ↗
+            </a>
+            <a
+              href="https://consolewallet.io/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("Get Console Wallet")} ↗
+            </a>
+          </>
+        )}
         {locked && <p role="status">{t("Checking wallet…")}</p>}
         {diagnostic && <p role="alert">{diagnostic}</p>}
       </dialog>
