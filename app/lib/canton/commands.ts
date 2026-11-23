@@ -30,6 +30,7 @@ export type Action =
   | "buy"
   | "sell"
   | "cancel"
+  | "clearDeparted"
   | "redeem"
   | "match"
   | "matchComplement"
@@ -109,6 +110,7 @@ export function buildPlan(
     buy: "OrderBook",
     sell: "OrderBook",
     cancel: "LimitOrder",
+    clearDeparted: "LimitOrder",
     redeem: "SettledReserve",
     match: "OrderBook",
     matchComplement: "OrderBook",
@@ -275,27 +277,14 @@ export function buildPlan(
   /** Restricted markets need the current policy contract named by the market;
    * public markets send no proof. The ledger rechecks everything. */
   const eligibilityFor = (market: Contract, who: string) => {
-    const access = market.data.access;
-    if (!access) return null;
-    const wanted = factoryRefKey(access);
-    // Club markets: the club roster is the policy; no extra evidence.
-    const club = all.find(
-      (c) => c.kind === "Club" && factoryRefKey(c.data.ref) === wanted,
-    );
-    if (club) {
-      if (!list(club.data.members).includes(who))
-        throw new Error("Only current club members can trade in this market.");
-      return { policy: use(club), evidence: [] };
-    }
-    const policy = single(
-      all.filter(
-        (c) =>
-          c.kind === "InviteListPolicy" && factoryRefKey(c.data.ref) === wanted,
-      ),
-      "InviteListPolicy",
-    );
-    if (policy.data.manager !== who && !list(policy.data.parties).includes(who))
-      throw new Error("This wallet is not invited to this market.");
+    const policy = accessPolicy(all, market);
+    if (!policy) return null;
+    if (excludedBy(policy, who))
+      throw new Error(
+        policy.kind === "Club"
+          ? "Only current club members can trade in this market."
+          : "This wallet is not invited to this market.",
+      );
     return { policy: use(policy), evidence: [] };
   };
   /** The club factory a club keeps in sync, for admin changes. */
@@ -413,6 +402,29 @@ export function buildPlan(
         owner: party,
         order: target.id,
         balance: target.data.side === "Buy" ? use(account()) : null,
+      };
+      context = true;
+      break;
+    }
+    case "clearDeparted": {
+      // A departed club member's (or uninvited party's) resting order cannot
+      // fill. The operator clears it; backing returns to the owner.
+      operator();
+      if (target.kind !== "LimitOrder") throw new Error("Order required.");
+      root = find("OrderBook");
+      if (!list(root.data.orders).some((r) => obj(r).order === target.id))
+        throw new Error("Order is no longer open.");
+      const market = find("BinaryMarket"),
+        orderOwner = text(target.data.owner),
+        policy = accessPolicy(all, market);
+      if (!policy || !excludedBy(policy, orderOwner))
+        throw new Error("This owner can still trade in this market.");
+      choice = "OrderBook_CancelIneligible";
+      args = {
+        market: currentMarket(),
+        order: target.id,
+        policy: use(policy),
+        balance: target.data.side === "Buy" ? use(account(orderOwner)) : null,
       };
       context = true;
       break;
@@ -978,4 +990,32 @@ function bestOrder(orders: Contract[], side: string) {
           ? -1
           : 1;
     })[0];
+}
+
+/** The current policy contract of a restricted market (its club or invite
+ * list), or null for a public market. Throws when the policy is not visible. */
+export function accessPolicy(all: Contract[], market: Contract) {
+  const access = market.data.access;
+  if (!access) return null;
+  const wanted = factoryRefKey(access);
+  // Club markets: the club roster is the policy; no extra evidence.
+  const club = all.find(
+    (c) => c.kind === "Club" && factoryRefKey(c.data.ref) === wanted,
+  );
+  if (club) return club;
+  return single(
+    all.filter(
+      (c) =>
+        c.kind === "InviteListPolicy" && factoryRefKey(c.data.ref) === wanted,
+    ),
+    "InviteListPolicy",
+  );
+}
+
+/** Mirrors the ledger's `excludes`: a club excludes parties off its roster;
+ * an invite list everyone except its manager and invitees. */
+export function excludedBy(policy: Contract, who: string) {
+  return policy.kind === "Club"
+    ? !list(policy.data.members).includes(who)
+    : policy.data.manager !== who && !list(policy.data.parties).includes(who);
 }
