@@ -373,8 +373,11 @@ export function PredictionMarkets({ address }: { address?: string }) {
         <div className="market-card-heading">
           <div>
             <div className="multi-market-badges">
-              <span className="ui-badge">{t("Binary")}</span>
-              <span className="ui-badge market-status-badge">
+              <span className="ui-badge market-kind-binary">{t("Binary")}</span>
+              <span
+                className="ui-badge market-status-badge"
+                data-status={status}
+              >
                 {t(status ?? "")}
               </span>
             </div>
@@ -433,7 +436,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
           </div>
         )}
         {!address && (
-          <div className="route-heading">
+          <div className="route-heading prediction-hero">
             <h1>{t("Prediction markets")}</h1>
 
             <p className="prediction-release-note">

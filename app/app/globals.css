@@ -1151,6 +1151,98 @@ select:focus-visible {
   margin: 0;
 }
 
+/* Colour on market lists: each card carries its type's colour (--kind-rgb)
+ * in a top bar, a corner glow and its hover; badges and the active filter
+ * and page pick up the same accent/violet pair. */
+.prediction-hero h1,
+.multi-list-head .ui-title {
+  background: linear-gradient(
+    100deg,
+    var(--ink) 15%,
+    var(--accent) 60%,
+    var(--multi) 95%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.markets-grid > .market-card,
+.markets-grid > .multi-market-card,
+.multi-market-grid > .multi-market-card {
+  --kind-rgb: var(--accent-rgb);
+  --kind-end-rgb: var(--hue-3-rgb);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      120% 90% at 100% 0%,
+      rgb(var(--kind-rgb) / 0.11),
+      transparent 55%
+    ),
+    var(--panel);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+.markets-grid > .multi-market-card,
+.multi-market-grid > .multi-market-card {
+  --kind-rgb: var(--multi-rgb);
+  --kind-end-rgb: var(--hue-5-rgb);
+}
+.markets-grid > .market-card::before,
+.markets-grid > .multi-market-card::before,
+.multi-market-grid > .multi-market-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--kind-rgb)),
+    rgb(var(--kind-end-rgb))
+  );
+}
+.markets-grid > .market-card:hover,
+.markets-grid > .multi-market-card:hover,
+.multi-market-grid > .multi-market-card:hover {
+  border-color: rgb(var(--kind-rgb) / 0.5);
+  box-shadow: 0 18px 40px -20px rgb(var(--kind-rgb) / 0.55);
+  transform: translateY(-2px);
+}
+.ui-badge.market-kind-binary,
+.ui-badge.market-kind-multi {
+  --badge-rgb: var(--accent-rgb);
+  border-color: rgb(var(--badge-rgb) / 0.35);
+  background: rgb(var(--badge-rgb) / 0.12);
+  color: rgb(var(--badge-rgb));
+  font-weight: 650;
+}
+.ui-badge.market-kind-multi {
+  --badge-rgb: var(--multi-rgb);
+}
+.ui-badge.market-status-badge[data-status="open"] {
+  border-color: rgb(var(--yes-rgb) / 0.35);
+  background: rgb(var(--yes-rgb) / 0.1);
+  color: var(--yes);
+}
+.market-status-badge[data-status="open"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgb(var(--yes-rgb) / 0.2);
+}
+.markets-grid > .multi-market-card .multi-market-open,
+.multi-market-grid > .multi-market-card .multi-market-open {
+  color: var(--multi);
+}
+.market-type-filter button[aria-pressed="true"],
+.pagination-pages .ui-btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--multi));
+}
+
 /* Page controls under market lists (components/pagination.tsx). */
 .pagination {
   display: flex;

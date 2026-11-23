@@ -14,6 +14,7 @@ import {
   multiAccounts,
   multiMarketPda,
   statusLabel,
+  statusOf,
   type MultiMarket,
 } from "../../lib/multi-outcome";
 import { visibleMarket } from "../../lib/market-visibility";
@@ -96,8 +97,13 @@ export function MultiOutcomeCard({ row }: { row: MultiOutcomeRow }) {
       href={`/predictions/multi/${row.address}`}
     >
       <div className="multi-market-badges">
-        <span className="ui-badge ui-badge-accent">{t("Multi-outcome")}</span>
-        <span className="ui-badge">{t(statusLabel(row.market))}</span>
+        <span className="ui-badge market-kind-multi">{t("Multi-outcome")}</span>
+        <span
+          className="ui-badge market-status-badge"
+          data-status={statusOf(row.market)}
+        >
+          {t(statusLabel(row.market))}
+        </span>
       </div>
       <h3>{row.name}</h3>
       <ul className="multi-market-outcomes" aria-label={t("Outcomes")}>

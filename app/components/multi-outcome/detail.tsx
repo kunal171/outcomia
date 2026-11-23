@@ -5,7 +5,11 @@ import { TradingChart } from "../trading-chart";
 import { AppHeader } from "../app-header";
 import { transactionExplorerUrl } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
-import { MULTI_OUTCOME_ENABLED, statusLabel } from "../../lib/multi-outcome";
+import {
+  MULTI_OUTCOME_ENABLED,
+  statusLabel,
+  statusOf,
+} from "../../lib/multi-outcome";
 import { useI18n } from "../preferences-provider";
 import { useMultiMarket } from "./use-market";
 import { SharedAssetFunds } from "../shared-wallet";
@@ -23,7 +27,9 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
       <AppHeader />
       <main className="route-shell multi-outcome">
         <Link href="/predictions/multi">← {t("Multi-outcome markets")}</Link>
-        <h1>{d?.metadata?.displayName ?? t("Multi-outcome market")}</h1>
+        <h1 className="multi-detail-title">
+          {d?.metadata?.displayName ?? t("Multi-outcome market")}
+        </h1>
         {!MULTI_OUTCOME_ENABLED && (
           <p role="status">
             {t(
@@ -54,7 +60,13 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
         {d && (
           <>
             <p className="multi-actions">
-              <span className="ui-badge ui-badge-accent">
+              <span className="ui-badge market-kind-multi">
+                {t("Multi-outcome")}
+              </span>
+              <span
+                className="ui-badge market-status-badge"
+                data-status={statusOf(d.market)}
+              >
                 {t(statusLabel(d.market))}
               </span>
               <span>

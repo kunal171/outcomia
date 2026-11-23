@@ -205,7 +205,10 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               </thead>
               <tbody>
                 {sorted.map((r) => (
-                  <tr key={r.publicKey.toBase58()}>
+                  <tr
+                    key={r.publicKey.toBase58()}
+                    data-side={sideOf(r.account)}
+                  >
                     <td>{t(sideOf(r.account) === "bid" ? "Buy" : "Sell")}</td>
                     <td>{readableAmount(r.account.price, d.decimals)}</td>
                     <td>{r.account.remainingQuantity.toString()}</td>
@@ -308,7 +311,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               aria-label={t("Side")}
             >
               {(["bid", "ask"] as const).map((v) => (
-                <label key={v}>
+                <label key={v} data-side={v}>
                   <input
                     type="radio"
                     name="multi-trade-side"
@@ -429,7 +432,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
           {t("Initialize trading accounts")}
         </button>
       )}
-      <h3>{t("Your open orders")}</h3>
+      <h3 className="multi-orders-title">{t("Your open orders")}</h3>
       {rows
         .filter((r) =>
           r.account.owner.equals(s.wallet?.publicKey ?? PROGRAM_ID),

@@ -270,14 +270,40 @@
   opacity: 0;
   cursor: pointer;
 }
+/* Each outcome keeps one palette colour (6n+k) on chips across the app. */
+.multi-outcome-chip:nth-child(6n + 1),
+.multi-market-outcomes li:nth-child(6n + 1) {
+  --chip-rgb: var(--hue-1-rgb);
+}
+.multi-outcome-chip:nth-child(6n + 2),
+.multi-market-outcomes li:nth-child(6n + 2) {
+  --chip-rgb: var(--hue-2-rgb);
+}
+.multi-outcome-chip:nth-child(6n + 3),
+.multi-market-outcomes li:nth-child(6n + 3) {
+  --chip-rgb: var(--hue-3-rgb);
+}
+.multi-outcome-chip:nth-child(6n + 4),
+.multi-market-outcomes li:nth-child(6n + 4) {
+  --chip-rgb: var(--hue-4-rgb);
+}
+.multi-outcome-chip:nth-child(6n + 5),
+.multi-market-outcomes li:nth-child(6n + 5) {
+  --chip-rgb: var(--hue-5-rgb);
+}
+.multi-outcome-chip:nth-child(6n + 6),
+.multi-market-outcomes li:nth-child(6n + 6) {
+  --chip-rgb: var(--hue-6-rgb);
+}
 .multi-outcome .multi-outcome-chip span {
   display: inline-flex;
   align-items: center;
   min-height: 40px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--line-strong);
+  border: 1px solid rgb(var(--chip-rgb, var(--ink-rgb)) / 0.4);
   border-radius: var(--radius-pill);
-  color: var(--ink);
+  background: rgb(var(--chip-rgb, var(--ink-rgb)) / 0.08);
+  color: rgb(var(--chip-rgb, var(--ink-rgb)));
   font-size: 14px;
   font-weight: 550;
   transition:
@@ -285,13 +311,13 @@
     border-color var(--dur-fast) var(--ease-out);
 }
 .multi-outcome .multi-outcome-chip:hover span {
-  background: rgb(var(--ink-rgb) / 0.05);
+  background: rgb(var(--chip-rgb, var(--ink-rgb)) / 0.16);
 }
 .multi-outcome .multi-outcome-chip input:checked + span {
   border-color: transparent;
-  background: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: var(--glow);
+  background: rgb(var(--chip-rgb, var(--accent-rgb)));
+  color: var(--outcome-ink);
+  box-shadow: 0 10px 24px -10px rgb(var(--chip-rgb, var(--accent-rgb)) / 0.7);
 }
 .multi-outcome .multi-segment {
   display: grid;
@@ -314,6 +340,31 @@
   background: var(--surface-2);
   color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--line);
+}
+.multi-outcome .multi-segment [data-side="bid"] input:checked + span {
+  background: var(--buy);
+  color: var(--outcome-ink);
+  box-shadow: none;
+}
+.multi-outcome .multi-segment [data-side="ask"] input:checked + span {
+  background: var(--sell);
+  color: var(--outcome-ink);
+  box-shadow: none;
+}
+/* Order book rows tinted by side. */
+.multi-outcome tr[data-side="bid"] td:first-child {
+  color: var(--buy);
+  font-weight: 650;
+}
+.multi-outcome tr[data-side="ask"] td:first-child {
+  color: var(--sell);
+  font-weight: 650;
+}
+.multi-outcome tr[data-side="bid"] {
+  background: rgb(var(--buy-rgb) / 0.06);
+}
+.multi-outcome tr[data-side="ask"] {
+  background: rgb(var(--sell-rgb) / 0.06);
 }
 .multi-outcome .multi-outcome-chip input:focus-visible + span,
 .multi-outcome .multi-segment input:focus-visible + span {
@@ -361,9 +412,12 @@
 }
 .multi-market-outcomes li {
   padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  background: rgb(var(--ink-rgb) / 0.05);
+  border: 1px solid rgb(var(--chip-rgb, var(--ink-rgb)) / 0.25);
+  border-radius: var(--radius-pill);
+  background: rgb(var(--chip-rgb, var(--ink-rgb)) / 0.1);
+  color: rgb(var(--chip-rgb, var(--ink-rgb)));
   font-size: var(--text-small);
+  font-weight: 550;
 }
 .multi-market-foot {
   display: flex;
@@ -381,4 +435,20 @@
 }
 .multi-list-head {
   margin-top: var(--space-4);
+}
+
+/* Market page title in the same ink → accent → violet as the list titles. */
+.multi-outcome h1.multi-detail-title {
+  background: linear-gradient(
+    100deg,
+    var(--ink) 15%,
+    var(--accent) 60%,
+    var(--multi) 95%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.multi-outcome .multi-orders-title {
+  margin-top: var(--space-6);
 }
