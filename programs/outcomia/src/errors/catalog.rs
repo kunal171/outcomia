@@ -509,4 +509,15 @@ pub enum OutcomiaError {
     InvalidClubMarket = 184,
     #[msg("Only current club members can do this in a members-only market")]
     ClubMembershipRequired = 185,
+
+    #[msg("Club topics are trimmed, nonempty and at most 32 bytes; descriptions at most 280; notes at most 140")]
+    InvalidClubListing = 186,
+    #[msg("This club is not listed as public and verified by a protocol admin")]
+    ClubNotPublic = 187,
+    #[msg("This club is not listed as open and verified by a protocol admin")]
+    ClubNotOpen = 188,
+    #[msg("The club join request has expired")]
+    ClubJoinRequestExpired = 189,
+    #[msg("The club join request has not expired yet")]
+    ClubJoinRequestNotExpired = 190,
 }

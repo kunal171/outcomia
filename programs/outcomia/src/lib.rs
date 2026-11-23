@@ -72,6 +72,55 @@ pub mod outcomia {
         crate::instructions::club_invites::handle_close_club_invite(ctx)
     }
 
+    /// Lets the club owner list the club as public (request to join) or open
+    /// (join directly); the listing awaits protocol-admin verification.
+    pub fn set_club_listing(
+        ctx: Context<SetClubListing>,
+        visibility: ClubVisibility,
+        topic: String,
+        description: String,
+    ) -> Result<()> {
+        crate::instructions::club_listings::handle_set_club_listing(
+            ctx,
+            visibility,
+            topic,
+            description,
+        )
+    }
+
+    /// Lets the club owner remove the listing, making the club private again.
+    pub fn close_club_listing(ctx: Context<CloseClubListing>) -> Result<()> {
+        crate::instructions::club_listings::handle_close_club_listing(ctx)
+    }
+
+    /// Lets an active protocol admin verify or unverify a club listing.
+    pub fn verify_club_listing(ctx: Context<VerifyClubListing>, verified: bool) -> Result<()> {
+        crate::instructions::club_listings::handle_verify_club_listing(ctx, verified)
+    }
+
+    /// Lets a wallet request membership of a verified public club.
+    pub fn request_club_membership(
+        ctx: Context<RequestClubMembership>,
+        note: String,
+    ) -> Result<()> {
+        crate::instructions::club_listings::handle_request_club_membership(ctx, note)
+    }
+
+    /// Lets a club admin approve a pending join request.
+    pub fn approve_club_request(ctx: Context<ApproveClubRequest>) -> Result<()> {
+        crate::instructions::club_listings::handle_approve_club_request(ctx)
+    }
+
+    /// Rejects (club admin), cancels (requester) or clears an expired join request (anyone).
+    pub fn close_club_request(ctx: Context<CloseClubRequest>) -> Result<()> {
+        crate::instructions::club_listings::handle_close_club_request(ctx)
+    }
+
+    /// Lets any wallet join a verified open club.
+    pub fn join_open_club(ctx: Context<JoinOpenClub>) -> Result<()> {
+        crate::instructions::club_listings::handle_join_open_club(ctx)
+    }
+
     /// Lets the club owner promote a member to admin or demote an admin.
     pub fn set_club_member_role(ctx: Context<SetClubMemberRole>, role: ClubRole) -> Result<()> {
         crate::instructions::club_members::handle_set_club_member_role(ctx, role)

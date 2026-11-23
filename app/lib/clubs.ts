@@ -23,6 +23,7 @@ import {
 } from "./shared";
 import {
   TOKEN_PROGRAM_ID,
+  deriveAdminRecordPda,
   deriveMarketMetadataPda,
   deriveVaultAuthorityPda,
   deriveVaultPda,
@@ -34,6 +35,10 @@ export const CLUBS_ENABLED =
   SHARED_BALANCES_ENABLED && process.env.NEXT_PUBLIC_CLUBS_ENABLED === "true";
 export const CLUB_INVITE_TTL_SECONDS = 7 * 24 * 60 * 60;
 export const CLUB_NAME_MAX_BYTES = 64;
+export const CLUB_JOIN_REQUEST_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const CLUB_TOPIC_MAX_BYTES = 32;
+export const CLUB_DESCRIPTION_MAX_BYTES = 280;
+export const CLUB_REQUEST_NOTE_MAX_BYTES = 140;
 
 export interface ClubAccount {
   clubId: number[];
@@ -64,6 +69,22 @@ export interface ClubMarketAccount {
   creator: PublicKey;
   accruedClubFees: BN;
 }
+/** Public (request + approval) or open (join directly) listing of a club.
+ * It admits members and appears in discovery only while verified. */
+export interface ClubListingAccount {
+  club: PublicKey;
+  visibility: { public?: object; open?: object };
+  topic: string;
+  description: string;
+  verifiedBy: PublicKey | null;
+  updatedAt: BN;
+}
+export interface ClubJoinRequestAccount {
+  club: PublicKey;
+  wallet: PublicKey;
+  note: string;
+  expiresAt: BN;
+}
 export interface MarketMetadata {
   market: PublicKey;
   displayName: string;
@@ -81,6 +102,8 @@ export function clubAccounts(p: Program) {
     clubMember: Reader<ClubMemberAccount>;
     clubInvite: Reader<ClubInviteAccount>;
     clubMarket: Reader<ClubMarketAccount>;
+    clubListing: Reader<ClubListingAccount>;
+    clubJoinRequest: Reader<ClubJoinRequestAccount>;
     predictionMarket: Reader<PredictionMarketAccount>;
     marketMetadata: Reader<MarketMetadata>;
   };
@@ -94,6 +117,10 @@ const address = (seed: string, ...parts: Uint8Array[]) =>
 export const clubPda = (clubId: Uint8Array) => address("club", clubId);
 export const clubInvitePda = (club: PublicKey, wallet: PublicKey) =>
   address("club_invite", club.toBytes(), wallet.toBytes());
+export const clubListingPda = (club: PublicKey) =>
+  address("club_listing", club.toBytes());
+export const clubJoinRequestPda = (club: PublicKey, wallet: PublicKey) =>
+  address("club_join_request", club.toBytes(), wallet.toBytes());
 export const clubMarketPda = (market: PublicKey) =>
   address("club_market", market.toBytes());
 export const clubPredictionMarketPda = (marketId: Uint8Array) =>
@@ -152,9 +179,10 @@ export function clubNameIssue(name: string) {
 export async function readWalletClubs(p: Program, wallet: PublicKey) {
   const a = clubAccounts(p);
   const byWallet = [{ memcmp: { offset: 40, bytes: wallet.toBase58() } }];
-  const [memberships, invites] = await Promise.all([
+  const [memberships, invites, requests] = await Promise.all([
     a.clubMember.all(byWallet),
     a.clubInvite.all(byWallet),
+    a.clubJoinRequest.all(byWallet).catch(() => []),
   ]);
   const load = async (club: PublicKey) => {
     const account = await a.club.fetchNullable(club);
@@ -169,6 +197,15 @@ export async function readWalletClubs(p: Program, wallet: PublicKey) {
           address: m.account.club,
           club: await load(m.account.club),
           member: m.account,
+        })),
+    ),
+    requests: await Promise.all(
+      requests
+        .filter((r) => r.account.wallet.equals(wallet))
+        .map(async (r) => ({
+          address: r.account.club,
+          request: r.account,
+          club: await load(r.account.club),
         })),
     ),
     invites: await Promise.all(
@@ -197,10 +234,12 @@ export async function readClub(p: Program, club: PublicKey) {
   if (!clubPda(Uint8Array.from(account.clubId)).equals(club))
     throw new Error("Club address does not match its id");
   const byClub = [{ memcmp: { offset: 8, bytes: club.toBase58() } }];
-  const [members, invites, bindings] = await Promise.all([
+  const [members, invites, bindings, listing, requests] = await Promise.all([
     a.clubMember.all(byClub),
     a.clubInvite.all(byClub),
     a.clubMarket.all(byClub),
+    a.clubListing.fetchNullable(clubListingPda(club)).catch(() => null),
+    a.clubJoinRequest.all(byClub).catch(() => []),
   ]);
   const markets: ClubMarketRow[] = [];
   for (const { account: binding } of bindings) {
@@ -228,6 +267,8 @@ export async function readClub(p: Program, club: PublicKey) {
           Number(isAdmin(y)) - Number(isAdmin(x)),
       ),
     invites: invites.map((i) => i.account).filter((i) => i.club.equals(club)),
+    listing: listing && listing.club.equals(club) ? listing : null,
+    requests: requests.map((r) => r.account).filter((r) => r.club.equals(club)),
     markets,
   };
 }
@@ -627,4 +668,163 @@ export const advanceClubPredictionInstruction = (
   p.methods
     .advanceClubPrediction(action)
     .accountsPartial({ market })
+    .instruction();
+
+// ---- Public and open clubs (Creator Clubs CC1) -------------------------------
+
+export const isOpenListing = (l: Pick<ClubListingAccount, "visibility">) =>
+  !!l.visibility.open;
+export const listingVerified = (l: Pick<ClubListingAccount, "verifiedBy">) =>
+  !!l.verifiedBy;
+export const requestExpired = (
+  r: Pick<ClubJoinRequestAccount, "expiresAt">,
+  now = Math.floor(Date.now() / 1000),
+) => now >= r.expiresAt.toNumber();
+const utf8 = (text: string) => new TextEncoder().encode(text).length;
+/** Mirrors the program's listing checks; returns an English issue or null. */
+export function clubListingIssue(topic: string, description: string) {
+  if (!topic || topic.trim() !== topic || utf8(topic) > CLUB_TOPIC_MAX_BYTES)
+    return "Topics must be trimmed, nonempty and at most 32 bytes.";
+  if (
+    description.trim() !== description ||
+    utf8(description) > CLUB_DESCRIPTION_MAX_BYTES
+  )
+    return "Descriptions must be trimmed and at most 280 bytes.";
+  return null;
+}
+export function clubRequestNoteIssue(note: string) {
+  return note.trim() !== note || utf8(note) > CLUB_REQUEST_NOTE_MAX_BYTES
+    ? "Notes must be trimmed and at most 140 bytes."
+    : null;
+}
+/** Verified public and open clubs for discovery, newest listing first.
+ * ClubListing stores club at offset 8. */
+export async function readClubListings(p: Program) {
+  const a = clubAccounts(p);
+  const listings = await a.clubListing.all();
+  const rows = await Promise.all(
+    listings
+      .filter(
+        ({ publicKey, account }) =>
+          listingVerified(account) &&
+          clubListingPda(account.club).equals(publicKey),
+      )
+      .map(async ({ account }) => {
+        const club = await a.club.fetchNullable(account.club);
+        return club ? { address: account.club, club, listing: account } : null;
+      }),
+  );
+  return rows
+    .filter((r): r is NonNullable<typeof r> => !!r)
+    .sort((x, y) => y.listing.updatedAt.cmp(x.listing.updatedAt));
+}
+export const setClubListingInstruction = (
+  p: Program,
+  owner: PublicKey,
+  club: PublicKey,
+  open: boolean,
+  topic: string,
+  description: string,
+) =>
+  p.methods
+    .setClubListing(open ? { open: {} } : { public: {} }, topic, description)
+    .accountsPartial({
+      owner,
+      club,
+      listing: clubListingPda(club),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+export const closeClubListingInstruction = (
+  p: Program,
+  owner: PublicKey,
+  club: PublicKey,
+) =>
+  p.methods
+    .closeClubListing()
+    .accountsPartial({ owner, club, listing: clubListingPda(club) })
+    .instruction();
+/** Protocol admins verify (or withdraw verification of) a listing. */
+export const verifyClubListingInstruction = (
+  p: Program,
+  authority: PublicKey,
+  club: PublicKey,
+  verified: boolean,
+) =>
+  p.methods
+    .verifyClubListing(verified)
+    .accountsPartial({
+      authority,
+      adminRecord: deriveAdminRecordPda(authority),
+      listing: clubListingPda(club),
+    })
+    .instruction();
+export const requestClubMembershipInstruction = (
+  p: Program,
+  wallet: PublicKey,
+  club: PublicKey,
+  note: string,
+) =>
+  p.methods
+    .requestClubMembership(note)
+    .accountsPartial({
+      wallet,
+      club,
+      listing: clubListingPda(club),
+      existingMember: memberOf(club, wallet),
+      request: clubJoinRequestPda(club, wallet),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+export const approveClubRequestInstruction = (
+  p: Program,
+  admin: PublicKey,
+  club: PublicKey,
+  wallet: PublicKey,
+) =>
+  p.methods
+    .approveClubRequest()
+    .accountsPartial({
+      admin,
+      club,
+      adminMember: memberOf(club, admin),
+      request: clubJoinRequestPda(club, wallet),
+      wallet,
+      member: memberOf(club, wallet),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+/** Reject (club admin), cancel (requester) or clear after expiry (anyone). */
+export const closeClubRequestInstruction = (
+  p: Program,
+  closer: PublicKey,
+  club: PublicKey,
+  wallet: PublicKey,
+  asAdmin: boolean,
+) =>
+  p.methods
+    .closeClubRequest()
+    .accountsPartial(
+      optionalAccounts({
+        closer,
+        request: clubJoinRequestPda(club, wallet),
+        wallet,
+        closerMember: asAdmin ? memberOf(club, closer) : null,
+      }),
+    )
+    .instruction();
+export const joinOpenClubInstruction = (
+  p: Program,
+  wallet: PublicKey,
+  club: PublicKey,
+) =>
+  p.methods
+    .joinOpenClub()
+    .accountsPartial({
+      wallet,
+      club,
+      listing: clubListingPda(club),
+      member: memberOf(club, wallet),
+      systemProgram: SystemProgram.programId,
+    })
     .instruction();

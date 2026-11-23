@@ -182,6 +182,18 @@ Solana implementations may land at different times.
 | --- | --- | --- |
 | CC0 | This specification | Landing page mention ("coming soon") |
 | CC1 | Public (request/approve) and Open (join) club types | Club discovery list, request and approval flows |
+
+**CC1 on Solana (implemented, not yet deployed).** A `ClubListing`
+(`["club_listing", club]`) makes a club Public or Open with a topic and
+description; clubs without one stay private, so existing clubs need no
+migration. A listing admits members and appears in discovery only while an
+active protocol admin has verified its current terms; any owner edit clears
+the verification (the hook for operator KYC and stake in CC4). Join requests
+(`["club_join_request", club, wallet]`) carry an optional note, last seven
+days and refund their rent to the requester however they close; the approving
+club admin pays the new membership's rent. Instructions: `set_club_listing`,
+`close_club_listing`, `verify_club_listing`, `request_club_membership`,
+`approve_club_request`, `close_club_request` and `join_open_club`.
 | CC2 | Registry sync and indexing (CantonGrid, Solana indexer) | Club search, topics, cross-chain club page |
 | CC3 | Fee split in settlement, club fee balance, withdrawal | Fee breakdown before trading; operator earnings |
 | CC4 | Operator attestations and stake with unbonding | Operator onboarding, verification and stake screens |

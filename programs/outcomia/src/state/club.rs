@@ -104,3 +104,48 @@ pub struct ClubMarket {
     pub accrued_club_fees: u64,
     pub bump: u8,
 }
+
+/// How a listed club admits members. Clubs without a listing stay private
+/// (invite-only), exactly as before listings existed.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum ClubVisibility {
+    /// Discoverable; wallets request membership and a club admin approves.
+    Public,
+    /// Discoverable; any wallet joins directly.
+    Open,
+}
+
+/// Public listing of a club. It is discoverable, and admits requests or open
+/// joins, only while a protocol admin has verified its current terms; any
+/// change by the owner clears the verification.
+///
+/// PDA: ["club_listing", club]
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubListing {
+    pub club: Pubkey,
+    pub visibility: ClubVisibility,
+    #[max_len(32)]
+    pub topic: String,
+    #[max_len(280)]
+    pub description: String,
+    /// Protocol admin who verified the current terms, if any.
+    pub verified_by: Option<Pubkey>,
+    pub updated_at: i64,
+    pub bump: u8,
+}
+
+/// A wallet's pending request to join a public club. The wallet pays its rent
+/// and receives it back however the request closes.
+///
+/// PDA: ["club_join_request", club, wallet]
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubJoinRequest {
+    pub club: Pubkey,
+    pub wallet: Pubkey,
+    #[max_len(140)]
+    pub note: String,
+    pub expires_at: i64,
+    pub bump: u8,
+}
