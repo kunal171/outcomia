@@ -10,6 +10,7 @@ import "./navigation.css";
 import "./prediction-detail.css";
 import "./theme.css";
 import "./design.css";
+import "./marketing.css";
 import { SolanaProvider } from "@/components/solana-provider";
 import { CantonWalletProvider } from "@/components/canton-wallet-provider";
 import { NetworkWalletProvider } from "@/components/network-wallet-provider";
