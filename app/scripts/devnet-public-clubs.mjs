@@ -501,8 +501,8 @@ async function seed() {
     false,
   );
   await trade(
-    "crypto market: m2 buys YES 0.32 x40 against the NO bid",
-    m2,
+    "crypto market: m1 buys YES 0.32 x40 against m2's NO bid",
+    m1,
     "yes",
     yes + 0.02,
     40,

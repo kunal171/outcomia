@@ -1,0 +1,162 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "startedAt": "2026-11-23T11:33:28.350Z",
+  "owner": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "clubs": {
+    "crypto": {
+      "name": "Crypto Forecasters",
+      "id": "476def89cee8cc9c6651685cc9b67e86b9c0a81110a441d9e59028705d079f09",
+      "address": "8Js5AM35JFHffCDpsg6wZncGvn5NwNitec3u1m8Qebxo",
+      "visibility": "public",
+      "topic": "Crypto"
+    },
+    "sports": {
+      "name": "Matchday Predictors",
+      "id": "e7b5ffde716c2dccf08014c0dd9015248d8a3113048220fde31b67e81271711c",
+      "address": "9tqw1HbDfxndzoCeSSEiBwfsnHm356PSRDchciqc476H",
+      "visibility": "open",
+      "topic": "Sports"
+    },
+    "founders": {
+      "name": "Outcomia Founders",
+      "id": "f7c91a3497b77918787b732df285aa3fdfae697daf0b224f1b4a2cfae7cf3844",
+      "address": "4vuhxHEuWiWnKNQPrruuc1v1MmESGKUSPKW6wqDzZG8g"
+    }
+  },
+  "steps": [
+    {
+      "label": "crypto: create club",
+      "signature": "rcc5xh8Mwo6nxXpWkMAqAp9rNpPh11TQ7pwNRh8XVpJoYsVn6qnNvMysKpnu8B4qXaR6KqmPbvEjzfgES8KiBzM"
+    },
+    {
+      "label": "crypto: list as public",
+      "signature": "2Qh4GmWCeuTRnvXUj2ksfxDy8VFPSfpFkkAaXQaWGNZa2dpTro7ajLiXi3n2dARzWT8qx4dkX9wMWPwKJbkHnbZW"
+    },
+    {
+      "label": "crypto: verify listing",
+      "signature": "4yvpy4qTJfcTzoZnbSyB8vnZn3y5d4KgkDjfDnGxZcg5F9xJxeVxGGVGwXtwSoUZU24oJykJi3Z8qHhQ1cugmnPj"
+    },
+    {
+      "label": "sports: create club",
+      "signature": "5wnKmmmx1YeDaEYhqFYTk4bg154hiGUazQnY4syFVDfPz2M6iqP5mDadssWNskLPn3V6obj76zrPPnDXHcuCa3xq"
+    },
+    {
+      "label": "sports: list as open",
+      "signature": "5qdKUsbikY5cjTxgAS8SSL6FZhnjEgFD99eZYeyBhNEKpFDreDHdQj9agipex1zqPdwzyUZBZrckg8WdaM7L7RZC"
+    },
+    {
+      "label": "sports: verify listing",
+      "signature": "4rJHkgmEY4fS73wjYoLJqnDGVYud91bsF6vTS9FNx7amYzYczcL2ud4dAX2rsyWKSUXgwGZJbbd78AK2Fc3iM9ha"
+    },
+    {
+      "label": "founders: create club",
+      "signature": "5YuYX68w39rT9vhLW5EkWGgr5Dg4ZD1HBGjoF8Qt5s4FfuxsgDhGTMsdLg93ETVsfX33r8ntx77vEht51fEMStch"
+    },
+    {
+      "label": "crypto: m1 requests to join",
+      "signature": "4mkLwcKMY8i1Z8B4JMBu764wsggPP8bb6HkwbCaxbVD2YoefCoGGd7a1VhkqsBfYw659YpTG4mQya5DTYGguD6on"
+    },
+    {
+      "label": "crypto: m2 requests to join",
+      "signature": "23eR4aDrGUTpFUZfj6AWjyT3nkMi3miTCv5vf7oMXqoPuMEm4kJYT5e9y8FswhqLqxG2JbXowkWZHtGRHWrsXATk"
+    },
+    {
+      "label": "crypto: m3 requests to join",
+      "signature": "3gG1m3GpFPY1kTVpyvh9qh9cyfcyNqHabNxevTtcXAe7czuq9yHV3FCXn658yNigwz5VkwMS2b3dDn4JYsnqV6pr"
+    },
+    {
+      "label": "crypto: m4 requests to join",
+      "signature": "5P4LmeXKPJuNPvHw2Vu9VVQC2MEH3aYQM6iCcEc36TfBM61TJvjnzfwN3TPdKB1xn96xCuuE7rETFUJb424hyuXK"
+    },
+    {
+      "label": "crypto: owner approves m1",
+      "signature": "aZT9cQztPvNNANgbh7nLSiSBnon7zVEfRfPtF3V535z6oZWJwyQXFFDFE7HFWoz5W2NC8oUXeueJ2z72QGidQm5"
+    },
+    {
+      "label": "crypto: owner approves m2",
+      "signature": "22VfLi3A6nn9mS5SQN4QwSTQvks5qstGHxEPMhE5XkHc1rYhHYF7wHXLKamwBRV12xPqE4kkVBWc1i4jzF4M9z3j"
+    },
+    {
+      "label": "crypto: m4 cancels its own request",
+      "signature": "25hxfU41z9BT2icA3X1WWodCPP5ELACKVkvb8cEQcu35HB7BYoVRUcX6GAScHJpfKJxGhby4ypMpG27RFpwEco8q"
+    },
+    {
+      "label": "sports: m3 joins directly",
+      "signature": "3UsvmiQcATUWL3fKCGenmFSgy9XSzJW7c77En9fMLw4JGNwVGwuWQxGRqqFsdeNdeG5MfyKgDPUY8D5Tom9irGy3"
+    },
+    {
+      "label": "sports: m4 joins directly",
+      "signature": "JhnwYuUKLEostUfKS5d4BGGurtEtZJdttmXJJcG5EcAUCHWGv2DiyzdjstGkLfudqFri33hAbdAARSacm3txdR3"
+    },
+    {
+      "label": "founders: owner invites m1",
+      "signature": "55Eyyy7YsaQmeJsc28zigxq6FgVy1bgKdPH4h7WCaUTZAgp787WbTwQRGcG4dWfDRdG6Q3srTDqi9iB1M4UEJUzu"
+    },
+    {
+      "label": "founders: m1 accepts",
+      "signature": "413bJNHq3qFDc7bXatVZhY1fopALn7aizGwQLFPwRdKCNcE5aztKxVzJY5LNrFLN6hZfi5CnUeiAm3K4hyLcRg4D"
+    },
+    {
+      "label": "founders: owner invites m2",
+      "signature": "2bqxQWfodydzhNnpojuuEvKABdYJ5YQehDnxr37443QSHCgrX32im2iAzyPZwvHJhGZudgToBLF43Wa6KGX5Zxt"
+    },
+    {
+      "label": "founders: m2 accepts",
+      "signature": "crD8PfDXRVh6FaDjKvjDUGQMAdEnBJRcJiDMJ3de2ttqeq8SjSBru5d5EeqUeiMtXg77VkBJduiGbcWwtR7HV7Z"
+    },
+    {
+      "label": "crypto: create, open and book the members-only market",
+      "signature": "5pGs3axgdxtJKGdYfoyhC5nUEfqtAe3sESyCVS18tSNZsc3NfUZaKRUCfyfL9MoRBVmmq6NEAeVpUnbJN5bqo8AB"
+    },
+    {
+      "label": "crypto market: m1 position",
+      "signature": "5rEdzYsbLbqXjKCcKgvJw98vgvseCGyQgWB24BjsLM3nYnKadkcRbVgDLsbms9VELzS4s7GYHxx64kz4WtQGsQG2"
+    },
+    {
+      "label": "crypto market: m2 position",
+      "signature": "3wh5QwgFhEbm2eoHeRC2gZE2NLuLaaUAUeJSjKpWJXEUqCvwTo8j1tCcfwzozNuFzSw9Ei76X5WQRa7h7QsAHmDA"
+    },
+    {
+      "label": "crypto market: m1 bids YES 0.28 x150",
+      "signature": "2zQkBDJ1B7r4XmsPh2XWD5kTGi82yQorTAsh3M2dDBvo2MYb1uX7mvzZjYRRQCZpZRTsKktzEfkHjR3b2fXx9BUP"
+    },
+    {
+      "label": "crypto market: m1 bids YES 0.25 x300",
+      "signature": "41kgMVrYEmQ9StieVCSjVVykhVnX2S4Nyqi13eMZWpTFyjCyuymmkwHkrmRJEFhyQTePoUk9mMdWdBq6DGqppDLA"
+    },
+    {
+      "label": "crypto market: m2 bids NO 0.68 x200",
+      "signature": "xnCv3diLdsthPLGHw7u2vn6nJULkt1F1awFfuSvsMecqS7cQU9yDKdk6StbM2NF3MTy7RGgmiuLcpBHkKx1y7Y9"
+    },
+    {
+      "label": "crypto market: m2 bids NO 0.65 x350",
+      "signature": "5FapgKa1wVR8jpz54tV1P8ZStayqnWXxFRWq2wjbfNzMrHRQevfipNvVAUv8GcwbuVcTFnrucZP1RaYXmaBek1Vf"
+    },
+    {
+      "label": "crypto market: m1 buys YES 0.32 x40 against m2's NO bid",
+      "signature": "2o3cFTh22hnBWZia4Ww4HT1hc2ZRCzjs4HM9XHq5YtfEpujjMKpZBTCeXyEE1ju9KnNaLYDqY6gkNkxBsvh3Y23w"
+    }
+  ],
+  "checks": [
+    "discovery lists Crypto Forecasters and Matchday Predictors, not Outcomia Founders",
+    "Crypto Forecasters: owner, m1 and m2 approved; m3 still pending; m4's cancelled request is gone",
+    "Matchday Predictors: m3 and m4 joined directly",
+    "Outcomia Founders: invite-only, m1 and m2 accepted, no listing",
+    "members-only market refuses a non-member (m3)"
+  ],
+  "rulesRef": "fdaf6b572ea4b804fa72af9958713db39ba1da77",
+  "members": {
+    "m1": "GADP9zxFvQso1FNdpPKwkz7JeQ9NGYUsjSc6Kyn1iKDU",
+    "m2": "AUewd27RMMXup935ErdBm8kT9ujmcudKZEPW26yWrYLd",
+    "m3": "4yJ65EFK24eoDFdrwXVknYvr9tercv4gaf1CgUdrJQNr",
+    "m4": "2EWd1tKBynVoFfNZS3TKpRojadus2fWjUJuy4Ee4szWb"
+  },
+  "market": {
+    "slug": "crypto-forecasters-sol-above-80-end-2026",
+    "name": "Solana at or above $80 at the end of 2026?",
+    "club": "crypto",
+    "id": "e66aefbcf81cfd8788af5fd1bf0257082a5850e9e1cbe16a3053b133049c46a9",
+    "address": "C4JsBMyohrCjtQNahak9HEFz37YoBLAFRSzxAEbDLEjv"
+  },
+  "finishedAt": "2026-11-23T11:34:40.306Z"
+}
