@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will the SOL/USD price be at or above $80.00 at 31 December 2026 23:59 UTC?",
+  "description": "Members-only market of the Crypto Forecasters club. SOL traded near $70 on 22 November 2026.",
+  "resolutionSource": "CoinGecko daily USD price page for the asset (coingecko.com), cross-checked with Coinbase and Kraken spot prices.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if the last SOL/USD trade on Coinbase at or before 31 December 2026 23:59 UTC is at or above $80.00 (Kraken if Coinbase is unavailable).",
+    "noCriteria": "Resolve NO if that price is below $80.00.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798754400,
+  "earliestResolutionTimestamp": 1798763400,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}
