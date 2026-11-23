@@ -17,7 +17,7 @@ const { chromium } = await import(
   process.env.PLAYWRIGHT_MODULE ?? "playwright"
 );
 const base = new URL(
-  process.env.CANTON_BROWSER_BASE_URL ?? "http://127.0.0.1:3016",
+  process.env.CANTON_BROWSER_BASE_URL ?? "http://localhost:3016",
 );
 if (!["127.0.0.1", "localhost"].includes(base.hostname))
   throw new Error("Browser fixtures require a local test server.");

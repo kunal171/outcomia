@@ -9,7 +9,7 @@ const { chromium } = await import(
     "/tmp/outcomia-browser/node_modules/playwright/index.mjs"
 );
 const base = new URL(
-  process.env.INDEXER_BROWSER_BASE_URL ?? "http://127.0.0.1:3024",
+  process.env.INDEXER_BROWSER_BASE_URL ?? "http://localhost:3024",
 );
 if (!["localhost", "127.0.0.1"].includes(base.hostname))
   throw new Error("Local fixture only");

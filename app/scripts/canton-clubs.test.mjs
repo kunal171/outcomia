@@ -264,3 +264,35 @@ test("members-only club markets need the club as trading proof", () => {
     /club members/,
   );
 });
+
+test("only club-factory markets are club scoped; protocol markets never throw", async () => {
+  const { clubScoped } = await import("../lib/canton/model.ts");
+  const { market } = await import("./fixtures/canton.mjs");
+  const ref = (factoryId) => ({
+    operator: d.operator,
+    namespace: d.namespace,
+    factoryId,
+  });
+  const factory = (id, factoryId, policy) =>
+    c("OutcomiaMarketFactory", id, { ref: ref(factoryId), policy });
+  const contracts = [
+    market,
+    factory("club-f", "club-1", { tag: "ByPolicy", value: clubRef }),
+    factory("open-f", "public", { tag: "AnyParty", value: {} }),
+  ];
+  // A protocol-root market has no issuing factory.
+  assert.equal(clubScoped(contracts, market.data), false);
+  assert.equal(
+    clubScoped(contracts, { ...market.data, factory: ref("club-1") }),
+    true,
+  );
+  assert.equal(
+    clubScoped(contracts, { ...market.data, factory: ref("public") }),
+    false,
+  );
+  // A scope whose factory is not in the catalog is not treated as a club market.
+  assert.equal(
+    clubScoped(contracts, { ...market.data, factory: ref("gone") }),
+    false,
+  );
+});

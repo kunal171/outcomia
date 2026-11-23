@@ -8,6 +8,7 @@ import { CantonDeploymentNotice, CantonPageHeading } from "./workspace";
 import {
   amount,
   integer,
+  clubScoped,
   factoryRefKey,
   marketKey,
   obj,
@@ -255,9 +256,7 @@ export function MarketList() {
   // Club markets are listed on their club pages.
   const contracts = s.catalog?.contracts ?? [],
     markets = marketRecords(contracts).filter(
-      (c) =>
-        obj(issuingFactory(contracts, marketRecord(c))?.data.policy).tag !==
-        "ByPolicy",
+      (c) => !clubScoped(contracts, marketRecord(c)),
     );
   return (
     <TradingFrame
