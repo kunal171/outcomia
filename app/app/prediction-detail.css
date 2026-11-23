@@ -814,3 +814,6 @@ body:has(.prediction-workspace) {
   margin-top: 16px;
   font-size: 11px;
 }
+.prediction-entry-fields .prediction-total-field {
+  grid-column: 1 / -1;
+}

@@ -2,8 +2,13 @@
 import { useI18n } from "../preferences-provider";
 
 import { BN } from "@anchor-lang/core";
-import type { ReactNode } from "react";
-import { bestBuyPrice, type SharedSnapshot, type Side } from "../../lib/shared";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  bestBuyPrice,
+  bestSellPrice,
+  type SharedSnapshot,
+  type Side,
+} from "../../lib/shared";
 import { parseTokenAmount } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 
@@ -31,6 +36,15 @@ export interface PredictionTradeTicketProps {
   funding: ReactNode;
 }
 
+/** Atomic units as a plain decimal string for inputs (no grouping). */
+function plainAmount(atoms: BN, decimals: number) {
+  const scale = new BN(10).pow(new BN(decimals));
+  const whole = atoms.div(scale).toString();
+  const fraction = atoms.mod(scale).toString().padStart(decimals, "0");
+  const trimmed = fraction.replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
 /** Controlled ticket: amounts stay in the transaction controller when tabs change.
  * The estimate is a limit value before fees, never an execution or profit promise.
  * Example: 10 contracts at 0.60 cost at most 6 collateral tokens before fees.
@@ -49,6 +63,33 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
     symbol,
     decimals,
   } = props;
+  // Exchange-style entry: picking an outcome or side fills the best price
+  // once, and either Contracts or Total can be typed; the other follows.
+  const [total, setTotal] = useState<string | null>(null);
+  const prefilled = useRef<string | null>(null);
+  const bestPrice = snapshot
+    ? side === "bid"
+      ? bestBuyPrice(snapshot.book, outcome)
+      : bestSellPrice(snapshot.book, outcome)
+    : null;
+  useEffect(() => {
+    const key = `${outcome}:${side}`;
+    if (!bestPrice || prefilled.current === key) return;
+    prefilled.current = key;
+    const filled = plainAmount(bestPrice, decimals);
+    props.onPrice(filled);
+    if (total !== null) props.onQuantity(contractsFor(total, filled));
+    // Only an outcome or side change triggers a new fill.
+  }, [outcome, side, bestPrice?.toString(), decimals]);
+  const contractsFor = (amount: string, limit: string) => {
+    try {
+      const spend = parseTokenAmount(amount, decimals, "Total");
+      const each = parseTokenAmount(limit, decimals, "Limit price");
+      return each.gtn(0) ? spend.div(each).toString() : "";
+    } catch {
+      return "";
+    }
+  };
   let estimate: { value: BN; payout: BN } | null = null;
   let inputError: string | null = null;
   let errorField: "price" | "quantity" = "price";
@@ -182,7 +223,11 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
                 placeholder="0.60"
                 value={price}
                 disabled={pending || !snapshot}
-                onChange={(event) => props.onPrice(event.target.value)}
+                onChange={(event) => {
+                  props.onPrice(event.target.value);
+                  if (total !== null)
+                    props.onQuantity(contractsFor(total, event.target.value));
+                }}
                 aria-invalid={!!inputError && errorField === "price"}
                 aria-describedby={
                   inputError ? "prediction-ticket-error" : undefined
@@ -196,11 +241,37 @@ export function PredictionTradeTicket(props: PredictionTradeTicketProps) {
                 placeholder="10"
                 value={quantity}
                 disabled={pending || !snapshot}
-                onChange={(event) => props.onQuantity(event.target.value)}
+                onChange={(event) => {
+                  setTotal(null);
+                  props.onQuantity(event.target.value);
+                }}
                 aria-invalid={!!inputError && errorField === "quantity"}
                 aria-describedby={
                   inputError ? "prediction-ticket-error" : undefined
                 }
+              />
+            </label>
+            <label className="prediction-total-field">
+              {t(
+                side === "bid"
+                  ? "Total to spend ({value0})"
+                  : "Total to receive ({value0})",
+                {
+                  value0: symbol,
+                },
+              )}
+              <input
+                inputMode="decimal"
+                placeholder="6"
+                value={
+                  total ??
+                  (estimate ? plainAmount(estimate.value, decimals) : "")
+                }
+                disabled={pending || !snapshot}
+                onChange={(event) => {
+                  setTotal(event.target.value);
+                  props.onQuantity(contractsFor(event.target.value, price));
+                }}
               />
             </label>
           </div>

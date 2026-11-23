@@ -1266,5 +1266,7 @@
   "Get 1,000 {symbol}": "Get 1,000 {symbol}",
   "Valueless devnet test collateral. Claim, then deposit below.": "Valueless devnet test collateral. Claim, then deposit below.",
   "You already claimed recently. Try again in {minutes} min.": "You already claimed recently. Try again in {minutes} min.",
-  "The faucet could not complete this claim": "The faucet could not complete this claim"
+  "The faucet could not complete this claim": "The faucet could not complete this claim",
+  "Total to spend ({value0})": "Total to spend ({value0})",
+  "Total to receive ({value0})": "Total to receive ({value0})"
 }

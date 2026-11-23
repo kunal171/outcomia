@@ -1266,5 +1266,7 @@
   "Get 1,000 {symbol}": "1,000 {symbol} पाएँ",
   "Valueless devnet test collateral. Claim, then deposit below.": "बिना मूल्य का devnet टेस्ट कोलैटरल। क्लेम करें, फिर नीचे जमा करें।",
   "You already claimed recently. Try again in {minutes} min.": "आपने हाल ही में क्लेम किया है। {minutes} मिनट बाद फिर से प्रयास करें।",
-  "The faucet could not complete this claim": "फ़ॉसेट यह क्लेम पूरा नहीं कर सका"
+  "The faucet could not complete this claim": "फ़ॉसेट यह क्लेम पूरा नहीं कर सका",
+  "Total to spend ({value0})": "कुल खर्च ({value0})",
+  "Total to receive ({value0})": "कुल प्राप्ति ({value0})"
 }
