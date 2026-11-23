@@ -196,8 +196,8 @@ export function PredictionMarkets({ address }: { address?: string }) {
         )}
         {!address && (
           <p>
-            <Link href="/predictions/multi">
-              Explore multi-outcome markets →
+            <Link className="text-button" href="/predictions/multi">
+              {t("Explore multi-outcome markets →")}
             </Link>
           </p>
         )}
