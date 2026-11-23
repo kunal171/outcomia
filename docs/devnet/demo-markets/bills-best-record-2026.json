@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will the Buffalo Bills finish the 2026 NFL regular season with the league's best win-loss record (sole or tied)?",
+  "description": "Buffalo were 9-1 after Week 12 of the 2026 season.",
+  "resolutionSource": "Final 2026 regular-season standings at nfl.com.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if no team finishes with a better winning percentage than Buffalo (ties count as YES).",
+    "noCriteria": "Resolve NO if any team finishes with a better winning percentage.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798995600,
+  "earliestResolutionTimestamp": 1799150400,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will Manchester City beat Chelsea in their Premier League match on 12 December 2026?",
+  "description": "Manchester City host Chelsea in the Premier League.",
+  "resolutionSource": "Official Premier League match result at premierleague.com.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if Manchester City win the match in regulation time.",
+    "noCriteria": "Resolve NO if the match ends in a draw or a Chelsea win.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1797073200,
+  "earliestResolutionTimestamp": 1797152400,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

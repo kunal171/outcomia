@@ -287,6 +287,23 @@ export function bestBuyPrice(
   if (direct && implied) return BN.min(direct, implied);
   return direct ?? implied;
 }
+/** Best price a seller of `outcome` can get now: the highest direct bid or,
+ * with complementary matching, 1 minus the other outcome's lowest ask. */
+export function bestSellPrice(
+  book: SharedBook,
+  outcome: "yes" | "no",
+  complement = COMPLEMENTARY_MATCHING_ENABLED,
+) {
+  const direct = book.bestPrices[outcome === "yes" ? 0 : 2];
+  if (!complement) return direct;
+  const otherAsk = book.bestPrices[outcome === "yes" ? 3 : 1];
+  const implied =
+    otherAsk && otherAsk.lt(book.payoutPerContract)
+      ? book.payoutPerContract.sub(otherAsk)
+      : null;
+  if (direct && implied) return BN.max(direct, implied);
+  return direct ?? implied;
+}
 /** Whether a legacy transaction with these instructions fits one packet.
  * The placeholder blockhash has the same encoded size as a real one. */
 function fitsPacket(instructions: TransactionInstruction[], owner: PublicKey) {

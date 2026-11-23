@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will Bitcoin's CoinGecko daily close for 31 December 2026 be above $60,000?",
+  "description": "BTC traded near $61,000 on 23 November 2026 after a sharp November drawdown.",
+  "resolutionSource": "CoinGecko daily USD price page for the asset (coingecko.com), cross-checked with Coinbase and Kraken spot prices.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if CoinGecko's BTC/USD daily close for 31 December 2026 (UTC) is above $60,000.00.",
+    "noCriteria": "Resolve NO if that daily close is $60,000.00 or below.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798754400,
+  "earliestResolutionTimestamp": 1798765200,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

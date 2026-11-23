@@ -1,4 +1,5 @@
 "use client";
+import { TestUsdcFaucet } from "./test-usdc-faucet";
 import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
@@ -194,6 +195,7 @@ function Funds({
           {t("Refresh")}
         </button>
       </div>
+      <TestUsdcFaucet mint={mint} onClaimed={() => setRevision((v) => v + 1)} />
       <a
         className="market-explorer-link"
         href={accountExplorerUrl(mint)}

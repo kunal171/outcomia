@@ -1,0 +1,952 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "startedAt": "2026-11-23T07:59:09.154Z",
+  "rulesRef": "daa55bba542590047bb80d210896034b8d0fb493",
+  "markets": {
+    "btc-80k-before-christmas": {
+      "kind": "binary",
+      "name": "Bitcoin above $80k before Christmas?",
+      "id": "81f25d3f7a1ae7d54d514c6cfc7cbc8e640aad817a1d7bd026c7546508484263",
+      "address": "4j3fKSLkUeAvvZYMrwn3qTAB53hcdQURBQYxYKKgyhib"
+    },
+    "btc-end-2026-above-60k": {
+      "kind": "binary",
+      "name": "Bitcoin ends 2026 above $60k?",
+      "id": "bb26f32a730c7a9abb31a60126485189db7660ae9035fe87b6e50129454dc3f9",
+      "address": "8tnxUrXfXry5WxiJoqsZ8q9BXXC9FkZVczaDKX9p4Z7D"
+    },
+    "eth-2500-before-new-year": {
+      "kind": "binary",
+      "name": "Ethereum above $2,500 before 2027?",
+      "id": "4ef60e7b67c3b12fbd72694c5c95cd01e8defee574eea38700cab0c5c91117ed",
+      "address": "GNiocTMShWJix7GXEqZrtcc9xPDbiVsWMGsbQU17dnBv"
+    },
+    "sol-below-50-before-new-year": {
+      "kind": "binary",
+      "name": "Solana below $50 before 2027?",
+      "id": "e71e3afe624a92858b8a3b71485bde62a775e9f98809d36ead9a2e9ef54dea5e",
+      "address": "BgHYHdZNCnZZqQHtNHYNsfdPxU9LqnYj2yt1RFLj1p6m"
+    },
+    "fed-hike-december-2026": {
+      "kind": "binary",
+      "name": "Fed raises rates on 9 December?",
+      "id": "d5eb36f5bef519bf560aa8cec8e8b5e2a984887b6127b0315f352aa29d641582",
+      "address": "AnkrvLwXPMnKdz8DAhojdg9qt94XsUDuZU3dF6wLu3dE"
+    },
+    "arsenal-beat-man-city-28-nov": {
+      "kind": "binary",
+      "name": "Arsenal beat Man City on 28 November?",
+      "id": "6c6e5316f4cffb6dbd7fabe9ea37f23c828e3b1214075f5652bed5849dfca205",
+      "address": "EJgGaUXdvfc38FQ6T4CK9ani2zuqoDajJLWaxnLRjhPv"
+    },
+    "arsenal-top-on-christmas": {
+      "kind": "binary",
+      "name": "Arsenal top of the Premier League at Christmas?",
+      "id": "02c04651711f7a9bbf721ffa278dd855b4fadda0a4dce1dcc77a4e026f53d80a",
+      "address": "De6aGZSUsqtHChzXjWtvVBUTncYLUzQ6Ar3Tj5h4Nfvs"
+    },
+    "bills-best-record-2026": {
+      "kind": "binary",
+      "name": "Bills finish with the NFL's best record?",
+      "id": "37f429661bff9478de270fa136e86a1ce9cc4e7f62a4c3f336dd0c50fd466539",
+      "address": "4gqCExCZWwzV11QcDGqDM6kvTR2TkSLcmMQxfiNdedSY"
+    },
+    "verstappen-wins-abu-dhabi": {
+      "kind": "binary",
+      "name": "Verstappen wins the Abu Dhabi GP?",
+      "id": "9786123bef612171ef5a29efabc1b308010a83a6ae7c7a800c773e737391a56f",
+      "address": "6oe1kcegJ29ayuDcxSr2WF9nEwGr5nf87oDPNfyZfSa2"
+    },
+    "btc-price-end-2026": {
+      "kind": "multi",
+      "name": "Bitcoin price on 31 December 2026",
+      "address": "CG2WdM7y2hDj2cshzymC29b74ZeHRtH4gddEc5kim5jZ"
+    },
+    "fed-decision-december-2026": {
+      "kind": "multi",
+      "name": "Fed decision on 9 December 2026",
+      "address": "939bA9dJKaw4FhbTb8HgmaA7KW7mbKGuKmb2tMnCD5eH"
+    },
+    "premier-league-leader-christmas": {
+      "kind": "multi",
+      "name": "Premier League leader at Christmas",
+      "address": "GXsCrXgcQ8Vjg3aWVC6n3xBU7x7PeUKuM2Ao1KZ9vM4"
+    },
+    "arsenal-man-city-result": {
+      "kind": "multi",
+      "name": "Arsenal vs Man City result, 28 November",
+      "address": "2ydKB7tZVFin6xydYivPevun998vK7NY6vj548qDCN98"
+    },
+    "nba-best-record-new-year": {
+      "kind": "multi",
+      "name": "NBA best record on 31 December",
+      "address": "ABuyzqheVr7kWFUFzLHMkqUMLyZpyivp5cSjUg7MYFGF"
+    }
+  },
+  "steps": [
+    {
+      "label": "fund maker 1 SOL",
+      "signature": "5Y7Pms8KmQLWSxcjHm3hjDYxA4Mzdn5UM9DpBtUdxe2DsGKJFrQJyULes1MVC8u8ALAHRpUYieSJxXie6tt5Tfw6"
+    },
+    {
+      "label": "deposit maker 1 USDC",
+      "signature": "2G5dSkeZ2yhVikkc1dNAhNh8btLfjQF5kcTVFZXhEyiGchwHLGLXfmzxjrE2Tt78cfHnFmaskM1Y36opqFxXNvxH"
+    },
+    {
+      "label": "fund maker 2 SOL",
+      "signature": "4VdkTCZghHmhog3xyj6yjDCbVeT38L7pSmseLXesZcexjTkqQw6hbo4S5TWK53wJk1BgWAcx5iapyRLyAEXtNzzV"
+    },
+    {
+      "label": "deposit maker 2 USDC",
+      "signature": "5LhZ3Gs7PZNbCcSJ6KA3aG5HVT3CUuAw7HJohrEPDCwMsAstuf5gThRhyD8552oRA7o1fSvCVpN3XsQQFcGu55GE"
+    },
+    {
+      "label": "fund maker 3 SOL",
+      "signature": "2VQ52Vb9EKzsM9u27ewJpUUFMBRzxmWowknPaykBgZxmXjRPrf1d6ucDSeZKnz1RcqUy7ZC4tjsS65dkkKPA6M1U"
+    },
+    {
+      "label": "deposit maker 3 USDC",
+      "signature": "29P1qkMFKjqitgAAWtdG5nGsvMQoBm1XBjurBDk1ZTBoWrf6DrXwFvAxjYH268gVZvTFwvsNuovUPWsy37i9FL3W"
+    },
+    {
+      "label": "fund maker 4 SOL",
+      "signature": "2cYCgPsCL89MNdiMCmkHmkBrnDkVcM7WCYgtGcnuuGPKz1aZkdBaFHvyp2A8tn42Xpf9fgSB3fcwrfaDqNtFoJZr"
+    },
+    {
+      "label": "deposit maker 4 USDC",
+      "signature": "Kpvt2M6eFNRtjbZ5xiR8gis8MjxzLE7sFQqecWxkiUvByGHCqLNiWivTLs4jYHHWfTpa92t7i66MonYy4Bmc33F"
+    },
+    {
+      "label": "fund taker SOL",
+      "signature": "3uFPpMBD8Wm2a1Tmgrxa9oXz2FbJCNGpFb6cBCwXCmEsXVYpQUPRYmQo7kbub7TTCGB1twCq7k58XYFrehXpdpxg"
+    },
+    {
+      "label": "deposit taker USDC",
+      "signature": "3F4LQTm9hseyC32TsSTwRFM1YM8bu2cppP3s5yEtXMZTSAExLWQgdasKqtQngNtf8vHsTYmRkPxTCZ89QmNWo7oa"
+    },
+    {
+      "label": "btc-80k-before-christmas: create",
+      "signature": "53xWME75fiznLpmjdYBozK29MBaKBeyYzdtdJWKfthgGeZa2XxmQZ1dtpZPdheAnDuAgHLSrv4E1dUVC24Uh4VXq"
+    },
+    {
+      "label": "btc-80k-before-christmas: open with shared book",
+      "signature": "3fMoqJe7xUR7NstobL4icM5htENHgXuTvGLpXiFLN8drsnVdyf64Danw2RsHxnWFyx3QbjkDiWUQwrwvvLWpm3CM"
+    },
+    {
+      "label": "btc-80k-before-christmas: position 0",
+      "signature": "3zgxSXfqgiN394huB88SLZXpQhdxA6kcA5n5nDiiu8jQ239YhdByzr15izYawkJdZsNyuceJVdsfPvZQD8pUQzMR"
+    },
+    {
+      "label": "btc-80k-before-christmas: position 1",
+      "signature": "25mMmRVSmfAwAQdtMd8r1fEnvJkqvYMvKe1iqDYog4898XTCXd2HHiFR6MGgxHrv1UDp1atoUE3ed6h6PHMecWS8"
+    },
+    {
+      "label": "btc-80k-before-christmas: position 2",
+      "signature": "zwj1Yi2D1P9Qamv5YnxEKmxcu3ukVSsEJBm1U14jYvZfCCKtFJW1sn3cdYT4EUCmYymUDVG68gW681dzMs5TXjw"
+    },
+    {
+      "label": "btc-80k-before-christmas: position 3",
+      "signature": "ASBtv6MGpAGZNhvipuzYoCHDZCE44wQC8ymWgC2MySqMek7m9oQnXnt4QnmxtUzztq4PLazQvuvPJCg6LrVE3KA"
+    },
+    {
+      "label": "btc-80k-before-christmas: position 4",
+      "signature": "2VQzkKV7Y4B5DKZexqQVJbKpShfFhZJXPm6GpwaaV34PvGFjR7QYh4TZu8GSx6qNGbxBxBb2E7w3j2vkW9fQPX42"
+    },
+    {
+      "label": "btc-80k-before-christmas: bid YES 0.05 x120",
+      "signature": "4TU4YNVDktsLxwhiSypoWmDq6yuV1G6wcGMHZsfBAZqpfioqLmaQmyfSfJBusyzP1hU75AH8z9kSwJVa22gufZKV"
+    },
+    {
+      "label": "btc-80k-before-christmas: bid YES 0.03 x260",
+      "signature": "52xWBaYhXrsTXLGZWNhvWBjpCdbNkt9Zhs7dCYoB8VsQSuqojMVapuPYwPNn2YGMfKcmY7ZPAdfAvAcuRgzPDMW5"
+    },
+    {
+      "label": "btc-80k-before-christmas: bid NO 0.91 x140",
+      "signature": "3DjyeXxDz39K8BfcVSxS7uTtiL6hFz7DSuG2M2FNpJXeqX2RVbWffX96oR5CQhJsHFozoy3RVCkCE1prkLoP7T1L"
+    },
+    {
+      "label": "btc-80k-before-christmas: bid NO 0.89 x240",
+      "signature": "UyzmSQHbGabCiEZgzcFbAqCLj261CposzQAnz48mDgf8kPg9WKho2ejmy9KGcKVcNebce5eYX6kM9VkJ4CAW3jA"
+    },
+    {
+      "label": "btc-80k-before-christmas: bid NO 0.86 x380",
+      "signature": "4huXnH2U7smJNrCFdF52vDcSdSd6Eq3fNDHt7DJPfSr3otNTWFZonPvGJ7BivpyBuoqk4jpaqfriBUezqB4miU41"
+    },
+    {
+      "label": "btc-80k-before-christmas: taker buys YES 0.09 x25",
+      "signature": "3g9iHke8ZUNguLxWBwRn7EtcfxoDudpiYNXhfgJvXWPaa3B5pYFvUZYa2dXUABzW5n8C9pN284iB34oYP9dkViSC"
+    },
+    {
+      "label": "btc-end-2026-above-60k: create",
+      "signature": "2SjYCmpxSxCHcPmCxe9aAJoKRBQ9nPU72dWcThsZGBbuhAZ6UecV7ps4USgGBvBtfhB4GdPW5wuDyazo2oLtMrXm"
+    },
+    {
+      "label": "btc-end-2026-above-60k: open with shared book",
+      "signature": "2aZ1t2ABG6wsS99cQtbCd3EukT956dCJQXLjaKEHzzm4tJz8591k44mkrY7bb8LAqEUPcgQPLo3nBMd3hXsHxNto"
+    },
+    {
+      "label": "btc-end-2026-above-60k: position 0",
+      "signature": "3Qwv8jFRRj3qMT77y9nSRGg3mFQ5Rj2tH94bPExjyu7h4ckTiFVz2KTbeofTi1aKqyFHKRddayZ9tNMUuvX7qJ4F"
+    },
+    {
+      "label": "btc-end-2026-above-60k: position 1",
+      "signature": "4ysgirpSjvuk1XptuSDod2i8cwNh2oBeNQVcrMJRZqsn4aFkVtWbTLLYaTjdMM1noKYr3LhtUkoSpZACvkRGqcVD"
+    },
+    {
+      "label": "btc-end-2026-above-60k: position 2",
+      "signature": "4TsjeVYmS8LfT2L9KTJ7XSfJS2DZG8YhwBisEMrbw7PJ8jrciyM7ujzf27rq7sFkVHHdrcCcwdQEW7ZhdLPFuqN9"
+    },
+    {
+      "label": "btc-end-2026-above-60k: position 3",
+      "signature": "3i9jRaBRRHzqFHH4iCvbmYwXzca3pt8aguxMEjSFGXcyevnJDyJ1WKj2VWLFWi1v4sjuZwQkqBoPw1w7ixqH4zKx"
+    },
+    {
+      "label": "btc-end-2026-above-60k: position 4",
+      "signature": "NvMSoNknK7aUR7dNnuzJDKqqL6stDGEXzghtZEjU1KGX93cXaeVF6aKNoeBK2xfrE5CFqGGLAQdaeWeZATfJ2sG"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid YES 0.50 x120",
+      "signature": "4zWWPp7R3P8bNTneXky1Z1ieXVM26FVLcNRe6naBbYYxpze9Y7xTDSGbpXooTkyNEZ1YFEXU1SiovX19yxHSzCUZ"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid YES 0.48 x260",
+      "signature": "2wYUH87oQoB8HgSnWwPFAbbRwE5wiFAfe4UNyzejzyZ2pS1mh3yVv1vXmnt6Nx1KAdxrvLU9xbSMvodzx6131NPu"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid YES 0.45 x400",
+      "signature": "3k4KT5qHyP8Nj1rNj6zXUzeRjBx5iYrr5xNkrqJKAHixnAGYPe48gq9own9C64yjQ1NB6mv4b9xDTuCMY3EUGsg9"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid NO 0.46 x140",
+      "signature": "qJjDmBogyi17PoaaSLziuPNswjd5YRumhGV7HDwkXy8Pv8Y86SmkBv8xamTsTBSzDpA1h2jPkgY9BZR3ByHdzuT"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid NO 0.44 x240",
+      "signature": "5nzQ5anoKY6j627ZMyDisQX8wDGm9RYds2teb46LdGSpNnu9h4ksR4XPHsx88gCqDNqbn3Fb5H5RHihY2EgbkhZp"
+    },
+    {
+      "label": "btc-end-2026-above-60k: bid NO 0.41 x380",
+      "signature": "2qeHdTDoD18yPfNdYJHunfAvWdZvzYes3aNcRQjwwkRARnsrtzHEKQ65jgJ8cWBpKBG7zDVsqDPBAnBRp9gvokxi"
+    },
+    {
+      "label": "btc-end-2026-above-60k: taker buys YES 0.54 x25",
+      "signature": "3YMV4HvBNM9DXeQX4LsYLFLaQbFxn4RS1vmGPECABMP8ZtDm6PMr4NBJAgM3ife5BdwozJ9HF4HtJn5sLHzaqjGF"
+    },
+    {
+      "label": "eth-2500-before-new-year: create",
+      "signature": "3JDyQAhdqVETL2hb8cYCd4vqfs4AWnUc7ebpARYBLqUEqAtFtwqHpJ1q9xnf5NHfHpxtqwjgrVhxo752QDhMoQNL"
+    },
+    {
+      "label": "eth-2500-before-new-year: open with shared book",
+      "signature": "D8fzq2UHHeUyY2ChFguUhvXkidsHx4hppnF5cQQsyUNKfhuWjRWRWUuRmjCd3zdyNY5sa6oBoU18dS3BWy5Ztnd"
+    },
+    {
+      "label": "eth-2500-before-new-year: position 0",
+      "signature": "5y5dMocDZp8xzika3Au74i2vy3aVHbYYehcDNhDW75BpG8J8nYwXJ78SJurS5KD1RW8aH7SRGAq8FGD7uEijoiRg"
+    },
+    {
+      "label": "eth-2500-before-new-year: position 1",
+      "signature": "41irumXbvstkYcinaGPcQ5N4Gajg2suxnyPCgkwfqDVypsvdMn86WariJxaZuAhwGnVgtpxRrWWkthq2nsyeASWu"
+    },
+    {
+      "label": "eth-2500-before-new-year: position 2",
+      "signature": "3QWgpYExnpz1Yt38UQiuL5WygD6GNyXb7VFzLLEZrh29o4HcrRnjLZAJqvDZvjddsqy4UUuktAuvTUkLJaQ2ygRh"
+    },
+    {
+      "label": "eth-2500-before-new-year: position 3",
+      "signature": "2NURvmHHSQitJ7dQxoFzDT7Fi7EPDCyUqP7kiypczjDfxxb8R1LLjX9LagmgazH8fYmxtojdhgXFHNkKG6xKB9qy"
+    },
+    {
+      "label": "eth-2500-before-new-year: position 4",
+      "signature": "2BLasMyDnVsSFGnxPzVPMZDpX63hpQcTpFvpuTh1ASSQowp7fHv68M56YKTi1mkxpCMxroKV5zToSwb3feSeJpW9"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid YES 0.07 x120",
+      "signature": "fo2VUFL2r2q7CnBqXTiVnRTA1jVRiZop8w34HxkVq1FSNyvchEmxwxLUz9AQJJKRGwRVfkGjg8wWRcZW8u3bfRF"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid YES 0.05 x260",
+      "signature": "4CH3ic7zzTzBxPFTR8umjZ5SfJDteDMggyn5CaHCzDHsiCn2ybbtWVREU5s72WWmZMsvhYcmX8hMostWdQiuxBnp"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid YES 0.02 x400",
+      "signature": "6evSbyU2ozGTPE5MjNiDpav7DvKKyCmubvGeSt4jdB8bEjxpnUYNZU911MPn7zGStdfjnZhXfJuStr8mPffvRfe"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid NO 0.89 x140",
+      "signature": "4zxVHguHqopQkhTwRfA7JGZyUVCeWvBcp7mX5BZvgFA1c2ptXCR93L9PsCvnN7iFdmuzc6uNPcfa2eYVgGdwXNUc"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid NO 0.87 x240",
+      "signature": "41pJ4zgujWQ4YxcXo4GUmLP1aLMQ4M36nzUkp8pPFr5AJKgkzaFbHFENvXHCPRW4cmNigPdJVRHzW9VLrtp7Rs1y"
+    },
+    {
+      "label": "eth-2500-before-new-year: bid NO 0.84 x380",
+      "signature": "4ygcRgpP1HByFrHi6NRaiJXvRWKm8vDbXnV9c5nQwqmDNtBLjQwmsy95AdirSUuq2z9CJ3Tdn4Cxjzx6UT6qSNTp"
+    },
+    {
+      "label": "eth-2500-before-new-year: taker buys YES 0.11 x25",
+      "signature": "3ByqgiJmBbT2neqiQbFXCYzXv48nPLReciqHGmHimn35Rm2gPEjgLSKvooyC3H8jwZEGcUrgjCX8erqugZaSMrwX"
+    },
+    {
+      "label": "sol-below-50-before-new-year: create",
+      "signature": "3jGELL1VbHSCAh48pR9zDaA7nhbyCy8JqL2mAt4vG1z5VS7KyMYr4zqdjkCp4mcpiMVWXtb7c6bov93Vx3dthpoA"
+    },
+    {
+      "label": "sol-below-50-before-new-year: open with shared book",
+      "signature": "25xggXqpiuzKfF87QMZoJLwphiKewN1LSmVD6CSnpcPaQLEWGaCPsAUnNn4cnhuFjfrUu5UjzDaVvWL7jYJNrLgt"
+    },
+    {
+      "label": "sol-below-50-before-new-year: position 0",
+      "signature": "4ArDxShwomPJX5MrgUnzdcPXXN8mPNJerAG1KyiXaBXoX1LSX6d6cT32mavE8xGp5mjEWEKHye7rWCnyc9MD1iVd"
+    },
+    {
+      "label": "sol-below-50-before-new-year: position 1",
+      "signature": "AqRK1wnH1vjkh1b8BPneG5wEjQD1AF44d4PDMzSTqHMxj7VF8cBz7WvfwaL8hMAZAyHJ4TePSZ4jju1ZqW1TbmR"
+    },
+    {
+      "label": "sol-below-50-before-new-year: position 2",
+      "signature": "25CJHcsp8E4dJ8oH455NmpnBw8FhT2UKPNghWQxemguRJeLDsUt5cKVXByza4hzNzqSbu6BLjkzbfMpn6r1YzkiL"
+    },
+    {
+      "label": "sol-below-50-before-new-year: position 3",
+      "signature": "4PCEdzxR59aSCBxtRenHAw5cwbqdK6qfrBc7eGLiQeWrj5tDVb6Na9wwxJKBDN9d9zUE4FhgmzXLc7g8Jce3HqZC"
+    },
+    {
+      "label": "sol-below-50-before-new-year: position 4",
+      "signature": "4BSa2ivsSBbtv45g77QsQCaZcPzmQfnoYMZeLx9DBtGXmQofoDjQ6avfJ1wJkWyyfRLQBjKZFkTUAyBVuFcKduGw"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid YES 0.12 x120",
+      "signature": "4CcoZrDsRZ3ZfYsjaRVAQX9ecU5jtnowP2cTLPG7rZ1o7ordouQGTco7Fo43F3fsXDtxPnsaXFA3vEwhB1mvHH37"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid YES 0.10 x260",
+      "signature": "4Ezvugkd8fQqjC3CyWNDiQYuYij2tfdbbHx7PDd1NGBLStu6E8LXbdV9ABYLiqHUma8AgUoMAThf5NacrSwgyTCu"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid YES 0.07 x400",
+      "signature": "45h1vj13NsEuf3F4iyYFFnYvEodibVjHjQoMoTfpb9RbbbC63FkupS6dC8FmsrnwWHJ9cWpCEAb8KcveyPR9sCH5"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid NO 0.84 x140",
+      "signature": "4sbZcGdciAWXPH6aoFjPiYcaoKBJHJgsTFRwrAmeNdRmL8v3wiTqGHAP9iuRwtPTw2FvHZKe3oSDiQVFHHypYQY3"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid NO 0.82 x240",
+      "signature": "5BdcMCW1z3LfEz95P6FdQ6ZstzHi7k7bKquy4TDF6gWRGqWtoVVcNNYYtLkbuWwyJRpwNfVQabMQeHPfKYDaPcQe"
+    },
+    {
+      "label": "sol-below-50-before-new-year: bid NO 0.79 x380",
+      "signature": "L3xyi2623GJNcWzmKcgqNrGsf1LPNaTFyXKsABKDkUArRXeKq5xPaojPf1UKUENNRrq67MwBDDpyfFfDYCXXWDJ"
+    },
+    {
+      "label": "sol-below-50-before-new-year: taker buys YES 0.16 x25",
+      "signature": "61gaqoRcniZDCte8KdKacgUkGk7Z7jy7DP8jwWtFDybDSeUVGsKAjQaYbAXx6p5kpVVWEMPCQh21AgbvGmZ2Czb6"
+    },
+    {
+      "label": "fed-hike-december-2026: create",
+      "signature": "xirRJav32fPNJrjACqNNieDhk8WdAEU7EjYpH7sKCpAz5pWpJqPwSqXGuVgXQTB4UuMTaRCeDTsB6VRrFQCLcEh"
+    },
+    {
+      "label": "fed-hike-december-2026: open with shared book",
+      "signature": "3bQvkTaVBcgbPzUpsz735sVQgNLf5XQtPEvUqzvMncpqswH52tvg6fcFX3uUiBjDx4unGmBSKtkiL7Cf2QGKwQML"
+    },
+    {
+      "label": "fed-hike-december-2026: position 0",
+      "signature": "w6HC5kY7HSBe9Drf8zusPFEPLuwLoMwRD7Ke53JhMWJ7JGM89VRyNmBenoZoMLqc13bezSA6Ee3mNLEr9b94ixU"
+    },
+    {
+      "label": "fed-hike-december-2026: position 1",
+      "signature": "3yx8H6kXJtpuKuXamXceueVztDtHxrK6f5dktVrmx866mveE1JjRDxxoRKRaUcP61mJzNBWkG3JtyJ6m528Hkk3t"
+    },
+    {
+      "label": "fed-hike-december-2026: position 2",
+      "signature": "kLSTCHMdr2jC2o1wNWvEEXq1ZgyHo9msyJ21MGWr7zicPoxyyix2sK2FfXDrUEcyRsLnNmeU7YZcbii2Z94xeaG"
+    },
+    {
+      "label": "fed-hike-december-2026: position 3",
+      "signature": "4n4EVbTziXqPutBr4BPeyxNgjZF2cmmw5ymTF3haLzkHj7WJ4pAaY1ye4txnw8inLu5otqdZ7ABpMui8hQ3vHwRt"
+    },
+    {
+      "label": "fed-hike-december-2026: position 4",
+      "signature": "5HZnZf5J4Z1zXUZaC9DFacMmLPgVimK4Zvh6jcoxEunAA3aCZg6ytfenjoP9JMno5LLDex1PSxmKjbgJrZXLj8PB"
+    },
+    {
+      "label": "fed-hike-december-2026: bid YES 0.82 x120",
+      "signature": "5xEZwC7rH4RQ8oh9jWScL8mXv3BWQc2R8JYQ5jH7FXX9PaVT3xK2fSomMgynbSZNczTFp9zGQgUnytFJjj1WAwpS"
+    },
+    {
+      "label": "fed-hike-december-2026: bid YES 0.80 x260",
+      "signature": "3VMqn8YskR1iLnzYbzEnqJiQ13TJsRZGLpihz8PwrsBzrPxfB39hvj9VTYqhRM821CzGKSHqDS7q8Q5Hm14AFyj3"
+    },
+    {
+      "label": "fed-hike-december-2026: bid YES 0.77 x400",
+      "signature": "2BLnPjPQvsxVEQGXJj7tJ3oxYWXTZqCZq2TBfapwELV33a8J5jE72GrmoViDAQgwUsKPjrbefNGmWaRXTscFrDwm"
+    },
+    {
+      "label": "fed-hike-december-2026: bid NO 0.14 x140",
+      "signature": "xyesap9NjYMHTxXaNULDgxGcgnst9st5mchH8jCmP1draf9bpE32yQbJvKFya1cD7ckmoc4SgQRoyZVE4knRVZk"
+    },
+    {
+      "label": "fed-hike-december-2026: bid NO 0.12 x240",
+      "signature": "2kZD5G7x4cGLoSLncUJ3dVsB5Uyk3w7gRpj7My1BGpg7hpT65uu24cihDXyUo95HsVwpVcS4iiixvzm67vrb3FH"
+    },
+    {
+      "label": "fed-hike-december-2026: bid NO 0.09 x380",
+      "signature": "2HdWKmMGWNYUbhL6FSgkzKB7pXr6rJKruXktJbi7MrkQjgnGUHjcUv1Wx2EQbyuMeDDm5AbQAsgG6tpBSxK9TYWG"
+    },
+    {
+      "label": "fed-hike-december-2026: taker buys YES 0.86 x25",
+      "signature": "tpkkAZKfWsMxEvZyrVRzPvKjssFVLAdsbLj4Qk8SEpsCD2cZYrPWCxKPg3HMLBPvdQ5VzV4rresXHqqDaraNYVU"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: create",
+      "signature": "4PdRHcTzzgJemWNM3mJukzy53CEQKcJJDR6FuGxXQrUFvnNjwFH1Jqq6pKzdhAPeLHjFUrNQoPNgPizVyegoUcQq"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: open with shared book",
+      "signature": "2FhU4nU6YXJbCZqffank1mtFu5ChyAZoQJop7VdiaeFN447PX7UTetufZK1G55mzkpEPx2LSsKUWfnAKDwcHkAtb"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: position 0",
+      "signature": "5EmSqbG84xE5GVL29dF3JvpYkws38kXJ4vJaYcH9dr6by9F8ueBQNXSaqqQDSFVTG9a1T67JNrkGWYh4UmLW4Jga"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: position 1",
+      "signature": "23hmGh6YEisExx9ZVJMCaETczAXbyVRs8sqD8qxqxcF7pDykpYG2mtvgfo7ARWCa8Ej3Mdxw32EGo5GEtfMwuCeR"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: position 2",
+      "signature": "4a47nJA1Z3edU5JydfYSe5tY6qQMwxxK6qJ83E7o2FkQUxSydLm3VSJRKkKV9swA4FLxT3Pqu3oprWvgARpA5eyM"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: position 3",
+      "signature": "2gise8hH2LS9r14AEDCedUiq7UCBxVHsWusruLbJBBPwphWNJjuEUK1E1CrgmGzdD4Z6GmxzfAcaNZ3NzDFiAtf9"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: position 4",
+      "signature": "2ce2iBGcYa5LjmZLfJMiV2r7gLjUKZzk4vAVx1UMsEyfyobN8FPYWsCa7NQ7xt1SMQkoq896uY4JR4GGxYH7uWrR"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid YES 0.44 x120",
+      "signature": "67f9K3MAiYdHJc6T2FA7gdnusbjHyriYhtC63aTGtEXwoYbZ9eL6A1fFaZaoexmrEbEaX24yy67YS2qVLnCFcvRr"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid YES 0.42 x260",
+      "signature": "38sjEgCcYYYeWHxCRNfcmEJ4S5CdZ2zTsrju4dU5sXSn1PGoiViPTqSeesNPdYuCq9nKDb49tx3wkge1CCTivi9N"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid YES 0.39 x400",
+      "signature": "5ohUD9us1TsL4pgRiYuyDR1cbNbcVRu1eH8tRGJ81Pb4bgjJ7xTdkehMAH44sigNm6BMXPhiq2isoPqhsKbFfdZn"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid NO 0.52 x140",
+      "signature": "3YDANBhRnFcXN9uftxNyaTRv2eDUbVbLjTcbgGp7WNd4sNf3k6HLjWWvtGQrxUj1Uw3MDQDBx8oSBkKH9te7oRQ5"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid NO 0.50 x240",
+      "signature": "48CRaGoEs72Us1K3Mwz1E6tVRmQBaC9gBUd4LwWYUmDNWamvZuzG5QHtQYF2SXq5rK7qxvx68Fw21vmvrgqu8R5m"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: bid NO 0.47 x380",
+      "signature": "QhRYZHTEmE1KKx1jwoUxPNH36J3P4cWh6sCMb3KHvZKe5rch6EyME1zSMTq3eQwLvKHvdrZtPoHNs8dA7XwyVhi"
+    },
+    {
+      "label": "arsenal-beat-man-city-28-nov: taker buys YES 0.48 x25",
+      "signature": "pM9BvYKLxzwLzv2GFm63Tb2oStPcmKc2geXNrv96g5ETWTcaTJug5YjVe1xWbm1hG4EiGoXB9TZPptXVqpegKfM"
+    },
+    {
+      "label": "arsenal-top-on-christmas: create",
+      "signature": "5eNgCrHd5zQRXomroS9DELmXu7esECYGuFT452BTxecB2uQ51eBGFWuzb1m1jAFx1xBdcyW7GLSsBcPptGmrAj53"
+    },
+    {
+      "label": "arsenal-top-on-christmas: open with shared book",
+      "signature": "4R6VM4PG1YWEyoWaqmj7mV35kwNosUzToA1kqNjxMPbbuk86Gm5ADyGa6Bw2isUjdDpUSP9m3uRNzdR839k8mh1t"
+    },
+    {
+      "label": "arsenal-top-on-christmas: position 0",
+      "signature": "4xa6AKfUGZ4E4rgZUQk9WaUfJYiCVdgfbggxjx3FATZUbWzz6GZpuTDxmYySAxnnFgxV4gh6r8arFZqVbdnNyqYJ"
+    },
+    {
+      "label": "arsenal-top-on-christmas: position 1",
+      "signature": "44okRNpJ75QsTps6cHGBN8m1FVjYKmbawiH4Qsz1wd8iKjA3q5CYKRQ3YbwcwBDfXm4pfHcSx1AD2PuzGj4Ydh9k"
+    },
+    {
+      "label": "arsenal-top-on-christmas: position 2",
+      "signature": "51ZaEiCoyrnhEnWZaCdoSDNwBct7wYSKzFCUen6xtshBbPXbbUF3wDr6C9sJVmSWFmhXRHw1FpJvWpUJmsBJSjLT"
+    },
+    {
+      "label": "arsenal-top-on-christmas: position 3",
+      "signature": "gyz6VuA8hXYyr8u4K6B7VfkWhYp45fHfVLH4MgMK5d6c91vbYf44P9P2vvuXMc7x5KNRY6QXUEcr3QyG5K38nHM"
+    },
+    {
+      "label": "arsenal-top-on-christmas: position 4",
+      "signature": "3MrjqNjhmRaqeR8Zf9byS5hEr3kNSJeeJA71WeUpWdQ5oCHBkureTdEB8U1H8boms1sj5rmetgcRbokbmHZudDRF"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid YES 0.69 x120",
+      "signature": "4aqeXyvtGvip1YqHuToDTQ1dQQAofsfuvHmPn2kpb2twnE67KQhGckqCdevAomTNvyAHMLYvJkpTr6g5ynVnPg7r"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid YES 0.67 x260",
+      "signature": "5hNvsYVTg5Qu3JezAtVHVYWTe7D7WFLpcRqSeE4TyErDcg9iyz4VewdPkH67LW4r2UsYjn47Tk3o7VparaoXdBRq"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid YES 0.64 x400",
+      "signature": "HKJnrptNg2ETDANkUxrx4pBzdgGwuwK2KPwuU53SAXwzALWtB8kuacrYwvUj27FXGXkvaaWnEpgYn5EVE92VfNx"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid NO 0.27 x140",
+      "signature": "5WQSEezbn9RJjMcxy7PvH5B6JTb8A6i1NPeUmAaTLdbzFFY7RbnoGsfk3cf7yfPkw9xe4SGnjzUu3md8ond9EwrM"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid NO 0.25 x240",
+      "signature": "2TzqyfGhQFZyjiD12G4D2LYAzCTLyfy4BGqis6CMxtWAFbdZ25abhB81k3poHhqZhYAdcE5j4JQjk182YQTrQu3T"
+    },
+    {
+      "label": "arsenal-top-on-christmas: bid NO 0.22 x380",
+      "signature": "NV92PJnxrkhQcceRVtRNVLQQc5SFsVkuZKr2SHShpA9wWUREnqKipFvQvuyH62G2ZpZrXtgaN623XdBJmBBfSKf"
+    },
+    {
+      "label": "arsenal-top-on-christmas: taker buys YES 0.73 x25",
+      "signature": "57VtU7pKRZQPgaK6ums1QaB6bsDtzUenx9eeyn1NqHFymyZKUnbct9W6EgnsRGqgKVwZo3Xh2UG85gWkXBxmuuNw"
+    },
+    {
+      "label": "bills-best-record-2026: create",
+      "signature": "33Dj4iY95DdbtEWkGpVMBeEEdrumhCADgnxk51x3cZSaJDke5Gcx8CZs5T653SJsuwWFXT8fsgMNyk2beeLjDeWZ"
+    },
+    {
+      "label": "bills-best-record-2026: open with shared book",
+      "signature": "2XvAzVQUFkHqoQHdrkjgRKU1nBR6KYvirGTPZauMdtDtMBArEoUK2NAL2gqaixqGrjTKQmoMonRdtob3g55BpNr3"
+    },
+    {
+      "label": "bills-best-record-2026: position 0",
+      "signature": "45DDP775VjfSuJmwBWdFwQV5Nu1xoLwuPnitEZWsxrydxZdvqMwJ2jsNrs6Hy4NBYGUBRYJZCZ9rJX2BMSNvKytX"
+    },
+    {
+      "label": "bills-best-record-2026: position 1",
+      "signature": "4KPprxBVhVEXnvsjAgDPFp1KzvbUGe9eVgQHNQaqPXuNTm8yxJv8GdXup6raW1mKib6WdAqksVV8kCz25Muptz3f"
+    },
+    {
+      "label": "bills-best-record-2026: position 2",
+      "signature": "GUe3Lj2mdQLoRBXvG9514tViCXjEXFHjoN4KyyQinNdPecQde94mQ6bgC3BRh3qtFEemghSymbgVLjGcjGEfjgd"
+    },
+    {
+      "label": "bills-best-record-2026: position 3",
+      "signature": "4rxTBJtxnQ6eCqGeTza7pGPL2PP7xEDV5mveJqggSWxo2XXyes2y7J78nQP7vBTUmfgHTG1nssFeuzGDKz6LWqKY"
+    },
+    {
+      "label": "bills-best-record-2026: position 4",
+      "signature": "22LwFYf3CbfXdb9f7xcbZSs9596NPTqHh1NUpc6cyjEACjgpnvxtLxdhhkeXG2caRoTKhEQrfG9qc7kFbVkV8K4N"
+    },
+    {
+      "label": "bills-best-record-2026: bid YES 0.32 x120",
+      "signature": "QyjFMZcqNYHXuEDR4ZBwNc1M8Y2YBqSEg9C5gNUMvMEcdKNdJ58ZRvy5womTyfExutuFcbMLS6PPnn2TfV79WnZ"
+    },
+    {
+      "label": "bills-best-record-2026: bid YES 0.30 x260",
+      "signature": "5sNDwG8j6QG8ZD7wbEWPFp7iR4odsB2ttSC1MEhe51rAXYLTDLwF4wvKURAtf4x22Mi3KVEPEVvpmSDy4wGjZCa5"
+    },
+    {
+      "label": "bills-best-record-2026: bid YES 0.27 x400",
+      "signature": "5eaKkk71Bm7KrMTanxV7PN5kgFPgFxX65kWPuiTtZAuL49kKGMeH8QocD5hhz275VUzqjkmZTPSKZgZ9fMv1tgZt"
+    },
+    {
+      "label": "bills-best-record-2026: bid NO 0.64 x140",
+      "signature": "3aenFU91G6jxoJDDSZ3JQMZbe1BPNw6QxnZwenNVT4Emq6pQNU59zuriecLJ1emWA7RCLxhqeb39nAhWqWXJMbPK"
+    },
+    {
+      "label": "bills-best-record-2026: bid NO 0.62 x240",
+      "signature": "5WndBqGg46s92FZiKpnsewiquXKta9xTYFUtAv3h1wXUc78Vx5fqTFQ4rDgcS44ssxU46BxYNj1bPsiMPVQgyLSa"
+    },
+    {
+      "label": "bills-best-record-2026: bid NO 0.59 x380",
+      "signature": "3Y9LvxtySvWYGZ3DFnRbtLUaJjaEz8nUgXq2VbKNhVsXiGy1v9DB46SzvdEDAFFgpyYqU29mGD4o6r4EMgarmwve"
+    },
+    {
+      "label": "bills-best-record-2026: taker buys YES 0.36 x25",
+      "signature": "2DgWzhCxwpmXiHB8sY5xLWqFp7BURxQ6BxEw1g8iRXVHQkGiq89GJTbZ25p4PY9uKgdqk6uYFi9aY19ZMk7rqhV7"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: create",
+      "signature": "tbnsMg1FFLrJnoVRy271nxfEDnWqEuiwufjy8xnUoSibPtto7NcZYi1jU8yKa8CTo6Q2kVT55JXrzaVYj4NuuZf"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: open with shared book",
+      "signature": "5Evg9W4LxmEYT8s8H6gKNHRyJEVJqxdiEkbkdDF389QsyYot4f7vdtN2SfFZBSJL5amn1kAJQSKEA8ehfCGqpWVW"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: position 0",
+      "signature": "5piWWnkXfFmRRbbzEoiZYwTWnxsBFXK3reYaUqC1ACFdRwGqNBtX5QNyjDpbwbqeeEhrgj2VPRCriCP1YV1ZmiNX"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: position 1",
+      "signature": "8mJchSYTPgUpYiYgL5jkUs7o3VQH4gg1ou9g99Z9zhms1Y2LR3krp5rcRoc5w3nYqxbbddZaWuKLqzkCRu6pPrm"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: position 2",
+      "signature": "2qVVbB8U48sXxr2sTCT924moeYnRkFvRwx45ucfj1JbKLMNqpr1EamA1RetDRzzftQvwNtydouR7pbCtgG9uw6Bf"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: position 3",
+      "signature": "3MCS7ErisfkPyw5CvVx7aWyzBd5mwJKjYr5RUceo4kA4M7E2dLvBuwMKCzxCx3xi4xnzbLAf9W5eaL1QrvhuSTGG"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: position 4",
+      "signature": "4ArsoEgL1EaPQ9nkess4KQWA3CGV1vkuardbYDPFE9WqNg9AixTCwffAeXTicZ3Au9PjWpUs8poANsfX4z4FC75D"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid YES 0.22 x120",
+      "signature": "4bPh2zdDALTAPokkGfSz3NYKEmnn5xuKjSzFy5eYevgESa5vEorcuyuTw23a9x9FdXEypEUyrEh4RkgFf4CCe1gV"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid YES 0.20 x260",
+      "signature": "3KxZ5AtndDt5TqTMTqZt6ryDSxVUtnZW5g6JDZ89jDe68TD6eop5bwx1FAeupfd8jUaehWkqpcC1eajEPaTutqaL"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid YES 0.17 x400",
+      "signature": "5dqApoTZz4n9DLydSvx7faXLqRrf5GFaNiG3pkYpBSfwyryNG7SshXfgsNUtcfWxKyJrwDMRch6UcxJ1ofamT48P"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid NO 0.74 x140",
+      "signature": "jkUUC27tAZFTWe8rFtXpkvK4tHBe9aye5z4K9e2StjD3rNF6Q99ufatHMnS1wRTU4UCDGebphAp9uUzFWZnEeSM"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid NO 0.72 x240",
+      "signature": "3xhcBKMCN3jkQdcvQLpaWGwJDrrECdDeCWpFu3ajqgwm27Jv81FcsZx87NESMgksK4buR5aALG9u3TZhfZKowt2E"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: bid NO 0.69 x380",
+      "signature": "251mDz4Q9HAyboJy8UnXboRSRGEE2bQ81vTU9qwzUnKeBuvrCkptYoku7iN4ppoHWJppcshA36g8GzS9i2YcjgH6"
+    },
+    {
+      "label": "verstappen-wins-abu-dhabi: taker buys YES 0.26 x25",
+      "signature": "5pT6kxTqDiZZmAC3VekhEebTDH7avqoUFqD1qZsd2gUTU516EZFSoMbaRgPf63qLHA4CvdU78EB5HyeNE1mQrA8V"
+    },
+    {
+      "label": "btc-price-end-2026: create",
+      "signature": "4EFdFPxQkjG1n7vF5jJPyESpJiHbL3HEoqstKUodiTeoqBnuokuiQsLjqMLWcFb6UTCAGdsMG2KsRE2fKpTR2iaV"
+    },
+    {
+      "label": "btc-price-end-2026: open with book",
+      "signature": "5h4jskPbyrMHuRJmy1mdq6rfBLYAhPC8zkSv1v5XmXAj3qRvFNmxShtHezr52ZksGyjroa9MYaojosCCrzQmX8iz"
+    },
+    {
+      "label": "btc-price-end-2026: position 0",
+      "signature": "4dmMx42dW96HmJNmeQEfuBwThu9S4MwU3LiTeYddUxNsnksFyQE1XcWZf58M4fsSov84c1NHyRjiHkiddD4UTeJ"
+    },
+    {
+      "label": "btc-price-end-2026: position 1",
+      "signature": "2S3enB4ffizPdtAJz9whNH8MGwQpGaNYbxeQhNrL35zS7z5AqB1tTJSozcc66gt2EyJZPY9iw3r5UJAaSH8hKMvD"
+    },
+    {
+      "label": "btc-price-end-2026: position 2",
+      "signature": "2az4dbN2S1Ygt4xy2JETXWKdrHXtVgKBrB2MmaqfRdGQQLDKVBZbqSCNK8mYscmR4AvHL9QhdzEPEwEgiebSuion"
+    },
+    {
+      "label": "btc-price-end-2026: position 3",
+      "signature": "3BEJNXGgx1iQ4744jSvBNz5BE6A4Rmtoz4svE1qMMRijwbqbkNcmnh24bsB97SqUKSYozf3b6Mx22RVzjDVef72o"
+    },
+    {
+      "label": "btc-price-end-2026: position 4",
+      "signature": "4D6DMneLuGzY656NNg7ZvQf7AFKTuofWPjnLhA3k1oAX1GQ8dqj6AD7Wic7sA1Z7qywSNn4LcNZpeea4wzTZR6Tu"
+    },
+    {
+      "label": "btc-price-end-2026: bid Below $50k 0.08",
+      "signature": "vzVLvt9u9JsJwaETdsJAFYzCWBVX1J87WkvDKwb2HBuViukqc34n3N8WYFy5iL8FEnByhqME66urQFVinuf5iXs"
+    },
+    {
+      "label": "btc-price-end-2026: bid Below $50k 0.05",
+      "signature": "3EHe6xeTwPG34hsYNHyqsoqdzSRpegXovS8yvAQUwkD2eK4zeHYDLbxjfaGvjobLfAHcCYgkTmzyEzSuh2yDKGW"
+    },
+    {
+      "label": "btc-price-end-2026: bid $50k-$60k 0.30",
+      "signature": "2qFLJ5RekJ37wtRE1XsKfn1YgvTNef1UcRPq9tDFPMsMoAY9TjQTsTgtBh6PJREkXcxqcvs7FxbshNQ2PSrceuuK"
+    },
+    {
+      "label": "btc-price-end-2026: bid $50k-$60k 0.27",
+      "signature": "vpwiL1YTzq4xhEXDtSuP1MMWB2pvSo6MQKrYDE8hdG6ct5wNZCu3qCZeffkfQ34xeUUfC19oScnK31YMm1KAx8j"
+    },
+    {
+      "label": "btc-price-end-2026: bid $60k-$70k 0.34",
+      "signature": "5K2JKZXCXyVFiYieY39LCV7rszg7hNQ6BUw2NhfowtsoruvoBRSGxJfWeu897wQ7p1CWJhcuXkmuxnqH6qkJM8Vc"
+    },
+    {
+      "label": "btc-price-end-2026: bid $60k-$70k 0.31",
+      "signature": "2Gv19aVnbzkmrCmGMYJ3qxAygQ5Tsgp6cSd25znLEAjCKiuHfAPJvfwfBLJ7SAw7Q93kJsPKh4BVn5npomB76MkC"
+    },
+    {
+      "label": "btc-price-end-2026: bid $70k-$80k 0.13",
+      "signature": "3YmWKxuMLY5YwnenvqXjsdDYA3dZVMDbYDXYztU4NcNXfaGVBrjdAKy72KHj4kk1FS9zy8VqD6hZpWNo3u538wpQ"
+    },
+    {
+      "label": "btc-price-end-2026: bid $70k-$80k 0.10",
+      "signature": "5bBUTT7LSZLX2CE8KhzkgCaM8tDAZMDRULDLVpFmXYgn7NqT5JsAYnbs8msSRJk1pF63GztEk39VkwanTNqJJNU"
+    },
+    {
+      "label": "btc-price-end-2026: bid Above $80k 0.05",
+      "signature": "2z8YCDqxXYrvjUkKhjfxr2Q9d8bW84cgkc97NzyyRK1P5zKWmPCKYg3h5rnHRMabcnCGoByg1a3sgMXnAvU59X3y"
+    },
+    {
+      "label": "btc-price-end-2026: bid Above $80k 0.02",
+      "signature": "4eRoomKYUNcJ3dQrntB1TPgHYCpisBqQbdhzmmVxaUBQgvKSMJegi7f7a8n6VKiFDxoe5ivnYeHy8U5sHMNwW482"
+    },
+    {
+      "label": "btc-price-end-2026: taker buys $60k-$70k 0.45",
+      "signature": "4PJURNryu7yNAVDNZ9e39NTEe4AkAzpk3jU4LXJZ3yVgBt9hK1DRtWrhiSR92CWwB5MVAfPscQiokTbZH2DJYpk8"
+    },
+    {
+      "label": "fed-decision-december-2026: create",
+      "signature": "ePu4KTuZLrHbN1EBVQCmkbffJrLHcZofembR5L83khV4hksB5T9X92zSMJd6cPXcH3zgf1SZJ7Fm3hicS6hF1oH"
+    },
+    {
+      "label": "fed-decision-december-2026: open with book",
+      "signature": "4jL1sS27mLkJk7Q5gPhssZvanBbvxWtDx2UedKcUeU1dxutTXvBmSfjaMTknrdMFFkKdhD3AG6bJF1jX3th4j7S9"
+    },
+    {
+      "label": "fed-decision-december-2026: position 0",
+      "signature": "5HSH59tJZ2Uqq7mgQy85PzcNjAsF9zugdhUShBXm8E32f4An7Nd27zHyR7ZR3hsnHyVEcLkvLBA9KdPSDcPGGKax"
+    },
+    {
+      "label": "fed-decision-december-2026: position 1",
+      "signature": "58rsYZetQwJoSPiDwBX97cGwdjyBstXbjw5vy2Fd66MRsm1gvWyQPttY3rBSPKCEcCxamrNfEuYCrfJ1Fp5jx2Qp"
+    },
+    {
+      "label": "fed-decision-december-2026: position 2",
+      "signature": "41oJM9YtMWQtqi6HqGHgFNNEb414TfYSD1iLe97WuTHrK5a91aBrUSdkis6jWnxGe6goxPriPCuE4qMTbCGjnJpr"
+    },
+    {
+      "label": "fed-decision-december-2026: position 3",
+      "signature": "4M1G4xjsiofx2iKRqg3hKELzx6oQBZgbYwwQtzBkAkuWzqTwgt5SP9vM7q9Xnz9P3dyGrzShGSeoAgjhiL6t4rr5"
+    },
+    {
+      "label": "fed-decision-december-2026: position 4",
+      "signature": "2VnTMKXdFd5RYWB6wBXa27J8Xo7Vs1HVTthP49es4n4draJteJcXKiSCiyz6evRe8genDbP5aVENMpquXY5GxYNW"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hike 25 bp 0.70",
+      "signature": "5Pt8pyLn66aXSLBATajiUWh9idffQR14wk3pu48RgS2yeDQsCYakcjh6zPPXrR5MhYiXJ1VkkZw8aWpA8iu2DEm8"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hike 25 bp 0.67",
+      "signature": "2FM59vyQvhv638mBjPSVbAGmXt6YqyxjhvehFma7ZJaW5Rixwx2AU1vfN9n2EHWDcQoLufKuDT51aiLm9wLhkgJY"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hike 50 bp+ 0.10",
+      "signature": "4ykzVUSx7EhzjZLFRQwVcr9pxm7eRt66r2dpZNzeEknriK2mqQa1o5EpgxK4E7vrhubiuFoy8HXJF2B4GxAv1tS2"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hike 50 bp+ 0.07",
+      "signature": "8qGSffFvtVQTyhfgNo4G4dXMs6EaB5KwPZs6hnyPYkFsMC6sXubKRcD4u68zdtEtWLcB5vPoDFHJDgGKWkffJhX"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hold 0.12",
+      "signature": "5UfHaGWFLas1tMZoxJzoL2srMEGEx6gXkYeutWXV6pLKh5jJJ9kTCHu7mKbdc9b8PKmS95itVriG3f4Cvvr4XXjC"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Hold 0.09",
+      "signature": "3zSeiBBk2fxQfBrBpxZP7Lxf4pCmRHnGkbEDqu7yswzPoPQ3DbC2UV4aBxUerhjGG5UCfCuj5YL3SprNs23hzRMq"
+    },
+    {
+      "label": "fed-decision-december-2026: bid Cut 0.01",
+      "signature": "2dkFw7awa7C9HmmUQNQvQJ3A4QipbLkAnQ78KVr5CroJLbGuPrdYgXiVJeKtkp5HGqAjPffqAmC9NEnaj4qb8Rp8"
+    },
+    {
+      "label": "fed-decision-december-2026: taker buys Hike 25 bp 0.78",
+      "signature": "29hD9sdBJtSFYE7MohCSPhaB2qRmM1JHoBHmkeQ78r4AL8uoxy1PwN8BbWckoLsCS59zP9Bya7qxuTjZ8VJAhUUh"
+    },
+    {
+      "label": "premier-league-leader-christmas: create",
+      "signature": "6664PmDfEbV5g4CwNSeAEZAKbwCu2ACyFL4AAv3nKjaVx7W15TZPod2JJpz2WpDLoVijsuCh1UQnZDnUYisvbJEF"
+    },
+    {
+      "label": "premier-league-leader-christmas: open with book",
+      "signature": "2X5vrp8aX9K5o3z23ZiB4cE25Vwi9Qt4Mp5vGAHBsB6qkwcPd1VHqTX1nqgvtUtPQP7Y2ZpixEPzziuyqfAYixuE"
+    },
+    {
+      "label": "premier-league-leader-christmas: position 0",
+      "signature": "dpd6r4c7ueRcDAmUU6txa2SvH9XqYxPtHweB1vyHDn32CRs1ivsZrpFTJh8SYcc9Ehe1Uitqt7d2N6pnp7sCoMu"
+    },
+    {
+      "label": "premier-league-leader-christmas: position 1",
+      "signature": "tSZ7pZdZcdt1gQrsygXWPcN9ktwx56LswpYjeuqX5VLAuYqDHvwgbLmFLSUzQiuchyraksZPkg1FjtFFfMTcmfg"
+    },
+    {
+      "label": "premier-league-leader-christmas: position 2",
+      "signature": "3yXB5H6qoDpM9x9MXnrUG59PsDUxSDYSHu73dRTypiATPpypLGuU69nw8Rihwe4Cf5AhktdPqUVg96PGG6FnFSgo"
+    },
+    {
+      "label": "premier-league-leader-christmas: position 3",
+      "signature": "4Vm78u56QJEj5UDhAH4YWiiQtHDsHC5hNdBoAmqMFCXiSed1yZ4y8uSydFZXTX9HQVypfbB5sfaqb1CxhNeBeye4"
+    },
+    {
+      "label": "premier-league-leader-christmas: position 4",
+      "signature": "5FWz5pi72MeFvWB5JGPTLuQ2y6yVAEAsCe3jakLnLX6y88DoXCKLYFvUEtzPVVBPS1pZxTCsEs2PrKNacUPWbxYe"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Arsenal 0.69",
+      "signature": "2kyKaLHoyqRSG4QGhrHekxxyr8ywy3R8gYQhALGtAS9ZKQ6VJCJk6D1VeoT1iMZpVzNSnbiXtWrPHRXSVhnLWM2X"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Arsenal 0.66",
+      "signature": "46vD5PA2hDntBaAszxVKvBtCVmJx3Fr9qxUGcRZ6M65fuMMuym86M1MbnQZgsVezLDC6vP14CA9w2tDDZgpicEzb"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Manchester City 0.13",
+      "signature": "5nsUK65ZTie6Kfwo3HaqgyQ7bajUZ9o1JU6vLkMa9k9LM8YmM71UM6efHjmKY6o7XJneTE1V8mH6iXUzGJRUm7kb"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Manchester City 0.10",
+      "signature": "4BaRy4V68uE4riSiwRwKvfzEwrUV3cTWrtAGxytpu4xyPaCj2aJhPe5q4qWpJs4bvqP4CzP9tKCJnQttA7h1t7Kc"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Brighton 0.03",
+      "signature": "61SGuEtqNZ3a5JTtxSrwqVGLcQQuH6q72uaPEvxmRLHkvYoxLpRv449yotMG46AAs2xCSNAjgJLg5cPv6WBpWNxX",
+      "note": "confirmed after client timeout"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Liverpool 0.04",
+      "signature": "3eif37FFsQhALa1B7iGajeYTZLUZcQxJQuF1VTPWnj1iufdgcMbrup5jbdUo3hDa33txszJ7h8yWfTTr8He98UJo"
+    },
+    {
+      "label": "premier-league-leader-christmas: bid Any other club 0.01",
+      "signature": "JPTwu5FscgSiN4DsWVdHtjbwnNgmS2YtrQqDnSMutVWdSYQEYSMmFpXXiiefszdf4VUPXradH3RoSbbwV1qY7dm"
+    },
+    {
+      "label": "premier-league-leader-christmas: taker buys Arsenal 0.80",
+      "signature": "5yRgCCSSZB7WoeEGnARYG1zXpeW5nWoQ9MawJhiJjk8H9DnnpTkoDKBrK6Ftf1BjYoo93FzbHoRwUcSL4cQtYXhT"
+    },
+    {
+      "label": "arsenal-man-city-result: create",
+      "signature": "2x5mCbN7enhzQKbeyBGmFDxL7y4ydvgoLWAxtPP9rdB1YwCcjjngqMwWA6jDWxTYXFv8LLj7ZBoYy8gHLzpuKVyy"
+    },
+    {
+      "label": "arsenal-man-city-result: open with book",
+      "signature": "M9h3sNq5RK1oHsrvV5pY35eViHCugxTRtY41ccJ9qqSboBT1N8Gxz1ARqUxvsm2od4NX6fWQu7ncKJpEBiAXVYk"
+    },
+    {
+      "label": "arsenal-man-city-result: position 0",
+      "signature": "41gtMTpy3dAYEYcqfud643DpuXGaiTpyTnKKowP6BtGLeUXchm8DzqWTithrB1PenqiyV6St26XBSrLreWqn2thR"
+    },
+    {
+      "label": "arsenal-man-city-result: position 1",
+      "signature": "61NeaEYbM9hUpp7ufdDpAZNRkmGSTKMsnWoynYP1VMGTkdTL28yjJbo4UWnmxo3woBVE3H9PbKGq4uHHR2sEaZPM"
+    },
+    {
+      "label": "arsenal-man-city-result: position 2",
+      "signature": "4g5ogxYH1etQR6opee2j9vRwgToZjmqbz3qLDbmezimGrPXAH8Tkv4YdRgaSWqEDtSKfZdxhrAyPwvoN9Vq8nn6Q"
+    },
+    {
+      "label": "arsenal-man-city-result: position 3",
+      "signature": "sDWRWuqhS6me6EwCkfbmjyrXgmXAJGguQ2ce4eUR8KCmHpFW8LVK6F5R4TP2ycHbJAsjPiHCZU9AHr79AzpFBMN"
+    },
+    {
+      "label": "arsenal-man-city-result: position 4",
+      "signature": "2C4RPHwtb9qFVf5EA5EciCgXu8srJ4Msi6dYyUGnuyXCNYfo8P1hXjH1spubYaHuvzxuZ4CD3agAakpnvVnWwwes"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Arsenal win 0.44",
+      "signature": "hABUf2KAFYom7yBa7eMrbwqgePSri6URy8jLSijwFhAGf7N1g1MbGbbzwK323Rbzz4X62DWHzKT1B2RutWtK447"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Arsenal win 0.41",
+      "signature": "3LD4s8PgwnxFeduPhopvdNMndVzRrepEdWDjfUHx13K419YmT6tTJzdmGah5jhi3ykNjZGTinuYNq4mcL3k7hurY"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Draw 0.25",
+      "signature": "33shfWzkK2pScGQi18KAReQpxoWPk3WjjeLXan7ttkwk4uuTbCKTeHYEi4YUXx1Stn1X7yMpkjCKqZhfNvMsa7S1"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Draw 0.22",
+      "signature": "3k9YrJuLzcxNZr5EV1ggFYLWzR2nbUeaJZUD38HXJmMSSe2Grj7YSfYoNxxjXe9NJyZcG88YaEFMmNQuqNNBL1v7"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Man City win 0.25",
+      "signature": "5J8XnLgihfd44SUgpWL2k3XuVAcCPxSRVKExsJJVq7E2H1gZom8jDRykrHcn2hbwP4KYnwLuBKmEJi1kYXeSXJrp"
+    },
+    {
+      "label": "arsenal-man-city-result: bid Man City win 0.22",
+      "signature": "4ms4YHNJGRNf5nKX7pxkGoTQS1iFYbmxePGaXdVtBRjjzh4u8rZdRUufsW7Bst5dkQTYRFso4Vh8ghtixxeoDkJ5"
+    },
+    {
+      "label": "arsenal-man-city-result: taker buys Arsenal win 0.51",
+      "signature": "48BKGEswJhEPscSSaEg2EyR5h15uU8UitdtqhRUNAcgkD7prhTJKYEBSbJNujhqgJ9G6REXXvtZtSvDsMAjBFDqb"
+    },
+    {
+      "label": "nba-best-record-new-year: create",
+      "signature": "2LNWSrsJcqJgTsCqfkASpB3TSysi3naaZfVZfCyQ6NzR6ZyMy8xBVa6QCHjP7oKT8YYjw5EFtEQj1t9xsWuypswt"
+    },
+    {
+      "label": "nba-best-record-new-year: open with book",
+      "signature": "sHz1SZf6JxFwAKXqYzjcx2P7VSSwD5EhNmFZveAmA6hFvFXjLdFgtMNyQ8GYpo5bvT1j3PiHWujnefEFkafNLQR"
+    },
+    {
+      "label": "nba-best-record-new-year: position 0",
+      "signature": "3D1gKskTehD7NeFhvC429wHyWFrEmHwsp2a2yvmLwBovitipbfeXBtcMYv2tUHcjSXNgzE5haxBMAeFQvCrR4UBf"
+    },
+    {
+      "label": "nba-best-record-new-year: position 1",
+      "signature": "4ba6ditZ2TwVg9gLsQQjn2RZ5fKf88m8LTqezhtZoRBPqy87EhHm2jhQNozCuymEtaz7bcazpUi1eF82hTLR6YcH"
+    },
+    {
+      "label": "nba-best-record-new-year: position 2",
+      "signature": "3tJYQf1DqHTYyptsLgHx2gebGWhVRW3DCVoKBveo3SQnK4sATXXRcpbddaLgrb5sKADEvZdw9JSSieR2tctMvEM9"
+    },
+    {
+      "label": "nba-best-record-new-year: position 3",
+      "signature": "5oxYfdcFSSkT2oNW9cm5wGtcrHeEVckXv7J2fnRvDdeAHP8atmBkPcXz9WcHF7zPDx1e8Y9WWr9R2cCddLaza6Ua"
+    },
+    {
+      "label": "nba-best-record-new-year: position 4",
+      "signature": "wdvW24eU12afBiQjKwobMcpGin3DgBKUMcGskYvAiEC1zYTA779VmXucPeUJdCuzCP856q9CTSbb28ErJFPpLYc"
+    },
+    {
+      "label": "nba-best-record-new-year: bid 76ers 0.24",
+      "signature": "4sL95yhZaiFcGt3LPFbGnpFK4KRpqePCftWKCr8ENR2yZ34Z9P5wSo3rw7QpranaGXA9xoiNuQUaJSr9XuQxDgkZ"
+    },
+    {
+      "label": "nba-best-record-new-year: bid 76ers 0.21",
+      "signature": "VhLgkmZ8cWgFM3kR81EY8Faoge7HAV9MQM2vRGmUiwhyQtqdcKYRQwSpkN3tqskwBdeBhKPk7hYtgFCuusAZydu"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Spurs 0.25",
+      "signature": "57AAe1QvdceKyP5RCNkrurm6SWVaeKdpq2GHUvfyEZrXofBs4o3R613kvtRe1HFamqBXerPnC7AYippYtWiRbgFi"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Spurs 0.22",
+      "signature": "5KTPfyx4mVuDNV4A3H48CFvWQHERz23UsHCjqNYgfqtS18xQHH8mfMmaaA8jf2sFMhADPJNbDhLDXUAaz9APStBm"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Lakers 0.20",
+      "signature": "3CJSopE24baEwYrcbmUsguVMCuW4or3bFqQaNHhcRnqYuLtQjepEu2TLaj9gUB4i2rvK2WdUjt1zPtuoVWR4MSJX"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Lakers 0.17",
+      "signature": "63WGoiCmwzg4BB7z9q2j3uFCZnGPPSxEDFBMnh7EoAFJiLy6oB5nHfyWkZgYEgoMguD3Z8taqMut5qCdDjVNHzAd"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Any other team 0.23",
+      "signature": "5aF6n1DYyMUjZENkantfjQJAchFg4PjrXgnvQVpLPhxRDLiPPQeZDmoAzVjYbMLkn5EiuDyfRoVTbyQRe8rACMmV"
+    },
+    {
+      "label": "nba-best-record-new-year: bid Any other team 0.20",
+      "signature": "55JFPTiu8i7NLoZGkfbqHSr8rK3H4XZNNYjGgnEyZoaCKL8Kz1MAGZV75u4ErB87wTDJ9WkWD31CD4uLSfTAh1ui"
+    },
+    {
+      "label": "nba-best-record-new-year: taker buys Spurs 0.34",
+      "signature": "5Vte3QvLSQwcy9x9PM9xb8nRDjiu1pJgQfaSb53pq3P6Dm8NR2zsN6P8suZHY8pHEGBi78yhCfy63kbSTxkePMNT"
+    }
+  ],
+  "wallets": {
+    "makers": [
+      "GADP9zxFvQso1FNdpPKwkz7JeQ9NGYUsjSc6Kyn1iKDU",
+      "AUewd27RMMXup935ErdBm8kT9ujmcudKZEPW26yWrYLd",
+      "4yJ65EFK24eoDFdrwXVknYvr9tercv4gaf1CgUdrJQNr",
+      "2EWd1tKBynVoFfNZS3TKpRojadus2fWjUJuy4Ee4szWb"
+    ],
+    "taker": "DLYeY9ZekX5DkKPfa1gvxWir6Dmogrp9tm9KtGfpCLvD"
+  },
+  "collateralMint": "FUU2RPtv519UtUD2apwBRUM8BT2x2Kew71AxRRLMCAbd",
+  "finishedAt": "2026-11-23T08:08:35.709Z"
+}

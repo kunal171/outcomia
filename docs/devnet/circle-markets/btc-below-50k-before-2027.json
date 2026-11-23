@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will Bitcoin (BTC) trade at or below $50,000 at any time before 1 January 2027 00:00 UTC?",
+  "description": "BTC dipped to about $55,250 in November 2026 and traded near $61,000 on 23 November.",
+  "resolutionSource": "CoinGecko daily USD price page for the asset (coingecko.com), cross-checked with Coinbase and Kraken spot prices.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if any 1-minute BTC/USD trade on Coinbase or Kraken prints at or below $50,000.00 before 1 January 2027 00:00 UTC.",
+    "noCriteria": "Resolve NO if no qualifying trade prints at or below $50,000.00 in that period.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798754400,
+  "earliestResolutionTimestamp": 1798763400,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

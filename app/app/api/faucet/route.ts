@@ -17,6 +17,11 @@ import {
 } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
 import { resolveHeliusDevnetUrl } from "../../../lib/rpc-config";
+import { TEST_USDC_MINT } from "../../../lib/collateral-display";
+
+/** outcomia-tUSDC: test collateral for the demo prediction markets. It has
+ * its own claim counters, so it never consumes a tBTC/tUSDT claim. */
+const TEST_USDC_CLAIM_ATOMS = BigInt("1000000000"); // 1,000 tokens at 6 decimals
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,13 +160,14 @@ async function enforceRateLimit(
   request: NextRequest,
   wallet: PublicKey,
   config: FaucetConfig,
+  scope = "",
 ) {
   const ipHash = createHash("sha256")
     .update(requesterIp(request))
     .digest("hex");
   // Persistent counter names survive rebranding; changing them would reset quotas.
-  const walletKey = `tidebook:faucet:wallet:${wallet.toBase58()}`;
-  const ipKey = `tidebook:faucet:ip:${ipHash}`;
+  const walletKey = `tidebook:faucet:${scope}wallet:${wallet.toBase58()}`;
+  const ipKey = `tidebook:faucet:${scope}ip:${ipHash}`;
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 
@@ -243,6 +249,8 @@ export async function GET() {
       quoteMint: config.quoteMint.toBase58(),
       baseClaimAtoms: config.baseClaimAtoms.toString(),
       quoteClaimAtoms: config.quoteClaimAtoms.toString(),
+      testUsdcMint: TEST_USDC_MINT,
+      testUsdcClaimAtoms: TEST_USDC_CLAIM_ATOMS.toString(),
       windowSeconds: config.windowSeconds,
     });
   } catch {
@@ -253,7 +261,11 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const config = readConfig();
-    const body = (await request.json()) as { wallet?: unknown };
+    const body = (await request.json()) as {
+      wallet?: unknown;
+      asset?: unknown;
+    };
+    const testUsdc = body.asset === "test-usdc";
     if (typeof body.wallet !== "string") {
       return NextResponse.json(
         { error: "A valid wallet address is required" },
@@ -271,7 +283,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rateLimit = await enforceRateLimit(request, claimant, config);
+    const rateLimit = await enforceRateLimit(
+      request,
+      claimant,
+      config,
+      testUsdc ? "tusdc:" : "",
+    );
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -286,6 +303,38 @@ export async function POST(request: NextRequest) {
     }
 
     const connection = new Connection(config.rpcUrl, "confirmed");
+    if (testUsdc) {
+      const mintKey = new PublicKey(TEST_USDC_MINT);
+      const mint = await getMint(
+        connection,
+        mintKey,
+        "confirmed",
+        TOKEN_PROGRAM_ID,
+      );
+      if (!mint.mintAuthority?.equals(config.authority.publicKey))
+        throw new Error("The faucet account is not the test USDC authority");
+      const account = getAssociatedTokenAddressSync(mintKey, claimant);
+      const signature = await sendAndConfirmTransaction(
+        connection,
+        new Transaction().add(
+          createAssociatedTokenAccountIdempotentInstruction(
+            config.authority.publicKey,
+            account,
+            claimant,
+            mintKey,
+          ),
+          createMintToInstruction(
+            mintKey,
+            account,
+            config.authority.publicKey,
+            TEST_USDC_CLAIM_ATOMS,
+          ),
+        ),
+        [config.authority],
+        { commitment: "confirmed" },
+      );
+      return NextResponse.json({ signature });
+    }
     const [baseMint, quoteMint] = await Promise.all([
       getMint(connection, config.baseMint, "confirmed", TOKEN_PROGRAM_ID),
       getMint(connection, config.quoteMint, "confirmed", TOKEN_PROGRAM_ID),
