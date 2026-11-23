@@ -1307,5 +1307,8 @@
   "Next →": "Next →",
   "Match YES + NO": "Match YES + NO",
   "Buys: mint pairs": "Buys: mint pairs",
-  "Sells: merge pairs": "Sells: merge pairs"
+  "Sells: merge pairs": "Sells: merge pairs",
+  "Orders from departed members": "Orders from departed members",
+  "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.",
+  "Clear order": "Clear order"
 }

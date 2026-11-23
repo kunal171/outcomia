@@ -1307,5 +1307,8 @@
   "Next →": "अगला →",
   "Match YES + NO": "हाँ + नहीं मिलान",
   "Buys: mint pairs": "खरीद: जोड़े बनाएँ",
-  "Sells: merge pairs": "बिक्री: जोड़े मिलाएँ"
+  "Sells: merge pairs": "बिक्री: जोड़े मिलाएँ",
+  "Orders from departed members": "छोड़ चुके सदस्यों के ऑर्डर",
+  "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "ये मालिक अब यहाँ ट्रेड नहीं कर सकते, इसलिए उनके ऑर्डर पूरे नहीं होंगे। हटाने पर फंड या कॉन्ट्रैक्ट हर मालिक को लौट जाते हैं।",
+  "Clear order": "ऑर्डर हटाएँ"
 }
