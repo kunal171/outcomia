@@ -31,8 +31,21 @@ import {
   setClubMarketPolicyInstruction,
   setClubMemberRoleInstruction,
   withdrawClubFeesInstruction,
+  approveClubRequestInstruction,
+  closeClubListingInstruction,
+  closeClubRequestInstruction,
+  clubListingIssue,
+  clubRequestNoteIssue,
+  isOpenListing,
+  joinOpenClubInstruction,
+  listingVerified,
+  requestClubMembershipInstruction,
+  requestExpired,
+  setClubListingInstruction,
+  verifyClubListingInstruction,
   type ClubSnapshot,
 } from "../../lib/clubs";
+import { useProtocolRole } from "../protocol-role-provider";
 import { ClubFeedback, shortKey, useClubTransaction } from "./club-transaction";
 import { roleLabel } from "./clubs-home";
 import { STATUS_LABELS } from "./club-market";
@@ -49,7 +62,16 @@ export function ClubDetail({ address }: { address: string }) {
     [loaded, setLoaded] = useState(false),
     [loadIssue, setLoadIssue] = useState<string | null>(null),
     [revision, setRevision] = useState(0),
-    [invitee, setInvitee] = useState("");
+    [invitee, setInvitee] = useState(""),
+    [note, setNote] = useState(""),
+    [listingDraft, setListingDraft] = useState<{
+      type: "private" | "public" | "open";
+      topic: string;
+      description: string;
+    } | null>(null);
+  const { role: protocolRole } = useProtocolRole();
+  const protocolAdmin =
+    protocolRole === "admin" || protocolRole === "super-admin";
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
   const wallet = tx.wallet?.publicKey;
 
@@ -76,6 +98,57 @@ export function ClubDetail({ address }: { address: string }) {
   const owner = role === "owner";
   const admin = owner || role === "admin";
   const now = Math.floor(Date.now() / 1000);
+
+  const listing = snapshot?.listing ?? null;
+  const myRequest = wallet
+    ? snapshot?.requests.find((r) => r.wallet.equals(wallet))
+    : undefined;
+  const draft = listingDraft ?? {
+    type: listing ? (isOpenListing(listing) ? "open" : "public") : "private",
+    topic: listing?.topic ?? "",
+    description: listing?.description ?? "",
+  };
+
+  async function saveListing(event: FormEvent) {
+    event.preventDefault();
+    if (draft.type === "private") {
+      if (!listing) return;
+      if (
+        await tx.run(async (p, signer) => [
+          await closeClubListingInstruction(p, signer, club),
+        ])
+      )
+        setListingDraft(null);
+      return;
+    }
+    const issue = clubListingIssue(draft.topic, draft.description);
+    if (issue) return tx.setIssue(issue);
+    if (
+      await tx.run(async (p, signer) => [
+        await setClubListingInstruction(
+          p,
+          signer,
+          club,
+          draft.type === "open",
+          draft.topic,
+          draft.description,
+        ),
+      ])
+    )
+      setListingDraft(null);
+  }
+
+  async function requestJoin(event: FormEvent) {
+    event.preventDefault();
+    const issue = clubRequestNoteIssue(note);
+    if (issue) return tx.setIssue(issue);
+    if (
+      await tx.run(async (p, signer) => [
+        await requestClubMembershipInstruction(p, signer, club, note),
+      ])
+    )
+      setNote("");
+  }
 
   async function invite(event: FormEvent) {
     event.preventDefault();
@@ -130,6 +203,117 @@ export function ClubDetail({ address }: { address: string }) {
                   : t("Admins create markets")}
               </p>
             </div>
+            {listing && (
+              <section
+                className="club-listing-banner"
+                aria-label={t("Club listing")}
+              >
+                <div className="club-discovery-head">
+                  <span
+                    className={`role-badge ${isOpenListing(listing) ? "club-open" : "club-public"}`}
+                  >
+                    {t(isOpenListing(listing) ? "Open" : "Public")}
+                  </span>
+                  <span
+                    className={`ui-badge ${listingVerified(listing) ? "ui-badge-yes" : "ui-badge-warn"}`}
+                  >
+                    {t(
+                      listingVerified(listing)
+                        ? "Verified"
+                        : "Awaiting verification",
+                    )}
+                  </span>
+                  <small>{listing.topic}</small>
+                </div>
+                {listing.description && <p>{listing.description}</p>}
+                {wallet &&
+                  !me &&
+                  listingVerified(listing) &&
+                  (isOpenListing(listing) ? (
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={tx.pending}
+                      onClick={() =>
+                        void tx.run(async (p, signer) => [
+                          await joinOpenClubInstruction(p, signer, club),
+                        ])
+                      }
+                    >
+                      {t("Join club")}
+                    </button>
+                  ) : myRequest ? (
+                    <div className="market-card-actions wallet-card-actions">
+                      <span className="ui-badge">{t("Request pending")}</span>
+                      <button
+                        type="button"
+                        className="admin-action-button"
+                        disabled={tx.pending}
+                        onClick={() =>
+                          void tx.run(async (p, signer) => [
+                            await closeClubRequestInstruction(
+                              p,
+                              signer,
+                              club,
+                              signer,
+                              false,
+                            ),
+                          ])
+                        }
+                      >
+                        {t("Cancel request")}
+                      </button>
+                    </div>
+                  ) : (
+                    <form
+                      className="admin-form"
+                      onSubmit={(e) => void requestJoin(e)}
+                    >
+                      <label>
+                        {t("Note to the club admins (optional)")}
+                        <input
+                          value={note}
+                          maxLength={140}
+                          disabled={tx.pending}
+                          onChange={(e) => setNote(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="primary-button"
+                        type="submit"
+                        disabled={tx.pending}
+                      >
+                        {t("Request to join")}
+                      </button>
+                    </form>
+                  ))}
+                {protocolAdmin && (
+                  <div className="market-card-actions wallet-card-actions">
+                    <button
+                      type="button"
+                      className="admin-action-button"
+                      disabled={tx.pending}
+                      onClick={() =>
+                        void tx.run(async (p, signer) => [
+                          await verifyClubListingInstruction(
+                            p,
+                            signer,
+                            club,
+                            !listingVerified(listing),
+                          ),
+                        ])
+                      }
+                    >
+                      {t(
+                        listingVerified(listing)
+                          ? "Withdraw verification"
+                          : "Verify listing",
+                      )}
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
             <div className="admin-layout">
               <section className="admin-card admin-list-card">
                 <div className="admin-list-heading">
@@ -342,6 +526,161 @@ export function ClubDetail({ address }: { address: string }) {
                   </button>
                 )}
               </section>
+
+              {owner && (
+                <section className="admin-card">
+                  <div className="card-label">{t("Listing")}</div>
+                  <form
+                    className="admin-form"
+                    onSubmit={(e) => void saveListing(e)}
+                  >
+                    <label>
+                      {t("Who can join")}
+                      <select
+                        value={draft.type}
+                        disabled={tx.pending}
+                        onChange={(e) =>
+                          setListingDraft({
+                            ...draft,
+                            type: e.target.value as
+                              "private" | "public" | "open",
+                          })
+                        }
+                      >
+                        <option value="private">
+                          {t("Private: invitation only")}
+                        </option>
+                        <option value="public">
+                          {t("Public: request and approval")}
+                        </option>
+                        <option value="open">
+                          {t("Open: anyone can join")}
+                        </option>
+                      </select>
+                    </label>
+                    {draft.type !== "private" && (
+                      <>
+                        <label>
+                          {t("Topic")}
+                          <input
+                            value={draft.topic}
+                            maxLength={32}
+                            disabled={tx.pending}
+                            onChange={(e) =>
+                              setListingDraft({
+                                ...draft,
+                                topic: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          {t("Description")}
+                          <textarea
+                            value={draft.description}
+                            maxLength={280}
+                            disabled={tx.pending}
+                            onChange={(e) =>
+                              setListingDraft({
+                                ...draft,
+                                description: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
+                    <p>
+                      {t(
+                        "Public and open clubs appear in discovery after a protocol admin verifies the listing. Any change needs verification again.",
+                      )}
+                    </p>
+                    <button
+                      className="primary-button"
+                      type="submit"
+                      disabled={
+                        tx.pending || (draft.type === "private" && !listing)
+                      }
+                    >
+                      {t(
+                        draft.type === "private"
+                          ? "Make private"
+                          : "Save listing",
+                      )}
+                    </button>
+                  </form>
+                </section>
+              )}
+
+              {admin && (snapshot.requests.length > 0 || listing) && (
+                <section className="admin-card admin-list-card">
+                  <div className="card-label">{t("Join requests")}</div>
+                  {snapshot.requests.length === 0 && (
+                    <p>{t("No pending requests.")}</p>
+                  )}
+                  <ul className="club-list">
+                    {snapshot.requests.map((r) => {
+                      const expired = requestExpired(r, now);
+                      return (
+                        <li key={r.wallet.toBase58()}>
+                          <strong title={r.wallet.toBase58()}>
+                            {shortKey(r.wallet)}
+                          </strong>
+                          {r.note && <small>“{r.note}”</small>}
+                          <small>
+                            {expired
+                              ? t("Expired")
+                              : t("Expires {value0}", {
+                                  value0: new Date(
+                                    r.expiresAt.toNumber() * 1000,
+                                  ).toLocaleString(),
+                                })}
+                          </small>
+                          <div className="admin-actions">
+                            {!expired && (
+                              <button
+                                type="button"
+                                className="primary-button"
+                                disabled={tx.pending}
+                                onClick={() =>
+                                  void tx.run(async (p, signer) => [
+                                    await approveClubRequestInstruction(
+                                      p,
+                                      signer,
+                                      club,
+                                      r.wallet,
+                                    ),
+                                  ])
+                                }
+                              >
+                                {t("Approve")}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="admin-action-button"
+                              disabled={tx.pending}
+                              onClick={() =>
+                                void tx.run(async (p, signer) => [
+                                  await closeClubRequestInstruction(
+                                    p,
+                                    signer,
+                                    club,
+                                    r.wallet,
+                                    true,
+                                  ),
+                                ])
+                              }
+                            >
+                              {t(expired ? "Clear" : "Reject")}
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
 
               {admin && (
                 <section className="admin-card">

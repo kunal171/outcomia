@@ -2290,3 +2290,77 @@ body:has(.prediction-guide[open]) {
 .club-list small {
   color: var(--muted);
 }
+
+/* Club discovery (public and open clubs) */
+.club-discovery {
+  margin-bottom: var(--space-7);
+}
+.club-discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--space-4);
+}
+.club-discovery-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+.club-discovery-card:hover {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+  transform: translateY(-2px);
+}
+.club-discovery-card h3 {
+  margin: 0;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  color: var(--ink);
+}
+.club-discovery-card a {
+  text-decoration: none;
+}
+.club-discovery-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+.club-discovery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--muted);
+}
+.club-discovery-card .market-card-actions {
+  justify-content: space-between;
+  margin-top: var(--space-2);
+}
+.role-badge.club-open {
+  border-color: rgb(var(--yes-rgb) / 0.35);
+  background: rgb(var(--yes-rgb) / 0.08);
+  color: var(--yes);
+}
+.club-listing-banner {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+.club-listing-banner p {
+  margin: 0;
+  color: var(--muted);
+}
+.club-listing-banner .primary-button {
+  width: auto;
+  margin-top: 0;
+  justify-self: start;
+}

@@ -15,11 +15,17 @@ import {
   clubRole,
   createClubInstruction,
   inviteExpired,
+  isOpenListing,
+  joinOpenClubInstruction,
+  closeClubRequestInstruction,
+  readClubListings,
   readWalletClubs,
+  requestClubMembershipInstruction,
 } from "../../lib/clubs";
 import { ClubFeedback, useClubTransaction } from "./club-transaction";
 
 type WalletClubs = Awaited<ReturnType<typeof readWalletClubs>>;
+type Listings = Awaited<ReturnType<typeof readClubListings>>;
 
 export function ClubsHome() {
   const { t } = useI18n();
@@ -32,7 +38,8 @@ export function ClubsHome() {
   const [data, setData] = useState<WalletClubs | null>(null),
     [loadIssue, setLoadIssue] = useState<string | null>(null),
     [revision, setRevision] = useState(0),
-    [name, setName] = useState("");
+    [name, setName] = useState(""),
+    [listings, setListings] = useState<Listings | null>(null);
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
   const wallet = tx.wallet?.publicKey;
 
@@ -47,6 +54,18 @@ export function ClubsHome() {
       dead = true;
     };
   }, [program, wallet, revision]);
+
+  // Verified public and open clubs are discoverable without a wallet.
+  useEffect(() => {
+    if (!CLUBS_ENABLED) return;
+    let dead = false;
+    void readClubListings(program)
+      .then((value) => !dead && setListings(value))
+      .catch(() => !dead && setListings([]));
+    return () => {
+      dead = true;
+    };
+  }, [program, revision]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -78,6 +97,98 @@ export function ClubsHome() {
             )}
           </p>
         </div>
+        {CLUBS_ENABLED && (
+          <section className="club-discovery" aria-labelledby="discover-clubs">
+            <div className="section-heading">
+              <h2 id="discover-clubs">{t("Discover clubs")}</h2>
+            </div>
+            {!listings && <p>{t("Loading clubs…")}</p>}
+            {listings?.length === 0 && (
+              <p className="wallet-empty">{t("No public clubs yet.")}</p>
+            )}
+            <div className="club-discovery-grid">
+              {listings?.map(({ address, club, listing }) => {
+                const key = address.toBase58();
+                const member = data?.clubs.some((c) =>
+                  c.address.equals(address),
+                );
+                const requested = data?.requests.some((r) =>
+                  r.address.equals(address),
+                );
+                const open = isOpenListing(listing);
+                return (
+                  <article className="club-discovery-card" key={key}>
+                    <div className="club-discovery-head">
+                      <span
+                        className={`role-badge ${open ? "club-open" : "club-public"}`}
+                      >
+                        {t(open ? "Open" : "Public")}
+                      </span>
+                      <small>{listing.topic}</small>
+                    </div>
+                    <Link href={`/clubs/${key}`}>
+                      <h3>{club.name}</h3>
+                    </Link>
+                    {listing.description && <p>{listing.description}</p>}
+                    <div className="market-card-actions wallet-card-actions">
+                      <small>
+                        {t("{value0} members", {
+                          value0: String(club.memberCount),
+                        })}
+                      </small>
+                      {!wallet ? null : member ? (
+                        <span className="role-badge">{t("Member")}</span>
+                      ) : requested ? (
+                        <button
+                          type="button"
+                          className="admin-action-button"
+                          disabled={tx.pending}
+                          onClick={() =>
+                            void tx.run(async (p, signer) => [
+                              await closeClubRequestInstruction(
+                                p,
+                                signer,
+                                address,
+                                signer,
+                                false,
+                              ),
+                            ])
+                          }
+                        >
+                          {t("Requested · Cancel")}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="market-open-link"
+                          disabled={tx.pending}
+                          onClick={() =>
+                            void tx.run(async (p, signer) => [
+                              open
+                                ? await joinOpenClubInstruction(
+                                    p,
+                                    signer,
+                                    address,
+                                  )
+                                : await requestClubMembershipInstruction(
+                                    p,
+                                    signer,
+                                    address,
+                                    "",
+                                  ),
+                            ])
+                          }
+                        >
+                          {t(open ? "Join club" : "Request to join")}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
         {!CLUBS_ENABLED ? (
           <div className="access-card">
             {t("Clubs are not enabled in this app configuration.")}
