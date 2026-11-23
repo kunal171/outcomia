@@ -1152,5 +1152,11 @@
   "That password is not correct.": "Esa contraseña no es correcta.",
   "Checking…": "Comprobando…",
   "Unlock": "Desbloquear",
-  "Back to home": "Volver al inicio"
+  "Back to home": "Volver al inicio",
+  "Fast public order books for YES/NO, multi-outcome and spot markets.": "Libros de órdenes públicos y rápidos para mercados YES/NO, de varios resultados y spot.",
+  "Any Solana wallet": "Cualquier billetera de Solana",
+  "Private, institutional prediction markets and clubs.": "Mercados de predicción privados e institucionales, y clubes.",
+  "Open Outcomia": "Abrir Outcomia",
+  "Choose a network": "Elige una red",
+  "Connect a wallet. Its network opens your workspace.": "Conecta una billetera. Su red abre tu espacio de trabajo."
 }

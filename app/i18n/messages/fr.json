@@ -1152,5 +1152,11 @@
   "That password is not correct.": "Ce mot de passe est incorrect.",
   "Checking…": "Vérification…",
   "Unlock": "Déverrouiller",
-  "Back to home": "Retour à l’accueil"
+  "Back to home": "Retour à l’accueil",
+  "Fast public order books for YES/NO, multi-outcome and spot markets.": "Carnets d’ordres publics et rapides pour les marchés YES/NO, à issues multiples et spot.",
+  "Any Solana wallet": "Tout portefeuille Solana",
+  "Private, institutional prediction markets and clubs.": "Marchés prédictifs privés et institutionnels, et clubs.",
+  "Open Outcomia": "Ouvrir Outcomia",
+  "Choose a network": "Choisissez un réseau",
+  "Connect a wallet. Its network opens your workspace.": "Connectez un portefeuille. Son réseau ouvre votre espace de travail."
 }

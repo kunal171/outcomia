@@ -5,7 +5,6 @@ import { isLocale, isTheme } from "../i18n/config";
 import { PreferencesProvider } from "../components/preferences-provider";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
-import "./landing.css";
 import "./navigation.css";
 import "./prediction-detail.css";
 import "./theme.css";

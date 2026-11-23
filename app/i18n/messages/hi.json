@@ -1152,5 +1152,11 @@
   "That password is not correct.": "यह पासवर्ड सही नहीं है।",
   "Checking…": "जाँच हो रही है…",
   "Unlock": "अनलॉक करें",
-  "Back to home": "होम पर वापस"
+  "Back to home": "होम पर वापस",
+  "Fast public order books for YES/NO, multi-outcome and spot markets.": "YES/NO, मल्टी-आउटकम और स्पॉट मार्केट के लिए तेज़ सार्वजनिक ऑर्डर बुक।",
+  "Any Solana wallet": "कोई भी Solana वॉलेट",
+  "Private, institutional prediction markets and clubs.": "निजी, संस्थागत प्रेडिक्शन मार्केट और क्लब।",
+  "Open Outcomia": "Outcomia खोलें",
+  "Choose a network": "नेटवर्क चुनें",
+  "Connect a wallet. Its network opens your workspace.": "वॉलेट कनेक्ट करें। उसका नेटवर्क आपका वर्कस्पेस खोलता है।"
 }

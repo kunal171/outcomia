@@ -22,7 +22,8 @@
   --warn: #f2cb76;
   --warn-rgb: 242 203 118;
   --outcome-ink: #07131a;
-  --glow: 0 0 0 1px rgb(143 168 255 / 0.35), 0 10px 40px -8px rgb(91 124 255 / 0.55);
+  --glow:
+    0 0 0 1px rgb(143 168 255 / 0.35), 0 10px 40px -8px rgb(91 124 255 / 0.55);
   --shadow-1: 0 8px 24px -12px rgb(0 0 0 / 0.6);
   --shadow-2: 0 30px 80px -20px rgb(0 0 0 / 0.75);
   --hero-background: #1a2a70;
@@ -67,7 +68,8 @@
   --warn: #7a5508;
   --warn-rgb: 122 85 8;
   --outcome-ink: #ffffff;
-  --glow: 0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);
+  --glow:
+    0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);
   --shadow-1: 0 8px 24px -12px rgb(13 19 38 / 0.18);
   --shadow-2: 0 30px 80px -24px rgb(13 19 38 / 0.28);
   --hero-background: #1f3fbf;
@@ -113,7 +115,8 @@
     --warn: #7a5508;
     --warn-rgb: 122 85 8;
     --outcome-ink: #ffffff;
-    --glow: 0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);
+    --glow:
+      0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);
     --shadow-1: 0 8px 24px -12px rgb(13 19 38 / 0.18);
     --shadow-2: 0 30px 80px -24px rgb(13 19 38 / 0.28);
     --hero-background: #1f3fbf;
@@ -475,108 +478,11 @@ body {
   flex-shrink: 0;
 }
 .primary-button,
-.landing-action-primary,
-.landing-action-secondary,
 .market-open-link {
   border-radius: 999px;
 }
-.landing-hero {
-  margin-top: 28px;
-  padding: 48px;
-  min-height: 480px;
-  border-radius: 28px;
-  background: var(--hero-background);
-  color: var(--hero-ink);
-  overflow: hidden;
-}
-.landing-copy h1 {
-  margin-top: 0;
-  font-size: clamp(46px, 5.7vw, 80px);
-  letter-spacing: -0.055em;
-}
-.landing-copy h1 > span {
-  color: var(--hero-ink);
-  background: none;
-  -webkit-text-fill-color: currentColor;
-}
-.landing-copy > p {
-  color: var(--hero-muted);
-}
-.landing-hero .landing-action-primary {
-  background: #111827;
-  color: #ffffff;
-  border: 1px solid #111827;
-  box-shadow: none;
-}
-.landing-hero .landing-action-primary:hover {
-  background: #202d48;
-}
-.landing-hero .landing-action-secondary {
-  color: var(--hero-ink);
-  border: 1px solid rgb(255 255 255 / 0.45);
-  background: transparent;
-}
-.landing-hero .landing-action-secondary:hover {
-  background: rgb(255 255 255 / 0.12);
-}
-.landing-hero .flow-orbit {
-  border-color: rgb(255 255 255 / 0.2);
-}
-.landing-hero .flow-order {
-  color: #ffffff;
-  border-color: rgb(255 255 255 / 0.4);
-  background: rgb(255 255 255 / 0.16);
-  box-shadow: 0 18px 48px rgb(5 19 70 / 0.18);
-}
-.landing-hero .flow-order span {
-  color: #ffffff;
-}
-.landing-hero .flow-order b {
-  background: rgb(255 255 255 / 0.4);
-}
-.landing-hero .flow-center {
-  color: #111827;
-  background: #ffffff;
-  border-color: #ffffff;
-}
-.landing-rollout-note {
-  border-left: 0;
-  background: transparent;
-  padding-inline: 0;
-}
-.journey-market {
-  background: var(--panel);
-  box-shadow: 0 14px 40px rgb(var(--shadow-rgb) / 0.08);
-}
-.journey-step {
-  opacity: 1;
-}
-.journey-step > span {
-  color: var(--accent);
-}
-.journey-step h3 {
-  letter-spacing: -0.035em;
-}
 .admin-card {
   box-shadow: none;
-}
-@media (max-width: 760px) {
-  .landing-hero {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 30px 24px;
-    border-radius: 20px;
-    gap: 12px;
-  }
-  .landing-copy h1 {
-    font-size: clamp(38px, 9vw, 62px);
-    overflow-wrap: anywhere;
-  }
-  .prediction-hero-art {
-    margin-top: 0;
-  }
-  .landing-hero .landing-actions {
-    align-items: stretch;
-  }
 }
 
 /* Keep retained position panels and their wide order tables inside the viewport. */
