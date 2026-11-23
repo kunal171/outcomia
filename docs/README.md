@@ -10,6 +10,11 @@ shared custody and payout instructions are deployed and verified on devnet.
 
 - [Future platform scope](future-scope.md): user-created predictions, private
   markets, clubs, multi-outcome trading and governance. Planned features only.
+- [Creator Clubs](creator-clubs.md): public, open and private clubs with
+  verified, staked operators and on-chain fee sharing, on Canton and Solana.
+  Planned; shared specification.
+- [Design system](design-system.md): tokens, primitives, motion and page
+  anatomy every route follows.
 - [Architecture](architecture.md): accounts, instructions, authorization,
   balances and application routes.
 - [Prediction market design](prediction-market-design.md): single-collateral

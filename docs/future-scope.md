@@ -95,6 +95,13 @@ The treatment of resting orders after removal must be decided before private
 markets launch: cancellation, matching eligibility and membership changes must
 agree on when an order can still fill.
 
+### Creator Clubs (next club phase)
+
+Public (request to join) and Open (join directly) clubs run by verified,
+staked operators who earn a protocol-enforced share of trading fees, on both
+Solana and Canton. Operators never resolve their own markets or control member
+funds. Specification and delivery plan: [Creator Clubs](creator-clubs.md).
+
 ## Governance
 
 Governance should support public communities and private clubs:
