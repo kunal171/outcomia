@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   PublicKey,
@@ -14,7 +14,7 @@ import {
   findMarketTable,
 } from "../../lib/market-lookup-table";
 import { parseTokenAmount, TOKEN_PROGRAM_ID } from "../../lib/outcomia";
-import { readableAmount } from "../../lib/market-display";
+import { plainAmount, readableAmount } from "../../lib/market-display";
 import { PROGRAM_ID } from "../../lib/solana";
 import {
   COMPLEMENTARY_MATCHING_ENABLED,
@@ -22,6 +22,7 @@ import {
   assetCustody,
 } from "../../lib/shared";
 import {
+  bestFillPrice,
   buildMultiTrade,
   fullSetQuote,
   multiBookPda,
@@ -84,6 +85,50 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
       active = false;
     };
   }, [connection, marketKey, mintKey, outcomeCount, tableRevision]);
+  // Exchange-style entry, as on binary markets: picking an outcome or side
+  // fills the best price once, and either Contracts or Total can be typed;
+  // the other follows, rounded down to the market's contract lot.
+  const [total, setTotal] = useState<string | null>(null);
+  const prefilled = useRef<string | null>(null);
+  const decimals = s.data?.decimals ?? 0,
+    lot = s.data?.market.terms.quantityLot;
+  const best = s.data?.book
+    ? bestFillPrice(
+        s.data.market,
+        s.data.book.book,
+        s.data.book.rows,
+        outcome,
+        side,
+        COMPLEMENTARY_MATCHING_ENABLED,
+      )
+    : null;
+  const contractsFor = (amount: string, limit: string) => {
+    try {
+      const spend = parseTokenAmount(amount, decimals, "Total"),
+        each = parseTokenAmount(limit, decimals, "Price");
+      if (each.lten(0)) return "";
+      const count = spend.div(each);
+      return (lot?.gtn(0) ? count.sub(count.mod(lot)) : count).toString();
+    } catch {
+      return "";
+    }
+  };
+  useEffect(() => {
+    const key = `${marketKey}:${outcome}:${side}`;
+    if (!best || prefilled.current === key) return;
+    prefilled.current = key;
+    const filled = plainAmount(best, decimals);
+    setPrice(filled);
+    if (total !== null) setQuantity(contractsFor(total, filled));
+    // Only a market, outcome or side change triggers a new fill.
+  }, [marketKey, outcome, side, best?.toString(), decimals]);
+  let orderValue = "";
+  try {
+    orderValue = plainAmount(
+      parseTokenAmount(price, decimals, "Price").mul(whole(quantity)),
+      decimals,
+    );
+  } catch {}
   const d = s.data;
   if (!d) return null;
   const ready = !!s.signed && !!s.wallet && !s.busy && !s.loading;
@@ -243,6 +288,7 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                   );
                 });
                 if (confirmed && unsubmitted !== null) {
+                  setTotal(null);
                   setQuantity(unsubmitted);
                   setLeft(
                     unsubmitted
@@ -284,7 +330,11 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                 inputMode="decimal"
                 disabled={s.busy}
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                  if (total !== null)
+                    setQuantity(contractsFor(total, e.target.value));
+                }}
               />
             </label>
             <label>
@@ -296,7 +346,27 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
                 inputMode="numeric"
                 disabled={s.busy}
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                onChange={(e) => {
+                  setTotal(null);
+                  setQuantity(e.target.value);
+                }}
+              />
+            </label>
+            <label>
+              {t(
+                side === "bid"
+                  ? "Total to spend ({value0})"
+                  : "Total to receive ({value0})",
+                { value0: d.metadata?.quoteSymbol ?? t("collateral") },
+              )}
+              <input
+                inputMode="decimal"
+                disabled={s.busy}
+                value={total ?? orderValue}
+                onChange={(e) => {
+                  setTotal(e.target.value);
+                  setQuantity(contractsFor(e.target.value, price));
+                }}
               />
             </label>
             <p>

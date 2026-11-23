@@ -342,6 +342,26 @@ export function fullSetQuote(
   if (!size || sum.gte(payout)) return null;
   return { price: payout.sub(sum), quantity: size };
 }
+/** Best price a new order on `outcome` would fill at right now: the opposite
+ * side of the same outcome, or (with complementary matching) the full set
+ * through every other outcome, whichever is better for the trader.
+ * Example: buying with an ask at 0.45 and a full set at 0.39 gives 0.39. */
+export function bestFillPrice(
+  m: MultiMarket,
+  book: Book,
+  rows: Row[],
+  outcome: number,
+  side: Side,
+  complementary: boolean,
+): BN | null {
+  const direct =
+    book.heads[slot(outcome, side === "bid" ? "ask" : "bid")]?.price ?? null;
+  const full = complementary
+    ? (fullSetQuote(m, book, outcome, side, rows)?.price ?? null)
+    : null;
+  if (!direct || !full) return direct ?? full;
+  return side === "bid" ? BN.min(direct, full) : BN.max(direct, full);
+}
 /** Packs a bounded maker path and safe remainder. Never skips a crossing FIFO order.
  * With complementary matching, the best same-side order of every other outcome
  * also crosses through a full set: buying outcome i at price p fills against

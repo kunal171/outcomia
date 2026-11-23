@@ -10,7 +10,7 @@ import {
   type Side,
 } from "../../lib/shared";
 import { parseTokenAmount } from "../../lib/outcomia";
-import { readableAmount } from "../../lib/market-display";
+import { plainAmount, readableAmount } from "../../lib/market-display";
 
 type Outcome = "yes" | "no";
 export interface PredictionTradeTicketProps {
@@ -34,15 +34,6 @@ export interface PredictionTradeTicketProps {
   onInitialize?: () => void;
   feedback: ReactNode;
   funding: ReactNode;
-}
-
-/** Atomic units as a plain decimal string for inputs (no grouping). */
-function plainAmount(atoms: BN, decimals: number) {
-  const scale = new BN(10).pow(new BN(decimals));
-  const whole = atoms.div(scale).toString();
-  const fraction = atoms.mod(scale).toString().padStart(decimals, "0");
-  const trimmed = fraction.replace(/0+$/, "");
-  return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
 /** Controlled ticket: amounts stay in the transaction controller when tabs change.
