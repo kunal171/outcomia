@@ -1297,5 +1297,8 @@
   "You already claimed recently. Try again in {minutes} min.": "You already claimed recently. Try again in {minutes} min.",
   "The faucet could not complete this claim": "The faucet could not complete this claim",
   "Total to spend ({value0})": "Total to spend ({value0})",
-  "Total to receive ({value0})": "Total to receive ({value0})"
+  "Total to receive ({value0})": "Total to receive ({value0})",
+  "View club": "View club",
+  "Manage club": "Manage club",
+  "Market creation": "Market creation"
 }

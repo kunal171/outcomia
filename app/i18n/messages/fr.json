@@ -1297,5 +1297,8 @@
   "You already claimed recently. Try again in {minutes} min.": "Vous avez déjà réclamé récemment. Réessayez dans {minutes} min.",
   "The faucet could not complete this claim": "Le faucet n’a pas pu terminer cette réclamation",
   "Total to spend ({value0})": "Total à dépenser ({value0})",
-  "Total to receive ({value0})": "Total à recevoir ({value0})"
+  "Total to receive ({value0})": "Total à recevoir ({value0})",
+  "View club": "Voir le club",
+  "Manage club": "Gérer le club",
+  "Market creation": "Création de marchés"
 }

@@ -112,7 +112,7 @@ export function ClubMarket({
   if (!CLUBS_ENABLED)
     return (
       <Shell clubAddress={clubAddress}>
-        <div className="access-card">
+        <div className="ui-notice">
           {t("Clubs are not enabled in this app configuration.")}
         </div>
       </Shell>
@@ -120,7 +120,7 @@ export function ClubMarket({
   if (loadIssue)
     return (
       <Shell clubAddress={clubAddress}>
-        <div className="access-card access-denied" role="alert">
+        <div className="ui-notice" role="alert">
           {t(loadIssue)}
         </div>
       </Shell>
@@ -128,13 +128,13 @@ export function ClubMarket({
   if (!loaded || !snapshot)
     return (
       <Shell clubAddress={clubAddress}>
-        <div className="access-card">{t("Loading club market…")}</div>
+        <div className="ui-notice">{t("Loading club market…")}</div>
       </Shell>
     );
   if (!row || !trading)
     return (
       <Shell clubAddress={clubAddress}>
-        <div className="access-card">
+        <div className="ui-notice">
           {t("This market does not belong to this club.")}
         </div>
       </Shell>
@@ -191,16 +191,27 @@ export function ClubMarket({
 
   return (
     <Shell clubAddress={clubAddress}>
-      <div className="route-heading">
-        <h1>{row.metadata?.displayName ?? marketAddress}</h1>
-        <p>
-          {snapshot.club.name} · {t(STATUS_LABELS[status] ?? status)} ·{" "}
-          {restricted ? t("Members only") : t("Public")} · {t("Trading close")}:{" "}
-          {predictionTime(m.closeTs)}
-        </p>
-      </div>
+      <header className="ui-page-head club-head">
+        <div>
+          <p className="ui-eyebrow">{snapshot.club.name}</p>
+          <h1 className="ui-title">
+            {row.metadata?.displayName ?? marketAddress}
+          </h1>
+          <div className="club-head-meta">
+            <span className="ui-badge ui-badge-accent">
+              {t(STATUS_LABELS[status] ?? status)}
+            </span>
+            <span className="ui-badge">
+              {restricted ? t("Members only") : t("Public")}
+            </span>
+            <span>
+              {t("Trading close")}: {predictionTime(m.closeTs)}
+            </span>
+          </div>
+        </div>
+      </header>
       {restricted && !me && (
-        <div className="access-card">
+        <div className="ui-notice">
           {t(
             "Only club members can trade in this market. You can still cancel your orders, merge pairs and redeem.",
           )}
@@ -245,8 +256,8 @@ export function ClubMarket({
         />
 
         {wallet && (
-          <section className="admin-card" id="position">
-            <div className="card-label">{t("Your position")}</div>
+          <section className="ui-card club-market-card" id="position">
+            <h2 className="ui-h3">{t("Your position")}</h2>
             {position ? (
               <p>
                 {t("YES")} {position.yesFree.toString()} · {t("NO")}{" "}
@@ -259,21 +270,22 @@ export function ClubMarket({
               <p>{t("No position in this market yet.")}</p>
             )}
             {position && positionKey && status !== "resolved" && (
-              <div className="admin-form">
-                <label>
-                  {t("Contracts")}
+              <div className="club-form">
+                <label className="ui-field">
+                  <span>{t("Contracts")}</span>
                   <input
+                    className="ui-input"
                     value={quantity}
                     inputMode="numeric"
                     disabled={tx.pending}
                     onChange={(e) => setQuantity(e.target.value)}
                   />
                 </label>
-                <div className="admin-actions">
+                <div className="ui-actions">
                   {canEnter && tradingOpen && (
                     <button
                       type="button"
-                      className="admin-action-button"
+                      className="ui-btn ui-btn-sm"
                       disabled={tx.pending || !quantity}
                       onClick={() => completeSet(true)}
                     >
@@ -284,7 +296,7 @@ export function ClubMarket({
                   )}
                   <button
                     type="button"
-                    className="admin-action-button"
+                    className="ui-btn ui-btn-sm"
                     disabled={tx.pending || !quantity}
                     onClick={() => completeSet(false)}
                   >
@@ -305,7 +317,7 @@ export function ClubMarket({
               (!position.yesFree.isZero() || !position.noFree.isZero()) && (
                 <button
                   type="button"
-                  className="primary-button"
+                  className="ui-btn ui-btn-primary"
                   disabled={tx.pending}
                   onClick={() =>
                     void tx.run(async (p, signer) => [
@@ -328,8 +340,8 @@ export function ClubMarket({
           </section>
         )}
 
-        <section className="admin-card">
-          <div className="card-label">{t("Resolution")}</div>
+        <section className="ui-card club-market-card">
+          <h2 className="ui-h3">{t("Resolution")}</h2>
           {finalOutcome && (
             <p>
               {t("Final outcome")}:{" "}
@@ -358,11 +370,11 @@ export function ClubMarket({
               "Any current club admin may propose or correct the outcome after trading closes. Anyone can finalize once the review delay ends.",
             )}
           </p>
-          <div className="admin-actions">
+          <div className="ui-actions">
             {manager && status === "open" && (
               <button
                 type="button"
-                className="admin-action-button"
+                className="ui-btn ui-btn-sm"
                 disabled={tx.pending}
                 onClick={() =>
                   void tx.run(async (p, signer) => [
@@ -376,7 +388,7 @@ export function ClubMarket({
             {wallet && status === "open" && m.closeTs.lten(now) && (
               <button
                 type="button"
-                className="admin-action-button"
+                className="ui-btn ui-btn-sm"
                 disabled={tx.pending}
                 onClick={() =>
                   void tx.run(async (p) => [
@@ -393,7 +405,7 @@ export function ClubMarket({
               maturity.lten(now) && (
                 <button
                   type="button"
-                  className="primary-button"
+                  className="ui-btn ui-btn-primary"
                   disabled={tx.pending}
                   onClick={() =>
                     void tx.run(async (p) => [
@@ -406,10 +418,11 @@ export function ClubMarket({
               )}
           </div>
           {(canPropose || canCorrect) && (
-            <div className="admin-form">
-              <label>
-                {t("Outcome")}
+            <div className="club-form">
+              <label className="ui-field">
+                <span>{t("Outcome")}</span>
                 <select
+                  className="ui-select"
                   value={outcome}
                   disabled={tx.pending}
                   onChange={(e) =>
@@ -421,18 +434,20 @@ export function ClubMarket({
                   <option value="invalid">{t("Invalid")}</option>
                 </select>
               </label>
-              <label>
-                {t("Evidence reference")}
+              <label className="ui-field">
+                <span>{t("Evidence reference")}</span>
                 <input
+                  className="ui-input"
                   value={evidenceUri}
                   disabled={tx.pending}
                   onChange={(e) => setEvidenceUri(e.target.value)}
                   placeholder="ar://…"
                 />
               </label>
-              <label>
-                {t("Exact evidence file")}
+              <label className="ui-field">
+                <span>{t("Exact evidence file")}</span>
                 <input
+                  className="ui-input"
                   type="file"
                   disabled={tx.pending}
                   onChange={(e) => {
@@ -453,7 +468,7 @@ export function ClubMarket({
               </label>
               <button
                 type="button"
-                className="primary-button"
+                className="ui-btn ui-btn-primary"
                 disabled={tx.pending || !evidenceUri || !evidenceHash}
                 onClick={() =>
                   void tx.run(async (p, signer) => [
@@ -479,7 +494,7 @@ export function ClubMarket({
         </section>
         <ClubFeedback issue={tx.issue} signature={tx.signature} />
       </div>
-      <p className="rules-help">
+      <p className="club-muted club-market-foot">
         {t("Collateral reserve")}: {readableAmount(m.backingReserve, decimals)}{" "}
         {symbol} · {t(clubRoleText(clubRole(snapshot.club, me)))}
       </p>
@@ -507,8 +522,8 @@ function Shell({
   return (
     <div className="app-shell">
       <AppHeader />
-      <main className="route-shell prediction-detail-route">
-        <Link className="text-button" href={`/clubs/${clubAddress}`}>
+      <main className="route-shell prediction-detail-route club-page">
+        <Link className="club-back" href={`/clubs/${clubAddress}`}>
           {t("← Club")}
         </Link>
         {children}

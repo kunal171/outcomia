@@ -53,22 +53,24 @@ export function ClubFeedback({
 }): ReactNode {
   const { t } = useI18n();
   return (
-    <>
+    <div className="club-feedback" aria-live="polite">
       {issue && (
-        <p className="access-denied" role="alert">
+        <p className="ui-notice" role="alert">
           {t(issue)}
         </p>
       )}
       {signature && (
-        <a
-          href={transactionExplorerUrl(signature)}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {t("View transaction ↗")}
-        </a>
+        <p className="ui-notice">
+          <a
+            href={transactionExplorerUrl(signature)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t("View transaction ↗")}
+          </a>
+        </p>
       )}
-    </>
+    </div>
   );
 }
 
