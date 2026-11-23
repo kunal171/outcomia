@@ -1247,7 +1247,6 @@
   "Proposed": "Propuesto",
   "Connect a Solana wallet": "Conecta una billetera de Solana",
   "Connect a Canton wallet": "Conecta una billetera de Canton",
-  "Explore multi-outcome markets →": "Explorar mercados de varios resultados →",
   "Club listing": "Ficha del club",
   "Join club": "Unirse al club",
   "Request pending": "Solicitud pendiente",
@@ -1297,5 +1296,8 @@
   "You already claimed recently. Try again in {minutes} min.": "Ya reclamaste hace poco. Inténtalo de nuevo en {minutes} min.",
   "The faucet could not complete this claim": "El faucet no pudo completar este reclamo",
   "Total to spend ({value0})": "Total a gastar ({value0})",
-  "Total to receive ({value0})": "Total a recibir ({value0})"
+  "Total to receive ({value0})": "Total a recibir ({value0})",
+  "Outcomes": "Resultados",
+  "{count} outcomes": "{count} resultados",
+  "View all \u2192": "Ver todos →"
 }

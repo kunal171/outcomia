@@ -1247,7 +1247,6 @@
   "Proposed": "प्रस्तावित",
   "Connect a Solana wallet": "Solana वॉलेट कनेक्ट करें",
   "Connect a Canton wallet": "Canton वॉलेट कनेक्ट करें",
-  "Explore multi-outcome markets →": "मल्टी-आउटकम मार्केट देखें →",
   "Club listing": "क्लब लिस्टिंग",
   "Join club": "क्लब से जुड़ें",
   "Request pending": "अनुरोध लंबित",
@@ -1297,5 +1296,8 @@
   "You already claimed recently. Try again in {minutes} min.": "आपने हाल ही में क्लेम किया है। {minutes} मिनट बाद फिर से प्रयास करें।",
   "The faucet could not complete this claim": "फ़ॉसेट यह क्लेम पूरा नहीं कर सका",
   "Total to spend ({value0})": "कुल खर्च ({value0})",
-  "Total to receive ({value0})": "कुल प्राप्ति ({value0})"
+  "Total to receive ({value0})": "कुल प्राप्ति ({value0})",
+  "Outcomes": "परिणाम",
+  "{count} outcomes": "{count} परिणाम",
+  "View all \u2192": "सभी देखें →"
 }
