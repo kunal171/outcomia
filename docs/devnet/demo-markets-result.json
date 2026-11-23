@@ -1,7 +1,7 @@
 {
   "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
   "startedAt": "2026-11-23T07:59:09.154Z",
-  "rulesRef": "daa55bba542590047bb80d210896034b8d0fb493",
+  "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15",
   "markets": {
     "btc-80k-before-christmas": {
       "kind": "binary",
@@ -81,6 +81,36 @@
       "kind": "multi",
       "name": "NBA best record on 31 December",
       "address": "ABuyzqheVr7kWFUFzLHMkqUMLyZpyivp5cSjUg7MYFGF"
+    },
+    "sol-price-end-2026": {
+      "kind": "multi",
+      "name": "Solana price on 31 December 2026",
+      "address": "2r8bwRmphi8aqKjdRWb1aqJgxXf51xrjjvMBmdoKUMxt",
+      "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15"
+    },
+    "best-crypto-december-2026": {
+      "kind": "multi",
+      "name": "Best December return: BTC, ETH or SOL?",
+      "address": "7ynpmc4Lz4uKwPExGWUhuBQpg3pCuWdNQFZuL9pa7dZX",
+      "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15"
+    },
+    "bills-regular-season-wins": {
+      "kind": "multi",
+      "name": "Bills regular-season wins",
+      "address": "DEnjQHsj3WbNd1pgG335KeCur8avWXwiV5Sk9wZBjXj8",
+      "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15"
+    },
+    "liverpool-place-christmas": {
+      "kind": "multi",
+      "name": "Liverpool's place at Christmas",
+      "address": "5f6TZWaRpfVPjKytdoj7BpM7wT7UCbLKC39Twmt1KCn5",
+      "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15"
+    },
+    "arsenal-city-total-goals": {
+      "kind": "multi",
+      "name": "Arsenal vs Man City total goals",
+      "address": "5R9pCpjknXGxcwbDjXLwsaYGMNwZdwytud71pep6u8Xe",
+      "rulesRef": "e7fe6909f8699a12c0ecc5bf34abc471c894fa15"
     }
   },
   "steps": [
@@ -936,6 +966,318 @@
     {
       "label": "nba-best-record-new-year: taker buys Spurs 0.34",
       "signature": "5Vte3QvLSQwcy9x9PM9xb8nRDjiu1pJgQfaSb53pq3P6Dm8NR2zsN6P8suZHY8pHEGBi78yhCfy63kbSTxkePMNT"
+    },
+    {
+      "label": "sol-price-end-2026: create",
+      "signature": "3iknAZLANmzAozbcQ8AEeEkaAWojRVvcBW837itxP8PvkS4q5vdLVoZsuazM55cEr5UZHqKJAypJGwQC5dUHmhfB"
+    },
+    {
+      "label": "sol-price-end-2026: open with book",
+      "signature": "4MXFnwyvTQzK7kCeTJQyvBmtw7bjQGboaHNZqbZTnfBref6GFrumcnvcCktKcAot8mgLZ49hqHfk1BRn7irgZ7bp"
+    },
+    {
+      "label": "sol-price-end-2026: position 0",
+      "signature": "2j5wdVYFqjUrS5DEC1TN9RwUnzttpmpgRCkRRp5Jebpzs5CtzFoNsTicL62QDHLTmKB9UotC8V4X9nzVFmmYW34W"
+    },
+    {
+      "label": "sol-price-end-2026: position 1",
+      "signature": "5p8Tm89ws7UognFvRNyqG3SPsiWfh3jo3qeYr9i9ngoiZ7tScrPq1voLBhGVUjNMGF1EZkCiAWdKMDuG98t1BjgX"
+    },
+    {
+      "label": "sol-price-end-2026: position 2",
+      "signature": "4APzTV1F1RD9PPzAi2ySg6QRaiQ2nRr9x39BfHg4BZudHTbX9QhHEAxqbphdML5tDV2AB4BnBaJu31phSjaPAi9K"
+    },
+    {
+      "label": "sol-price-end-2026: position 3",
+      "signature": "4VtoXQRQr3SHu6Pt9V9cTXBBCscmNYfpYYQYHiCyz3sJN6ymwwEukHR8ydNvaz2WqTfvkZ9QsQ7b8zxCU71kJ2t2"
+    },
+    {
+      "label": "sol-price-end-2026: position 4",
+      "signature": "4DcmneT3M62kr4dLVC6ivRmW9PqoE3DNZWwY6PpwQBgnhuZyLLAwgNPXyoiENyotgrxQdU2xQ6fUFkhCfB45qgsW"
+    },
+    {
+      "label": "sol-price-end-2026: bid Below $50 0.13",
+      "signature": "4TZwSpzckLgbGm4wyK6oeydzoVK8Quctsf59Cx8njbx8UaGv2NLKJQqznJHazkbw47N42Wi3gMjXkHz5fmNj56by"
+    },
+    {
+      "label": "sol-price-end-2026: bid Below $50 0.10",
+      "signature": "NsZ58zPNas6Zi5xKnduPFjvPSW6PhHbdNWj86BDCfkPDsbw2txStUbHsn67W8RcDasQoEJ2pEV8i5eQ7B4VGGRA"
+    },
+    {
+      "label": "sol-price-end-2026: bid $50-$70 0.38",
+      "signature": "2pmuewe7ALBsybgeNFDHvANi1jBoDAcfKbWUL1EyyLcD141wAjFpAemesTGRtYv7K3dDQbMYWEa2K97g7GascVr7"
+    },
+    {
+      "label": "sol-price-end-2026: bid $50-$70 0.35",
+      "signature": "UhAtfAcHvbq7Mpy2LrLrC8r5E3tfJgoYes9LjB7LyJ3BV7MJoUB8F7CKgLUAzWUyaAeqNd4D8Y5PSg4j9rtgPqh"
+    },
+    {
+      "label": "sol-price-end-2026: bid $70-$90 0.31",
+      "signature": "4dftJNjE5AQ9LQ9ihLeETwJGjKGZ6Tkm4Ehjmcn2hoCy7PifbnYTngZDwALZrvGFpX8kSbvtE5VqRM5t1Qc4qyyZ"
+    },
+    {
+      "label": "sol-price-end-2026: bid $70-$90 0.28",
+      "signature": "Zh9U5HdmjRi3H9TrGx5wPy7q7ELZq1oFJk1GKWP4YdYxodnvYNxafFLzJPQAuZ4JKmWgtWek8GAvHSP6oLu5kFM"
+    },
+    {
+      "label": "sol-price-end-2026: bid Above $90 0.10",
+      "signature": "2ijP3u8JedcGrm11jV7aiUBee5eUKeKtg97GKLoqi3QdQxm6Ue2x2acVyhdAUCqcXhhCxVspSgPHcKU2RuCabFfn"
+    },
+    {
+      "label": "sol-price-end-2026: bid Above $90 0.07",
+      "signature": "dsTxg7tKQVL1DXZihcxBTRmBS2MYWzZPbdJKjPTtBh2QzfknfLNaQRABhXkfW6AFbEbZ6gZo8rsPSmMjd2WCWWw"
+    },
+    {
+      "label": "sol-price-end-2026: taker buys $50-$70 0.47",
+      "signature": "5GaRjDGMbUHqwceu392btnEN9Vqe3Cuaas1dkatKMWNVr8eWW8gsGu1TYB3dgDKRUBKmGQauV8rZC2Uvpo5GrQS4"
+    },
+    {
+      "label": "best-crypto-december-2026: create",
+      "signature": "5sBqHCsAp1uURcxwTA4jMD1y6Cz2X2TVFGfvgsbZASc5GngJYXXUW27wc9otEjsWbyfPMSCBYJ79LYUDw518H9ED"
+    },
+    {
+      "label": "best-crypto-december-2026: open with book",
+      "signature": "3UUCNWUkH62niXrWkRGqF8PRL5u4Q5VH9vRU9EpkWUnHEdEyB8iEEbznEoaaZUfTntGiP59fXjQdSbwUZM14CCjF"
+    },
+    {
+      "label": "best-crypto-december-2026: position 0",
+      "signature": "EtR9pMHgV1z2gdTykrkBfNhhVNr4eUoisYyLrJHFEKR1QMnDAKYDVyash4a7yXVHdbWgB5AF9Lwaowiouepo8X1"
+    },
+    {
+      "label": "best-crypto-december-2026: position 1",
+      "signature": "4gemHtyMNu7T7eusYBQeeDapxWFGj49HRWqScuABsSvu2D44zfDshCH6PNNTNdutyfmoyETfHy1BWWMmGGUtngrW"
+    },
+    {
+      "label": "best-crypto-december-2026: position 2",
+      "signature": "BpTzieeZovMmfiMuprYW6CZfAgpMKRjxdknCUJdimzN3CK9fNnnXrZTgvP4A4LvJdhSpDE9fbVkMH9rU8Wkd7st"
+    },
+    {
+      "label": "best-crypto-december-2026: position 3",
+      "signature": "4JKYF3h5cKaVYU1dVGfoz2UEtDQznCUUBEotYSa3yVQqnHVnbnVR8kR9RUaVGV3ttP9Nb6NZoEkovTi6HweVJ94j"
+    },
+    {
+      "label": "best-crypto-december-2026: position 4",
+      "signature": "3h5Dz2eD2hYoQJzGEY2aeM1L1YxQzB82AM2QuPCdCNp8vRQFzuSmeUFdjfr6uFmFBUArQJEEZQTW3yNWJpsKJJs4"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Bitcoin 0.34",
+      "signature": "4DBUkF7KuRpSReMEnwFZPGLR76eQtjf7ywQVyVvUMGHWgw12PWdr9pLs5tfgRqyMyHX3vk83j6yH3B8ctWqDtUN3"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Bitcoin 0.31",
+      "signature": "4zRaWLFqstc7iUqFjjHo6z56DF8jPqUwXn3a43P5mxQ3WPXLBwJZLshVJLzn915AWRUUdkFuS5JATNjQdJ2FzGKm"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Ethereum 0.29",
+      "signature": "5n8Zgvxq8sNqxSMEkgMxyHKX65EXyDS4QpwPmK4Z81UJqSfgvrS4mLpHMH7sUjbs353PZ8KiNPHLDEAkMS1cDGRs"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Ethereum 0.26",
+      "signature": "5RuXh5itRUx4E6eDvBc7xFZLQbJNkDwP94uYd91mY7aWooima5fiPNSmoSJ3qeHchbWuxj9HueBob4yMTuikt2Re"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Solana 0.31",
+      "signature": "3CAoKbj6A2YmQzW5bq9BkD2gfpXbMm7KKHXzNsUQL6Fp2ia2D8t4wSTyetV2oqDeEArEK4TDfaRVEXnAXW7cPBgq"
+    },
+    {
+      "label": "best-crypto-december-2026: bid Solana 0.28",
+      "signature": "3T4FujDLDGnjunQTbKTsYtz2QYCk1vUBnVPVDNethtHbjfQVYvDH6fFqGF5NdvZNvn5regkWzauuorTUNiaArDDE"
+    },
+    {
+      "label": "best-crypto-december-2026: taker buys Bitcoin 0.41",
+      "signature": "3KUascra8S3U5FZX4XiPAw2FsyDC7qTyaHp5Js5AUDTtq7ZviREUBoHk2EPfEnt3LSUVBdf1n5BQN84TnxVDYc8u"
+    },
+    {
+      "label": "bills-regular-season-wins: create",
+      "signature": "8dd6ncBb36yEhvTN8XzJxwqG4bwqgEqgJfugEAYNR4AbTiiNUt4YuvVtVNQxhXuu5H8vsAShts4N63ivVRSiSJz"
+    },
+    {
+      "label": "bills-regular-season-wins: open with book",
+      "signature": "mEh1LHpfSyoBGUJmdbnW9hiCNrTv7zpuhC8HG6aAFsoYzwvzpN74m68vYwLyp81Dzmq8vW8XJ5PU2erKr8LAdMu"
+    },
+    {
+      "label": "bills-regular-season-wins: position 0",
+      "signature": "39F54v7gvCdBK27aX8MLNQeyq5ufqXESJ7mNt3WRumPok8cpmRFvEEsYkpRpjG46Az7z9iZw4po7VWbEHCAEAsV9"
+    },
+    {
+      "label": "bills-regular-season-wins: position 1",
+      "signature": "2UiVyNfkbzRRd8D6GPFGCn57Cc3VnBZq7fhFtih44zxsm8b4RMrzphHzk7dr51VWnYkLriRo7vhvL3R3QHS4JHbN"
+    },
+    {
+      "label": "bills-regular-season-wins: position 2",
+      "signature": "31v1So3XjSte8sgRcthbdehumA4HinuLi58DzB6gcGhfvcw8d3JHu6XAbXgkFbrRBt1F6q8ZLtq4wq7c2Rf1mtj"
+    },
+    {
+      "label": "bills-regular-season-wins: position 3",
+      "signature": "3ftVZ59A83Ky9oUSCRjEzjKuwFwDA3CtaZJZqdjxHLhTn3bo6aPUwPSeQXjPVd4xqXSeL5KkLTLLzLh5ZV6AbSRP"
+    },
+    {
+      "label": "bills-regular-season-wins: position 4",
+      "signature": "2cG53RkJKv2WDQbUmsA3DJTMVgU9vpRMrakvhu2zcFQNCZWS5jMwP3y4KQgbphYEjrFk2QwfRycAqYDTGSYe2Jv7"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 12 or fewer 0.18",
+      "signature": "482EeG3pU8E9uW9ivTqMvtJDeNgcCc4nKMs7Xm7KxbfoPBvrPDLYQQjzie5FHvjpFbuHTLadRSETJkVx67HyqVvR"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 12 or fewer 0.15",
+      "signature": "8GeUvxNrjKk8Pn6Skc51bb5hBD6SDgC8V1p5pZJXm6D5WubzfcEYyi3B4ebpYKHWQ2LV6YpZRLDVRm8orLRTURR"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 13 wins 0.23",
+      "signature": "4MU6H2uJ83rUpo6VmkUzQkQySN6hQCZBG8gjHGkMnGvEc6Q7GVCbZsKWeG45vL59hugabiYHgi75F7WafWoiBYod"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 13 wins 0.20",
+      "signature": "57jre5vbxLAyuiP2Fn9BcGb5gMP2ieTuw8bhWUShqmwBrMJngH7kANEbN8akyftwcdVgcs5vHiSUvtrvw5e7sRBM"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 14 wins 0.25",
+      "signature": "28a1hkjSQU596LsVq7Yt2GLH3m8YoRA5b1kuXci4BpFdCQwC2YdzmVLyTWWf3psxcZnQ3Af9XuTywYGMazsVpo3C"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 14 wins 0.22",
+      "signature": "3i4Vs3FCsdE2cbpPN4ni7yiwY8bBrdQ4NB58g8koZPzKVboCSMz5Ai32scRsxwcG9bnG1xZXnm4HZ1ztrrzkcake"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 15 or more 0.26",
+      "signature": "5XnnuKZV9P4XfyqKrMP5FiDHmWCPnSdUV1Jg7JojmXHPW2jbk3RaNPkUzFqLh5fBzbTemK1oVHiAvN6wNcf4dWAS"
+    },
+    {
+      "label": "bills-regular-season-wins: bid 15 or more 0.23",
+      "signature": "4AeEAtaSi2ZykXfQzHwF756PK8Zqu4DDsEwGS2neu2Ttxpzkutqx8mWreLCKwE1QCAK7ZH2E9vUkcWEn421od5An"
+    },
+    {
+      "label": "bills-regular-season-wins: taker buys 15 or more 0.35",
+      "signature": "3c3V4NygjBT8fuQU9uPHpTPoTgrPkPDpPRed74A3nxGELNjBkyNCpTWkmFsFMXm8WSLZyYjTZQ4q3QyAnq9iHXQF"
+    },
+    {
+      "label": "liverpool-place-christmas: create",
+      "signature": "21B6WMUq7zp1AcAYBu8o62r9fnxiYvXbupKiCisnhiPVNzTWc6PKjJ7wa4bsFFkXVJvjJNuornDtkiLzTLDwKPR9"
+    },
+    {
+      "label": "liverpool-place-christmas: open with book",
+      "signature": "4crFrjeg7zesVdLa5r1sKavCWbTnPpXPh5PKhMM99RZZVabJJFx5ypZjSDMueJnRQN2EjwUfVz8m68xS5DuX7XLx"
+    },
+    {
+      "label": "liverpool-place-christmas: position 0",
+      "signature": "5AEoChsmw6X1G5cpaiAuSiaJUSs55Ao36SURjvjxg5HKDKP59J1sJmyfEBMUbeXV4fDoXhX77RXpKxgK4RMu3ogh"
+    },
+    {
+      "label": "liverpool-place-christmas: position 1",
+      "signature": "5w8JuoXVG3Vv4drx4h7aCravwSSZDyNUHbdMyzyy5e7e4NeQXcbwSarpr5LCXdFix8FEpSdJ6gY57x9LXPbH3ntN"
+    },
+    {
+      "label": "liverpool-place-christmas: position 2",
+      "signature": "4FC718o9eDumD3e18VqsaAhRQzW42TgpL1vgpE64tqseBnQdqNJ8gd4sxge9jenQ5fG2PeCDBfLNuVZVPoxFeb4J"
+    },
+    {
+      "label": "liverpool-place-christmas: position 3",
+      "signature": "3yGsMN71W6J2Tky9oxTAQBgxtTyWqVBq5VatC4QPGDX1JZ99TuHXjy8Ys7CL9b5hqemoC45ecDpPFAieLuTMQSXR"
+    },
+    {
+      "label": "liverpool-place-christmas: position 4",
+      "signature": "4pf3GneEJfiaHwRPgB3t5CvJooLGxzWLkMbyvrb5GWC5wEu4wUgwcpUwfyrUuHFtUKRHdcGVcbJhUimDeeNEruQn"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 1st-2nd 0.10",
+      "signature": "5fwjEr9ZyzYta1TqgHYbu2vJrawLipbDpbveL7yc77646SUfsad7TUtFHrk1h6ZBZANSCNkKfHWH5Zhj9B5Fn4fK"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 1st-2nd 0.07",
+      "signature": "2ntU7xi8w9d2Roz2PHtHqTdAbu9EG46YiaHKKdWx2sQodVGJ2xGkkDe8ZsfcawvMxy5fof2u4pBihNKK2NJ84ztr"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 3rd-4th 0.36",
+      "signature": "2Lr9H7DUgtnx5TGLTctxG66wbH9j5B8rwiGDTyZVe8B6t5trC4yhpQakdav8gjawhiNZJan59wmUup5tZsuNiSDM"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 3rd-4th 0.33",
+      "signature": "2fzqpwk2mAHMELUmtDnd7UU1qtESzrqcEjze474zFFy4KX2TRbZ4tvURsfUTX1w2JJw5Cxjhmo2ockafiSeKeV2Q"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 5th-8th 0.36",
+      "signature": "5UU1c2CYxxVBvWjymRvDBzVUY3vsuqSv1cwyRhgs6eK8PKciUL8PT44Zvrv855viABsrz5miHNvN2meRp7CKfQSk"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 5th-8th 0.33",
+      "signature": "5HYFxbWVaXyXsAtWYtLLeVUGQmgQZsUBGSpoQcWdhvkDvh3AE68YbopQms67Yo4KMHs7sBiv4pfCM6yHjaSLKt9e"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 9th or lower 0.10",
+      "signature": "66rjDeNmgnwF8yPSXyuv9AotB3dNvtFgLQ9xVY7cVCwdbmfLNwZJbfLW7GPHAWkyrMMHC6mRfLV4KqfVJakvkaHV"
+    },
+    {
+      "label": "liverpool-place-christmas: bid 9th or lower 0.07",
+      "signature": "5Wrd9bheUFbk8GbR7LfPpACCRrWHBA1NVpti8kWbXLz4FJEjkwWQrXibt6ANJR9ZtVdtF484xoRUU78hCzjdR3b7"
+    },
+    {
+      "label": "liverpool-place-christmas: taker buys 3rd-4th 0.45",
+      "signature": "AMfo44NdeFENE39UJuvJ3kWJ7tAEkgwois1Bz7xfEJZ5E7SHnaGdu55KCCTvpiNBFt1abCfR4jZy68ZjNWZ6EJq"
+    },
+    {
+      "label": "arsenal-city-total-goals: create",
+      "signature": "2fL6KUB5xNWhThLsLLgbwCdKmUroiWWfk3nARtFnPoX9s7rxBxbWzBwgmYJ4P21fTSQVxWk9acAJSfaDEnCYPGT5"
+    },
+    {
+      "label": "arsenal-city-total-goals: open with book",
+      "signature": "3u9BGZD7qbhDE9mYbCAfw8W4RJyPy5HKNr9w6JCU3UDtSyvnNVF3qwSwvr1oJRcXQ2vc6uWEaowV6fBnY38YGt21"
+    },
+    {
+      "label": "arsenal-city-total-goals: position 0",
+      "signature": "2hsCoQzSoajJ3D1W1xR7G4YaP4YRoHE4JBrco2SUJmfrLncTpD81S4usuZdGQVz69p7s6APpQaBPo2NdrmTPhNSA"
+    },
+    {
+      "label": "arsenal-city-total-goals: position 1",
+      "signature": "u9R2TK3Y9nEJfrFeowFq19nbaZYdftY52UuhWs1XkaCJUzSwaHkUqjbxy929B57LnfK8MJmXSgnrpF4UT9kc8yw"
+    },
+    {
+      "label": "arsenal-city-total-goals: position 2",
+      "signature": "5tyHCjPrd4EZRumCNVkYgk2FFWZ8F1GXW5Fwz5Fn4187vEUCeewn7HbHWAm9UKFnh7MqT8jw4LC2NoYc2FHAzBAV"
+    },
+    {
+      "label": "arsenal-city-total-goals: position 3",
+      "signature": "26h1PDyuyyBpAUnpBgr4VZVnwcy1hdE2FD7DQt11zW5uzBpU1LNjTrFJYq3AjX4qewbkPpWtwkt2Er3UFhnQzx8w"
+    },
+    {
+      "label": "arsenal-city-total-goals: position 4",
+      "signature": "5YXB2E6Hs5x52TntYgFyW39rYUxNt7wb58joEQeu1BrKVWu7AaJavQJt8i5SpDuaG3LdvbnGinbaqmQGGfwVwC3U"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 0-1 goals 0.23",
+      "signature": "2f6JEjeEdsTpmpiboqGuKFgGFZTNNNhW1wUQnqwPHn6KGw1nMijbuxo6JZCJypq4Y3VLKEWxs3eiSgsAcWfANHLX"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 0-1 goals 0.20",
+      "signature": "5s8yR5QeM4H7U73eKoA9zus3fGqgFnT5NFVLMDnVnSLosaBwJJSAekVSHrgsVrYg7EeHBUryCdhEmyDhxGChx8XA"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 2 goals 0.26",
+      "signature": "2paV5g9mMBPHbjiUr3hK1bAe1wQAGUSEcwkrTqvy1SuKb2cieCw8YWgmqZsgjmv7TGG3JLFXUze31dAWnkfNEw5w"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 2 goals 0.23",
+      "signature": "2cUJgdgcvRigV8e5Xk2NGm5Sf4NbvGbtBvEsb44LA1vAZNJ5c9opw11KCNDqcgSB81WNDEhyNGxAesc4onk1vdoa"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 3 goals 0.22",
+      "signature": "2H24716qEvkLFbK7RvezvdjHJ7hW9e77o3B8nUujNeimx1mfpSQjpb5E5dmZ8e7TvvQwpsUw24mQfo2F6uZTtXMw"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 3 goals 0.19",
+      "signature": "4pSM8ymrv5B4NDUkBTtxwGxX5N5bEdUPYJyQcCAMT8xgSucaqEa76pqUn6K1XM4ahszuSPpoSEhpGk8cbSzBsEbh"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 4+ goals 0.21",
+      "signature": "62s9iu29y6yXKPp9KPbnetD3QEuwPai5BMNaFTe6meLwj6MdsVvivccSaMRf5oJHyxs8EVYJntJixGiRWLVNwUb3"
+    },
+    {
+      "label": "arsenal-city-total-goals: bid 4+ goals 0.18",
+      "signature": "Jcwd5mSbJWxd8hVJQfuWXVPsU91Bk38fM6dTFM47utDqnoxkTMKVFcMEG7zpYfDkjUPDgqGWh1wvNbnkfpnUZKA"
+    },
+    {
+      "label": "arsenal-city-total-goals: taker buys 2 goals 0.35",
+      "signature": "3nr3TyZcttBDkwvtAWg2sTL9wvwjsJrMWkubCTS5EjBuVAg92nc8v4fLUgGRwKNJfYcv2HpmHRoECCDo3HFw2KdB"
     }
   ],
   "wallets": {
@@ -948,5 +1290,5 @@
     "taker": "DLYeY9ZekX5DkKPfa1gvxWir6Dmogrp9tm9KtGfpCLvD"
   },
   "collateralMint": "FUU2RPtv519UtUD2apwBRUM8BT2x2Kew71AxRRLMCAbd",
-  "finishedAt": "2026-11-23T08:08:35.709Z"
+  "finishedAt": "2026-11-23T12:06:51.203Z"
 }

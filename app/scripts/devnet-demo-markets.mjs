@@ -303,6 +303,95 @@ const multi = [
     resolve: "2027-01-01T12:00:00Z",
     p: [0.26, 0.27, 0.22, 0.25],
   },
+  // Second multi-outcome slate (added 23 November 2026).
+  {
+    slug: "sol-price-end-2026",
+    name: "Solana price on 31 December 2026",
+    question:
+      "Which range will Solana's CoinGecko daily close for 31 December 2026 fall in?",
+    description: "SOL traded near $70 on 23 November 2026.",
+    source: CRYPTO,
+    outcomes: [
+      ["Below $50", "Daily close below $50.00."],
+      ["$50-$70", "Daily close from $50.00 up to and including $70.00."],
+      ["$70-$90", "Daily close above $70.00 up to and including $90.00."],
+      ["Above $90", "Daily close above $90.00."],
+    ],
+    close: "2026-12-31T22:00:00Z",
+    resolve: "2027-01-01T01:00:00Z",
+    p: [0.15, 0.4, 0.33, 0.12],
+  },
+  {
+    slug: "best-crypto-december-2026",
+    name: "Best December return: BTC, ETH or SOL?",
+    question:
+      "Which of Bitcoin, Ethereum and Solana will have the highest percentage change from its 30 November 2026 to its 31 December 2026 CoinGecko daily close?",
+    description:
+      "BTC near $61,000, ETH near $1,820 and SOL near $70 on 23 November 2026.",
+    source: CRYPTO,
+    outcomes: [
+      ["Bitcoin", "BTC has the highest percentage change."],
+      ["Ethereum", "ETH has the highest percentage change."],
+      ["Solana", "SOL has the highest percentage change."],
+    ],
+    close: "2026-12-31T22:00:00Z",
+    resolve: "2027-01-01T01:00:00Z",
+    p: [0.36, 0.31, 0.33],
+  },
+  {
+    slug: "bills-regular-season-wins",
+    name: "Bills regular-season wins",
+    question:
+      "How many regular-season games will the Buffalo Bills win in the 2026 NFL season?",
+    description:
+      "The Bills were 9-1 in late November 2026 with seven games left.",
+    source:
+      "Official NFL standings at nfl.com after the final regular-season week.",
+    outcomes: [
+      ["12 or fewer", "The Bills finish with 12 or fewer wins."],
+      ["13 wins", "The Bills finish with exactly 13 wins."],
+      ["14 wins", "The Bills finish with exactly 14 wins."],
+      ["15 or more", "The Bills finish with 15 or more wins."],
+    ],
+    close: "2027-01-09T17:00:00Z",
+    resolve: "2027-01-11T12:00:00Z",
+    p: [0.2, 0.25, 0.27, 0.28],
+  },
+  {
+    slug: "liverpool-place-christmas",
+    name: "Liverpool's place at Christmas",
+    question:
+      "Where will Liverpool be in the Premier League table on 25 December 2026 at 12:00 UTC?",
+    description:
+      "Liverpool had 21 points after 11 matches, seven behind leaders Arsenal.",
+    source: "Official Premier League table at premierleague.com.",
+    outcomes: [
+      ["1st-2nd", "Liverpool are first or second."],
+      ["3rd-4th", "Liverpool are third or fourth."],
+      ["5th-8th", "Liverpool are fifth to eighth."],
+      ["9th or lower", "Liverpool are ninth or lower."],
+    ],
+    close: "2026-12-24T23:59:00Z",
+    resolve: "2026-12-25T12:30:00Z",
+    p: [0.12, 0.38, 0.38, 0.12],
+  },
+  {
+    slug: "arsenal-city-total-goals",
+    name: "Arsenal vs Man City total goals",
+    question:
+      "How many goals will be scored in Arsenal vs Manchester City in the Premier League on 28 November 2026?",
+    description: "Total goals in regulation time, including stoppage time.",
+    source: "Official Premier League match result at premierleague.com.",
+    outcomes: [
+      ["0-1 goals", "Zero or one goal is scored."],
+      ["2 goals", "Exactly two goals are scored."],
+      ["3 goals", "Exactly three goals are scored."],
+      ["4+ goals", "Four or more goals are scored."],
+    ],
+    close: "2026-11-28T12:00:00Z",
+    resolve: "2026-11-28T21:00:00Z",
+    p: [0.25, 0.28, 0.24, 0.23],
+  },
 ];
 // Ties at the top of an outcome-based market resolve to the outcome listed first.
 const TIE_RULE =
@@ -722,7 +811,9 @@ async function seed() {
           quantityLot: new BN(lot),
         },
         d.name,
-        "USDC",
+        // The first five multi-outcome markets were created as "USDC" and are
+        // relabelled in the app (lib/collateral-display.ts).
+        "outcomia-tUSDC",
       );
       for (const [i, tx] of plan.uploads.entries())
         await send(`${d.slug}: stage terms ${i + 1}`, tx, [admin]);
@@ -731,6 +822,7 @@ async function seed() {
         await send(`${d.slug}: close staged terms`, plan.cleanup, [admin]);
       market = plan.market;
       rec.address = market.toBase58();
+      rec.rulesRef = ref;
       save();
     }
     await send(

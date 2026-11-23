@@ -1247,7 +1247,6 @@
   "Proposed": "Proposto",
   "Connect a Solana wallet": "Conectar uma carteira Solana",
   "Connect a Canton wallet": "Conectar uma carteira Canton",
-  "Explore multi-outcome markets →": "Explorar mercados de vários resultados →",
   "Club listing": "Anúncio do clube",
   "Join club": "Entrar no clube",
   "Request pending": "Pedido pendente",
@@ -1298,6 +1297,9 @@
   "The faucet could not complete this claim": "O faucet não conseguiu concluir este resgate",
   "Total to spend ({value0})": "Total a gastar ({value0})",
   "Total to receive ({value0})": "Total a receber ({value0})",
+  "Outcomes": "Resultados",
+  "{count} outcomes": "{count} resultados",
+  "View all \u2192": "Ver todos →",
   "View club": "Ver clube",
   "Manage club": "Gerenciar clube",
   "Market creation": "Criação de mercados"

@@ -25,6 +25,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { PredictionGuide } from "./prediction-guide";
 import { AppHeader } from "./app-header";
+import { MultiOutcomeShelf } from "./multi-outcome/markets";
 import { PredictionPositionPanel } from "./prediction-position";
 import { PredictionLifecycle } from "./prediction-lifecycle";
 import { PredictionBook } from "./prediction-book";
@@ -196,13 +197,6 @@ export function PredictionMarkets({ address }: { address?: string }) {
           </div>
         )}
         {!address && (
-          <p>
-            <Link className="text-button" href="/predictions/multi">
-              {t("Explore multi-outcome markets →")}
-            </Link>
-          </p>
-        )}
-        {!address && (
           <label className="prediction-search">
             {t("Find a market")}
             <input
@@ -218,6 +212,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
             <PredictionGuide />
           </div>
         )}
+        {!address && <MultiOutcomeShelf query={query} />}
         {!address && (
           <div className="market-list-heading">
             <h2>{t("On-chain markets")}</h2>

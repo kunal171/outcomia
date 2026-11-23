@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "question": "How many regular-season games will the Buffalo Bills win in the 2026 NFL season?",
+  "description": "The Bills were 9-1 in late November 2026 with seven games left.",
+  "resolutionSource": "Official NFL standings at nfl.com after the final regular-season week.",
+  "resolutionRules": {
+    "outcomes": [
+      {
+        "label": "12 or fewer",
+        "criteria": "The Bills finish with 12 or fewer wins."
+      },
+      {
+        "label": "13 wins",
+        "criteria": "The Bills finish with exactly 13 wins."
+      },
+      {
+        "label": "14 wins",
+        "criteria": "The Bills finish with exactly 14 wins."
+      },
+      {
+        "label": "15 or more",
+        "criteria": "The Bills finish with 15 or more wins."
+      }
+    ],
+    "invalidRefund": "Each outcome contract refunds an equal share of one collateral token on Invalid; contract quantities must use the configured exact refund lot.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes. If teams or clubs are level, use the official tiebreakers of the named source; if still level, resolve to the first tied outcome in market order."
+  },
+  "closeTimestamp": 1799514000,
+  "earliestResolutionTimestamp": 1799668800,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}
