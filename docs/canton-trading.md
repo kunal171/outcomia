@@ -19,6 +19,16 @@ liquidity as implied rows, e.g. a NO buy at 0.40 appears as "Sell via NO" at
 0.60 on YES. Contract rules: `docs/binary-complementary-matching.md` in
 `outcomia-canton`.
 
+## Departed members' orders
+
+In members-only club markets and invite-only markets, a wallet that leaves
+(or is removed from) the club or list cannot fill its resting orders. On
+Solana anyone may clear them; on Canton other traders cannot see them, so the
+operator panel lists them under "Orders from departed members" with **Clear
+order**. The ledger re-checks the current club or invite list
+(`OrderBook_CancelIneligible`) and returns the funds or contracts to the owner,
+exactly as the owner's own cancel would.
+
 ## Data and wallet boundaries
 
 - `/api/canton/catalog` reads a fixed operator party from the configured JSON
