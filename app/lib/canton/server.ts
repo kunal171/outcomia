@@ -171,6 +171,7 @@ export async function registryContext(
       "split",
       "merge",
       "cancel",
+      "clearDeparted",
       "match",
       "matchComplement",
       "redeem",

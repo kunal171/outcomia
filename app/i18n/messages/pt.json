@@ -1307,5 +1307,8 @@
   "Next →": "Próximo →",
   "Match YES + NO": "Cruzar SIM + NÃO",
   "Buys: mint pairs": "Compras: criar pares",
-  "Sells: merge pairs": "Vendas: fundir pares"
+  "Sells: merge pairs": "Vendas: fundir pares",
+  "Orders from departed members": "Ordens de membros que saíram",
+  "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "Esses titulares não podem mais negociar aqui, então suas ordens não serão executadas. Removê-las devolve os fundos ou contratos a cada titular.",
+  "Clear order": "Remover ordem"
 }

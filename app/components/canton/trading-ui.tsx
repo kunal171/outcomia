@@ -22,7 +22,12 @@ import {
   type RecordValue,
 } from "../../lib/canton/model";
 import { assetRows } from "../../lib/canton/portfolio";
-import { mayCreate, type Intent } from "../../lib/canton/commands";
+import {
+  accessPolicy,
+  excludedBy,
+  mayCreate,
+  type Intent,
+} from "../../lib/canton/commands";
 import { walletError } from "../../lib/console-wallet";
 import { ResolutionPolicy } from "../resolution-policy";
 
@@ -551,6 +556,31 @@ export function MarketDetail({ marketId }: { marketId: string }) {
     (c) =>
       c.kind === "PositionLot" && c.data.owner === party && sameMarket(c, key),
   );
+  // Resting orders whose owners left the club or invite list: they cannot
+  // fill, so the operator clears them (backing returns to the owner).
+  const departed = (() => {
+    if (!operator || !book) return [];
+    try {
+      const access = accessPolicy(
+        [...(s.catalog?.contracts ?? []), ...s.owned],
+        current,
+      );
+      if (!access) return [];
+      const open = new Set(
+        (Array.isArray(book.data.orders) ? book.data.orders : []).map((r) =>
+          text(obj(r).order),
+        ),
+      );
+      return s.owned.filter(
+        (c) =>
+          c.kind === "LimitOrder" &&
+          open.has(c.id) &&
+          excludedBy(access, text(c.data.owner)),
+      );
+    } catch {
+      return [];
+    }
+  })();
   return (
     <TradingFrame
       title={text(terms.question)}
@@ -893,6 +923,31 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                   values: v,
                 })}
               />
+              {departed.length ? (
+                <div className="canton-departed">
+                  <h3>{t("Orders from departed members")}</h3>
+                  <p>
+                    {t(
+                      "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.",
+                    )}
+                  </p>
+                  <ul>
+                    {departed.map((o) => (
+                      <li key={o.id}>
+                        <span className="ui-num">
+                          {t(text(o.data.side) === "Buy" ? "Buy" : "Sell")}{" "}
+                          {t(text(o.data.outcome))} {text(o.data.quantity)} @{" "}
+                          {text(o.data.price)}
+                        </span>
+                        <ActionButton
+                          label="Clear order"
+                          intent={{ action: "clearDeparted", target: o.id }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <p>
                 {t("Earned fees")}: {text(obj(book.data.fees).amount)}
               </p>

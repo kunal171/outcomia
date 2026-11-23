@@ -296,3 +296,47 @@ test("only club-factory markets are club scoped; protocol markets never throw", 
     false,
   );
 });
+
+test("the operator clears orders of wallets that left the club", () => {
+  const order = (id, owner, side) =>
+    c("LimitOrder", id, {
+      key: scopedKey,
+      vault: d.vault,
+      owner,
+      instrument,
+      factory: balance.data.factory,
+      outcome: "Yes",
+      side,
+      price: "0.4",
+      quantity: "2",
+      orderId: id === "carol-bid" ? "1" : "2",
+    });
+  const departed = order("carol-bid", carol, "Buy"),
+    current = order("bob-ask", bob, "Sell");
+  const book = c("OrderBook", "club-book", {
+    key: scopedKey,
+    vault: d.vault,
+    creator: owner,
+    terms,
+    orders: [{ order: "carol-bid" }, { order: "bob-ask" }],
+    fees: { amount: "0", cash: null },
+  });
+  const carolBalance = {
+    ...balance,
+    id: "carol-balance",
+    data: { ...balance.data, owner: carol },
+  };
+  const view = { ...snapshot, contracts: [...snapshot.contracts, book] };
+  const owned = [club, departed, current, carolBalance];
+  const clear = (party, target) =>
+    buildPlan(party, view, owned, { action: "clearDeparted", target });
+  const p = clear(d.operator, "carol-bid");
+  assert.equal(choice(p), "OrderBook_CancelIneligible");
+  assert.equal(p.command.ExerciseCommand.contractId, "club-book");
+  assert.equal(args(p).order, "carol-bid");
+  assert.equal(args(p).policy, "club");
+  assert.equal(args(p).balance, "carol-balance");
+  // Bob is still a member, and only the operator clears.
+  assert.throws(() => clear(d.operator, "bob-ask"), /can still trade/);
+  assert.throws(() => clear(owner, "carol-bid"), /Operator wallet required/);
+});
