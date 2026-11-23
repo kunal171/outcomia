@@ -29,16 +29,18 @@ export function TradingFrame({
   title,
   children,
   tools,
+  level = 1,
 }: {
   title: string;
   children: ReactNode;
   tools?: ReactNode;
+  level?: 1 | 2;
 }) {
   const s = useCantonTrading(),
     { t } = useI18n();
   return (
     <>
-      <CantonPageHeading title={title}>
+      <CantonPageHeading title={title} level={level}>
         <div className="canton-toolbar">
           {tools}
           <button
@@ -275,15 +277,29 @@ export function MarketList() {
             <Link className="canton-market-row" href={marketLink(c)} key={c.id}>
               <h2>{text(terms.question)}</h2>
               <span>
-                {t(
-                  c.kind === "FinalResolution"
-                    ? "Finalized"
-                    : c.kind === "ResolutionProposal"
-                      ? "Review period"
-                      : String(data.status),
-                )}{" "}
-                · {text(obj(terms.collateral).id)}
-                {data.access ? <> · {t("Invite only")}</> : null}
+                <span
+                  className={`ui-badge ${
+                    c.kind === "FinalResolution"
+                      ? ""
+                      : c.kind === "ResolutionProposal"
+                        ? "ui-badge-warn"
+                        : data.status === "Open"
+                          ? "ui-badge-accent"
+                          : ""
+                  }`}
+                >
+                  {t(
+                    c.kind === "FinalResolution"
+                      ? "Finalized"
+                      : c.kind === "ResolutionProposal"
+                        ? "Review period"
+                        : String(data.status),
+                  )}
+                </span>
+                <span className="ui-num">{text(obj(terms.collateral).id)}</span>
+                {data.access ? (
+                  <span className="ui-badge">{t("Invite only")}</span>
+                ) : null}
               </span>
             </Link>
           );
@@ -340,7 +356,9 @@ export function OrdersList() {
             ))}
           </tbody>
         </table>
-        {!orders.length ? <p>{t("No open orders.")}</p> : null}
+        {!orders.length ? (
+          <p className="canton-empty">{t("No open orders.")}</p>
+        ) : null}
       </div>
     </TradingFrame>
   );
@@ -366,19 +384,32 @@ export function PositionsList() {
             yes = lots.reduce((v, c) => v + integer(c.data.yes), BigInt(0)),
             no = lots.reduce((v, c) => v + integer(c.data.no), BigInt(0));
           return (
-            <section className="canton-panel" key={key}>
-              <Link href={`/canton/markets/${marketRouteId(lots[0].data)}`}>
-                {marketLabel(s.catalog?.contracts ?? [], key)}
-              </Link>
-              <p>
-                YES {yes.toString()} · NO {no.toString()}
-              </p>
+            <section className="canton-position" key={key}>
+              <div className="canton-position-main">
+                <Link
+                  className="canton-position-title"
+                  href={`/canton/markets/${marketRouteId(lots[0].data)}`}
+                >
+                  {marketLabel(s.catalog?.contracts ?? [], key)}
+                </Link>
+                <span className="canton-position-holdings">
+                  <span className="ui-badge ui-badge-yes">
+                    YES <span className="ui-num">{yes.toString()}</span>
+                  </span>
+                  <span className="ui-badge ui-badge-no">
+                    NO <span className="ui-num">{no.toString()}</span>
+                  </span>
+                </span>
+              </div>
               {settled ? (
-                <>
-                  <p>
-                    {t("Next claim")}: {claimValue(settled, lots.slice(0, 16))}{" "}
-                    {text(obj(obj(settled.data.terms).collateral).id)}
-                  </p>
+                <div className="canton-position-action">
+                  <span className="ui-stat">
+                    <span>{t("Next claim")}</span>
+                    <strong>
+                      {claimValue(settled, lots.slice(0, 16))}{" "}
+                      {text(obj(obj(settled.data.terms).collateral).id)}
+                    </strong>
+                  </span>
                   <ActionButton
                     label={
                       claimValue(settled, lots.slice(0, 16)) === "0"
@@ -387,14 +418,18 @@ export function PositionsList() {
                     }
                     intent={{ action: "redeem", target: settled.id }}
                   />
-                </>
+                </div>
               ) : (
-                <span>{t("Awaiting final settlement")}</span>
+                <span className="ui-badge">
+                  {t("Awaiting final settlement")}
+                </span>
               )}
             </section>
           );
         })}
-        {!groups.size ? <p>{t("No positions yet.")}</p> : null}
+        {!groups.size ? (
+          <p className="canton-empty">{t("No positions yet.")}</p>
+        ) : null}
       </div>
     </TradingFrame>
   );
@@ -421,18 +456,22 @@ export function Balances() {
     wallet.session?.partyId ?? "",
   );
   return (
-    <TradingFrame title="Trading balances">
-      <div className="canton-grid">
+    <TradingFrame title="Trading balances" level={2}>
+      <div className="canton-balances">
         {rows.map(({ key, instrument, admission, balance }) => {
           return (
-            <section className="canton-panel" key={key}>
-              <h2>{text(instrument.id)}</h2>
-              {balance ? (
-                <>
-                  <p>
-                    {t("Available")}:{" "}
+            <section className="canton-panel canton-balance" key={key}>
+              <header className="canton-balance-head">
+                <h3>{text(instrument.id)}</h3>
+                {balance ? (
+                  <div className="ui-stat">
+                    <span>{t("Available")}</span>
                     <strong>{text(balance.data.available)}</strong>
-                  </p>
+                  </div>
+                ) : null}
+              </header>
+              {balance ? (
+                <div className="canton-balance-actions">
                   <ActionForm
                     label="Deposit"
                     disabled={!admission}
@@ -453,7 +492,7 @@ export function Balances() {
                       values: v,
                     })}
                   />
-                </>
+                </div>
               ) : admission ? (
                 <ActionButton
                   label="Initialize balance"
@@ -546,8 +585,8 @@ export function MarketDetail({ marketId }: { marketId: string }) {
         )}
       </nav>
       {tab === "Trade" ? (
-        <div className="canton-grid">
-          <section className="canton-panel">
+        <div className="canton-trade">
+          <section className="canton-book">
             <h2>{t("Order book")}</h2>
             <table>
               <thead>
@@ -569,16 +608,22 @@ export function MarketDetail({ marketId }: { marketId: string }) {
                   )
                   .map((q) => (
                     <tr key={q.orderId}>
-                      <td>{t(q.outcome)}</td>
+                      <td>
+                        <span
+                          className={`ui-badge ${q.outcome === "Yes" ? "ui-badge-yes" : "ui-badge-no"}`}
+                        >
+                          {t(q.outcome)}
+                        </span>
+                      </td>
                       <td>{t(q.side === "Buy" ? "Buy" : "Sell")}</td>
-                      <td>{q.price}</td>
-                      <td>{q.quantity}</td>
+                      <td className="ui-num">{q.price}</td>
+                      <td className="ui-num">{q.quantity}</td>
                     </tr>
                   ))}
               </tbody>
             </table>
             {!s.catalog?.quotes.some((q) => q.market === key) ? (
-              <p>{t("No open orders.")}</p>
+              <p className="canton-empty">{t("No open orders.")}</p>
             ) : null}
           </section>
           {book &&
@@ -591,7 +636,7 @@ export function MarketDetail({ marketId }: { marketId: string }) {
               rate={String(policy?.data.takerFeeBps)}
             />
           ) : (
-            <p>{t("Trading closed")}</p>
+            <p className="canton-panel canton-closed">{t("Trading closed")}</p>
           )}
         </div>
       ) : null}
@@ -864,7 +909,7 @@ function OrderEntry({
   } catch {}
   return (
     <form
-      className="canton-panel canton-form"
+      className="canton-panel canton-form canton-ticket"
       onSubmit={(e) => {
         e.preventDefault();
         void s
@@ -884,28 +929,42 @@ function OrderEntry({
       <fieldset
         disabled={s.busy || s.syncing || !s.catalog?.deployment.trading}
       >
-        <label htmlFor={`${id}-side`}>
-          {t("Side")}
-          <select
-            id={`${id}-side`}
-            value={side}
-            onChange={(e) => setSide(e.target.value)}
-          >
-            <option value="buy">{t("Buy")}</option>
-            <option value="sell">{t("Sell")}</option>
-          </select>
-        </label>
-        <label htmlFor={`${id}-outcome`}>
-          {t("Outcome")}
-          <select
-            id={`${id}-outcome`}
-            value={outcome}
-            onChange={(e) => setOutcome(e.target.value)}
-          >
-            <option value="Yes">YES</option>
-            <option value="No">NO</option>
-          </select>
-        </label>
+        <div
+          className="canton-segment canton-segment-outcome"
+          role="radiogroup"
+          aria-label={t("Outcome")}
+        >
+          {["Yes", "No"].map((o) => (
+            <label key={o} data-outcome={o}>
+              <input
+                type="radio"
+                name={`${id}-outcome`}
+                value={o}
+                checked={outcome === o}
+                onChange={() => setOutcome(o)}
+              />
+              <span>{o.toUpperCase()}</span>
+            </label>
+          ))}
+        </div>
+        <div
+          className="canton-segment"
+          role="radiogroup"
+          aria-label={t("Side")}
+        >
+          {(["buy", "sell"] as const).map((v) => (
+            <label key={v}>
+              <input
+                type="radio"
+                name={`${id}-side`}
+                value={v}
+                checked={side === v}
+                onChange={() => setSide(v)}
+              />
+              <span>{t(v === "buy" ? "Buy" : "Sell")}</span>
+            </label>
+          ))}
+        </div>
         <label htmlFor={`${id}-price`}>
           {t("Price")}
           <input
@@ -935,7 +994,12 @@ function OrderEntry({
             {text(obj(terms.collateral).id)} · {t("Fee budget")}: {quote.fee}
           </p>
         ) : null}
-        <button className="canton-action" disabled={!quote} type="submit">
+        <button
+          className="canton-action"
+          data-outcome={outcome}
+          disabled={!quote}
+          type="submit"
+        >
           {t(side === "buy" ? "Buy" : "Sell")} {outcome.toUpperCase()}
         </button>
       </fieldset>

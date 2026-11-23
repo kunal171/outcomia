@@ -188,12 +188,6 @@ function CantonWalletView({ session }: { session: CantonSession }) {
           </div>
         )}
       </section>
-      <section
-        className="canton-funding-unavailable"
-        aria-labelledby="canton-funding-heading"
-      >
-        <h2 id="canton-funding-heading">{t("Outcomia balance")}</h2>
-      </section>
     </>
   );
 }
