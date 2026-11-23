@@ -172,6 +172,7 @@ export async function registryContext(
       "merge",
       "cancel",
       "match",
+      "matchComplement",
       "redeem",
       "withdrawFees",
     ].includes(action) ||

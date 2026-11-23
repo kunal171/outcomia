@@ -10,6 +10,7 @@ import {
   orderQuote,
   raw,
   sameMarket,
+  scale,
   sameInstrument,
   resolverEligible,
   single,
@@ -31,6 +32,7 @@ export type Action =
   | "cancel"
   | "redeem"
   | "match"
+  | "matchComplement"
   | "propose"
   | "fallbackPropose"
   | "correct"
@@ -109,6 +111,7 @@ export function buildPlan(
     cancel: "LimitOrder",
     redeem: "SettledReserve",
     match: "OrderBook",
+    matchComplement: "OrderBook",
     propose: "BinaryMarket",
     fallbackPropose: "BinaryMarket",
     correct: "ResolutionProposal",
@@ -224,6 +227,18 @@ export function buildPlan(
     dependencies.add(c.id);
     return c.id;
   };
+  /** Every indexed order of the target book, from wallet-visible contracts. */
+  const snapshotOrders = () =>
+    list(target.data.orders)
+      .map(obj)
+      .map((ref) => {
+        const o = owned.find(
+          (c) => c.kind === "LimitOrder" && c.id === ref.order,
+        );
+        if (!o) throw new Error("Incomplete matching snapshot. Refresh.");
+        use(o);
+        return o;
+      });
   const currentMarket = () => {
     const m = find("BinaryMarket");
     if (
@@ -435,33 +450,9 @@ export function buildPlan(
       operator();
       if (target.kind !== "OrderBook") throw new Error("Order book required.");
       const outcome = v.outcome === "No" ? "No" : "Yes",
-        refs = list(target.data.orders).map(obj);
-      const orders = refs
-        .map((ref) => {
-          const o = owned.find(
-            (c) => c.kind === "LimitOrder" && c.id === ref.order,
-          );
-          if (!o) throw new Error("Incomplete matching snapshot. Refresh.");
-          use(o);
-          return o;
-        })
-        .filter((o) => o.data.outcome === outcome);
-      const best = (side: string) =>
-        orders
-          .filter((o) => o.data.side === side)
-          .sort((a, b) => {
-            const priceA = raw(a.data.price),
-              priceB = raw(b.data.price);
-            return priceA === priceB
-              ? integer(a.data.orderId) < integer(b.data.orderId)
-                ? -1
-                : 1
-              : (side === "Buy" ? priceA > priceB : priceA < priceB)
-                ? -1
-                : 1;
-          })[0];
-      const buy = best("Buy"),
-        sell = best("Sell");
+        orders = snapshotOrders().filter((o) => o.data.outcome === outcome);
+      const buy = bestOrder(orders, "Buy"),
+        sell = bestOrder(orders, "Sell");
       if (!buy || !sell || raw(buy.data.price) < raw(sell.data.price))
         throw new Error("No crossed orders to match.");
       choice = "OrderBook_MatchBest";
@@ -478,6 +469,38 @@ export function buildPlan(
           find("BinaryMarket"),
           text(sell.data.owner),
         ),
+      };
+      context = true;
+      break;
+    }
+    case "matchComplement": {
+      // Complete-set fill between the YES and NO heads of one side: two buys
+      // mint pairs (prices sum to at least 1), two sells merge them (at most 1).
+      operator();
+      if (target.kind !== "OrderBook") throw new Error("Order book required.");
+      const side = v.side === "Sell" ? "Sell" : "Buy",
+        orders = snapshotOrders().filter((o) => o.data.side === side);
+      const yes = bestOrder(
+          orders.filter((o) => o.data.outcome === "Yes"),
+          side,
+        ),
+        no = bestOrder(
+          orders.filter((o) => o.data.outcome === "No"),
+          side,
+        );
+      const total = yes && no ? raw(yes.data.price) + raw(no.data.price) : null;
+      if (total === null || (side === "Buy" ? total < scale : total > scale))
+        throw new Error("No complementary orders to match.");
+      const market = find("BinaryMarket");
+      choice = "OrderBook_MatchComplement";
+      args = {
+        market: currentMarket(),
+        reserve: use(find("MarketReserve")),
+        side,
+        yesBalance: use(account(text(yes!.data.owner))),
+        noBalance: use(account(text(no!.data.owner))),
+        yesEligibility: eligibilityFor(market, text(yes!.data.owner)),
+        noEligibility: eligibilityFor(market, text(no!.data.owner)),
       };
       context = true;
       break;
@@ -937,4 +960,22 @@ function standardTerms(value: unknown) {
     throw new Error("Quantity lot must be positive.");
   integer(t.resolutionDelaySeconds);
   return t;
+}
+
+/** Best-price, then lowest-acceptance-ID order of one side, as the ledger's
+ * planner selects it. Example: sells at 0.40 (#2) and 0.40 (#1) pick #1. */
+function bestOrder(orders: Contract[], side: string) {
+  return orders
+    .filter((o) => o.data.side === side)
+    .sort((a, b) => {
+      const priceA = raw(a.data.price),
+        priceB = raw(b.data.price);
+      return priceA === priceB
+        ? integer(a.data.orderId) < integer(b.data.orderId)
+          ? -1
+          : 1
+        : (side === "Buy" ? priceA > priceB : priceA < priceB)
+          ? -1
+          : 1;
+    })[0];
 }
