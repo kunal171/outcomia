@@ -24,6 +24,7 @@ const outcomia = {
   deriveVaultAuthorityPda: (m) => derive("vault-authority", m.toBuffer()),
   deriveVaultPda: (m, mint) => derive("vault", m.toBuffer(), mint.toBuffer()),
   deriveMarketMetadataPda: (m) => derive("market_metadata", m.toBuffer()),
+  deriveAdminRecordPda: (a) => derive("admin", a.toBuffer()),
   TOKEN_PROGRAM_ID: new PublicKey(
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   ),
@@ -270,4 +271,73 @@ test("custody passes membership only to members-only splits", async () => {
     true,
   );
   assert(account(publicSplit, "member").equals(programId));
+});
+
+test("public and open club instructions bind listings, requests and memberships", async () => {
+  const club = c.clubPda(id);
+  assert(
+    c.clubListingPda(club).equals(derive("club_listing", club.toBuffer())),
+  );
+  assert(
+    c
+      .clubJoinRequestPda(club, wallet)
+      .equals(derive("club_join_request", club.toBuffer(), wallet.toBuffer())),
+  );
+  const list = await c.setClubListingInstruction(
+    p,
+    owner,
+    club,
+    true,
+    "Football",
+    "Fans",
+  );
+  assert.equal(name(list), "setClubListing");
+  assert.deepEqual(p.coder.instruction.decode(list.data).data.visibility, {
+    open: {},
+  });
+  assert(account(list, "listing").equals(c.clubListingPda(club)));
+  const verify = await c.verifyClubListingInstruction(p, inviter, club, true);
+  assert(
+    account(verify, "admin_record").equals(derive("admin", inviter.toBuffer())),
+  );
+  const ask = await c.requestClubMembershipInstruction(p, wallet, club, "Hi");
+  assert(account(ask, "existing_member").equals(c.clubMemberPda(club, wallet)));
+  assert(account(ask, "request").equals(c.clubJoinRequestPda(club, wallet)));
+  const approve = await c.approveClubRequestInstruction(p, owner, club, wallet);
+  assert(account(approve, "admin_member").equals(c.clubMemberPda(club, owner)));
+  assert(account(approve, "member").equals(c.clubMemberPda(club, wallet)));
+  assert(account(approve, "wallet").equals(wallet));
+  const cancel = await c.closeClubRequestInstruction(
+    p,
+    wallet,
+    club,
+    wallet,
+    false,
+  );
+  assert(account(cancel, "closer_member").equals(programId));
+  const reject = await c.closeClubRequestInstruction(
+    p,
+    owner,
+    club,
+    wallet,
+    true,
+  );
+  assert(account(reject, "closer_member").equals(c.clubMemberPda(club, owner)));
+  const join = await c.joinOpenClubInstruction(p, wallet, club);
+  assert(account(join, "member").equals(c.clubMemberPda(club, wallet)));
+});
+
+test("listing and request text follow the program limits", () => {
+  assert.equal(c.clubListingIssue("Football", ""), null);
+  assert.ok(c.clubListingIssue("", "x"));
+  assert.ok(c.clubListingIssue(" Football", "x"));
+  assert.ok(c.clubListingIssue("t".repeat(33), ""));
+  assert.ok(c.clubListingIssue("F1", "d".repeat(281)));
+  assert.equal(c.clubRequestNoteIssue(""), null);
+  assert.ok(c.clubRequestNoteIssue("n".repeat(141)));
+  const now = 1_000;
+  assert.equal(c.requestExpired({ expiresAt: new BN(1_001) }, now), false);
+  assert.equal(c.requestExpired({ expiresAt: new BN(1_000) }, now), true);
+  assert.equal(c.isOpenListing({ visibility: { open: {} } }), true);
+  assert.equal(c.listingVerified({ verifiedBy: null }), false);
 });
