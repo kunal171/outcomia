@@ -325,12 +325,6 @@
 .multi-market-grid {
   margin-top: var(--space-5);
 }
-.multi-market-shelf {
-  margin-bottom: var(--space-8);
-}
-.multi-market-shelf .multi-market-grid {
-  margin-top: 0;
-}
 .multi-market-card {
   display: flex;
   flex-direction: column;

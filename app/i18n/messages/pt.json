@@ -521,7 +521,6 @@
   "Prediction price example": "Exemplo de preço de previsão",
   "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.": "A negociação está implantada na Devnet. Resolução e resgates exigem a próxima atualização.",
   "Prediction trading is disabled in this app configuration.": "A negociação de previsões está desativada nesta configuração.",
-  "Prediction · {value0}": "Previsão · {value0}",
   "Predictions": "Previsões",
   "Preview generated JSON": "Prévia do JSON gerado",
   "Preview: {value0} Refreshes before signing; execution can change.": "Prévia: {value0} Atualiza antes de assinar; a execução pode mudar.",
@@ -1190,7 +1189,6 @@
   "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.": "Taxas ganhas: {amount} {symbol}. O saque vai para a conta de token associada da sua carteira.",
   "collateral": "colateral",
   "Fee withdrawal ({symbol})": "Saque de taxas ({symbol})",
-  "Binary prediction markets": "Mercados de previsão binários",
   "2–8 named outcomes. One winner. One collateral token backs each complete set.": "2–8 resultados nomeados. Um vencedor. Um token de colateral lastreia cada conjunto completo.",
   "Create a market": "Criar um mercado",
   "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.": "A negociação de vários resultados aguarda a verificação da implantação na devnet. Criação e negociação estão desativadas.",
@@ -1299,8 +1297,8 @@
   "Total to receive ({value0})": "Total a receber ({value0})",
   "Outcomes": "Resultados",
   "{count} outcomes": "{count} resultados",
-  "View all \u2192": "Ver todos →",
   "View club": "Ver clube",
   "Manage club": "Gerenciar clube",
-  "Market creation": "Criação de mercados"
+  "Market creation": "Criação de mercados",
+  "Binary": "Binária"
 }

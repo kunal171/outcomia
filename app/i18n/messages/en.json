@@ -521,7 +521,6 @@
   "Prediction price example": "Prediction price example",
   "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.": "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.",
   "Prediction trading is disabled in this app configuration.": "Prediction trading is disabled in this app configuration.",
-  "Prediction · {value0}": "Prediction · {value0}",
   "Predictions": "Predictions",
   "Preview generated JSON": "Preview generated JSON",
   "Preview: {value0} Refreshes before signing; execution can change.": "Preview: {value0} Refreshes before signing; execution can change.",
@@ -1190,7 +1189,6 @@
   "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.": "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.",
   "collateral": "collateral",
   "Fee withdrawal ({symbol})": "Fee withdrawal ({symbol})",
-  "Binary prediction markets": "Binary prediction markets",
   "2–8 named outcomes. One winner. One collateral token backs each complete set.": "2–8 named outcomes. One winner. One collateral token backs each complete set.",
   "Create a market": "Create a market",
   "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.": "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.",
@@ -1299,8 +1297,8 @@
   "Total to receive ({value0})": "Total to receive ({value0})",
   "Outcomes": "Outcomes",
   "{count} outcomes": "{count} outcomes",
-  "View all \u2192": "View all →",
   "View club": "View club",
   "Manage club": "Manage club",
-  "Market creation": "Market creation"
+  "Market creation": "Market creation",
+  "Binary": "Binary"
 }

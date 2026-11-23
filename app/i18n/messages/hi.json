@@ -521,7 +521,6 @@
   "Prediction price example": "पूर्वानुमान कीमत उदाहरण",
   "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.": "पूर्वानुमान ट्रेडिंग Devnet पर तैनात है। निर्णय और क्लेम के लिए अगला प्रोग्राम अपग्रेड चाहिए।",
   "Prediction trading is disabled in this app configuration.": "इस कॉन्फ़िगरेशन में पूर्वानुमान ट्रेडिंग बंद है।",
-  "Prediction · {value0}": "पूर्वानुमान · {value0}",
   "Predictions": "पूर्वानुमान",
   "Preview generated JSON": "बने JSON का पूर्वावलोकन",
   "Preview: {value0} Refreshes before signing; execution can change.": "पूर्वावलोकन: {value0} साइन करने से पहले रीफ़्रेश होगा; निष्पादन बदल सकता है।",
@@ -1190,7 +1189,6 @@
   "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.": "अर्जित शुल्क: {amount} {symbol}। निकासी आपके वॉलेट के संबद्ध टोकन खाते में जाती है।",
   "collateral": "कोलैटरल",
   "Fee withdrawal ({symbol})": "शुल्क निकासी ({symbol})",
-  "Binary prediction markets": "बाइनरी प्रेडिक्शन मार्केट",
   "2–8 named outcomes. One winner. One collateral token backs each complete set.": "2–8 नामित परिणाम। एक विजेता। हर पूरे सेट के पीछे एक कोलैटरल टोकन।",
   "Create a market": "मार्केट बनाएँ",
   "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.": "मल्टी-आउटकम ट्रेडिंग devnet पर डिप्लॉयमेंट सत्यापन की प्रतीक्षा में है। निर्माण और ट्रेडिंग बंद हैं।",
@@ -1299,8 +1297,8 @@
   "Total to receive ({value0})": "कुल प्राप्ति ({value0})",
   "Outcomes": "परिणाम",
   "{count} outcomes": "{count} परिणाम",
-  "View all \u2192": "सभी देखें →",
   "View club": "क्लब देखें",
   "Manage club": "क्लब प्रबंधित करें",
-  "Market creation": "मार्केट निर्माण"
+  "Market creation": "मार्केट निर्माण",
+  "Binary": "बाइनरी"
 }

@@ -19,20 +19,22 @@ import { visibleMarket } from "../../lib/market-visibility";
 import { useI18n } from "../preferences-provider";
 import "./multi-outcome.css";
 
-/** Every visible multi-outcome market, refreshed on indexer updates. */
-export function useMultiOutcomeMarkets() {
+/** Every visible multi-outcome market, refreshed on indexer updates.
+ * `enabled = false` skips the fetch (e.g. on a binary market's detail page). */
+export function useMultiOutcomeMarkets(enabled = true) {
   const { connection } = useConnection();
   const p = useMemo(() => getOutcomiaReadProgram(connection), [connection]);
   const [rows, setRows] = useState<
     { address: string; name: string; market: MultiMarket }[]
   >([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(MULTI_OUTCOME_ENABLED);
+  const active = MULTI_OUTCOME_ENABLED && enabled;
+  const [loading, setLoading] = useState(active);
   const [revision, setRevision] = useState(0);
   useIndexerUpdates(() => setRevision((v) => v + 1));
   useEffect(() => {
-    if (!MULTI_OUTCOME_ENABLED) return;
-    let active = true;
+    if (!active) return;
+    let live = true;
     setLoading(true);
     setError("");
     void (async () => {
@@ -58,18 +60,18 @@ export function useMultiOutcomeMarkets() {
             };
           }),
         );
-        if (active)
+        if (live)
           setRows(result.filter((r) => visibleMarket(r.address, r.name)));
       } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : String(e));
+        if (live) setError(e instanceof Error ? e.message : String(e));
       } finally {
-        if (active) setLoading(false);
+        if (live) setLoading(false);
       }
     })();
     return () => {
-      active = false;
+      live = false;
     };
-  }, [p, revision]);
+  }, [p, revision, active]);
   return {
     rows,
     error,
@@ -118,7 +120,7 @@ export function MultiOutcomeMarkets() {
       <AppHeader />
       <main className="route-shell multi-outcome">
         <Link className="text-button" href="/predictions">
-          ← {t("Binary prediction markets")}
+          {t("← Prediction markets")}
         </Link>
         <header className="ui-page-head multi-list-head">
           <div>
@@ -169,43 +171,14 @@ export function MultiOutcomeMarkets() {
   );
 }
 
-/** Multi-outcome markets on the main predictions list, filtered by the same
- * search as the binary markets below them. */
-/** Cards shown on the main list before "View all". */
-const SHELF_LIMIT = 6;
-
-export function MultiOutcomeShelf({ query }: { query: string }) {
-  const { t } = useI18n();
-  const { rows, loading } = useMultiOutcomeMarkets();
-  if (!MULTI_OUTCOME_ENABLED) return null;
+/** Whether a multi-outcome market matches the predictions-page search:
+ * by name, address or any outcome label. */
+export function matchesMultiQuery(row: MultiOutcomeRow, query: string) {
   const needle = query.trim().toLowerCase();
-  const shown = rows.filter(
-    (r) =>
-      !needle ||
-      r.name.toLowerCase().includes(needle) ||
-      r.address.toLowerCase().includes(needle) ||
-      r.market.terms.outcomeLabels.some((l) =>
-        l.toLowerCase().includes(needle),
-      ),
-  );
-  if (!loading && shown.length === 0) return null;
   return (
-    <section className="ui-section multi-market-shelf">
-      <div className="ui-section-head">
-        <h2>{t("Multi-outcome markets")}</h2>
-        <Link className="text-button" href="/predictions/multi">
-          {t("View all →")}
-        </Link>
-      </div>
-      {loading && rows.length === 0 ? (
-        <p role="status">{t("Loading markets…")}</p>
-      ) : (
-        <div className="ui-grid multi-market-grid">
-          {shown.slice(0, SHELF_LIMIT).map((r) => (
-            <MultiOutcomeCard key={r.address} row={r} />
-          ))}
-        </div>
-      )}
-    </section>
+    !needle ||
+    row.name.toLowerCase().includes(needle) ||
+    row.address.toLowerCase().includes(needle) ||
+    row.market.terms.outcomeLabels.some((l) => l.toLowerCase().includes(needle))
   );
 }
