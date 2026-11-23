@@ -267,7 +267,7 @@ separate disabled production build that must submit no transactions. See the
 # Terminal 1
 OUTCOMIA_BUILD_DIR=.next-multi-browser NEXT_PUBLIC_SHARED_BALANCES_ENABLED=true \
 NEXT_PUBLIC_MULTI_OUTCOME_ENABLED=true npm --prefix app run dev -- \
-  --hostname 127.0.0.1 --port 3017
+  --hostname localhost --port 3017
 # Terminal 2 (provide locally installed Playwright/Chromium paths if needed)
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
 MULTI_BROWSER_EXECUTABLE=/path/to/chromium \

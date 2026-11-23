@@ -159,7 +159,7 @@ and Chromium executable:
 
 ```bash
 # Terminal 1, from app/
-OUTCOMIA_BUILD_DIR=target/canton-browser-check npm run dev -- --webpack --hostname 127.0.0.1 --port 3016
+OUTCOMIA_BUILD_DIR=target/canton-browser-check npm run dev -- --webpack --hostname localhost --port 3016
 # Terminal 2, from the repository root; replace these tool paths
 PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
 CANTON_BROWSER_EXECUTABLE=/path/to/chromium \
