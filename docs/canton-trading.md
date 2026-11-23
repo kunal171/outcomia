@@ -8,6 +8,34 @@ This feature is verified locally. It does not deploy the DAR, configure public
 participants, enable Vercel transactions or perform a live wallet smoke test.
 Keep `CANTON_TRADING_ENABLED=false` until those checks pass.
 
+## CIP-0103 wallets
+
+All Canton wallet traffic follows [CIP-0103](https://github.com/canton-foundation/cips/blob/main/cip-0103/cip-0103.md),
+the Canton dApp Standard. The app talks to one EIP-1193-style provider per
+wallet (`request({ method, params })`, `on`, `removeListener`):
+
+| Need | Standard call |
+| --- | --- |
+| Connect, disconnect | `connect`, `disconnect` |
+| Identity | `status`, `getPrimaryAccount`, `getActiveNetwork` (CAIP-2 IDs) |
+| Changes | `accountsChanged`, `statusChanged` events |
+| Reads (contracts, holdings, balances) | `ledgerApi` → JSON Ledger API `/v2/state/*` |
+| Submission | `prepareExecute`, then the `txChanged` events |
+
+- **Loop** ships a native CIP-0103 provider.
+- **Console** exposes the same methods as SDK functions; `lib/console-wallet.ts`
+  adapts them into the standard provider (unknown methods fail with 4200).
+- **Submission** (`lib/canton/cip103.ts`, `executePrepared`) subscribes to
+  `txChanged` before calling `prepareExecute`, then waits for `executed` with
+  our command ID and an update ID. `failed`, a provider error or a 3-minute
+  silence reject; nothing is retried, because a late transaction may still
+  execute.
+- **Errors**: the standard codes (4001 user rejected, 4100 unauthorized, 4200
+  unsupported, 4900/4901 disconnected, −32700…−32005) show clear messages.
+- **Balances** on `/canton/wallet` come from the party's Token Standard holdings
+  via `ledgerApi`, grouped by instrument with unlocked and locked totals.
+  Canton Coin (`Amulet`) is labelled CC; other instruments show their ID.
+
 ## Complementary matching
 
 As on Solana, YES and NO orders on the same side also trade through the
@@ -39,12 +67,13 @@ exactly as the owner's own cancel would.
   accounts to match them; another trader cannot request that identity.
 - Commands are compiled from a fixed action/template/choice map. Forms cannot
   choose an arbitrary recipient, factory, `actAs`, `readAs` or package.
-- Loop uses its CIP-0103 bridge. Console uses its SDK. Deposit input selection
-  reads unlocked Token Standard HoldingV2 interface views for the wallet owner,
-  matching the exact instrument administrator and ID. It selects at most 15
-  inputs, leaving room for an existing canonical balance holding.
-- Console's ledger-auth token remains transient inside the SDK adapter. It never
-  enters React state, cookies, browser storage, logs or an app API request.
+- Every wallet is used through its CIP-0103 provider (see
+  [CIP-0103 wallets](#cip-0103-wallets)). Deposit input selection reads unlocked
+  Token Standard HoldingV2 interface views for the wallet owner through
+  `ledgerApi`, matching the exact instrument administrator and ID. It selects at
+  most 15 inputs, leaving room for an existing canonical balance holding.
+- Console's ledger-auth token remains transient inside its provider adapter. It
+  never enters React state, cookies, browser storage, logs or an app API request.
 - Identity is rechecked before and after wallet reads/submission. Changing the
   party, wallet or network unmounts old financial views and discards late reads.
 
