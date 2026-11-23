@@ -119,7 +119,8 @@ body:has(.ui-standalone) {
   padding: var(--space-5);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgb(var(--ink-rgb) / 0.025), transparent 40%),
+  background:
+    linear-gradient(180deg, rgb(var(--ink-rgb) / 0.025), transparent 40%),
     var(--surface-1);
   min-width: 0;
 }

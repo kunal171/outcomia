@@ -1144,5 +1144,13 @@
   "AI": "IA",
   "Earnings": "Resultados",
   "Esports": "Esports",
-  "Science": "Ciencia"
+  "Science": "Ciencia",
+  "Early access": "Acceso anticipado",
+  "Enter the access password to open the app.": "Introduce la contraseña de acceso para abrir la app.",
+  "Password": "Contraseña",
+  "Access is not configured yet.": "El acceso aún no está configurado.",
+  "That password is not correct.": "Esa contraseña no es correcta.",
+  "Checking…": "Comprobando…",
+  "Unlock": "Desbloquear",
+  "Back to home": "Volver al inicio"
 }

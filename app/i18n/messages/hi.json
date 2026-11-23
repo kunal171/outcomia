@@ -1144,5 +1144,13 @@
   "AI": "एआई",
   "Earnings": "कमाई रिपोर्ट",
   "Esports": "ई-स्पोर्ट्स",
-  "Science": "विज्ञान"
+  "Science": "विज्ञान",
+  "Early access": "अर्ली एक्सेस",
+  "Enter the access password to open the app.": "ऐप खोलने के लिए एक्सेस पासवर्ड डालें।",
+  "Password": "पासवर्ड",
+  "Access is not configured yet.": "एक्सेस अभी कॉन्फ़िगर नहीं है।",
+  "That password is not correct.": "यह पासवर्ड सही नहीं है।",
+  "Checking…": "जाँच हो रही है…",
+  "Unlock": "अनलॉक करें",
+  "Back to home": "होम पर वापस"
 }

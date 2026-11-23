@@ -1,4 +1,5 @@
 "use client";
+import { APP_HOME } from "../lib/routes";
 
 import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,8 +39,7 @@ export function NetworkHeader() {
 /** Routes rendered without a wallet: the landing page, the password gate and
  * the design reference. */
 const PUBLIC_ROUTES = new Set(["/", "/unlock", "/design"]);
-/** The app's entry: choose a wallet, then a network workspace. */
-export const APP_HOME = "/app";
+export { APP_HOME };
 
 export function NetworkBoundary({ children }: { children: ReactNode }) {
   const pathname = usePathname();

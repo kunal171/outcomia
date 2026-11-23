@@ -1144,5 +1144,13 @@
   "AI": "AI",
   "Earnings": "Earnings",
   "Esports": "Esports",
-  "Science": "Science"
+  "Science": "Science",
+  "Early access": "Early access",
+  "Enter the access password to open the app.": "Enter the access password to open the app.",
+  "Password": "Password",
+  "Access is not configured yet.": "Access is not configured yet.",
+  "That password is not correct.": "That password is not correct.",
+  "Checking…": "Checking…",
+  "Unlock": "Unlock",
+  "Back to home": "Back to home"
 }
