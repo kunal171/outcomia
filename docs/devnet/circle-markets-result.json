@@ -1,0 +1,253 @@
+{
+  "program": "AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL",
+  "collateralMint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "startedAt": "2026-11-23T08:56:37.382Z",
+  "markets": {
+    "btc-below-50k-before-2027": {
+      "kind": "binary",
+      "name": "Bitcoin below $50k before 2027?",
+      "id": "969bccfc517f8c578cc03598ca9d102e50f3361c5c5fd3262339f192d6bef5ec",
+      "address": "8R8HPmHm9VKZUB274Cs9mLHeCzA7mE9P4yqZhyDDLzxd"
+    },
+    "eth-below-1500-before-2027": {
+      "kind": "binary",
+      "name": "Ethereum below $1,500 before 2027?",
+      "id": "a913b8a15c209987b57da91fc497bceb42d20196d956774adc4a080848b487b0",
+      "address": "6s6TKraoRahXeCTB5FLfis6vRnyWE6eRp5UsFhMBhTkE"
+    },
+    "sol-above-100-before-2027": {
+      "kind": "binary",
+      "name": "Solana above $100 before 2027?",
+      "id": "eacbeb55d770abf43854ce19976810d094d712688d25e7ea1f56411c48646962",
+      "address": "3VQQTNmdSXvsms7RDsUGAj1vTcjYKzWeXsnQf672vPqv"
+    },
+    "fed-hike-50bp-december": {
+      "kind": "binary",
+      "name": "Fed hikes 50 bp or more on 9 December?",
+      "id": "be562d55b1ff2e327b0bf1de8a7d6f55caf69928525ae529d435d9ed8d6d1e82",
+      "address": "2pm28Gw8NTxiuUe2RW8Hv9TC8FaCKzgJfodoX6V92fCQ"
+    },
+    "man-city-beat-chelsea-12-dec": {
+      "kind": "binary",
+      "name": "Man City beat Chelsea on 12 December?",
+      "id": "be2c518b7758370c4aab10dc52d94eb2a5ce53575991c6c42849798e7e458034",
+      "address": "DuE8cLvHHkucPbnuCPjwVRLysc4wB36dWr5Mef3GfVgt"
+    },
+    "arsenal-beat-man-utd-19-dec": {
+      "kind": "binary",
+      "name": "Arsenal beat Man United on 19 December?",
+      "id": "d81b357f2a2ac43e889636a3ea5795412396a80a59cb1d5d0a7773286102b23c",
+      "address": "C7Ww6EVY7haiH6AAEQYonhV2rxihAsqvWbtQpegciJjX"
+    },
+    "spurs-top-west-new-year": {
+      "kind": "binary",
+      "name": "Spurs top the West on 31 December?",
+      "id": "1879ff387b1766c69620e875b0929a0093e56ad017bc3805d098ef788afcd904",
+      "address": "FDucMMKEddS1xzwrZeRNJpyaqiQZPcgVDyTvzqMaGG2P"
+    },
+    "antonelli-wins-abu-dhabi": {
+      "kind": "binary",
+      "name": "Antonelli wins the Abu Dhabi GP?",
+      "id": "a00f84e1cddfc6aa9cc65ff6f88d6b9cfe773776e639109903798f692fe3501d",
+      "address": "DZesHw9nig72aauTVPW2uYTCpBimNLwJak66XyUR4GR"
+    },
+    "abu-dhabi-gp-winner": {
+      "kind": "multi",
+      "name": "Abu Dhabi GP winner, 6 December",
+      "address": "VBGS84bKaAwkbCBg37Vnm9GBtNTW4qmK7KqVoeWukNv"
+    },
+    "eth-price-end-2026": {
+      "kind": "multi",
+      "name": "Ethereum price on 31 December 2026",
+      "address": "AEVdDEXwxBxKXp1CevhbKCfxDoatVFC3wUstXCVaV1EL"
+    }
+  },
+  "steps": [
+    {
+      "label": "initialize USDC balance",
+      "signature": "2g1HKgXsevJMXQN7DqnFFSUVGZhpbN39wcaoTcmuTDFBLMjUS1st72NvoCZLBQQSs4xQucTPwLQAnHABy1PyMZAY"
+    },
+    {
+      "label": "deposit 10000000 USDC atoms",
+      "signature": "VkukzAPFRV3QjFNjZhpchyrfcakSo34eSGEVbjvecajrpMH2tJVX1KXzP2KeepWKHwSbWwXsU5fHutT5MfdrCNS"
+    },
+    {
+      "label": "btc-below-50k-before-2027: create",
+      "signature": "3YhVuHPuFdL1iC164FjF2qimddTEzD2JxcgiEgf9gp8Bc9vSeWbZCvjPL4UefndrKDFXqt8YdyT9KUSmwx4fVU4n"
+    },
+    {
+      "label": "btc-below-50k-before-2027: open with shared book",
+      "signature": "u1M9HHFZC3hkXTYZ7cGfPzgbBHY1Uj52ejXuUPTgYWUuaqVHxMdTCWqYhqe67zFyMveq59zdkxQbtyQdDBoSMUP"
+    },
+    {
+      "label": "btc-below-50k-before-2027: bid YES 0.16 x1",
+      "signature": "5xH8986rKKUbjqScs12xFvTrMzFXBsw675CqaSsH1kSJ2BfWD3NHg8tqRXmejpqAEK2QcPSXeczK2ft7M9j8yLDp"
+    },
+    {
+      "label": "btc-below-50k-before-2027: bid NO 0.80 x1",
+      "signature": "2nzpfehGFrweEkgpAxWDtWAwRnFJJgfDvZwoLSQuYJr9grc79jsbMfA4nDnN7Q17trVUAb1rUQjUR5qP6yHU49QD"
+    },
+    {
+      "label": "eth-below-1500-before-2027: create",
+      "signature": "3k1Qvn1Z3TATXzMNYVG177EHswvtaLXqFZ4PassTV3v4VsF4vhrnSvAKsXaWEJyDCB54NA41DXxagfVPReF4WjQs"
+    },
+    {
+      "label": "eth-below-1500-before-2027: open with shared book",
+      "signature": "4uAbau1kGMzmj1mkAK9aT852koVTUh5hjPcDxU6ebfYoktb43SjH53zdb57hXSkpHyJj7No8tjC7mFRzq2dimyTF"
+    },
+    {
+      "label": "eth-below-1500-before-2027: bid YES 0.19 x1",
+      "signature": "Re1Pdt9NZ2nPhAiMbc7RTejsfiMTAr1Auf2uF8qwgX7BsiDMkMWtCxEqA78q6CnGH4K3WDvZUyrtBkuievPHoXB"
+    },
+    {
+      "label": "eth-below-1500-before-2027: bid NO 0.77 x1",
+      "signature": "2yz34VFgfnzBwSrtELCQ7eb6Ys9DhKwiNnFkfm5JXDnYhcSXxHCHXeRTL14aGcpVpr3hffSxJBjUsqAHeTvhgVZe"
+    },
+    {
+      "label": "sol-above-100-before-2027: create",
+      "signature": "3kJ1wEAsHo8oztvcLZmgVjJn1vb8XoENyXud3vWhpVJksRD1zHxboAYhDoKYmRnDwmrbxh2gPiHBVtDsvgr1B41s"
+    },
+    {
+      "label": "sol-above-100-before-2027: open with shared book",
+      "signature": "3jXwAy8Sun4X7ahnynnzZpC6oseZ7qBmgaHDsATyzMnpwu7DxtkmX7keEz3C4aJJJGEm1NVbnXi3gh5wnqXEhCvg"
+    },
+    {
+      "label": "sol-above-100-before-2027: bid YES 0.06 x1",
+      "signature": "4Z5yvtCFG1nnY8Uto5yfPAiG5S1zY7enp5RL3WC9hLh8YkGpVrERjqLNRUA9UqiRQt5rx45DjPR99T6UX4VGkj6N"
+    },
+    {
+      "label": "sol-above-100-before-2027: bid NO 0.90 x1",
+      "signature": "Y4KMZN73ycs4Ut4i3yvMKAXMyu8A3LmCaFewKegHh2R12UghxkWBCnnpu4eTT8YQdB2YJpw1h8EmBYdP5MuZUC4"
+    },
+    {
+      "label": "fed-hike-50bp-december: create",
+      "signature": "gq64HEM8WehdgxD4pYFRK2qKjXYS45apaQ97mNkLZb1UKFyinrLxqGL4DVYquRkrf9WuqCFCWW5x6nLvnMVMkNP"
+    },
+    {
+      "label": "fed-hike-50bp-december: open with shared book",
+      "signature": "2d5y9u5Ben7uULCprFxkUH9WLyXAXuCpEaJZwTHqC7D4AayXXvAWbSjDnWxH1dW863w1347x9viT7c8jdapqF4Ww"
+    },
+    {
+      "label": "fed-hike-50bp-december: bid YES 0.10 x1",
+      "signature": "4LuYmZcU9TgcyLo9qtd4N76YG4db3fTa43CufmbrDibunGjcHJdEPGRtLrH7ZxKsuopt3udgSReSCDvw5Xi7wFcp"
+    },
+    {
+      "label": "fed-hike-50bp-december: bid NO 0.86 x1",
+      "signature": "3gGx54g747GM5J8DchvznDnBrDXmnP3NJXRoe1TRo4jpgK5WG8daX43Qj6EBKAEFvyPc3iqQ3Jzyi3cusSiTznnZ"
+    },
+    {
+      "label": "man-city-beat-chelsea-12-dec: create",
+      "signature": "5zaoGSiDt3ng6hTSVZktkEoXeQnx3fTCQeReDqKYrJ6vxRMayxnC8z83nP7aL6sb8ZjD2nh5FgWaLFWTuNhYgQj3"
+    },
+    {
+      "label": "man-city-beat-chelsea-12-dec: open with shared book",
+      "signature": "n3ZBsNyFYbZnLkyvmpV9fMnUwHenY6uKDwo3d8Zq9NbfEfC6i3VA4zHKY236ue6jH7U6V2Pt9WomYbY1eb9Ub5b"
+    },
+    {
+      "label": "man-city-beat-chelsea-12-dec: bid YES 0.53 x1",
+      "signature": "5GW756yhZggSLM6AcqfmxWX7SeCrStBPUUyFkWQ9T1hPJ7Bet4nDhvSGjgTAUjeLaN7Lg6K9J3S16tz5LAoPyggJ"
+    },
+    {
+      "label": "man-city-beat-chelsea-12-dec: bid NO 0.43 x1",
+      "signature": "4cNKvfn6Pyk6kdJZYvneygq3Vi53tUU2erAFS74mkUEAYnp9q8wiw4qee2M8Pc4QxxahwVyuDkQidnMwTaiwxUnt"
+    },
+    {
+      "label": "arsenal-beat-man-utd-19-dec: create",
+      "signature": "41Pb314w5Ms9WUuRpvqEwnkitLLXDLTKWZQqmov75m643apNsNoHTcPHCst8baFpZ2J9tcC2pEhPo9k2MTbfxEx6"
+    },
+    {
+      "label": "arsenal-beat-man-utd-19-dec: open with shared book",
+      "signature": "46AogAnb45MSgErU8Zsv9KLpeJ9cfE65tSamEuunuDGiBq9LSMHT6LpYsxreDoKvyUJUiDCpE4qiQxQwpVpGqFfe"
+    },
+    {
+      "label": "arsenal-beat-man-utd-19-dec: bid YES 0.58 x1",
+      "signature": "4VEL7UwNA1FMf6j3mfmNvJvzpZWmc9HNSFSFA4kYd9zLZEqvwHgFnpdRueddFDoNqzmwEACNTtEnN9MJrifDHuuh"
+    },
+    {
+      "label": "arsenal-beat-man-utd-19-dec: bid NO 0.38 x1",
+      "signature": "3rZXbfGh3h6y4ZfwRW4D4KcszoUmcf8Hm2YdCUwAmysK35H8v2aeMXRATTGJYQLoLr5BhTQ5xCNgrmwCCdan2tHh"
+    },
+    {
+      "label": "spurs-top-west-new-year: create",
+      "signature": "29TBKC3h54scGHQKmy6Bq4MCME95ND27puntiroziWbRcH4sibzQRduBRLCreco1UjxUKWqeQdRv9Ue4npDpSURn"
+    },
+    {
+      "label": "spurs-top-west-new-year: open with shared book",
+      "signature": "4vo1jj4QZKtcMxJNLJtLwmVUJuKPhH2tMBJDPD3X77uqRUDG9KwyJAjbTXsekLipHsz95YK9bP3F9nqVxTSPk7RD"
+    },
+    {
+      "label": "spurs-top-west-new-year: bid YES 0.36 x1",
+      "signature": "59WSSPgy7WY1caxpip8K5ETBdborgL4Fk84cN7whNSeUYkLiBwumr3uwLXwJp4tEqesMBT9bST6Udu2fd6syC1wU"
+    },
+    {
+      "label": "spurs-top-west-new-year: bid NO 0.60 x1",
+      "signature": "4FiWPQUGAK7irFUWDpN5QQVR88zLkhQ4LosqnkXJNLg13Q2L7nGnPRRrEdspoQ7AAKAf9AC6f7MvnAjKrxfzjhUn"
+    },
+    {
+      "label": "antonelli-wins-abu-dhabi: create",
+      "signature": "23LQPPkh3JyiVaBp8RKufXy8B3H8QopSFJeA2zBPFbQ5Sna6fJtT65N4UEGPVGe6LxpfYVxBfDDNmvRHougxoSaG"
+    },
+    {
+      "label": "antonelli-wins-abu-dhabi: open with shared book",
+      "signature": "59ddyXeF6UieXHdaB8g7FS2drWn46VmwVwkoJuywANQK3KV6MRkSx8BTn8exAt39F9mRxTMvrxU1bQqhqzjqtr8G"
+    },
+    {
+      "label": "antonelli-wins-abu-dhabi: bid YES 0.28 x1",
+      "signature": "3pvqjd7ekSBfFzhDHWEzCjNUHB65KBkw9FzWTECUXUbWDZ1irRkSThyccZpKeyBETBVQLGkdYDa1HJWWoCKcdr2V"
+    },
+    {
+      "label": "antonelli-wins-abu-dhabi: bid NO 0.68 x1",
+      "signature": "xb4rsPjFCavPaT3FVcTAGfRFc5sY7sHTuhWq48rjK1WMo1mRtVpU9z2BUXQ12JjFxSW9XdX4EbzXXQkN875gWah"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: create",
+      "signature": "4kGjr1Khi66t11nRKavcFVzvCDCAewVesZtgThDhfdQszYAxNenaLwF3LENV5TCXLPR2qS8LWcFdtg4PkFAGhaxQ"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: open with book",
+      "signature": "5TGR1SmAGr8uJfPmBqoKA4i5ywduR8f3sDya9h5qUmEL7u3ttMnF4MyJVvSQcBs1hPoNUYT89P9dw5N2cxPasHkg"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: bid Antonelli 0.27 x1",
+      "signature": "2ZGZXiq6qRnzhD9DyLZhYr8Cf2PECbaxkv1KKnMfAc28UGvNWNo8cUKgq9Uz16axALhrhA3ppSKB4vZV6QE2BwBe"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: bid Verstappen 0.21 x1",
+      "signature": "2m8gcKCfXzvaMiYGRhaUcY9siRt28nrRVdkxfrVdVmer29FkeCjBZp5USAitsSk9xpiG43GKAMx61kzu4pTu7GKk"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: bid Russell 0.13 x1",
+      "signature": "2AfAdHLzPxZyFFMYTSEGGmT5Et3i9KPpohf4pVswByK1gDbwTNrLqBzQUyapAwdyj3SWydawT39aDg2fHaxKT39g"
+    },
+    {
+      "label": "abu-dhabi-gp-winner: bid Any other driver 0.27 x1",
+      "signature": "4heTxob83df2gEx9PMxgU9U9wMCf1zvffySQifXj7Sfmgu1y7MUh8kbQh3TSTgttexM6h1eJ7KqzsiSBqNhWzwig"
+    },
+    {
+      "label": "eth-price-end-2026: create",
+      "signature": "2oRB3ywAfim2eDJLaUubj7w1tn9bPHcmDbVV5XdwGbx61o5XQUT44PNKAeWCSskMWohyfnDxUnEQNZDtGEDDNdSB"
+    },
+    {
+      "label": "eth-price-end-2026: open with book",
+      "signature": "4f7pw2beWf7KcQ7KjVPE2gSw64Qfh9pcAed2qtX8Jtuw2cb86ZMrnwbiHyWywZjP3FjZead7ScATWSjnVRV9zxVD"
+    },
+    {
+      "label": "eth-price-end-2026: bid Below $1,500 0.17 x1",
+      "signature": "3L17yVVTAPndm6r9mzaWkEfRLntXyHkeYdNuH4oj3HJNYcZvVEaSSYfAbKDzrFk5oqXJk6bvHtVP1yowPXZ9sUe8"
+    },
+    {
+      "label": "eth-price-end-2026: bid $1,500-$2,000 0.47 x1",
+      "signature": "4PZqPqxZWxtxtYLbMuxSqh8oRugKWgARbKxSusPnYsaeTihhmKxrBZHT8qTGVtbr1A7oRXFTaQkr6g9XaZmLMtCJ"
+    },
+    {
+      "label": "eth-price-end-2026: bid $2,000-$2,500 0.19 x1",
+      "signature": "2zQco9mSHo9zaCaj1Yp1E9aspKGRpTTKzgjQQRTHkzh3NiFCwXsb3CSPe6qFNaZdTqwCt9RNV8kaocUuhht12LB9"
+    },
+    {
+      "label": "eth-price-end-2026: bid Above $2,500 0.05 x1",
+      "signature": "3mrkQjggQGjw91YRgBkf7ikaJmxsuRPTHqJgV8LeKdi6dVjBqSrHJrSoqdWpaHnu5DX8ranNBnqspqUvcSBfd8Y3"
+    }
+  ],
+  "rulesRef": "062ee5e314471ff9f08f19ecbf803b110068f9e4",
+  "finishedAt": "2026-11-23T08:58:20.487Z"
+}
