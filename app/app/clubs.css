@@ -1,0 +1,304 @@
+/* Club pages (home, club, club market). Primitives come from design.css;
+ * this file only adds layout that is unique to clubs. */
+
+.club-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 550;
+  text-decoration: none;
+}
+.club-back:hover {
+  color: var(--ink);
+}
+
+/* ---------- Header ---------- */
+.club-head .ui-actions {
+  align-items: center;
+}
+.club-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+
+/* ---------- About / join ---------- */
+.club-about {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.club-about-text {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.club-join-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+  max-width: 640px;
+}
+.club-inline {
+  align-items: center;
+}
+
+/* ---------- Layout ---------- */
+.club-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-6);
+  align-items: start;
+}
+.club-layout-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.club-main,
+.club-side {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.club-side .ui-eyebrow {
+  margin: 0;
+}
+@media (max-width: 960px) {
+  .club-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Cards and rows ---------- */
+.club-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.club-card-head .ui-h3 {
+  margin: 0;
+}
+.club-card-foot {
+  margin-top: var(--space-4);
+}
+.club-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.club-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.club-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.club-row-arrow {
+  color: var(--muted);
+}
+.club-danger {
+  color: var(--no);
+}
+.club-danger:hover {
+  background: rgb(var(--no-rgb) / 0.08);
+}
+.club-member-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+}
+.club-market-row {
+  gap: var(--space-3);
+}
+.club-market-link {
+  display: grid;
+  flex: 1;
+  gap: var(--space-2);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.club-market-link:hover .ui-row-title {
+  color: var(--accent);
+}
+.club-request-row {
+  align-items: flex-start;
+}
+.club-request-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.club-request-note {
+  margin: 0;
+  color: var(--ink);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .club-member-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .club-member-row .club-row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .club-request-row,
+  .club-market-row {
+    flex-wrap: wrap;
+  }
+  .club-join-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- Discovery cards ---------- */
+.club-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.club-card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+.club-card-title {
+  margin: 0;
+  font-size: var(--text-h3);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.club-card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.club-card-title a::after {
+  /* The whole card is the link target; buttons sit above it. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.club-card-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  line-height: 1.55;
+}
+.club-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+.club-card-foot .ui-btn {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Forms ---------- */
+.club-form {
+  display: grid;
+  gap: var(--space-4);
+}
+.club-field-label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.club-field-label small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.8;
+}
+.club-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+.club-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+  line-height: 1.45;
+}
+.club-toggle input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.club-feedback {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.club-feedback:empty {
+  display: none;
+}
+
+/* ---------- Club market ---------- */
+.club-page .prediction-detail-grid {
+  gap: var(--space-5);
+}
+.club-market-card {
+  display: grid;
+  gap: var(--space-3);
+}
+.club-market-card > .ui-h3 {
+  margin: 0;
+}
+.club-market-card > p {
+  margin: 0;
+}
+.club-market-card .club-form {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.club-market-foot {
+  margin-top: var(--space-5);
+}
+.club-redirect {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.club-redirect p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+/* List rows sit flush with the card's content edge. */
+.club-page li.ui-row {
+  margin-inline: 0;
+  padding-inline: 0;
+}
+.club-page li:last-child > .ui-row,
+.club-page li.ui-row:last-child {
+  border-bottom: 0;
+}
