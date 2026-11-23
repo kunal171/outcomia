@@ -521,7 +521,6 @@
   "Prediction price example": "Exemple de prix de prédiction",
   "Prediction trading is deployed on devnet. Resolution and claims require the next program upgrade.": "Les échanges sont déployés sur Devnet. La résolution et les versements nécessitent la prochaine mise à jour.",
   "Prediction trading is disabled in this app configuration.": "Les échanges de prédiction sont désactivés dans cette configuration.",
-  "Prediction · {value0}": "Prédiction · {value0}",
   "Predictions": "Prédictions",
   "Preview generated JSON": "Aperçu du JSON généré",
   "Preview: {value0} Refreshes before signing; execution can change.": "Aperçu : {value0} Actualisé avant signature ; l’exécution peut changer.",
@@ -1190,7 +1189,6 @@
   "Earned fees: {amount} {symbol}. Withdrawal goes to your wallet's associated token account.": "Frais gagnés : {amount} {symbol}. Le retrait va sur le compte de jetons associé de votre portefeuille.",
   "collateral": "collatéral",
   "Fee withdrawal ({symbol})": "Retrait des frais ({symbol})",
-  "Binary prediction markets": "Marchés prédictifs binaires",
   "2–8 named outcomes. One winner. One collateral token backs each complete set.": "2 à 8 issues nommées. Un gagnant. Un jeton de collatéral garantit chaque ensemble complet.",
   "Create a market": "Créer un marché",
   "Multi-outcome trading is awaiting deployment verification on devnet. Creation and trading are disabled.": "Le trading à issues multiples attend la vérification du déploiement sur devnet. La création et le trading sont désactivés.",
@@ -1299,8 +1297,8 @@
   "Total to receive ({value0})": "Total à recevoir ({value0})",
   "Outcomes": "Issues",
   "{count} outcomes": "{count} issues",
-  "View all \u2192": "Tout voir →",
   "View club": "Voir le club",
   "Manage club": "Gérer le club",
-  "Market creation": "Création de marchés"
+  "Market creation": "Création de marchés",
+  "Binary": "Binaire"
 }
