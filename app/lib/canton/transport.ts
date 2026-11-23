@@ -1,81 +1,84 @@
 import { executeWallet, assertIdentity } from "./wallet-flow.ts";
 import { selectInputs } from "./holdings.ts";
+import { executePrepared, ledgerApi } from "./cip103.ts";
 import type { CantonSession } from "../canton-session";
 import type { Command } from "./commands";
 import {
   decodeContracts,
-  list,
   obj,
   templateId,
   templates,
-  text,
   type Deployment,
 } from "./model.ts";
-import { walletNetworks } from "../canton-display";
-import { loadLoopWallet, readLoopSession } from "../loop-wallet";
-import { loadWallet, readSession } from "../console-wallet";
+import { cantonProvider, readCantonSession } from "../canton-provider";
+
+/** Token Standard holdings, read as interface views. */
+const HOLDING_INTERFACE =
+  "#splice-api-token-holding-v2:Splice.Api.Token.HoldingV2:Holding";
 
 /** Reverify before AND after every wallet await. Identity swaps never attach old
  * private reads or transaction success to the newly connected wallet. SDK-owned
  * credentials never cross this adapter. No operator/vault readAs is requested. */
 export async function verifyIdentity(session: CantonSession) {
-  const current =
-    session.wallet === "loop"
-      ? await readLoopSession()
-      : await readSession(await loadWallet());
-  assertIdentity(session, current);
+  assertIdentity(session, await readCantonSession(session.wallet));
 }
-export async function readContracts(session: CantonSession, d: Deployment) {
+
+/**
+ * The party's active contracts matching `filters`, at the current ledger end,
+ * through the wallet's CIP-0103 `ledgerApi` (authenticated as that party).
+ * Identity is checked before and after the reads.
+ */
+export async function activeContracts(
+  session: CantonSession,
+  filters: Record<string, unknown>[],
+) {
   await verifyIdentity(session);
-  let response: unknown;
+  const provider = await cantonProvider(session.wallet);
+  const end = obj(await ledgerApi(provider, "/v2/state/ledger-end"));
+  if (!/^\d+$/.test(String(end.offset)))
+    throw new Error("Invalid wallet ledger offset.");
+  const response = await ledgerApi(provider, "/v2/state/active-contracts", {
+    eventFormat: {
+      filtersByParty: { [session.partyId]: { cumulative: filters } },
+      verbose: true,
+    },
+    activeAtOffset: end.offset,
+  });
+  await verifyIdentity(session);
+  return response;
+}
+
+/** The wallet party's unlocked and locked Token Standard holdings. */
+export function holdingContracts(session: CantonSession) {
+  return activeContracts(session, [
+    {
+      identifierFilter: {
+        InterfaceFilter: {
+          value: {
+            interfaceId: HOLDING_INTERFACE,
+            includeInterfaceView: true,
+            includeCreatedEventBlob: true,
+          },
+        },
+      },
+    },
+  ]);
+}
+
+export async function readContracts(session: CantonSession, d: Deployment) {
   const ids = (Object.keys(templates) as (keyof typeof templates)[]).map((k) =>
     templateId(d, k),
   );
-  if (session.wallet === "loop") {
-    const { provider } = await loadLoopWallet();
-    const end = obj(
-      await provider.request({
-        method: "ledgerApi",
-        params: { requestMethod: "get", resource: "/v2/state/ledger-end" },
-      }),
-    );
-    if (!/^\d+$/.test(String(end.offset)))
-      throw new Error("Invalid wallet ledger offset.");
-    response = await provider.request({
-      method: "ledgerApi",
-      params: {
-        requestMethod: "post",
-        resource: "/v2/state/active-contracts",
-        body: {
-          eventFormat: {
-            filtersByParty: {
-              [session.partyId]: {
-                cumulative: ids.map((id) => ({
-                  identifierFilter: {
-                    TemplateFilter: {
-                      value: { templateId: id, includeCreatedEventBlob: true },
-                    },
-                  },
-                })),
-              },
-            },
-            verbose: true,
-          },
-          activeAtOffset: end.offset,
+  const response = await activeContracts(
+    session,
+    ids.map((id) => ({
+      identifierFilter: {
+        TemplateFilter: {
+          value: { templateId: id, includeCreatedEventBlob: true },
         },
       },
-    });
-  } else {
-    const sdk = await import("@console-wallet/dapp-sdk");
-    response = await (
-      await loadWallet()
-    ).getContracts({
-      parties: [session.partyId],
-      templateIds: ids,
-      network: sdk.CANTON_NETWORK_VARIANTS[walletNetworks[session.networkId]],
-    });
-  }
-  await verifyIdentity(session);
+    })),
+  );
   const decoded = decodeContracts(response, d);
   const privateContracts = decoded.filter((c) =>
     ["AssetBalance", "PositionLot", "LimitOrder"].includes(c.kind),
@@ -84,6 +87,9 @@ export async function readContracts(session: CantonSession, d: Deployment) {
     ? privateContracts
     : privateContracts.filter((c) => c.data.owner === session.partyId);
 }
+
+/** Submits through CIP-0103 `prepareExecute` and waits for the matching
+ * `txChanged: executed` event. */
 export async function submit(
   session: CantonSession,
   d: Deployment,
@@ -100,97 +106,24 @@ export async function submit(
     d,
     command,
     disclosedContracts,
-    () =>
-      session.wallet === "loop"
-        ? readLoopSession()
-        : loadWallet().then(readSession),
-    async (request) =>
-      session.wallet === "loop"
-        ? (await loadLoopWallet()).provider.request({
-            method: "prepareExecuteAndWait",
-            params: request,
-          })
-        : (await loadWallet()).prepareExecuteAndWait(request),
+    () => readCantonSession(session.wallet),
+    async (request) => ({
+      tx: await executePrepared(await cantonProvider(session.wallet), request),
+    }),
   );
 }
 
-/** Select only authenticated-wallet, unlocked Token Standard holdings. Console's
- * ledger-auth token is used transiently inside this call, never cached, logged,
- * returned to React or forwarded to the application server. */
+/** Select only authenticated-wallet, unlocked Token Standard holdings. */
 export async function depositInputs(
   session: CantonSession,
   d: Deployment,
   instrument: Record<string, unknown>,
   requested: string,
 ) {
-  await verifyIdentity(session);
-  let request: (
-    resource: string,
-    body?: Record<string, unknown>,
-  ) => Promise<unknown>;
-  if (session.wallet === "loop") {
-    const { provider } = await loadLoopWallet();
-    request = (resource, body) =>
-      provider.request({
-        method: "ledgerApi",
-        params: {
-          requestMethod: body ? "post" : "get",
-          resource,
-          ...(body ? { body } : {}),
-        },
-      });
-  } else {
-    const sdk = await import("@console-wallet/dapp-sdk"),
-      wallet = await loadWallet(),
-      account = await wallet.getPrimaryAccount();
-    if (!account || account.partyId !== session.partyId)
-      throw new Error("Wallet changed. Refresh.");
-    const network =
-      sdk.CANTON_NETWORK_VARIANTS[walletNetworks[session.networkId]];
-    const auth = await wallet.ledgerAuth({
-      publicKey: account.publicKey,
-      partyId: session.partyId,
-      network,
-    });
-    await verifyIdentity(session);
-    request = async (resource, body) => {
-      const result = await wallet.ledgerApi({
-        accessToken: auth.accessToken,
-        network,
-        resource,
-        requestMethod: body ? "POST" : "GET",
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-      return JSON.parse(result.response) as unknown;
-    };
-  }
-  const end = obj(await request("/v2/state/ledger-end"));
-  if (!/^\d+$/.test(String(end.offset)))
-    throw new Error("Invalid wallet ledger offset.");
-  const response = await request("/v2/state/active-contracts", {
-    eventFormat: {
-      filtersByParty: {
-        [session.partyId]: {
-          cumulative: [
-            {
-              identifierFilter: {
-                InterfaceFilter: {
-                  value: {
-                    interfaceId:
-                      "#splice-api-token-holding-v2:Splice.Api.Token.HoldingV2:Holding",
-                    includeInterfaceView: true,
-                    includeCreatedEventBlob: true,
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-      verbose: true,
-    },
-    activeAtOffset: end.offset,
-  });
-  await verifyIdentity(session);
-  return selectInputs(response, session.partyId, instrument, requested);
+  return selectInputs(
+    await holdingContracts(session),
+    session.partyId,
+    instrument,
+    requested,
+  );
 }
