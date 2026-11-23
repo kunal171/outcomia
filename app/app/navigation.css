@@ -46,19 +46,19 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--space-1);
 }
 .sidebar-nav a {
   position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 46px;
-  padding: 12px 14px;
+  min-height: 42px;
+  padding: 0 var(--space-3);
   color: var(--muted);
   border: 1px solid transparent;
-  border-radius: 10px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
   font-weight: 500;
   text-decoration: none;
   transition:
@@ -92,12 +92,8 @@ body {
 }
 .sidebar-nav a[aria-current="page"] {
   color: var(--ink);
-  background: linear-gradient(
-    100deg,
-    rgb(var(--accent-rgb) / 0.16),
-    rgb(var(--accent-rgb) / 0.04)
-  );
-  border-color: rgb(var(--accent-rgb) / 0.17);
+  background: var(--surface-2);
+  border-color: var(--line);
 }
 .sidebar-nav a[aria-current="page"]::before {
   content: "";
@@ -107,7 +103,8 @@ body {
   bottom: 13px;
   width: 3px;
   border-radius: 3px;
-  background: linear-gradient(var(--coral), var(--accent));
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
 }
 .sidebar-nav a[aria-current="page"] > svg,
 .sidebar-nav a:hover > svg {
