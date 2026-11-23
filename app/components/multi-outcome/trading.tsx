@@ -127,20 +127,25 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
   return (
     <section aria-labelledby="multi-trade">
       <h2 id="multi-trade">{t("Trade")}</h2>
-      <label>
-        {t("Outcome")}
-        <select
-          disabled={s.busy}
-          value={outcome}
-          onChange={(e) => setOutcome(Number(e.target.value))}
-        >
-          {d.market.terms.outcomeLabels.map((label, i) => (
-            <option key={i} value={i}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div
+        className="multi-outcomes"
+        role="radiogroup"
+        aria-label={t("Outcome")}
+      >
+        {d.market.terms.outcomeLabels.map((label, i) => (
+          <label key={i} className="multi-outcome-chip">
+            <input
+              type="radio"
+              name="multi-trade-outcome"
+              value={i}
+              checked={outcome === i}
+              disabled={s.busy}
+              onChange={() => setOutcome(i)}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
       <div className="multi-grid">
         <div className="multi-card">
           <h3>{t("Order book")}</h3>
@@ -251,17 +256,25 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
               })();
             }}
           >
-            <label>
-              {t("Side")}
-              <select
-                disabled={s.busy}
-                value={side}
-                onChange={(e) => setSide(e.target.value as Side)}
-              >
-                <option value="bid">{t("Buy")}</option>
-                <option value="ask">{t("Sell")}</option>
-              </select>
-            </label>
+            <div
+              className="multi-segment"
+              role="radiogroup"
+              aria-label={t("Side")}
+            >
+              {(["bid", "ask"] as const).map((v) => (
+                <label key={v}>
+                  <input
+                    type="radio"
+                    name="multi-trade-side"
+                    value={v}
+                    checked={side === v}
+                    disabled={s.busy}
+                    onChange={() => setSide(v)}
+                  />
+                  <span>{t(v === "bid" ? "Buy" : "Sell")}</span>
+                </label>
+              ))}
+            </div>
             <label>
               {t("Limit price ({symbol})", {
                 symbol: d.metadata?.quoteSymbol ?? t("collateral"),
