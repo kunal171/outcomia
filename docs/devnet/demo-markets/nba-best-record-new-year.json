@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "question": "Which team will have the NBA's best win percentage after all games on 31 December 2026 (US Eastern)?",
+  "description": "The 76ers, Spurs and Lakers were each 14-3 in late November 2026.",
+  "resolutionSource": "NBA league standings at nba.com on 1 January 2027.",
+  "resolutionRules": {
+    "outcomes": [
+      {
+        "label": "76ers",
+        "criteria": "Philadelphia 76ers have the best percentage."
+      },
+      {
+        "label": "Spurs",
+        "criteria": "San Antonio Spurs have the best percentage."
+      },
+      {
+        "label": "Lakers",
+        "criteria": "Los Angeles Lakers have the best percentage."
+      },
+      {
+        "label": "Any other team",
+        "criteria": "Another team has the best percentage."
+      }
+    ],
+    "invalidRefund": "Each outcome contract refunds an equal share of one collateral token on Invalid; contract quantities must use the configured exact refund lot.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes. If teams or clubs are level, use the official tiebreakers of the named source; if still level, resolve to the first tied outcome in market order."
+  },
+  "closeTimestamp": 1798758000,
+  "earliestResolutionTimestamp": 1798804800,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}
