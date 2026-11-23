@@ -706,7 +706,7 @@
   "Trading close time must be in the future": "O encerramento deve ser no futuro",
   "Trading close time passed during upload. Update the rules before creating the market.": "O prazo passou durante o envio. Atualize as regras antes de criar o mercado.",
   "Trading closed": "Negociação encerrada",
-  "Trading closes {value0}. Collateral: {value1}.": "Encerramento: {value0}. Garantia: {value1}.",
+  "Trading closes {value0}.": "Encerramento: {value0}.",
   "Trading closes {value0}. Earliest outcome proposal: {value1}.": "Encerramento: {value0}. Primeira proposta possível: {value1}.",
   "Trading fees": "Taxas de negociação",
   "Trading has closed. You can still cancel open orders.": "A negociação encerrou. Você ainda pode cancelar ordens abertas.",

@@ -1,4 +1,5 @@
 "use client";
+import { TokenSymbol } from "../token-symbol";
 import { useI18n } from "../preferences-provider";
 
 import type { PredictionMarketAccount } from "../../lib/prediction";
@@ -64,7 +65,7 @@ export function PredictionMarketOverview({
         <div>
           <dt>{t("Winning payout")}</dt>
           <dd>
-            {`1 ${symbol}`} <span>{t("/ contract")}</span>
+            1 <TokenSymbol symbol={symbol} /> <span>{t("/ contract")}</span>
           </dd>
         </div>
         <div>

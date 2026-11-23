@@ -1,4 +1,5 @@
 "use client";
+import { TokenSymbol } from "../token-symbol";
 import Link from "next/link";
 import { TradingChart } from "../trading-chart";
 import { AppHeader } from "../app-header";
@@ -62,8 +63,11 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
                     d.market.terms.payoutPerContract,
                     d.decimals,
                   ),
-                  symbol: d.metadata?.quoteSymbol ?? "",
-                })}
+                  symbol: "",
+                }).trim()}{" "}
+                {d.metadata?.quoteSymbol && (
+                  <TokenSymbol symbol={d.metadata.quoteSymbol} />
+                )}
               </span>
               <span>
                 {t("Minimum {count} contracts", {

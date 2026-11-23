@@ -706,7 +706,7 @@
   "Trading close time must be in the future": "Trading close time must be in the future",
   "Trading close time passed during upload. Update the rules before creating the market.": "Trading close time passed during upload. Update the rules before creating the market.",
   "Trading closed": "Trading closed",
-  "Trading closes {value0}. Collateral: {value1}.": "Trading closes {value0}. Collateral: {value1}.",
+  "Trading closes {value0}.": "Trading closes {value0}.",
   "Trading closes {value0}. Earliest outcome proposal: {value1}.": "Trading closes {value0}. Earliest outcome proposal: {value1}.",
   "Trading fees": "Trading fees",
   "Trading has closed. You can still cancel open orders.": "Trading has closed. You can still cancel open orders.",
