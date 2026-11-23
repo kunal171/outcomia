@@ -1,6 +1,5 @@
 "use client";
 import type { CSSProperties } from "react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { NetworkHeader } from "./network-workspace";
 import { useNetworkWallet } from "./network-wallet-provider";
 import { useI18n } from "./preferences-provider";
@@ -9,8 +8,7 @@ import { useI18n } from "./preferences-provider";
  * Marketing content lives on the public landing page. */
 export function Dashboard() {
   const { t } = useI18n(),
-    { error, busy } = useNetworkWallet(),
-    { setVisible } = useWalletModal();
+    { error, busy, openPicker } = useNetworkWallet();
   const networks = [
     {
       name: "Solana",
@@ -19,14 +17,14 @@ export function Dashboard() {
         "Fast public order books for YES/NO, multi-outcome and spot markets.",
       ),
       wallets: t("Any Solana wallet"),
-      tone: "solana",
+      tone: "solana" as const,
     },
     {
       name: "Canton",
       tag: t("Predictions"),
       body: t("Private, institutional prediction markets and clubs."),
       wallets: "Console · Loop Wallet",
-      tone: "canton",
+      tone: "canton" as const,
     },
   ];
   return (
@@ -62,7 +60,7 @@ export function Dashboard() {
                 className={`entry-network entry-${n.tone} lp-in`}
                 style={{ "--d": 3 + i } as CSSProperties}
                 disabled={busy}
-                onClick={() => setVisible(true)}
+                onClick={() => openPicker(n.tone)}
               >
                 <span className="entry-network-head">
                   <span className="entry-network-name">{n.name}</span>

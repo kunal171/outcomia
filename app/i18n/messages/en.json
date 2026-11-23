@@ -1244,5 +1244,7 @@
   "Approve market creation": "Approve market creation",
   "Recover terms buffer rent": "Recover terms buffer rent",
   "Frozen": "Frozen",
-  "Proposed": "Proposed"
+  "Proposed": "Proposed",
+  "Connect a Solana wallet": "Connect a Solana wallet",
+  "Connect a Canton wallet": "Connect a Canton wallet"
 }
