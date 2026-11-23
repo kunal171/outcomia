@@ -21,6 +21,15 @@
   --no-rgb: 255 143 171;
   --warn: #f2cb76;
   --warn-rgb: 242 203 118;
+  /* Multi-outcome markets and the outcome palette (chips, bars). */
+  --multi: #b49bff;
+  --multi-rgb: 180 155 255;
+  --hue-1-rgb: 143 168 255;
+  --hue-2-rgb: 180 155 255;
+  --hue-3-rgb: 94 220 200;
+  --hue-4-rgb: 242 203 118;
+  --hue-5-rgb: 255 143 171;
+  --hue-6-rgb: 120 200 255;
   --outcome-ink: #07131a;
   --glow:
     0 0 0 1px rgb(143 168 255 / 0.35), 0 10px 40px -8px rgb(91 124 255 / 0.55);
@@ -67,6 +76,15 @@
   --no-rgb: 176 48 90;
   --warn: #7a5508;
   --warn-rgb: 122 85 8;
+  /* Multi-outcome markets and the outcome palette (chips, bars). */
+  --multi: #6d3bd7;
+  --multi-rgb: 109 59 215;
+  --hue-1-rgb: 43 79 216;
+  --hue-2-rgb: 109 59 215;
+  --hue-3-rgb: 8 118 108;
+  --hue-4-rgb: 150 92 0;
+  --hue-5-rgb: 176 48 90;
+  --hue-6-rgb: 3 105 161;
   --outcome-ink: #ffffff;
   --glow:
     0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);
@@ -114,6 +132,15 @@
     --no-rgb: 176 48 90;
     --warn: #7a5508;
     --warn-rgb: 122 85 8;
+    /* Multi-outcome markets and the outcome palette (chips, bars). */
+    --multi: #6d3bd7;
+    --multi-rgb: 109 59 215;
+    --hue-1-rgb: 43 79 216;
+    --hue-2-rgb: 109 59 215;
+    --hue-3-rgb: 8 118 108;
+    --hue-4-rgb: 150 92 0;
+    --hue-5-rgb: 176 48 90;
+    --hue-6-rgb: 3 105 161;
     --outcome-ink: #ffffff;
     --glow:
       0 0 0 1px rgb(43 79 216 / 0.25), 0 12px 36px -10px rgb(43 79 216 / 0.45);

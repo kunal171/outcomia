@@ -760,6 +760,36 @@ test("full-set quotes price each outcome through the others' best orders", () =>
   assert.equal(m.fullSetQuote(f.market, f.book, 0, "ask", f.rows), null);
 });
 
+test("best fill price takes the better of the direct and full-set routes", () => {
+  const others = [
+    [1, "bid", 300000, 6, maker],
+    [2, "bid", 250000, 3, key(6)],
+  ];
+  const best = (rows, side, complementary = true) => {
+    const f = linkedBook(rows);
+    return m
+      .bestFillPrice(f.market, f.book, f.rows, 0, side, complementary)
+      ?.toString();
+  };
+  // No ask on outcome 0: buying fills only through the full set (1 − 0.30 − 0.25).
+  assert.equal(best(others, "bid"), "450000");
+  assert.equal(best(others, "bid", false), undefined);
+  // A cheaper direct ask wins; a dearer one loses to the full set.
+  assert.equal(
+    best([...others, [0, "ask", 400000, 1, maker]], "bid"),
+    "400000",
+  );
+  assert.equal(
+    best([...others, [0, "ask", 500000, 1, maker]], "bid"),
+    "450000",
+  );
+  // Selling with no full-set route uses the best direct bid.
+  assert.equal(
+    best([...others, [0, "bid", 200000, 1, maker]], "ask"),
+    "200000",
+  );
+});
+
 test("wallet lists only multi-outcome positions that hold contracts", () => {
   const { holdsContracts } = loadTypeScript(
     new URL("../lib/multi-outcome-wallet.ts", import.meta.url),

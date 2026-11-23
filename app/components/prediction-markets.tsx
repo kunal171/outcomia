@@ -25,6 +25,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { PredictionGuide } from "./prediction-guide";
 import { AppHeader } from "./app-header";
+import { Pagination, usePage } from "./pagination";
 import {
   MultiOutcomeCard,
   matchesMultiQuery,
@@ -198,6 +199,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
       multi,
     })),
   ].sort((a, b) => a.close - b.close);
+  const paged = usePage(listed, `${query}|${kind}`);
   const renderBinary = ({ address: key, market, metadata }: Record) => {
     const status = predictionStatus(market);
     const decimals = market.payoutPerContract.toString().length - 1;
@@ -371,8 +373,11 @@ export function PredictionMarkets({ address }: { address?: string }) {
         <div className="market-card-heading">
           <div>
             <div className="multi-market-badges">
-              <span className="ui-badge">{t("Binary")}</span>
-              <span className="ui-badge market-status-badge">
+              <span className="ui-badge market-kind-binary">{t("Binary")}</span>
+              <span
+                className="ui-badge market-status-badge"
+                data-status={status}
+              >
                 {t(status ?? "")}
               </span>
             </div>
@@ -431,7 +436,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
           </div>
         )}
         {!address && (
-          <div className="route-heading">
+          <div className="route-heading prediction-hero">
             <h1>{t("Prediction markets")}</h1>
 
             <p className="prediction-release-note">
@@ -462,7 +467,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
           </div>
         )}
         {!address && (
-          <div className="market-list-heading">
+          <div className="market-list-heading" id="market-list">
             <h2>{t("On-chain markets")}</h2>
             <div className="admin-actions">
               {isAdmin && (
@@ -535,7 +540,7 @@ export function PredictionMarkets({ address }: { address?: string }) {
           className={address ? "prediction-detail-grid" : "markets-grid"}
           aria-live="polite"
         >
-          {listed.map((item) =>
+          {paged.slice.map((item) =>
             item.multi ? (
               <MultiOutcomeCard key={item.multi.address} row={item.multi} />
             ) : (
@@ -543,6 +548,15 @@ export function PredictionMarkets({ address }: { address?: string }) {
             ),
           )}
         </section>
+        {!address && (
+          <Pagination
+            page={paged.page}
+            pages={paged.pages}
+            total={paged.total}
+            onPage={paged.setPage}
+            targetId="market-list"
+          />
+        )}
       </main>
     </div>
   );

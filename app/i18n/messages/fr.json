@@ -1300,5 +1300,9 @@
   "View club": "Voir le club",
   "Manage club": "Gérer le club",
   "Market creation": "Création de marchés",
-  "Binary": "Binaire"
+  "Binary": "Binaire",
+  "Pagination": "Pagination",
+  "{from}–{to} of {total}": "{from}–{to} sur {total}",
+  "← Previous": "← Précédent",
+  "Next →": "Suivant →"
 }

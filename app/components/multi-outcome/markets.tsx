@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { AppHeader } from "../app-header";
+import { Pagination, usePage } from "../pagination";
 import {
   getOutcomiaAccounts,
   getOutcomiaReadProgram,
@@ -13,6 +14,7 @@ import {
   multiAccounts,
   multiMarketPda,
   statusLabel,
+  statusOf,
   type MultiMarket,
 } from "../../lib/multi-outcome";
 import { visibleMarket } from "../../lib/market-visibility";
@@ -95,8 +97,13 @@ export function MultiOutcomeCard({ row }: { row: MultiOutcomeRow }) {
       href={`/predictions/multi/${row.address}`}
     >
       <div className="multi-market-badges">
-        <span className="ui-badge ui-badge-accent">{t("Multi-outcome")}</span>
-        <span className="ui-badge">{t(statusLabel(row.market))}</span>
+        <span className="ui-badge market-kind-multi">{t("Multi-outcome")}</span>
+        <span
+          className="ui-badge market-status-badge"
+          data-status={statusOf(row.market)}
+        >
+          {t(statusLabel(row.market))}
+        </span>
       </div>
       <h3>{row.name}</h3>
       <ul className="multi-market-outcomes" aria-label={t("Outcomes")}>
@@ -115,6 +122,7 @@ export function MultiOutcomeCard({ row }: { row: MultiOutcomeRow }) {
 export function MultiOutcomeMarkets() {
   const { t } = useI18n();
   const { rows, error, loading, refresh } = useMultiOutcomeMarkets();
+  const paged = usePage(rows, "");
   return (
     <div className="app-shell">
       <AppHeader />
@@ -122,7 +130,7 @@ export function MultiOutcomeMarkets() {
         <Link className="text-button" href="/predictions">
           {t("← Prediction markets")}
         </Link>
-        <header className="ui-page-head multi-list-head">
+        <header className="ui-page-head multi-list-head" id="multi-list">
           <div>
             <p className="ui-eyebrow">{t("Multi-outcome")}</p>
             <h1 className="ui-title">{t("Multi-outcome markets")}</h1>
@@ -162,10 +170,17 @@ export function MultiOutcomeMarkets() {
           <p>{t("No multi-outcome markets found.")}</p>
         )}
         <div className="ui-grid multi-market-grid">
-          {rows.map((r) => (
+          {paged.slice.map((r) => (
             <MultiOutcomeCard key={r.address} row={r} />
           ))}
         </div>
+        <Pagination
+          page={paged.page}
+          pages={paged.pages}
+          total={paged.total}
+          onPage={paged.setPage}
+          targetId="multi-list"
+        />
       </main>
     </div>
   );

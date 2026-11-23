@@ -31,6 +31,16 @@ export function marketLabels(
 }
 
 /** Group decimal strings directly: converting u64 values to Number loses precision. */
+/** Atomic units as a plain decimal string for inputs (no grouping).
+ * Example: 390000 with 6 decimals is "0.39". */
+export function plainAmount(atoms: BN, decimals: number) {
+  const scale = new BN(10).pow(new BN(decimals));
+  const whole = atoms.div(scale).toString();
+  const fraction = atoms.mod(scale).toString().padStart(decimals, "0");
+  const trimmed = fraction.replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
 export function readableAmount(value: BN, decimals: number): string {
   const [whole, fraction] = formatAtomicAmount(value, decimals).split(".");
   return (
