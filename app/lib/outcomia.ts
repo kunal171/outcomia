@@ -1,6 +1,11 @@
 import { createGuardedProvider } from "./transactions/provider";
+import { withDisplaySymbols } from "./collateral-display";
 import { getLatestTrade as indexedLatestTrade } from "./graphql/markets";
-import { indexedAccounts, indexedReader, usesIndexer } from "./indexed-accounts";
+import {
+  indexedAccounts,
+  indexedReader,
+  usesIndexer,
+} from "./indexed-accounts";
 import { readWithRpcFallback } from "./read-source";
 import { walletAssets } from "./graphql/wallet";
 import {
@@ -242,11 +247,13 @@ export function getOutcomiaProgram(
   wallet: BrowserWallet,
 ) {
   const provider = createGuardedProvider(connection, wallet);
-  return new Program(outcomiaIdl as Idl, provider);
+  return withDisplaySymbols(new Program(outcomiaIdl as Idl, provider));
 }
 
 export function getOutcomiaReadProgram(connection: Connection) {
-  return indexedReader(new Program(outcomiaIdl as Idl, { connection }));
+  return indexedReader(
+    withDisplaySymbols(new Program(outcomiaIdl as Idl, { connection })),
+  );
 }
 
 export function getOutcomiaAccounts(program: Program): OutcomiaAccounts {
@@ -387,21 +394,29 @@ export async function fetchLatestTrade(
   signatureLimit = 8,
 ): Promise<LastTradeView | null> {
   if (usesIndexer(program)) {
-    const engine = process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED === "true"
-      ? "SHARED_SPOT" : "LEGACY_SPOT";
+    const engine =
+      process.env.NEXT_PUBLIC_SHARED_BALANCES_ENABLED === "true"
+        ? "SHARED_SPOT"
+        : "LEGACY_SPOT";
     const indexed = async (): Promise<LastTradeView | null> => {
       const result = await indexedLatestTrade(market.toBase58(), engine);
-      return result ? {
-        price: new BN(result.price),
-        signature: result.signature,
-        blockTime: result.blockTime === null ? null : Number(result.blockTime),
-      } : null;
+      return result
+        ? {
+            price: new BN(result.price),
+            signature: result.signature,
+            blockTime:
+              result.blockTime === null ? null : Number(result.blockTime),
+          }
+        : null;
     };
     if (engine === "SHARED_SPOT") return indexed();
-    return readWithRpcFallback(
-      `latest:${market}`,
-      indexed,
-      () => fetchLatestTrade(connection, new Program(outcomiaIdl as Idl, { connection }), market, signatureLimit),
+    return readWithRpcFallback(`latest:${market}`, indexed, () =>
+      fetchLatestTrade(
+        connection,
+        new Program(outcomiaIdl as Idl, { connection }),
+        market,
+        signatureLimit,
+      ),
     );
   }
   const signatures = await connection.getSignaturesForAddress(market, {
@@ -581,7 +596,9 @@ export async function getOwnedTokenBalance(
     `wallet:${owner}:tokens`,
     async () => {
       const assets = await walletAssets(owner);
-      return new BN(assets.find((asset) => asset.mint === mint.toBase58())?.amount ?? "0");
+      return new BN(
+        assets.find((asset) => asset.mint === mint.toBase58())?.amount ?? "0",
+      );
     },
     async () => {
       const response = await connection.getParsedTokenAccountsByOwner(
@@ -593,7 +610,9 @@ export async function getOwnedTokenBalance(
       return response.value.reduce((total, { account }) => {
         if (!("parsed" in account.data)) return total;
         const amount = account.data.parsed?.info?.tokenAmount?.amount;
-        return typeof amount === "string" ? total.add(new BN(amount, 10)) : total;
+        return typeof amount === "string"
+          ? total.add(new BN(amount, 10))
+          : total;
       }, new BN(0));
     },
   );

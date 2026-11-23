@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will the San Antonio Spurs have the best win percentage in the NBA Western Conference after all games on 31 December 2026 (US Eastern)?",
+  "description": "The Spurs and Lakers were both 14-3 in late November 2026.",
+  "resolutionSource": "NBA Western Conference standings at nba.com on 1 January 2027.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if the Spurs are first in the Western Conference by win percentage (ties resolved by official NBA tiebreakers).",
+    "noCriteria": "Resolve NO if any other Western Conference team is first.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1798758000,
+  "earliestResolutionTimestamp": 1798804800,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

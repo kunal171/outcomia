@@ -8,6 +8,7 @@ import { resolutionAvailability } from "../../lib/multi-outcome-lifecycle";
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 import { useI18n } from "../preferences-provider";
+import { RulesDocumentDialog } from "../rules-document-dialog";
 export function MultiResolution({ session: s }: { session: MultiSession }) {
   const [result, setResult] = useState("invalid"),
     [uri, setUri] = useState(""),
@@ -75,9 +76,10 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
       <h2 id="multi-resolution">{t("Rules & outcome")}</h2>
       <p>
         {t("Published rules")}:{" "}
-        <a href={d.market.terms.rulesUri} target="_blank" rel="noreferrer">
-          {d.market.terms.rulesUri}
-        </a>
+        <RulesDocumentDialog
+          uri={d.market.terms.rulesUri}
+          rulesHash={d.market.terms.rulesHash}
+        />
       </p>
       <p>
         {t("Rules SHA-256")}:{" "}

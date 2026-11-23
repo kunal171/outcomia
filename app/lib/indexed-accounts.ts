@@ -1,4 +1,5 @@
 /** Anchor compatibility belongs here; GraphQL operations stay in lib/graphql. */
+import { displayMetadata } from "./collateral-display";
 import { readWithRpcFallback } from "./read-source";
 import { BN, type Program, type AccountClient } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
@@ -90,61 +91,91 @@ export function hydrate(type: WireType, value: unknown): unknown {
 }
 export function indexedAccounts(program: Program) {
   if (!usesIndexer(program)) return program.account;
-  return new Proxy({}, {
-    get(_target, key: string) {
-      const name = idl.accounts.find((account) => camel(account.name) === key)?.name;
-      if (!name) throw new Error(`Unsupported indexed account ${key}`);
-      const rpcAccount = (program.account as unknown as Record<string, AccountClient>)[key];
-      const convert = (row: AccountRecord) => {
-        if (row.accountType !== name)
-          throw new Error("Indexed account type mismatch");
-        return hydrate({ defined: { name } }, row.data);
-      };
-      return {
-        fetchNullable: (address: PublicKey) =>
-          readWithRpcFallback(
-            "accounts",
-            () => getAccount(address.toBase58()).then((row) => row ? convert(row) : null),
-            () => dedupe(`rpc:nullable:${program.programId}:${key}:${address}`, () =>
-              rpcAccount.fetchNullable(address, "confirmed")),
-          ),
-        fetch: (address: PublicKey) => readWithRpcFallback(
-          "accounts",
-          async () => {
-            const row = await getAccount(address.toBase58());
-            if (!row) throw new Error("Indexed account was not found");
-            return convert(row);
-          },
-          () => dedupe(`rpc:account:${program.programId}:${key}:${address}`, () =>
-            rpcAccount.fetch(address, "confirmed")),
-        ),
-        all: (filters?: { memcmp: AccountFilter }[]) =>
-          dedupe(`all:${name}:${JSON.stringify(filters)}`, () => readWithRpcFallback(
-            "accounts",
-            async () => {
-              const output: { publicKey: PublicKey; account: unknown }[] = [];
-              let after: string | null = null;
-              let revision: string | null = null;
-              const getPage = MARKET_ACCOUNT_TYPES.includes(name) ? getMarkets : getAccounts;
-              for (let count = 0; count < 100; count++) {
-                const page = await getPage(name, filters?.map((filter) => filter.memcmp), after, revision);
-                revision ??= page.sync.revision;
-                output.push(...page.nodes.map((row) => ({
-                  publicKey: new PublicKey(row.address),
-                  account: convert(row),
-                })));
-                if (!page.hasNextPage) return output;
-                if (!page.endCursor || page.endCursor === after)
-                  throw new Error("Indexed pagination did not advance");
-                after = page.endCursor;
-              }
-              throw new Error("Indexed account result limit exceeded");
-            },
-            () => rpcAccount.all(filters),
-          )),
-      };
+  return new Proxy(
+    {},
+    {
+      get(_target, key: string) {
+        const name = idl.accounts.find(
+          (account) => camel(account.name) === key,
+        )?.name;
+        if (!name) throw new Error(`Unsupported indexed account ${key}`);
+        const rpcAccount = (
+          program.account as unknown as Record<string, AccountClient>
+        )[key];
+        const convert = (row: AccountRecord) => {
+          if (row.accountType !== name)
+            throw new Error("Indexed account type mismatch");
+          const value = hydrate({ defined: { name } }, row.data);
+          return name === "MarketMetadata" ? displayMetadata(value) : value;
+        };
+        return {
+          fetchNullable: (address: PublicKey) =>
+            readWithRpcFallback(
+              "accounts",
+              () =>
+                getAccount(address.toBase58()).then((row) =>
+                  row ? convert(row) : null,
+                ),
+              () =>
+                dedupe(
+                  `rpc:nullable:${program.programId}:${key}:${address}`,
+                  () => rpcAccount.fetchNullable(address, "confirmed"),
+                ),
+            ),
+          fetch: (address: PublicKey) =>
+            readWithRpcFallback(
+              "accounts",
+              async () => {
+                const row = await getAccount(address.toBase58());
+                if (!row) throw new Error("Indexed account was not found");
+                return convert(row);
+              },
+              () =>
+                dedupe(
+                  `rpc:account:${program.programId}:${key}:${address}`,
+                  () => rpcAccount.fetch(address, "confirmed"),
+                ),
+            ),
+          all: (filters?: { memcmp: AccountFilter }[]) =>
+            dedupe(`all:${name}:${JSON.stringify(filters)}`, () =>
+              readWithRpcFallback(
+                "accounts",
+                async () => {
+                  const output: { publicKey: PublicKey; account: unknown }[] =
+                    [];
+                  let after: string | null = null;
+                  let revision: string | null = null;
+                  const getPage = MARKET_ACCOUNT_TYPES.includes(name)
+                    ? getMarkets
+                    : getAccounts;
+                  for (let count = 0; count < 100; count++) {
+                    const page = await getPage(
+                      name,
+                      filters?.map((filter) => filter.memcmp),
+                      after,
+                      revision,
+                    );
+                    revision ??= page.sync.revision;
+                    output.push(
+                      ...page.nodes.map((row) => ({
+                        publicKey: new PublicKey(row.address),
+                        account: convert(row),
+                      })),
+                    );
+                    if (!page.hasNextPage) return output;
+                    if (!page.endCursor || page.endCursor === after)
+                      throw new Error("Indexed pagination did not advance");
+                    after = page.endCursor;
+                  }
+                  throw new Error("Indexed account result limit exceeded");
+                },
+                () => rpcAccount.all(filters),
+              ),
+            ),
+        };
+      },
     },
-  });
+  );
 }
 export async function accountInfos(
   connection: import("@solana/web3.js").Connection,

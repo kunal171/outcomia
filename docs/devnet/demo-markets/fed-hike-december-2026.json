@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will the Federal Reserve raise the federal funds target range at its 8–9 December 2026 FOMC meeting?",
+  "description": "The target range is 3.75–4.00%. Futures markets price a December hike as likely.",
+  "resolutionSource": "Federal Reserve FOMC statement published at federalreserve.gov on 9 December 2026.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if the FOMC statement raises the upper bound of the target range above 4.00%.",
+    "noCriteria": "Resolve NO if the target range is held or lowered.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1796839200,
+  "earliestResolutionTimestamp": 1796844600,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

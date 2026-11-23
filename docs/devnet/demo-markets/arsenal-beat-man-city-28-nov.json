@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "question": "Will Arsenal beat Manchester City in their Premier League match at the Emirates Stadium on 28 November 2026?",
+  "description": "Leaders Arsenal (28 pts) host third-placed Manchester City (22 pts).",
+  "resolutionSource": "Official Premier League match result at premierleague.com.",
+  "resolutionRules": {
+    "yesCriteria": "Resolve YES if Arsenal win the match in regulation time (including stoppage time).",
+    "noCriteria": "Resolve NO if the match ends in a draw or a Manchester City win.",
+    "invalidCriteria": "Resolve Invalid if the event is cancelled or the outcome cannot be established using these rules.",
+    "evidenceRequirements": "Provide the source URL, observation time in UTC, and a copy or reference to the published result.",
+    "conflictingEvidencePolicy": "Use the named source as authoritative. Document any revisions and apply the same cutoff to both outcomes."
+  },
+  "closeTimestamp": 1795867200,
+  "earliestResolutionTimestamp": 1795899600,
+  "primaryResolver": "BX6RJHGbi7msj7t1ECCX6T1ZvvetHDK6UkjzAhPfWngq",
+  "fallback": null,
+  "resolutionDelaySeconds": 3600
+}

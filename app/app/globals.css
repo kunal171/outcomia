@@ -2290,3 +2290,30 @@ body:has(.prediction-guide[open]) {
 .club-list small {
   color: var(--muted);
 }
+
+/* outcomia-tUSDC claim row inside the shared funds panel */
+.test-usdc-faucet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed rgb(var(--accent-rgb) / 0.4);
+  border-radius: var(--radius-md);
+  background: rgb(var(--accent-rgb) / 0.05);
+}
+.test-usdc-faucet > div {
+  display: grid;
+  gap: 2px;
+}
+.test-usdc-faucet span {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.test-usdc-faucet [role] {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-small);
+}
