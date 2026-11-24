@@ -64,6 +64,11 @@ type Revision {
 	commitment: String!
 	revision: String!
 	resync: Boolean!
+	"""
+	Accounts, markets and owners this revision changed; null means the
+	change is unknown or too large to list, so clients refresh everything.
+	"""
+	scope: [String!]
 }
 
 type SyncInfo {
