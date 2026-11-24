@@ -197,7 +197,8 @@ export function TradingChart(props: Props) {
       <div className="chart-heading">
         <h2 id={title}>Trading chart</h2>
         <span>
-          {loading
+          {/* Background refreshes keep the current series and stay silent. */}
+          {loading && !series
             ? "Updating…"
             : series
               ? `${series.commitment} · ${series.coverage.toLowerCase()}`
@@ -273,13 +274,34 @@ export function TradingChart(props: Props) {
           Volume
         </label>
       </div>
+      {valid && candles.length > 0 && (
+        <p className="chart-last">
+          <strong>
+            {exact(candles.at(-1)!.close)} {props.symbol}
+          </strong>
+          {(() => {
+            // Change over the selected range: first open to latest close.
+            const open = value(candles[0].open),
+              close = value(candles.at(-1)!.close);
+            if (!open || Math.abs(close - open) < 1e-12) return null;
+            const change = ((close - open) / open) * 100;
+            return (
+              <span className={change > 0 ? "chart-up" : "chart-down"}>
+                {change > 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+              </span>
+            );
+          })()}
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {series?.error && <p role="status">{series.error}</p>}
       {series && !candles.length && !series.error && (
         <p role="status">
-          {series.coverage === "COMPLETE"
-            ? "No executions in this range."
-            : "Trade history is still being indexed."}
+          {/* PARTIAL means the newest seconds may still be replaying; only
+              INCOMPLETE history is genuinely unknown. */}
+          {series.coverage === "INCOMPLETE"
+            ? "Trade history is still being indexed."
+            : "No trades in this range yet."}
         </p>
       )}
       {!valid && <p role="alert">Chart values could not be displayed.</p>}
@@ -398,7 +420,7 @@ export function TradingChart(props: Props) {
               ))}
           </svg>
           <p className="rules-help">
-            Execution prices · {props.symbol} per contract or base token.{" "}
+            Execution prices in {props.symbol}.{" "}
             {kind === "Line" || kind === "Area"
               ? "The line holds the last trade price between trades (dashed after the latest)."
               : "Intervals without trades are empty."}{" "}
