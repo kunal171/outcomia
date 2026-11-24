@@ -12,6 +12,7 @@ import {
 import type { MarketMetadataAccount } from "../lib/outcomia";
 import { PredictionMarketOverview } from "./prediction/market-overview";
 import { PredictionMarketRules } from "./prediction/market-rules";
+import { PredictionGuide } from "./prediction-guide";
 import { useProtocolRole } from "./protocol-role-provider";
 
 type Tab = "trade" | "position" | "rules" | "manage";
@@ -94,7 +95,8 @@ export function PredictionDetailLayout(props: Props) {
   return (
     <div className="prediction-workspace">
       <PredictionMarketOverview
-        market={market}
+        closeTs={market.closeTs}
+        guide={<PredictionGuide compact market={market} symbol={symbol} />}
         name={metadata?.displayName ?? "Prediction market"}
         symbol={symbol}
         status={label}
