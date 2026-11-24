@@ -1232,7 +1232,6 @@
   "Review in wallet": "Review in wallet",
   "Available collateral": "Available collateral",
   "Account not initialized": "Account not initialized",
-  "Deposit or withdraw in Wallet →": "Deposit or withdraw in Wallet →",
   "Initialize trading accounts": "Initialize trading accounts",
   "Buy via other outcomes: {price} × {quantity}": "Buy via other outcomes: {price} × {quantity}",
   "Sell via other outcomes: {price} × {quantity}": "Sell via other outcomes: {price} × {quantity}",
@@ -1310,5 +1309,8 @@
   "Sells: merge pairs": "Sells: merge pairs",
   "Orders from departed members": "Orders from departed members",
   "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.",
-  "Clear order": "Clear order"
+  "Clear order": "Clear order",
+  "Available to trade": "Available to trade",
+  "Add collateral to place orders.": "Add collateral to place orders.",
+  "Set up trading accounts below to deposit.": "Set up trading accounts below to deposit."
 }

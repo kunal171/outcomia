@@ -34,6 +34,7 @@ import {
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 import { useI18n } from "../preferences-provider";
+import { TokenSymbol } from "../token-symbol";
 export function MultiTrading({ session: s }: { session: MultiSession }) {
   const [outcome, setOutcome] = useState(0),
     [side, setSide] = useState<Side>("bid"),
@@ -387,13 +388,51 @@ export function MultiTrading({ session: s }: { session: MultiSession }) {
           </form>
         </div>
       </div>
-      <p>
-        {t("Available collateral")}:{" "}
-        {d.cash
-          ? readableAmount(d.cash.free, d.decimals)
-          : t("Account not initialized")}
-        . <Link href="/wallet">{t("Deposit or withdraw in Wallet →")}</Link>
-      </p>
+      {/* What the trader can spend, with the way to add more right beside it. */}
+      <div
+        className={`multi-balance${d.cash && d.cash.free.isZero() ? " multi-balance-empty" : ""}`}
+      >
+        <div>
+          <span className="multi-balance-label">{t("Available to trade")}</span>
+          <strong className="multi-balance-amount">
+            {d.cash ? readableAmount(d.cash.free, d.decimals) : "—"}{" "}
+            {d.metadata?.quoteSymbol && (
+              <TokenSymbol symbol={d.metadata.quoteSymbol} />
+            )}
+          </strong>
+          {!d.cash ? (
+            <span className="multi-balance-hint">
+              {t("Set up trading accounts below to deposit.")}
+            </span>
+          ) : d.cash.free.isZero() ? (
+            <span className="multi-balance-hint">
+              {t("Add collateral to place orders.")}
+            </span>
+          ) : null}
+        </div>
+        <div className="multi-balance-actions">
+          {d.cash && (
+            <a
+              className="ui-btn ui-btn-primary"
+              href="#multi-funds"
+              onClick={(e) => {
+                // Open the deposit panel on this page instead of leaving it.
+                const panel = document.getElementById("multi-funds");
+                if (panel instanceof HTMLDetailsElement) {
+                  e.preventDefault();
+                  panel.open = true;
+                  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+            >
+              {t("Deposit")}
+            </a>
+          )}
+          <Link className="ui-btn" href="/wallet">
+            {t("Wallet →")}
+          </Link>
+        </div>
+      </div>
       {(!d.position || !d.cash) && (
         <button
           disabled={!ready}

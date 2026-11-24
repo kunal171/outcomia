@@ -1232,7 +1232,6 @@
   "Review in wallet": "Revisar na carteira",
   "Available collateral": "Colateral disponível",
   "Account not initialized": "Conta não inicializada",
-  "Deposit or withdraw in Wallet →": "Depositar ou sacar na Carteira →",
   "Initialize trading accounts": "Inicializar contas de negociação",
   "Buy via other outcomes: {price} × {quantity}": "Comprar via outros resultados: {price} × {quantity}",
   "Sell via other outcomes: {price} × {quantity}": "Vender via outros resultados: {price} × {quantity}",
@@ -1310,5 +1309,8 @@
   "Sells: merge pairs": "Vendas: fundir pares",
   "Orders from departed members": "Ordens de membros que saíram",
   "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "Esses titulares não podem mais negociar aqui, então suas ordens não serão executadas. Removê-las devolve os fundos ou contratos a cada titular.",
-  "Clear order": "Remover ordem"
+  "Clear order": "Remover ordem",
+  "Available to trade": "Disponível para negociar",
+  "Add collateral to place orders.": "Adicione garantia para enviar ordens.",
+  "Set up trading accounts below to deposit.": "Configure suas contas de negociação abaixo para depositar."
 }

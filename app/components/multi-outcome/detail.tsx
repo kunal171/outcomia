@@ -94,7 +94,7 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
               outcomes={d.market.terms.outcomeLabels}
             />
             <MultiTrading session={s} />
-            <details>
+            <details id="multi-funds">
               <summary>{t("Deposit or withdraw collateral")}</summary>
               <SharedAssetFunds
                 mint={d.market.collateralMint}
