@@ -3,7 +3,6 @@ import { TokenSymbol } from "../token-symbol";
 import Link from "next/link";
 import { PredictionChart } from "../prediction-chart";
 import { AppHeader } from "../app-header";
-import { transactionExplorerUrl } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
 import {
   MULTI_OUTCOME_ENABLED,
@@ -17,19 +16,35 @@ import { MultiTrading } from "./trading";
 import { MultiPositions } from "./positions";
 import { MultiFees } from "./fees";
 import { MultiResolution } from "./resolution";
+import { MultiOutcomeRules } from "./rules";
+import { useMarketClock } from "./use-clock";
+import { PredictionMarketOverview } from "../prediction/market-overview";
+import { MarketTabs } from "../market-tabs";
+import { TransactionToast } from "../transaction-toast";
+import { useProtocolRole } from "../protocol-role-provider";
 import "./multi-outcome.css";
 export function MultiOutcomeDetail({ address }: { address: string }) {
   const s = useMultiMarket(address),
     d = s.data,
-    { t } = useI18n();
+    { t } = useI18n(),
+    now = useMarketClock(),
+    { role } = useProtocolRole();
+  const symbol = d?.metadata?.quoteSymbol ?? "collateral";
+  // Same status wording as binary markets.
+  const status = !d
+    ? ""
+    : statusOf(d.market) === "open"
+      ? now < d.market.terms.closeTs.toNumber()
+        ? "Open for trading"
+        : "Trading closed"
+      : statusLabel(d.market);
   return (
     <div className="app-shell">
       <AppHeader />
-      <main className="route-shell multi-outcome">
-        <Link href="/predictions/multi">← {t("Multi-outcome markets")}</Link>
-        <h1 className="multi-detail-title">
-          {d?.metadata?.displayName ?? t("Multi-outcome market")}
-        </h1>
+      <main className="route-shell prediction-detail-route">
+        <Link className="text-button" href="/predictions">
+          {t("← Prediction markets")}
+        </Link>
         {!MULTI_OUTCOME_ENABLED && (
           <p role="status">
             {t(
@@ -37,102 +52,158 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
             )}
           </p>
         )}
-        <button
-          onClick={() => void s.refresh()}
-          disabled={!MULTI_OUTCOME_ENABLED || s.busy || s.loading}
-        >
-          {t("Refresh")}
-        </button>
-        {s.loading && <p role="status">{t("Refreshing market…")}</p>}
-        {s.error && <p role="alert">{s.error}</p>}
-        {s.signature && (
-          <p role="status">
-            {t("Confirmed")}:{" "}
-            <a
-              href={transactionExplorerUrl(s.signature)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t("View transaction")}
-            </a>
-          </p>
+        {s.error && (
+          <div className="access-card access-denied" role="alert">
+            <p>{s.error}</p>
+            {/* Without a loaded market there is no header refresh: retry here. */}
+            {!d && (
+              <button
+                type="button"
+                className="ui-btn"
+                aria-label={t("Refresh market")}
+                disabled={s.loading || !MULTI_OUTCOME_ENABLED}
+                onClick={() => void s.refresh()}
+              >
+                {t("Refresh")}
+              </button>
+            )}
+          </div>
+        )}
+        {!d && s.loading && (
+          <div className="access-card">{t("Loading market…")}</div>
         )}
         {d && (
-          <>
-            <p className="multi-actions">
-              <span className="ui-badge market-kind-multi">
-                {t("Multi-outcome")}
-              </span>
-              <span
-                className="ui-badge market-status-badge"
-                data-status={statusOf(d.market)}
-              >
-                {t(statusLabel(d.market))}
-              </span>
-              <span>
-                {t("Face payout {amount} {symbol}", {
-                  amount: readableAmount(
-                    d.market.terms.payoutPerContract,
-                    d.decimals,
-                  ),
-                  symbol: "",
-                }).trim()}{" "}
-                {d.metadata?.quoteSymbol && (
-                  <TokenSymbol symbol={d.metadata.quoteSymbol} />
-                )}
-              </span>
-              <span>
-                {t("Minimum {count} contracts", {
-                  count: d.market.terms.quantityLot.toString(),
-                })}
-              </span>
-            </p>
-            <PredictionChart
-              market={address}
-              engine="MULTI_OUTCOME"
-              priceDecimals={d.decimals}
-              outcomes={d.market.terms.outcomeLabels}
+          <div className="prediction-workspace">
+            <PredictionMarketOverview
+              closeTs={d.market.terms.closeTs}
+              name={d.metadata?.displayName ?? t("Multi-outcome market")}
+              symbol={symbol}
+              status={status}
+              tag="Multi-outcome"
+              loading={s.loading || !MULTI_OUTCOME_ENABLED}
+              onRefresh={() => void s.refresh()}
+              facts={[
+                {
+                  label: "Outcomes",
+                  value: String(d.market.terms.outcomeLabels.length),
+                },
+                {
+                  label: "Minimum order",
+                  value: t("{count} contracts", {
+                    count: d.market.terms.quantityLot.toString(),
+                  }),
+                },
+              ]}
             />
-            <MultiTrading session={s} />
-            <details id="multi-funds">
-              <summary>{t("Deposit or withdraw collateral")}</summary>
-              <SharedAssetFunds
-                mint={d.market.collateralMint}
-                decimals={d.decimals}
-                symbol={d.metadata?.quoteSymbol ?? "collateral"}
-                onChanged={() => void s.refresh()}
-              />
-            </details>
-            <MultiPositions session={s} />
-            <MultiResolution session={s} />
-            <MultiFees session={s} />
-            <details>
-              <summary>{t("Market details")}</summary>
-              <p>
-                {t("Market")}: <code>{address}</code>
-              </p>
-              <p>
-                {t("Resolver")}:{" "}
-                <code>{d.market.terms.resolver.toBase58()}</code>
-              </p>
-              <p>
-                {t("Closes")}:{" "}
-                {new Date(
-                  d.market.terms.closeTs.toNumber() * 1000,
-                ).toLocaleString()}
-              </p>
-              <p>
-                {t("Review delay: {seconds} seconds", {
-                  seconds: d.market.terms.resolutionDelaySeconds.toString(),
-                })}
-              </p>
-              <p>
-                {t("Reserve")}:{" "}
-                {readableAmount(d.market.backingReserve, d.decimals)}
-              </p>
-            </details>
-          </>
+            <MarketTabs
+              initial={statusOf(d.market) === "resolved" ? "position" : "trade"}
+              tabs={[
+                {
+                  id: "trade",
+                  label: "Trade",
+                  content: (
+                    <>
+                      <PredictionChart
+                        market={address}
+                        engine="MULTI_OUTCOME"
+                        priceDecimals={d.decimals}
+                        outcomes={d.market.terms.outcomeLabels}
+                      />
+                      <div className="multi-outcome">
+                        <MultiTrading session={s} />
+                        <details id="multi-funds">
+                          <summary>
+                            {t("Deposit or withdraw collateral")}
+                          </summary>
+                          <SharedAssetFunds
+                            mint={d.market.collateralMint}
+                            decimals={d.decimals}
+                            symbol={symbol}
+                            onChanged={() => void s.refresh()}
+                          />
+                        </details>
+                      </div>
+                    </>
+                  ),
+                },
+                {
+                  id: "position",
+                  label: "Your position",
+                  content: (
+                    <>
+                      <div className="prediction-position-intro">
+                        <Link className="text-button" href="/wallet">
+                          {t("Wallet →")}
+                        </Link>
+                      </div>
+                      <div className="multi-outcome">
+                        <MultiPositions session={s} />
+                      </div>
+                    </>
+                  ),
+                },
+                {
+                  id: "rules",
+                  label: "Rules & outcome",
+                  content: (
+                    <MultiOutcomeRules market={d.market} symbol={symbol}>
+                      <div className="multi-outcome multi-resolution-column">
+                        <MultiResolution session={s} />
+                        <details className="multi-technical">
+                          <summary>
+                            {t("Technical details & on-chain references")}
+                          </summary>
+                          <dl>
+                            <dt>{t("Market")}</dt>
+                            <dd>
+                              <code>{address}</code>
+                            </dd>
+                            <dt>{t("Resolver")}</dt>
+                            <dd>
+                              <code>{d.market.terms.resolver.toBase58()}</code>
+                            </dd>
+                            <dt>{t("Rules SHA-256")}</dt>
+                            <dd>
+                              <code>
+                                {Buffer.from(d.market.terms.rulesHash).toString(
+                                  "hex",
+                                )}
+                              </code>
+                            </dd>
+                            <dt>{t("Reserve")}</dt>
+                            <dd>
+                              {readableAmount(
+                                d.market.backingReserve,
+                                d.decimals,
+                              )}{" "}
+                              <TokenSymbol symbol={symbol} />
+                            </dd>
+                          </dl>
+                        </details>
+                      </div>
+                    </MultiOutcomeRules>
+                  ),
+                },
+                // Fee withdrawal is the only market administration here and
+                // only the super-admin can do it, as on binary markets.
+                ...(role === "super-admin"
+                  ? [
+                      {
+                        id: "manage",
+                        label: "Manage market",
+                        content: (
+                          <div className="multi-outcome">
+                            <MultiFees session={s} />
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
         )}
+        <TransactionToast signature={s.signature ?? null} />
       </main>
     </div>
   );

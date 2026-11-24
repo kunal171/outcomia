@@ -509,7 +509,37 @@
 .multi-outcome .multi-balance-actions a {
   text-decoration: none;
 }
-.multi-outcome .multi-rules-link {
+/* Rules tab: the resolution column sits flush, as on binary markets. */
+.multi-outcome.multi-resolution-column section {
+  padding: 0;
+  border-top: 0;
+}
+.multi-outcome .multi-technical {
+  margin-top: var(--space-5);
+}
+.multi-outcome .multi-technical dl {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-3) 0 0;
+}
+.multi-outcome .multi-technical dt {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.multi-outcome .multi-technical dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+/* Inside the market tabs, headings and notes use the binary page's sizes. */
+.prediction-workspace .multi-outcome h2 {
   margin: 0 0 var(--space-3);
-  line-height: 1.55;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.prediction-workspace .multi-resolution-column section > p {
+  color: var(--muted);
+  font-size: 14px;
 }

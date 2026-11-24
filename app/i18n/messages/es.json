@@ -1312,5 +1312,10 @@
   "Clear order": "Eliminar orden",
   "Available to trade": "Disponible para operar",
   "Add collateral to place orders.": "Añade garantía para colocar órdenes.",
-  "Set up trading accounts below to deposit.": "Configura tus cuentas de trading abajo para depositar."
+  "Set up trading accounts below to deposit.": "Configura tus cuentas de trading abajo para depositar.",
+  "Dismiss": "Cerrar",
+  "Minimum order": "Orden mínima",
+  "{count} contracts": "{count} contratos",
+  "Paid contracts": "Contratos pagados",
+  "Payout": "Pago"
 }

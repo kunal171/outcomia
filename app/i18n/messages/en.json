@@ -1312,5 +1312,10 @@
   "Clear order": "Clear order",
   "Available to trade": "Available to trade",
   "Add collateral to place orders.": "Add collateral to place orders.",
-  "Set up trading accounts below to deposit.": "Set up trading accounts below to deposit."
+  "Set up trading accounts below to deposit.": "Set up trading accounts below to deposit.",
+  "Dismiss": "Dismiss",
+  "Minimum order": "Minimum order",
+  "{count} contracts": "{count} contracts",
+  "Paid contracts": "Paid contracts",
+  "Payout": "Payout"
 }
