@@ -74,13 +74,15 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
   return (
     <section aria-labelledby="multi-resolution">
       <h2 id="multi-resolution">{t("Rules & outcome")}</h2>
-      <p>
+      {/* A div, not a p: the rules viewer renders a <dialog>, which a
+          paragraph cannot contain (React reports it as a hydration error). */}
+      <div className="multi-rules-link">
         {t("Published rules")}:{" "}
         <RulesDocumentDialog
           uri={d.market.terms.rulesUri}
           rulesHash={d.market.terms.rulesHash}
         />
-      </p>
+      </div>
       <p>
         {t("Rules SHA-256")}:{" "}
         <code>{Buffer.from(d.market.terms.rulesHash).toString("hex")}</code>
