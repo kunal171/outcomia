@@ -57,7 +57,7 @@
 .prediction-chart .pc-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 4px 6px;
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
@@ -74,6 +74,46 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+/* Legend entries double as the outcome filter (multi-outcome charts). */
+.prediction-chart .pc-legend button[type="button"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
+}
+.prediction-chart .pc-legend button[type="button"]:hover {
+  background: rgb(var(--ink-rgb) / 0.05);
+}
+.prediction-chart .pc-legend button[type="button"][aria-pressed="true"] {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+.prediction-chart .pc-legend button[type="button"].pc-legend-dim {
+  opacity: 0.55;
+}
+.prediction-chart .pc-legend button[type="button"].pc-legend-dim:hover {
+  opacity: 1;
+}
+.prediction-chart .pc-legend button[type="button"].pc-legend-all {
+  border-color: var(--line);
+  color: var(--accent);
+  font-weight: 600;
+}
+.prediction-chart .pc-legend button[type="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .prediction-chart .pc-legend strong {
   font-variant-numeric: tabular-nums;
