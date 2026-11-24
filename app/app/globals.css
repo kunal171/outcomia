@@ -2407,6 +2407,27 @@ body:has(.prediction-guide[open]) {
   fill: #d34c6f;
   stroke: #d34c6f;
 }
+/* Spot chart headline: last price and change over the range. */
+.chart-last {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.chart-last strong {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.chart-up {
+  color: var(--yes);
+  font-weight: 650;
+}
+.chart-down {
+  color: var(--no);
+  font-weight: 650;
+}
 .chart-line {
   fill: none;
   stroke: var(--accent);
@@ -2440,20 +2461,100 @@ body:has(.prediction-guide[open]) {
   border-bottom: 1px solid var(--line);
   text-align: right;
 }
+/* Header session widget (components/wallet-session-provider.tsx). */
 .wallet-session-status {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
 }
-.wallet-session-status details {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  width: min(290px, 80vw);
-  padding: 10px;
+.wss-state {
+  display: grid;
+  gap: 1px;
+  line-height: 1.25;
+  text-align: right;
+}
+.wss-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wss-label i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.wss-label.wss-signed i {
+  background: var(--yes);
+}
+.wss-signin {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
   background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wss-signin:hover:enabled {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.wss-signin:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.wss-issue summary {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgb(var(--warn-rgb) / 0.16);
+  color: var(--warn);
+  font-weight: 800;
+  list-style: none;
+  cursor: pointer;
+}
+.wss-issue summary::-webkit-details-marker {
+  display: none;
+}
+.wss-issue[open] p {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(290px, 80vw);
+  margin: 0;
+  padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  z-index: 10;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+  color: var(--ink);
+  line-height: 1.45;
+}
+@media (max-width: 600px) {
+  /* Phones: keep the logo visible; the status text moves out of the row. */
+  .wss-state {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  /* Signing in is optional (trading works without it); give the row back. */
+  .wallet-session-status {
+    display: none;
+  }
 }
 
 .indexed-commitment {
