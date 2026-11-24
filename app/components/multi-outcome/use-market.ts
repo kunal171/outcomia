@@ -96,24 +96,32 @@ export function useMultiMarket(address: string) {
     };
   }, [reader, connection, wallet, address]);
   /** `quiet` (live updates) keeps the current data visible while reloading. */
-  const refresh = useCallback(async (quiet = false) => {
-    if (!MULTI_OUTCOME_ENABLED) return;
-    const request = ++generation.current;
-    if (!quiet) setLoading(true);
-    setError("");
-    try {
-      const value = await load();
-      if (request === generation.current)
-        setData({ ...value, identity: owner, address });
-    } catch (e) {
-      if (request === generation.current) {
-        setData(null);
-        setError(e instanceof Error ? e.message : String(e));
+  const refresh = useCallback(
+    async (quiet = false) => {
+      if (!MULTI_OUTCOME_ENABLED) return;
+      const request = ++generation.current;
+      // A background refresh must not wipe a message the user is reading
+      // (e.g. a rejected signature), and a transient failure keeps the current
+      // data on screen; the next update retries. Manual refreshes report errors.
+      if (!quiet) {
+        setLoading(true);
+        setError("");
       }
-    } finally {
-      if (request === generation.current) setLoading(false);
-    }
-  }, [load, owner, address]);
+      try {
+        const value = await load();
+        if (request === generation.current)
+          setData({ ...value, identity: owner, address });
+      } catch (e) {
+        if (request === generation.current && !quiet) {
+          setData(null);
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      } finally {
+        if (request === generation.current) setLoading(false);
+      }
+    },
+    [load, owner, address],
+  );
   useEffect(() => {
     setData(null);
     setSignature("");
@@ -164,12 +172,9 @@ export function useMultiMarket(address: string) {
       if (mounted.current) setBusy(false);
     }
   };
-  useIndexerUpdates(
-    () => {
-      if (!lock.current) void refresh(true);
-    },
-    [address, owner],
-  );
+  useIndexerUpdates(() => {
+    if (!lock.current) void refresh(true);
+  }, [address, owner]);
   return {
     data: data?.identity === owner && data.address === address ? data : null,
     reader,

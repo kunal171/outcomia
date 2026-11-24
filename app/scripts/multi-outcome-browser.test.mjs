@@ -199,9 +199,7 @@ try {
       await page
         .getByRole("heading", { name: "Multi-outcome positions", exact: true })
         .waitFor({ timeout: 120000 });
-      await page
-        .getByRole("link", { name: "Manage position →" })
-        .waitFor();
+      await page.getByRole("link", { name: "Manage position →" }).waitFor();
       await page.goto(new URL("/orders", base).href);
       await page
         .getByRole("heading", { name: "Multi-outcome orders", exact: true })
@@ -219,7 +217,9 @@ try {
         .getByRole("heading", { name: "Which colour wins?", exact: true })
         .waitFor();
       setMarketMissing(true);
-      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Refresh market", exact: true })
+        .click();
       await page
         .getByText("Multi-outcome market not found on this network.", {
           exact: true,
@@ -227,12 +227,14 @@ try {
         .waitFor();
       assert.equal(
         await page
-          .getByRole("button", { name: "Refresh", exact: true })
+          .getByRole("button", { name: "Refresh market", exact: true })
           .isEnabled(),
         true,
       );
       setMarketMissing(false);
-      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Refresh market", exact: true })
+        .click();
       await page
         .getByRole("heading", { name: "Which colour wins?", exact: true })
         .waitFor();
@@ -263,7 +265,7 @@ try {
         .getByRole("button", { name: "Review in wallet", exact: true })
         .click();
       await page.waitForFunction(() =>
-        document.body.textContent.includes("Confirmed:"),
+        document.body.textContent.includes("Transaction confirmed"),
       );
       assert.ok(submissions.includes("matchMultiOutcomeOrder"));
       await page.waitForFunction(
@@ -271,7 +273,9 @@ try {
           document.querySelector('input[inputmode="numeric"]')?.value === "",
       );
       await setAskLadder(4);
-      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Refresh market", exact: true })
+        .click();
       await page.getByLabel(/Contracts \(multiples/).fill("12");
       await page
         .getByRole("button", { name: "Review in wallet", exact: true })
@@ -300,17 +304,21 @@ try {
         submissions.filter((n) => n === "matchMultiOutcomeOrder").length,
         5,
       );
+      // Fee withdrawal sits on the super-admin Manage market tab.
+      await page.getByRole("tab", { name: "Manage market" }).click();
       await page.getByText("Protocol fees", { exact: true }).click();
       await page.getByLabel(/Fee withdrawal/).fill("0.01");
       await page
         .getByRole("button", { name: "Withdraw earned fees", exact: true })
         .click();
       await page.waitForFunction(() =>
-        document.body.textContent.includes("Confirmed:"),
+        document.body.textContent.includes("Transaction confirmed"),
       );
       assert.ok(submissions.includes("withdrawMultiOutcomeFees"));
       await page.clock.setFixedTime(new Date(2000000005 * 1000));
       setLedgerNow(2000000005);
+      // Resolution actions sit on the Rules & outcome tab.
+      await page.getByRole("tab", { name: "Rules & outcome" }).click();
       await page
         .getByRole("button", { name: "Freeze at cutoff", exact: true })
         .click();
@@ -332,7 +340,11 @@ try {
       await page
         .getByRole("button", { name: "Finalize outcome", exact: true })
         .click();
-      await page.getByRole("button", { name: "Refresh", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Refresh market", exact: true })
+        .click();
+      // Redemption sits on the Your position tab.
+      await page.getByRole("tab", { name: "Your position" }).click();
       await page
         .getByRole("button", { name: "Redeem available contracts" })
         .waitFor();
@@ -340,7 +352,7 @@ try {
         .getByRole("button", { name: "Redeem available contracts" })
         .click();
       await page.waitForFunction(() =>
-        document.body.textContent.includes("Confirmed:"),
+        document.body.textContent.includes("Transaction confirmed"),
       );
       assert.ok(submissions.includes("redeemMultiOutcome"));
     }

@@ -8,7 +8,6 @@ import { resolutionAvailability } from "../../lib/multi-outcome-lifecycle";
 import { useMarketClock } from "./use-clock";
 import type { MultiSession } from "./use-market";
 import { useI18n } from "../preferences-provider";
-import { RulesDocumentDialog } from "../rules-document-dialog";
 export function MultiResolution({ session: s }: { session: MultiSession }) {
   const [result, setResult] = useState("invalid"),
     [uri, setUri] = useState(""),
@@ -73,18 +72,11 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
       : t("Invalid (equal refunds)");
   return (
     <section aria-labelledby="multi-resolution">
-      <h2 id="multi-resolution">{t("Rules & outcome")}</h2>
-      <p>
-        {t("Published rules")}:{" "}
-        <RulesDocumentDialog
-          uri={d.market.terms.rulesUri}
-          rulesHash={d.market.terms.rulesHash}
-        />
-      </p>
-      <p>
-        {t("Rules SHA-256")}:{" "}
-        <code>{Buffer.from(d.market.terms.rulesHash).toString("hex")}</code>
-      </p>
+      {/* The rules themselves live in the left column (MultiOutcomeRules). */}
+      <h2 id="multi-resolution">{t("Resolution")}</h2>
+      {!d.market.finalOutcome && !proposed && (
+        <p>{t("No outcome proposed.")}</p>
+      )}
       {d.market.finalOutcome && (
         <p>
           {t("Final outcome")}: {outcomeText(d.market.finalOutcome)}

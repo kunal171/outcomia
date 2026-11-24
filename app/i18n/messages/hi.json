@@ -1232,7 +1232,6 @@
   "Review in wallet": "वॉलेट में समीक्षा करें",
   "Available collateral": "उपलब्ध कोलैटरल",
   "Account not initialized": "खाता आरंभ नहीं हुआ",
-  "Deposit or withdraw in Wallet →": "वॉलेट में जमा या निकासी करें →",
   "Initialize trading accounts": "ट्रेडिंग खाते आरंभ करें",
   "Buy via other outcomes: {price} × {quantity}": "अन्य परिणामों से खरीदें: {price} × {quantity}",
   "Sell via other outcomes: {price} × {quantity}": "अन्य परिणामों से बेचें: {price} × {quantity}",
@@ -1310,5 +1309,13 @@
   "Sells: merge pairs": "बिक्री: जोड़े मिलाएँ",
   "Orders from departed members": "छोड़ चुके सदस्यों के ऑर्डर",
   "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "ये मालिक अब यहाँ ट्रेड नहीं कर सकते, इसलिए उनके ऑर्डर पूरे नहीं होंगे। हटाने पर फंड या कॉन्ट्रैक्ट हर मालिक को लौट जाते हैं।",
-  "Clear order": "ऑर्डर हटाएँ"
+  "Clear order": "ऑर्डर हटाएँ",
+  "Available to trade": "ट्रेड के लिए उपलब्ध",
+  "Add collateral to place orders.": "ऑर्डर देने के लिए कोलैटरल जोड़ें।",
+  "Set up trading accounts below to deposit.": "जमा करने के लिए नीचे ट्रेडिंग खाते सेट करें।",
+  "Dismiss": "बंद करें",
+  "Minimum order": "न्यूनतम ऑर्डर",
+  "{count} contracts": "{count} कॉन्ट्रैक्ट",
+  "Paid contracts": "भुगतान वाले कॉन्ट्रैक्ट",
+  "Payout": "भुगतान"
 }

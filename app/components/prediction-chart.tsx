@@ -52,6 +52,8 @@ const PRIOR_DAYS = 89;
  */
 export function PredictionChart(props: Props) {
   const [range, setRange] = useState<RangeLabel>("1D");
+  /** Multi-outcome filter: one outcome's line only, or null for all. */
+  const [focus, setFocus] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -201,7 +203,10 @@ export function PredictionChart(props: Props) {
       ? "var(--accent)"
       : `rgb(var(--hue-${(i % 6) + 1}-rgb))`,
   }));
-  const drawn = series.filter((s) => s.line.length > 0);
+  const traded = series.filter((s) => s.line.length > 0);
+  // A selected outcome hides the others and rezooms the axis to its line.
+  const focused = traded.find((s) => s.label === focus) ?? null;
+  const drawn = focused ? [focused] : traded;
   const values = drawn.flatMap((s) => s.line.map((p) => p.v));
   const axis = probabilityAxis(values);
   const plotRight = width - RIGHT;
@@ -213,12 +218,14 @@ export function PredictionChart(props: Props) {
     TOP +
     ((axis.max - v) / Math.max(1e-9, axis.max - axis.min)) *
       (HEIGHT - TOP - BOTTOM);
-  const current = drawn.map((s) => ({
+  const current = traded.map((s) => ({
     ...s,
     now: s.line.at(-1)!.v,
     start: s.line[0].v,
   }));
-  const headline = props.binary ? current[0] : null;
+  const headline = props.binary
+    ? current[0]
+    : (current.find((s) => s.label === focused?.label) ?? null);
   const change = headline ? (headline.now - headline.start) * 100 : 0;
   const timeLabel = (t: number) =>
     new Date(t * 1000).toLocaleString(
@@ -237,9 +244,13 @@ export function PredictionChart(props: Props) {
       <div className="pc-head">
         <div>
           <h2 id={title} className="pc-title">
-            {props.binary ? "Chance of Yes" : "Outcome chances"}
+            {props.binary
+              ? "Chance of Yes"
+              : focused
+                ? focused.label
+                : "Outcome chances"}
           </h2>
-          {headline ? (
+          {headline && (
             <p className="pc-headline">
               <strong>{percent(headline.now)}</strong> chance
               {Math.abs(change) >= 0.05 && (
@@ -249,14 +260,44 @@ export function PredictionChart(props: Props) {
                 </span>
               )}
             </p>
-          ) : (
-            <ul className="pc-legend">
+          )}
+          {!props.binary && (
+            <ul className="pc-legend" aria-label="Show outcome">
+              {focused && (
+                <li>
+                  <button
+                    type="button"
+                    className="pc-legend-all"
+                    onClick={() => setFocus(null)}
+                  >
+                    All outcomes
+                  </button>
+                </li>
+              )}
               {[...current]
                 .sort((a, b) => b.now - a.now)
                 .map((s) => (
                   <li key={s.label}>
-                    <i style={{ background: s.color }} />
-                    {s.label} <strong>{percent(s.now)}</strong>
+                    <button
+                      type="button"
+                      aria-pressed={focused?.label === s.label}
+                      className={
+                        focused && focused.label !== s.label
+                          ? "pc-legend-dim"
+                          : undefined
+                      }
+                      title={
+                        focused?.label === s.label
+                          ? "Show all outcomes"
+                          : `Show only ${s.label}`
+                      }
+                      onClick={() =>
+                        setFocus(focused?.label === s.label ? null : s.label)
+                      }
+                    >
+                      <i style={{ background: s.color }} />
+                      {s.label} <strong>{percent(s.now)}</strong>
+                    </button>
                   </li>
                 ))}
             </ul>
@@ -329,7 +370,10 @@ export function PredictionChart(props: Props) {
               );
             })}
             {drawn.map((s) => (
-              <g key={`${data!.key}:${s.label}`} className="pc-series">
+              <g
+                key={`${data!.key}:${focused?.label ?? "all"}:${s.label}`}
+                className="pc-series"
+              >
                 {props.binary && (
                   <path
                     className="pc-area"

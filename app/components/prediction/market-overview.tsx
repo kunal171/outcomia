@@ -2,26 +2,36 @@
 import { TokenSymbol } from "../token-symbol";
 import { useI18n } from "../preferences-provider";
 
-import type { PredictionMarketAccount } from "../../lib/prediction";
+import type { ReactNode } from "react";
+import type { BN } from "@anchor-lang/core";
 import { predictionTime } from "../../lib/prediction";
 import { predictionCloseLabel } from "../../lib/prediction-display";
-import { PredictionGuide } from "../prediction-guide";
 
-/** The question leads; status, settlement unit and deadline share one quiet header. */
+/** The question leads; status, settlement unit and deadline share one quiet
+ * header. Shared by binary and multi-outcome markets so both pages match. */
 export function PredictionMarketOverview({
-  market,
+  closeTs,
   name,
   symbol,
   status,
   loading,
   onRefresh,
+  guide,
+  tag,
+  facts = [],
 }: {
-  market: PredictionMarketAccount;
+  closeTs: BN;
   name: string;
   symbol: string;
   status: string;
   loading: boolean;
   onRefresh: () => void;
+  /** Optional help control beside refresh (the binary guide). */
+  guide?: ReactNode;
+  /** Optional market-type badge, e.g. "Multi-outcome". */
+  tag?: string;
+  /** Extra facts after payout and close time. */
+  facts?: { label: string; value: ReactNode }[];
 }) {
   const { t, locale } = useI18n();
 
@@ -40,9 +50,10 @@ export function PredictionMarketOverview({
               : t(status)}
           </span>
           <span className="prediction-network">{t("Devnet")}</span>
+          {tag && <span className="ui-badge market-kind-multi">{t(tag)}</span>}
         </div>
         <div className="prediction-overview-actions">
-          <PredictionGuide compact market={market} symbol={symbol} />
+          {guide}
           <button
             type="button"
             className="prediction-refresh"
@@ -70,10 +81,16 @@ export function PredictionMarketOverview({
         </div>
         <div>
           <dt>{t("Closes")}</dt>
-          <dd title={predictionTime(market.closeTs)}>
-            {predictionCloseLabel(market.closeTs, locale)}
+          <dd title={predictionTime(closeTs)}>
+            {predictionCloseLabel(closeTs, locale)}
           </dd>
         </div>
+        {facts.map((fact) => (
+          <div key={fact.label}>
+            <dt>{t(fact.label)}</dt>
+            <dd>{fact.value}</dd>
+          </div>
+        ))}
       </dl>
     </header>
   );

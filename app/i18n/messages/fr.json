@@ -1232,7 +1232,6 @@
   "Review in wallet": "Vérifier dans le portefeuille",
   "Available collateral": "Collatéral disponible",
   "Account not initialized": "Compte non initialisé",
-  "Deposit or withdraw in Wallet →": "Déposer ou retirer dans Portefeuille →",
   "Initialize trading accounts": "Initialiser les comptes de trading",
   "Buy via other outcomes: {price} × {quantity}": "Acheter via les autres issues : {price} × {quantity}",
   "Sell via other outcomes: {price} × {quantity}": "Vendre via les autres issues : {price} × {quantity}",
@@ -1310,5 +1309,13 @@
   "Sells: merge pairs": "Ventes : fusionner des paires",
   "Orders from departed members": "Ordres de membres partis",
   "These owners can no longer trade here, so their orders cannot fill. Clearing returns the funds or contracts to each owner.": "Ces titulaires ne peuvent plus négocier ici, leurs ordres ne seront pas exécutés. Les retirer rend les fonds ou contrats à chaque titulaire.",
-  "Clear order": "Retirer l’ordre"
+  "Clear order": "Retirer l’ordre",
+  "Available to trade": "Disponible pour trader",
+  "Add collateral to place orders.": "Ajoutez une garantie pour passer des ordres.",
+  "Set up trading accounts below to deposit.": "Configurez vos comptes de trading ci-dessous pour déposer.",
+  "Dismiss": "Fermer",
+  "Minimum order": "Ordre minimum",
+  "{count} contracts": "{count} contrats",
+  "Paid contracts": "Contrats payés",
+  "Payout": "Paiement"
 }

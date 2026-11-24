@@ -452,3 +452,94 @@
 .multi-outcome .multi-orders-title {
   margin-top: var(--space-6);
 }
+
+/* Trading balance card (components/multi-outcome/trading.tsx). */
+.multi-outcome .multi-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  margin: var(--space-5) 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--panel);
+}
+.multi-outcome .multi-balance.multi-balance-empty {
+  border-color: rgb(var(--warn-rgb) / 0.4);
+  background: rgb(var(--warn-rgb) / 0.06);
+}
+.multi-outcome .multi-balance > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.multi-outcome .multi-balance-label {
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.multi-outcome .multi-balance-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.multi-outcome .multi-balance-amount .token-symbol {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.multi-outcome .multi-balance-hint {
+  color: var(--warn);
+  font-size: var(--text-small);
+  font-weight: 600;
+}
+.multi-outcome .multi-balance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.multi-outcome .multi-balance-actions a {
+  text-decoration: none;
+}
+/* Rules tab: the resolution column sits flush, as on binary markets. */
+.multi-outcome.multi-resolution-column section {
+  padding: 0;
+  border-top: 0;
+}
+.multi-outcome .multi-technical {
+  margin-top: var(--space-5);
+}
+.multi-outcome .multi-technical dl {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-3) 0 0;
+}
+.multi-outcome .multi-technical dt {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.multi-outcome .multi-technical dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+/* Inside the market tabs, headings and notes use the binary page's sizes. */
+.prediction-workspace .multi-outcome h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.prediction-workspace .multi-resolution-column section > p {
+  color: var(--muted);
+  font-size: 14px;
+}
