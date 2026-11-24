@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import type { PublicKey } from "@solana/web3.js";
 import { useI18n } from "./preferences-provider";
@@ -20,8 +20,23 @@ export function TestUsdcFaucet({
     wallet = useAnchorWallet(),
     [pending, setPending] = useState(false),
     [error, setError] = useState<string | null>(null),
-    [signature, setSignature] = useState<string | null>(null);
-  if (mint.toBase58() !== TEST_USDC_MINT) return null;
+    [signature, setSignature] = useState<string | null>(null),
+    [enabled, setEnabled] = useState<boolean | null>(null);
+  const isTestMint = mint.toBase58() === TEST_USDC_MINT;
+  // A deployment without the faucet's keys or durable rate limiting reports
+  // enabled:false; hide the offer instead of a button that always fails.
+  useEffect(() => {
+    if (!isTestMint) return;
+    let dead = false;
+    fetch("/api/faucet", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ enabled?: boolean }>)
+      .then((body) => !dead && setEnabled(body.enabled === true))
+      .catch(() => !dead && setEnabled(false));
+    return () => {
+      dead = true;
+    };
+  }, [isTestMint]);
+  if (!isTestMint || !enabled) return null;
 
   async function claim() {
     if (!wallet) return;

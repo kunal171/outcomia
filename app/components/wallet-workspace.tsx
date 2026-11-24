@@ -8,7 +8,7 @@ import {
   PREDICTION_RESOLUTION_ENABLED,
   SHARED_BALANCES_ENABLED,
 } from "../lib/shared";
-import { SharedAssetFunds } from "./shared-wallet";
+import { SharedFundsPanel } from "./shared-funds-panel";
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
@@ -233,17 +233,14 @@ export function WalletWorkspace() {
             {data && (
               <div className="wallet-errors">
                 {data.shared && (
-                  <details className="admin-card">
-                    <summary>{t("Deposit or withdraw shared assets")}</summary>
-                    {assets.map((a) => (
-                      <SharedAssetFunds
-                        key={a.mint.toBase58()}
-                        mint={a.mint}
-                        decimals={a.decimals}
-                        symbol={a.symbol}
-                        onChanged={() => setRevision((v) => v + 1)}
-                      />
-                    ))}
+                  <details className="admin-card" open>
+                    <summary>
+                      {t("Move funds between your wallet and Outcomia")}
+                    </summary>
+                    <SharedFundsPanel
+                      assets={assets}
+                      onChanged={() => setRevision((v) => v + 1)}
+                    />
                   </details>
                 )}
                 <ReadError label={t("SOL balance")} result={data.sol} />

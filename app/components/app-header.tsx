@@ -26,7 +26,14 @@ type NavigationItem = {
   href: string;
   label: string;
   icon:
-    "prediction" | "spot" | "wallet" | "orders" | "admins" | "create" | "clubs";
+    | "prediction"
+    | "spot"
+    | "wallet"
+    | "faucet"
+    | "orders"
+    | "admins"
+    | "create"
+    | "clubs";
   active: boolean;
 };
 
@@ -35,6 +42,7 @@ function NavigationIcon({ name }: { name: NavigationItem["icon"] }) {
     prediction: "M12 3 21 12 12 21 3 12 12 3Z M8 12h8 M12 8v8",
     spot: "M4 8h15l-4-4 M20 16H5l4 4",
     wallet: "M20 8V5H5a2 2 0 0 0 0 4h15v11H5a2 2 0 0 1-2-2V7 M16 12h5v5h-5z",
+    faucet: "M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z",
     orders: "M8 6h12 M8 12h12 M8 18h12 M3 6h1 M3 12h1 M3 18h1",
     admins:
       "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 4a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87",
@@ -132,6 +140,12 @@ export function AppHeader() {
       label: "Wallet",
       icon: "wallet",
       active: pathname === "/wallet",
+    },
+    {
+      href: "/faucet",
+      label: "Faucet",
+      icon: "faucet",
+      active: pathname === "/faucet",
     },
     ...(CLUBS_ENABLED
       ? [
