@@ -141,42 +141,68 @@ console.log(
   `markets: ${markets.length}, until ${new Date(deadline).toISOString()}`,
 );
 
+/** Free shared collateral of a wallet, in whole tokens (6 decimals). */
+async function freeCollateral(owner, mint) {
+  const b = await sh
+    .sharedAccounts(P)
+    .assetBalance.fetchNullable(sh.assetBalancePda(owner, mint));
+  return b ? b.free.toNumber() / 1e6 : 0;
+}
+/** The taker sells while it has collateral; otherwise a maker other than the
+ * buyer does, so one drained wallet never stalls every market. */
+async function chooseSeller(buyer, mint) {
+  if ((await freeCollateral(seller.publicKey, mint)) >= 60) return seller;
+  return pick(makers.filter((k) => !k.publicKey.equals(buyer.publicKey)));
+}
+
 async function binaryTrade(t) {
   const buyer = pick(makers);
+  const from = await chooseSeller(buyer, t.market.collateralMint);
   const outcome = Math.random() < 0.5 ? "yes" : "no";
   t.prices[0] = walk(t.prices[0], t.anchors[0]);
   const p =
     outcome === "yes" ? t.prices[0] : Math.round((1 - t.prices[0]) * 100) / 100;
   const qty = new BN(5 + Math.floor(Math.random() * 36));
-  // 1. Seller splits qty complete sets (qty YES + qty NO from qty collateral).
-  await send(
-    [
-      await programFor(seller)
-        .methods.sharedCompleteSet(qty, true)
-        .accountsPartial({
-          owner: seller.publicKey,
-          market: t.key,
-          position: pr.derivePredictionPositionPda(t.key, seller.publicKey),
-          mint: t.market.collateralMint,
-          assetBalance: sh.assetBalancePda(
-            seller.publicKey,
-            t.market.collateralMint,
-          ),
-          assetAuthority: sh.assetAuthorityPda(t.market.collateralMint),
-          assetVault: sh.assetVaultPda(t.market.collateralMint),
-          marketAuthority: o.deriveVaultAuthorityPda(t.key),
-          marketVault: t.market.collateralVault,
-          tokenProgram: o.TOKEN_PROGRAM_ID,
-        })
-        .instruction(),
-    ],
-    [seller],
+  // 1. Seller sells contracts it already holds and splits complete sets only
+  // for the shortfall (each set costs one collateral token).
+  const held = await P.account.predictionPosition.fetchNullable(
+    pr.derivePredictionPositionPda(t.key, from.publicKey),
   );
+  const have = held
+    ? outcome === "yes"
+      ? held.yesFree
+      : held.noFree
+    : new BN(0);
+  const shortfall = qty.sub(BN.min(qty, have));
+  if (shortfall.gtn(0))
+    await send(
+      [
+        await programFor(from)
+          .methods.sharedCompleteSet(shortfall, true)
+          .accountsPartial({
+            owner: from.publicKey,
+            market: t.key,
+            position: pr.derivePredictionPositionPda(t.key, from.publicKey),
+            mint: t.market.collateralMint,
+            assetBalance: sh.assetBalancePda(
+              from.publicKey,
+              t.market.collateralMint,
+            ),
+            assetAuthority: sh.assetAuthorityPda(t.market.collateralMint),
+            assetVault: sh.assetVaultPda(t.market.collateralMint),
+            marketAuthority: o.deriveVaultAuthorityPda(t.key),
+            marketVault: t.market.collateralVault,
+            tokenProgram: o.TOKEN_PROGRAM_ID,
+          })
+          .instruction(),
+      ],
+      [from],
+    );
   // 2. Maker bids; 3. seller sells into it. Complements on so a crossing bid
   // fills through the other outcome instead of being rejected at rest.
   for (const [kp, side] of [
     [buyer, "bid"],
-    [seller, "ask"],
+    [from, "ask"],
   ]) {
     const snap = await sh.readSharedBook(P, t.key);
     const plan = await sh.buildSharedTrade(
@@ -197,6 +223,7 @@ async function binaryTrade(t) {
 
 async function multiTrade(t) {
   const buyer = pick(makers);
+  const from = await chooseSeller(buyer, t.mk.collateralMint);
   const i = Math.floor(Math.random() * t.n);
   t.prices[i] = walk(t.prices[i], t.anchors[i]);
   const p = Math.min(0.95, t.prices[i]);
@@ -204,18 +231,31 @@ async function multiTrade(t) {
   const qty = new BN(
     lot * (1 + Math.floor(Math.random() * Math.max(1, Math.floor(40 / lot)))),
   );
-  await send(
-    [
-      await programFor(seller)
-        .methods.multiOutcomeCompleteSet(qty, true)
-        .accountsStrict(m.custody(t.key, seller.publicKey, t.mk.collateralMint))
-        .instruction(),
-    ],
-    [seller],
-  );
+  const held = await m
+    .multiAccounts(P)
+    .multiOutcomePosition.fetchNullable(
+      m.multiPositionPda(t.key, from.publicKey),
+    );
+  const have = held ? held.free[i] : new BN(0);
+  // Split whole lots for the shortfall only.
+  const missing = qty.sub(BN.min(qty, have));
+  const shortfall = missing
+    .addn(lot - 1)
+    .divn(lot)
+    .muln(lot);
+  if (shortfall.gtn(0))
+    await send(
+      [
+        await programFor(from)
+          .methods.multiOutcomeCompleteSet(shortfall, true)
+          .accountsStrict(m.custody(t.key, from.publicKey, t.mk.collateralMint))
+          .instruction(),
+      ],
+      [from],
+    );
   for (const [kp, side] of [
     [buyer, "bid"],
-    [seller, "ask"],
+    [from, "ask"],
   ]) {
     const mk = await m.multiAccounts(P).multiOutcomeMarket.fetch(t.key);
     const b = await m.readMultiBook(P, t.key);
@@ -243,13 +283,15 @@ async function multiTrade(t) {
 
 let round = 0,
   ok = 0,
-  failed = 0;
+  failed = 0,
+  streak = 0;
 while (Date.now() < deadline) {
   const t = markets[round++ % markets.length];
   try {
     const what =
       t.kind === "binary" ? await binaryTrade(t) : await multiTrade(t);
     ok++;
+    streak = 0;
     console.log(`${new Date().toISOString()} ok   ${t.slug}: ${what}`);
   } catch (cause) {
     failed++;
@@ -260,6 +302,14 @@ while (Date.now() < deadline) {
         .split("\n")[0]
         .slice(0, 160)}`,
     );
+    // Back off instead of hammering a failing path.
+    if (++streak >= 10) {
+      console.log(
+        `${new Date().toISOString()} 10 failures in a row; pausing 60s`,
+      );
+      await new Promise((r) => setTimeout(r, 60_000));
+      streak = 0;
+    }
   }
   await new Promise((r) => setTimeout(r, pauseMs));
 }
