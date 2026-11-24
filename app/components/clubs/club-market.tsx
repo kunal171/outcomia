@@ -9,7 +9,7 @@ import { PublicKey } from "@solana/web3.js";
 import { AppHeader } from "../app-header";
 import { useI18n } from "../preferences-provider";
 import { SharedMarket } from "../shared-market";
-import { TradingChart } from "../trading-chart";
+import { PredictionChart } from "../prediction-chart";
 import {
   getOutcomiaAccounts,
   getOutcomiaReadProgram,
@@ -218,12 +218,12 @@ export function ClubMarket({
         </div>
       )}
       {/* Club fills replay into the shared binary history (indexer). */}
-      <TradingChart
+      <PredictionChart
         market={marketAddress}
         engine="SHARED_BINARY"
         priceDecimals={decimals}
-        symbol={symbol || "collateral"}
         outcomes={["YES", "NO"]}
+        binary
       />
       <div className="prediction-detail-grid">
         {canEnter && tradingOpen && (

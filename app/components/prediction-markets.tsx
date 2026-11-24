@@ -1,7 +1,7 @@
 "use client";
 import { TokenSymbol } from "./token-symbol";
 import { useIndexerUpdates } from "./use-indexer-updates";
-import { TradingChart } from "./trading-chart";
+import { PredictionChart } from "./prediction-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
 import { visibleMarket } from "../lib/market-visibility";
@@ -244,14 +244,14 @@ export function PredictionMarkets({ address }: { address?: string }) {
           onRefresh={() => setRefresh((v) => v + 1)}
           trade={(tradingOpen) => (
             <>
-              <TradingChart
+              <PredictionChart
                 market={key.toBase58()}
                 engine={
                   SHARED_BALANCES_ENABLED ? "SHARED_BINARY" : "LEGACY_BINARY"
                 }
                 priceDecimals={decimals}
-                symbol={metadata?.quoteSymbol ?? "collateral"}
                 outcomes={["YES", "NO"]}
+                binary
               />
               <SharedMarket
                 market={key}
