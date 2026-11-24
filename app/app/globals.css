@@ -2712,3 +2712,22 @@ body:has(.prediction-guide[open]) {
 .funds-warning { margin: 0; color: var(--coral); font-size: 0.9rem; }
 .funds-meta { display: flex; justify-content: space-between; align-items: center; margin: 0; font-size: 0.85rem; }
 .funds-panel .funds-meta button { min-height: 32px; padding: 4px 12px; }
+
+/* Devnet faucet page */
+.faucet-page .route-heading p { color: var(--muted); max-width: 60ch; }
+.faucet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+.faucet-card { display: flex; flex-direction: column; gap: 0.75rem; margin: 0; }
+.faucet-card h2 { margin: 0; font-size: 1.2rem; }
+.faucet-card > p { margin: 0; color: var(--muted); }
+.faucet-tokens { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.faucet-tokens li {
+  display: grid; gap: 2px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-inset);
+  font-size: 0.9rem;
+}
+.faucet-tokens li a { font-size: 0.8rem; }
+.faucet-held { margin: 0; }
+.faucet-card .faucet-claim { margin-top: auto; width: 100%; justify-content: center; text-align: center; text-decoration: none; }
+.faucet-limit { color: var(--muted); }
+.faucet-card [role="alert"] { margin: 0; color: var(--coral); }
+.faucet-next { margin-top: 1.5rem; color: var(--muted); }

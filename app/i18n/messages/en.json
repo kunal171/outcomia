@@ -1334,5 +1334,19 @@
   "Only {value0} {value1} is free to withdraw.": "Only {value0} {value1} is free to withdraw.",
   "Deposit {value0} {value1}": "Deposit {value0} {value1}",
   "Withdraw {value0} {value1}": "Withdraw {value0} {value1}",
-  "Move funds between your wallet and Outcomia": "Move funds between your wallet and Outcomia"
+  "Move funds between your wallet and Outcomia": "Move funds between your wallet and Outcomia",
+  "Faucet": "Faucet",
+  "Free test tokens for trying Outcomia on devnet. They have no value and only exist on devnet.": "Free test tokens for trying Outcomia on devnet. They have no value and only exist on devnet.",
+  "The faucet is not available on this deployment.": "The faucet is not available on this deployment.",
+  "Devnet SOL": "Devnet SOL",
+  "Pays network fees for every transaction.": "Pays network fees for every transaction.",
+  "You hold": "You hold",
+  "Get devnet SOL ↗": "Get devnet SOL ↗",
+  "Claimed tokens land in your wallet. To trade with them,": "Claimed tokens land in your wallet. To trade with them,",
+  "deposit them on the Wallet page": "deposit them on the Wallet page",
+  "per claim": "per claim",
+  "Claim {value0}": "Claim {value0}",
+  "One claim per wallet every {value0} min.": "One claim per wallet every {value0} min.",
+  "Collateral for prediction markets and clubs.": "Collateral for prediction markets and clubs.",
+  "The spot market pair. Both tokens arrive in one claim.": "The spot market pair. Both tokens arrive in one claim."
 }

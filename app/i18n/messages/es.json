@@ -1334,5 +1334,19 @@
   "Only {value0} {value1} is free to withdraw.": "Solo {value0} {value1} está disponible para retirar.",
   "Deposit {value0} {value1}": "Depositar {value0} {value1}",
   "Withdraw {value0} {value1}": "Retirar {value0} {value1}",
-  "Move funds between your wallet and Outcomia": "Mueve fondos entre tu billetera y Outcomia"
+  "Move funds between your wallet and Outcomia": "Mueve fondos entre tu billetera y Outcomia",
+  "Faucet": "Faucet",
+  "Free test tokens for trying Outcomia on devnet. They have no value and only exist on devnet.": "Tokens de prueba gratuitos para probar Outcomia en devnet. No tienen valor y solo existen en devnet.",
+  "The faucet is not available on this deployment.": "El faucet no está disponible en este despliegue.",
+  "Devnet SOL": "SOL de devnet",
+  "Pays network fees for every transaction.": "Paga las comisiones de red de cada transacción.",
+  "You hold": "Tienes",
+  "Get devnet SOL ↗": "Obtener SOL de devnet ↗",
+  "Claimed tokens land in your wallet. To trade with them,": "Los tokens reclamados llegan a tu billetera. Para operar con ellos,",
+  "deposit them on the Wallet page": "deposítalos en la página Billetera",
+  "per claim": "por reclamo",
+  "Claim {value0}": "Reclamar {value0}",
+  "One claim per wallet every {value0} min.": "Un reclamo por billetera cada {value0} min.",
+  "Collateral for prediction markets and clubs.": "Garantía para mercados de predicción y clubes.",
+  "The spot market pair. Both tokens arrive in one claim.": "El par del mercado spot. Ambos tokens llegan en un solo reclamo."
 }

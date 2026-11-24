@@ -1334,5 +1334,19 @@
   "Only {value0} {value1} is free to withdraw.": "केवल {value0} {value1} निकालने के लिए उपलब्ध है।",
   "Deposit {value0} {value1}": "{value0} {value1} जमा करें",
   "Withdraw {value0} {value1}": "{value0} {value1} निकालें",
-  "Move funds between your wallet and Outcomia": "अपने वॉलेट और Outcomia के बीच फंड भेजें"
+  "Move funds between your wallet and Outcomia": "अपने वॉलेट और Outcomia के बीच फंड भेजें",
+  "Faucet": "फ़ॉसेट",
+  "Free test tokens for trying Outcomia on devnet. They have no value and only exist on devnet.": "devnet पर Outcomia आज़माने के लिए मुफ़्त टेस्ट टोकन। इनका कोई मूल्य नहीं है और ये केवल devnet पर हैं।",
+  "The faucet is not available on this deployment.": "इस डिप्लॉयमेंट पर फ़ॉसेट उपलब्ध नहीं है।",
+  "Devnet SOL": "Devnet SOL",
+  "Pays network fees for every transaction.": "हर लेन-देन की नेटवर्क फ़ीस चुकाता है।",
+  "You hold": "आपके पास",
+  "Get devnet SOL ↗": "devnet SOL पाएँ ↗",
+  "Claimed tokens land in your wallet. To trade with them,": "क्लेम किए गए टोकन आपके वॉलेट में आते हैं। उनसे ट्रेड करने के लिए,",
+  "deposit them on the Wallet page": "उन्हें वॉलेट पेज पर जमा करें",
+  "per claim": "प्रति क्लेम",
+  "Claim {value0}": "{value0} क्लेम करें",
+  "One claim per wallet every {value0} min.": "हर {value0} मिनट में प्रति वॉलेट एक क्लेम।",
+  "Collateral for prediction markets and clubs.": "प्रेडिक्शन मार्केट और क्लब के लिए कोलैटरल।",
+  "The spot market pair. Both tokens arrive in one claim.": "स्पॉट मार्केट की जोड़ी। दोनों टोकन एक ही क्लेम में आते हैं।"
 }
