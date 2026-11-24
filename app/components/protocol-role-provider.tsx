@@ -38,14 +38,14 @@ export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (quiet = false) => {
     if (!wallet) {
       setRole("disconnected");
       setError(null);
       return;
     }
 
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError(null);
 
     try {
@@ -89,7 +89,8 @@ export function ProtocolRoleProvider({ children }: { children: ReactNode }) {
     }
   }, [connection, wallet]);
 
-  useIndexerUpdates(() => void refresh());
+  // Role changes touch the wallet's admin record; refresh quietly.
+  useIndexerUpdates(() => void refresh(true), [wallet?.publicKey.toBase58()]);
   useEffect(() => {
     void refresh();
   }, [refresh]);

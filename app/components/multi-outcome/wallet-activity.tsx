@@ -4,7 +4,7 @@
  * (positions) or has orders in the selected view (orders) are listed, so empty
  * positions and finished test markets do not clutter either page. */
 import { useIndexerUpdates } from "../use-indexer-updates";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useI18n } from "../preferences-provider";
@@ -41,13 +41,21 @@ export function MultiWalletActivity({
     [revision, setRevision] = useState(0),
     [loading, setLoading] = useState(false),
     [filter, setFilter] = useState<"open" | "history" | "all">("open");
-  useIndexerUpdates(() => setRevision((v) => v + 1));
+  // Live updates reload in the background; the list stays on screen.
+  const quiet = useRef(-1);
+  useIndexerUpdates(
+    () => setRevision((v) => (quiet.current = v + 1)),
+    [wallet?.publicKey.toBase58()],
+  );
   useEffect(() => {
     let active = true;
-    setResult(null);
-    setError("");
+    const background = revision === quiet.current;
+    if (!background) {
+      setResult(null);
+      setError("");
+    }
     if (!MULTI_OUTCOME_ENABLED || !wallet) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     void loadMultiWallet(p, wallet.publicKey, mode)
       .then((rows) => {
         if (active) setResult({ identity, rows });

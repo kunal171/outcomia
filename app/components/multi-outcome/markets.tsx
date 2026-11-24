@@ -1,6 +1,6 @@
 "use client";
 import { useIndexerUpdates } from "../use-indexer-updates";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { AppHeader } from "../app-header";
@@ -33,12 +33,16 @@ export function useMultiOutcomeMarkets(enabled = true) {
   const active = MULTI_OUTCOME_ENABLED && enabled;
   const [loading, setLoading] = useState(active);
   const [revision, setRevision] = useState(0);
-  useIndexerUpdates(() => setRevision((v) => v + 1));
+  // Live updates reload in the background; the list stays on screen.
+  const quiet = useRef(-1);
+  useIndexerUpdates(() => setRevision((v) => (quiet.current = v + 1)));
   useEffect(() => {
     if (!active) return;
     let live = true;
-    setLoading(true);
-    setError("");
+    if (revision !== quiet.current) {
+      setLoading(true);
+      setError("");
+    }
     void (async () => {
       try {
         const records = await multiAccounts(p).multiOutcomeMarket.all();

@@ -98,93 +98,102 @@ function LegacyOrders() {
     [connection, wallet],
   );
 
-  const loadOrders = useCallback(async () => {
-    if (!program || !wallet) {
-      setOrders([]);
-      setOrderMarkets(new Map());
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const records = await getOutcomiaAccounts(
-        getOutcomiaReadProgram(connection),
-      ).order.all([
-        {
-          memcmp: {
-            offset: 8,
-            bytes: wallet.publicKey.toBase58(),
-          },
-        },
-      ]);
-
-      setOrders(
-        records
-          .map(({ publicKey, account }) => ({
-            address: publicKey,
-            ...account,
-          }))
-          .sort((left, right) => right.orderId.cmp(left.orderId)),
-      );
-      // Batch only the markets referenced by this wallet's orders (50 pairs
-      // per request), rather than fetching each market and mint separately.
-      const keys = [
-        ...new Map(
-          records.map(({ account }) => [
-            account.market.toBase58(),
-            account.market,
-          ]),
-        ).values(),
-      ];
-      const views = new Map<
-        string,
-        { market: MarketAccount; metadata: MarketMetadataAccount | null }
-      >();
-      for (let start = 0; start < keys.length; start += 50) {
-        const batch = keys.slice(start, start + 50);
-        const infos = await accountInfos(connection, [
-          ...batch,
-          ...batch.map(deriveMarketMetadataPda),
-        ]);
-        batch.forEach((key, index) => {
-          const info = infos[index];
-          if (!info || !info.owner.equals(program.programId)) return;
-          try {
-            const market = program.coder.accounts.decode<MarketAccount>(
-              "market",
-              info.data,
-            );
-            const metadataInfo = infos[index + batch.length];
-            let metadata: MarketMetadataAccount | null = null;
-            if (metadataInfo?.owner.equals(program.programId)) {
-              try {
-                const value =
-                  program.coder.accounts.decode<MarketMetadataAccount>(
-                    "marketMetadata",
-                    metadataInfo.data,
-                  );
-                if (value.market.equals(key)) metadata = value;
-              } catch {
-                /* Missing/old labels never turn an order into fake units. */
-              }
-            }
-            views.set(key.toBase58(), { market, metadata });
-          } catch {
-            /* Closed or incompatible markets have unavailable units. */
-          }
-        });
+  /** `quiet` (live updates) reloads without the loading state. */
+  const loadOrders = useCallback(
+    async (quiet = false) => {
+      if (!program || !wallet) {
+        setOrders([]);
+        setOrderMarkets(new Map());
+        return;
       }
-      setOrderMarkets(views);
-    } catch (cause) {
-      setError(getErrorMessage(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, [program, wallet, connection]);
 
-  useIndexerUpdates(() => void loadOrders());
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
+
+      try {
+        const records = await getOutcomiaAccounts(
+          getOutcomiaReadProgram(connection),
+        ).order.all([
+          {
+            memcmp: {
+              offset: 8,
+              bytes: wallet.publicKey.toBase58(),
+            },
+          },
+        ]);
+
+        setOrders(
+          records
+            .map(({ publicKey, account }) => ({
+              address: publicKey,
+              ...account,
+            }))
+            .sort((left, right) => right.orderId.cmp(left.orderId)),
+        );
+        // Batch only the markets referenced by this wallet's orders (50 pairs
+        // per request), rather than fetching each market and mint separately.
+        const keys = [
+          ...new Map(
+            records.map(({ account }) => [
+              account.market.toBase58(),
+              account.market,
+            ]),
+          ).values(),
+        ];
+        const views = new Map<
+          string,
+          { market: MarketAccount; metadata: MarketMetadataAccount | null }
+        >();
+        for (let start = 0; start < keys.length; start += 50) {
+          const batch = keys.slice(start, start + 50);
+          const infos = await accountInfos(connection, [
+            ...batch,
+            ...batch.map(deriveMarketMetadataPda),
+          ]);
+          batch.forEach((key, index) => {
+            const info = infos[index];
+            if (!info || !info.owner.equals(program.programId)) return;
+            try {
+              const market = program.coder.accounts.decode<MarketAccount>(
+                "market",
+                info.data,
+              );
+              const metadataInfo = infos[index + batch.length];
+              let metadata: MarketMetadataAccount | null = null;
+              if (metadataInfo?.owner.equals(program.programId)) {
+                try {
+                  const value =
+                    program.coder.accounts.decode<MarketMetadataAccount>(
+                      "marketMetadata",
+                      metadataInfo.data,
+                    );
+                  if (value.market.equals(key)) metadata = value;
+                } catch {
+                  /* Missing/old labels never turn an order into fake units. */
+                }
+              }
+              views.set(key.toBase58(), { market, metadata });
+            } catch {
+              /* Closed or incompatible markets have unavailable units. */
+            }
+          });
+        }
+        setOrderMarkets(views);
+      } catch (cause) {
+        setError(getErrorMessage(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program, wallet, connection],
+  );
+
+  useIndexerUpdates(
+    () => void loadOrders(true),
+    [wallet?.publicKey.toBase58()],
+  );
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);

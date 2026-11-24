@@ -95,10 +95,11 @@ export function useMultiMarket(address: string) {
       feeBps: config.takerFeeBps,
     };
   }, [reader, connection, wallet, address]);
-  const refresh = useCallback(async () => {
+  /** `quiet` (live updates) keeps the current data visible while reloading. */
+  const refresh = useCallback(async (quiet = false) => {
     if (!MULTI_OUTCOME_ENABLED) return;
     const request = ++generation.current;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     setError("");
     try {
       const value = await load();
@@ -163,9 +164,12 @@ export function useMultiMarket(address: string) {
       if (mounted.current) setBusy(false);
     }
   };
-  useIndexerUpdates(() => {
-    if (!lock.current) void refresh();
-  });
+  useIndexerUpdates(
+    () => {
+      if (!lock.current) void refresh(true);
+    },
+    [address, owner],
+  );
   return {
     data: data?.identity === owner && data.address === address ? data : null,
     reader,

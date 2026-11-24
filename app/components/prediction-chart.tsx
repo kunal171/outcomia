@@ -67,7 +67,7 @@ export function PredictionChart(props: Props) {
     value: (CandleSeries | null)[];
   } | null>(null);
   const title = useId();
-  useIndexerUpdates(() => setRevision((v) => v + 1));
+  useIndexerUpdates(() => setRevision((v) => v + 1), [props.market]);
 
   useEffect(() => {
     if (!INDEXER_ENABLED || !box.current) return;
@@ -408,7 +408,8 @@ export function PredictionChart(props: Props) {
         )}
       </div>
       <p className="pc-foot">
-        {loading
+        {/* Only a new market or range shows progress; live refreshes are silent. */}
+        {loading && data?.key !== key
           ? "Updating…"
           : `Indexed trades · ${data?.coverage ?? "loading"}`}{" "}
         · Prices are the last trade; the line holds it until the next fill.

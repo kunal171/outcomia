@@ -4,7 +4,7 @@ import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Shared funds are reusable across markets. Never count contract backing as spendable cash. */
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
@@ -69,14 +69,20 @@ function Funds({
     [issue, setIssue] = useState<string | null>(null),
     [signature, setSignature] = useState<string | null>(null),
     [revision, setRevision] = useState(0);
-  useIndexerUpdates(() => setRevision((value) => value + 1));
+  // A refresh triggered by a live update is a background one: keep showing
+  // the current data instead of flashing a loading state.
+  const quiet = useRef(-1);
+  useIndexerUpdates(
+    () => setRevision((value) => (quiet.current = value + 1)),
+    [wallet.publicKey.toBase58()],
+  );
   const program = useMemo(
     () => getOutcomiaReadProgram(connection),
     [connection],
   );
   useEffect(() => {
     let dead = false;
-    setLoaded(false);
+    if (revision !== quiet.current) setLoaded(false);
     void sharedAccounts(program)
       .assetBalance.fetchNullable(assetBalancePda(wallet.publicKey, mint))
       .then((b) => {

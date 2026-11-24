@@ -3,7 +3,7 @@ import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Public shared order book and signed owner actions. Old queues are separate recovery paths. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { AnchorProvider, BN } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
@@ -104,13 +104,18 @@ function Market(props: Props) {
     [price, setPrice] = useState(""),
     [quantity, setQuantity] = useState("");
   const [fundingOpen, setFundingOpen] = useState(false);
-  useIndexerUpdates(() => setRevision((v) => v + 1));
+  // Live updates (and the parent's refreshKey) reload in the background:
+  // only a first load or a different market shows the loading state.
+  const shown = useRef("");
+  useIndexerUpdates(() => setRevision((v) => v + 1), [props.market.toBase58()]);
   useEffect(() => {
     let dead = false;
-    setLoaded(false);
+    const identity = `${props.market.toBase58()}:${props.club?.club.toBase58() ?? ""}`;
+    if (shown.current !== identity) setLoaded(false);
     void readSharedBook(program, props.market, props.club)
       .then((s) => {
         if (!dead) {
+          shown.current = identity;
           setSnapshot(s);
           setLoaded(true);
           setIssue(null);

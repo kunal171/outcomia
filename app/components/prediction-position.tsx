@@ -7,7 +7,7 @@ import {
   PREDICTION_RESOLUTION_ENABLED,
 } from "../lib/shared";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { PredictionOrders } from "./prediction-orders";
 import { PredictionMatchForm } from "./prediction-match-form";
 import { AnchorProvider, BN } from "@anchor-lang/core";
@@ -156,7 +156,13 @@ function ConnectedPosition({
     useState<PredictionMarketAccount | null>(null);
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [refresh, setRefresh] = useState(0);
-  useIndexerUpdates(() => setRefresh((v) => v + 1));
+  // A refresh triggered by a live update is a background one: keep showing
+  // the current data instead of flashing a loading state.
+  const quiet = useRef(-1);
+  useIndexerUpdates(
+    () => setRefresh((v) => (quiet.current = v + 1)),
+    [market.toBase58(), wallet.publicKey.toBase58()],
+  );
 
   useEffect(() => {
     const timer = setInterval(
@@ -168,8 +174,10 @@ function ConnectedPosition({
 
   useEffect(() => {
     let canceled = false;
-    setLoading(true);
-    setError(null);
+    if (refresh !== quiet.current) {
+      setLoading(true);
+      setError(null);
+    }
     async function load() {
       try {
         const accounts = getOutcomiaAccounts(
@@ -212,9 +220,11 @@ function ConnectedPosition({
 
   useEffect(() => {
     let canceled = false;
-    setWalletLoading(true);
-    setWalletBalance(null);
-    setWalletError(null);
+    if (refresh !== quiet.current) {
+      setWalletLoading(true);
+      setWalletBalance(null);
+      setWalletError(null);
+    }
     getOwnedTokenBalance(connection, wallet.publicKey, collateralMint)
       .then((balance) => {
         if (!canceled) setWalletBalance(balance);

@@ -76,7 +76,7 @@ export function TradingChart(props: Props) {
   ].join(":");
   const [loadedKey, setLoadedKey] = useState("");
   const series = loadedKey === selectionKey ? result : null;
-  useIndexerUpdates(() => setRevision((value) => value + 1));
+  useIndexerUpdates(() => setRevision((value) => value + 1), [props.market]);
   useEffect(() => {
     if (!INDEXER_ENABLED) return;
     const controller = new AbortController();

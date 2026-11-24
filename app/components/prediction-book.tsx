@@ -4,7 +4,7 @@ import { useI18n } from "./preferences-provider";
 
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { type Program } from "@anchor-lang/core";
 import { type PublicKey } from "@solana/web3.js";
 import {
@@ -41,12 +41,20 @@ export function PredictionBook({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
-  useIndexerUpdates(() => setRefresh((v) => v + 1));
+  // A refresh triggered by a live update is a background one: keep showing
+  // the current data instead of flashing a loading state.
+  const quiet = useRef(-1);
+  useIndexerUpdates(
+    () => setRefresh((v) => (quiet.current = v + 1)),
+    [market.toBase58()],
+  );
   useEffect(() => {
     let canceled = false;
-    setLoading(true);
-    setDepth(null);
-    setError(null);
+    if (refresh !== quiet.current) {
+      setLoading(true);
+      setDepth(null);
+      setError(null);
+    }
     async function load() {
       const accounts = getOutcomiaAccounts(program);
       const book = await accounts.predictionOrderBook.fetchNullable(
