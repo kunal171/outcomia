@@ -1,5 +1,9 @@
 "use client";
-import { getCandles, type Candle, type CandleSeries } from "../lib/graphql/charts";
+import {
+  getCandles,
+  type Candle,
+  type CandleSeries,
+} from "../lib/graphql/charts";
 import { useEffect, useId, useRef, useState } from "react";
 import { BN } from "@anchor-lang/core";
 import { INDEXER_ENABLED } from "../lib/graphql/client";
@@ -16,13 +20,26 @@ type Props = {
 const steps = [60, 300, 900, 3600, 14400, 86400];
 const stepLabels = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const chartTypes = ["Candlestick", "OHLC bars", "Line", "Area"] as const;
+/** Prediction prices are shares of the 1-token payout, so they live in [0, 1]. */
+const predictionEngines = new Set([
+  "SHARED_BINARY",
+  "LEGACY_BINARY",
+  "MULTI_OUTCOME",
+]);
 export function TradingChart(props: Props) {
-  const [kind, setKind] = useState<(typeof chartTypes)[number]>("Candlestick"),
+  const prediction = predictionEngines.has(props.engine);
+  // Sparse prediction trading reads best as a held-price line.
+  const [kind, setKind] = useState<(typeof chartTypes)[number]>(
+      prediction ? "Line" : "Candlestick",
+    ),
     [interval, setInterval] = useState(3600),
     [range, setRange] = useState(7 * 86400),
     [outcome, setOutcome] = useState(props.outcomes ? "0" : "spot"),
     [volume, setVolume] = useState(true);
   const [result, setSeries] = useState<Series | null>(null),
+    // The requested window, so the x-axis shows the selected range even when
+    // trades cover only part of it (or a single interval).
+    [loadedWindow, setLoadedWindow] = useState({ from: 0, to: 0 }),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(false),
     [revision, setRevision] = useState(0);
@@ -59,7 +76,7 @@ export function TradingChart(props: Props) {
   ].join(":");
   const [loadedKey, setLoadedKey] = useState("");
   const series = loadedKey === selectionKey ? result : null;
-  useIndexerUpdates(() => setRevision((value) => value + 1));
+  useIndexerUpdates(() => setRevision((value) => value + 1), [props.market]);
   useEffect(() => {
     if (!INDEXER_ENABLED) return;
     const controller = new AbortController();
@@ -81,6 +98,7 @@ export function TradingChart(props: Props) {
       .then((result) => {
         if (!controller.signal.aborted) {
           setSeries(result);
+          setLoadedWindow({ from, to });
           setLoadedKey(selectionKey);
         }
       })
@@ -116,29 +134,62 @@ export function TradingChart(props: Props) {
   const highs = candles.map((c) => value(c.high)),
     lows = candles.map((c) => value(c.low));
   const min = Math.min(...lows),
-    max = Math.max(...highs),
-    spread = Math.max(max - min, max * 0.01, 10 ** -props.priceDecimals),
-    floor = min - spread * 0.06,
-    ceiling = max + spread * 0.06;
-  const first = Number(candles[0]?.time ?? 0),
-    last = Number(candles.at(-1)?.time ?? first + interval),
-    span = Math.max(last - first, interval);
-  const x = (c: Candle) =>
-    60 + ((Number(c.time) - first) / span) * (plotWidth - 110);
+    max = Math.max(...highs);
+  // Price axis: never zoom tighter than 10 cents for prediction markets
+  // (prices are 0–1) or 4% of price for spot, so one trade or a tiny move
+  // does not fill the whole height. Prediction axes stay within [0, 1].
+  const minimumSpan = Math.max(
+      prediction ? 0.1 : max * 0.04,
+      10 ** -props.priceDecimals,
+    ),
+    pad = Math.max((max - min) * 0.1, (minimumSpan - (max - min)) / 2, 0);
+  let floor = min - pad,
+    ceiling = max + pad;
+  if (prediction) {
+    // Four equal steps of a round size (0.01, 0.02, 0.025, 0.05, …) so the
+    // labels read as plain cents, kept inside [0, 1].
+    const step =
+      [0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25].find(
+        (size) => size * 4 >= ceiling - floor,
+      ) ?? 0.25;
+    floor = Math.max(0, Math.floor(floor / step + 1e-9) * step);
+    if (floor + 4 * step > 1) floor = Math.max(0, 1 - 4 * step);
+    ceiling = floor + 4 * step;
+  }
+  // Time axis: the requested window, aligned to whole intervals.
+  const first = Math.floor(loadedWindow.from / interval) * interval,
+    last = Math.max(loadedWindow.to, first + interval),
+    span = last - first;
+  const at = (time: number) => 60 + ((time - first) / span) * (plotWidth - 110);
+  const x = (c: Candle) => at(Number(c.time) + interval / 2);
   const y = (raw: string) =>
     245 - ((value(raw) - floor) / (ceiling - floor)) * 215;
   const width = Math.max(
     1,
-    Math.min(12, ((plotWidth - 110) / (span / interval + 1)) * 0.7),
+    Math.min(12, ((plotWidth - 110) / (span / interval)) * 0.7),
   );
   const maxVolume = Math.max(...candles.map((c) => Number(c.quoteVolume)), 1);
-  const segments: Candle[][] = [];
-  for (const candle of candles) {
-    const previous = segments.at(-1)?.at(-1);
-    if (!previous || Number(candle.time) - Number(previous.time) > interval)
-      segments.push([]);
-    segments.at(-1)!.push(candle);
-  }
+  // Line/Area: the price holds at the last trade until the next one (a step
+  // line), then a dashed segment carries the latest price to the window end.
+  const lastClose = candles.at(-1);
+  const stepPath = candles
+    .map((c, i) => (i ? `H${x(c)} V${y(c.close)}` : `M${x(c)},${y(c.close)}`))
+    .join(" ");
+  const tail = lastClose
+    ? `M${x(lastClose)},${y(lastClose.close)} H${at(last)}`
+    : "";
+  const label = (time: number) =>
+    plotWidth < 600 || span <= 86400
+      ? new Date(time * 1000).toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : new Date(time * 1000).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        });
   const exact = (raw: string) =>
     readableAmount(new BN(raw), props.priceDecimals);
   return (
@@ -146,7 +197,8 @@ export function TradingChart(props: Props) {
       <div className="chart-heading">
         <h2 id={title}>Trading chart</h2>
         <span>
-          {loading
+          {/* Background refreshes keep the current series and stay silent. */}
+          {loading && !series
             ? "Updating…"
             : series
               ? `${series.commitment} · ${series.coverage.toLowerCase()}`
@@ -222,13 +274,34 @@ export function TradingChart(props: Props) {
           Volume
         </label>
       </div>
+      {valid && candles.length > 0 && (
+        <p className="chart-last">
+          <strong>
+            {exact(candles.at(-1)!.close)} {props.symbol}
+          </strong>
+          {(() => {
+            // Change over the selected range: first open to latest close.
+            const open = value(candles[0].open),
+              close = value(candles.at(-1)!.close);
+            if (!open || Math.abs(close - open) < 1e-12) return null;
+            const change = ((close - open) / open) * 100;
+            return (
+              <span className={change > 0 ? "chart-up" : "chart-down"}>
+                {change > 0 ? "▲" : "▼"} {Math.abs(change).toFixed(2)}%
+              </span>
+            );
+          })()}
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {series?.error && <p role="status">{series.error}</p>}
       {series && !candles.length && !series.error && (
         <p role="status">
-          {series.coverage === "COMPLETE"
-            ? "No executions in this range."
-            : "Trade history is still being indexed."}
+          {/* PARTIAL means the newest seconds may still be replaying; only
+              INCOMPLETE history is genuinely unknown. */}
+          {series.coverage === "INCOMPLETE"
+            ? "Trade history is still being indexed."
+            : "No trades in this range yet."}
         </p>
       )}
       {!valid && <p role="alert">Chart values could not be displayed.</p>}
@@ -252,35 +325,35 @@ export function TradingChart(props: Props) {
                   y2={30 + i * 53.75}
                 />
                 <text x="53" y={34 + i * 53.75} textAnchor="end">
-                  {(ceiling - (i / 4) * (ceiling - floor)).toPrecision(5)}
+                  {prediction
+                    ? (ceiling - (i / 4) * (ceiling - floor))
+                        .toFixed(3)
+                        .replace(/0$/, "")
+                    : (ceiling - (i / 4) * (ceiling - floor)).toPrecision(5)}
                 </text>
               </g>
             ))}
             {kind === "Line" || kind === "Area"
-              ? segments.map((segment, index) => {
-                  const path = segment
-                    .map((c, i) => `${i ? "L" : "M"}${x(c)},${y(c.close)}`)
-                    .join(" ");
-                  return (
-                    <g key={index}>
-                      {kind === "Area" && (
-                        <path
-                          className="chart-area"
-                          d={`${path} L${x(segment.at(-1)!)},245 L${x(segment[0])},245 Z`}
-                        />
-                      )}
-                      <path className="chart-line" d={path} />
-                      {segment.map((c) => (
-                        <circle key={c.time} cx={x(c)} cy={y(c.close)} r="2">
-                          <title>
-                            {new Date(Number(c.time) * 1000).toISOString()}:{" "}
-                            {exact(c.close)} {props.symbol}
-                          </title>
-                        </circle>
-                      ))}
-                    </g>
-                  );
-                })
+              ? lastClose && (
+                  <g>
+                    {kind === "Area" && (
+                      <path
+                        className="chart-area"
+                        d={`${stepPath} H${at(last)} V245 H${x(candles[0])} Z`}
+                      />
+                    )}
+                    <path className="chart-line" d={stepPath} />
+                    <path className="chart-line chart-line-held" d={tail} />
+                    {candles.map((c) => (
+                      <circle key={c.time} cx={x(c)} cy={y(c.close)} r="3">
+                        <title>
+                          {new Date(Number(c.time) * 1000).toISOString()}:{" "}
+                          {exact(c.close)} {props.symbol}
+                        </title>
+                      </circle>
+                    ))}
+                  </g>
+                )
               : candles.map((c) => (
                   <g
                     key={c.time}
@@ -320,9 +393,7 @@ export function TradingChart(props: Props) {
                   </g>
                 ))}
             <text className="chart-time" x="60" y="266">
-              {plotWidth < 600
-                ? new Date(first * 1000).toLocaleTimeString()
-                : new Date(first * 1000).toLocaleString()}
+              {label(first)}
             </text>
             <text
               className="chart-time"
@@ -330,9 +401,7 @@ export function TradingChart(props: Props) {
               y="266"
               textAnchor="end"
             >
-              {plotWidth < 600
-                ? new Date(last * 1000).toLocaleTimeString()
-                : new Date(last * 1000).toLocaleString()}
+              {label(last)}
             </text>
             {volume &&
               candles.map((c) => (
@@ -351,8 +420,10 @@ export function TradingChart(props: Props) {
               ))}
           </svg>
           <p className="rules-help">
-            Execution prices · {props.symbol} per contract or base token.
-            Missing intervals are gaps.{" "}
+            Execution prices in {props.symbol}.{" "}
+            {kind === "Line" || kind === "Area"
+              ? "The line holds the last trade price between trades (dashed after the latest)."
+              : "Intervals without trades are empty."}{" "}
             {series?.commitment === "confirmed"
               ? "Latest updates await finalization."
               : "Finalized execution history."}

@@ -1,7 +1,7 @@
 "use client";
 import { TokenSymbol } from "../token-symbol";
 import Link from "next/link";
-import { TradingChart } from "../trading-chart";
+import { PredictionChart } from "../prediction-chart";
 import { AppHeader } from "../app-header";
 import { transactionExplorerUrl } from "../../lib/outcomia";
 import { readableAmount } from "../../lib/market-display";
@@ -87,11 +87,10 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
                 })}
               </span>
             </p>
-            <TradingChart
+            <PredictionChart
               market={address}
               engine="MULTI_OUTCOME"
               priceDecimals={d.decimals}
-              symbol={d.metadata?.quoteSymbol ?? "collateral"}
               outcomes={d.market.terms.outcomeLabels}
             />
             <MultiTrading session={s} />

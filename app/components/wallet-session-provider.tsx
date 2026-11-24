@@ -11,8 +11,14 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ReadSourceStatus } from "./read-source-status";
 import { useIndexerStream } from "./use-indexer-updates";
-import { INDEXER_ENABLED, IndexerUnavailableError } from "../lib/graphql/client";
-import { callWalletAuth as call, type WalletUser as User } from "../lib/auth/client";
+import {
+  INDEXER_ENABLED,
+  IndexerUnavailableError,
+} from "../lib/graphql/client";
+import {
+  callWalletAuth as call,
+  type WalletUser as User,
+} from "../lib/auth/client";
 type Session = {
   user: User | null;
   busy: boolean;
@@ -101,9 +107,13 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
       ) {
         if (cause instanceof IndexerUnavailableError) {
           setDeferred(true);
-          setError("Your wallet is connected. You can deposit and trade; profile verification can wait. Finalized on-chain activity will register your wallet when the indexer recovers.");
+          setError(
+            "Your wallet is connected. You can deposit and trade; profile verification can wait. Finalized on-chain activity will register your wallet when the indexer recovers.",
+          );
         } else {
-          setError(cause instanceof Error ? cause.message : "Wallet sign-in failed");
+          setError(
+            cause instanceof Error ? cause.message : "Wallet sign-in failed",
+          );
         }
       }
     } finally {
@@ -145,8 +155,12 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           setDeferred(false);
           setError(null);
         })
-        .catch(() => { /* Connected-wallet access remains available during recovery. */ })
-        .finally(() => { checking = false; });
+        .catch(() => {
+          /* Connected-wallet access remains available during recovery. */
+        })
+        .finally(() => {
+          checking = false;
+        });
     }, 15000);
     return () => {
       recovery.abort();
@@ -170,28 +184,44 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
 export function WalletSessionStatus() {
   const session = useContext(Context);
   if (!INDEXER_ENABLED || !session) return null;
+  // One compact row: status (with the data source under it), an optional
+  // Sign in button and, after a failed attempt, a "!" chip whose message
+  // opens on click instead of floating over the page.
   return (
     <div className="wallet-session-status">
-      {session.user ? (
-        <span title="Wallet ownership verified">Signed in</span>
-      ) : (
-        <>
-          <span title="Your wallet can deposit and trade without a website session">
-            Wallet connected
-          </span>
-          <button
-            className="admin-action-button"
-            disabled={session.busy}
-            onClick={() => void session.signIn()}
-          >
-            {session.busy ? "Signing in…" : session.deferred ? "Retry sign-in" : "Sign in"}
-          </button>
-        </>
+      <div className="wss-state">
+        <span
+          className={session.user ? "wss-label wss-signed" : "wss-label"}
+          title={
+            session.user
+              ? "Wallet ownership verified"
+              : "Your wallet can deposit and trade without a website session"
+          }
+        >
+          <i aria-hidden="true" />
+          {session.user ? "Signed in" : "Wallet connected"}
+        </span>
+        <ReadSourceStatus />
+      </div>
+      {!session.user && (
+        <button
+          type="button"
+          className="wss-signin"
+          disabled={session.busy}
+          onClick={() => void session.signIn()}
+        >
+          {session.busy
+            ? "Signing in…"
+            : session.deferred
+              ? "Retry sign-in"
+              : "Sign in"}
+        </button>
       )}
-      <ReadSourceStatus />
       {session.error && (
-        <details>
-          <summary>Sign-in status</summary>
+        <details className="wss-issue">
+          <summary aria-label="Sign-in status" title="Sign-in status">
+            !
+          </summary>
           <p role={session.deferred ? "status" : "alert"}>{session.error}</p>
         </details>
       )}

@@ -7,6 +7,9 @@ pub struct Revision {
     pub commitment: String,
     pub revision: String,
     pub resync: bool,
+    /// Accounts, markets and owners this revision changed; null means the
+    /// change is unknown or too large to list, so clients refresh everything.
+    pub scope: Option<Vec<String>>,
 }
 pub struct Changes;
 #[Subscription]
@@ -23,7 +26,11 @@ impl Changes {
             loop {
                 match rx.recv().await {
                     Ok(value) => {
-                        if let Some((kind, revision)) = value.split_once(':') {
+                        if let Some((kind, rest)) = value.split_once(':') {
+                            let (revision, names) = match rest.split_once('|') {
+                                Some((revision, names)) => (revision, Some(names)),
+                                None => (rest, None),
+                            };
                             if kind == level
                                 || (kind == "wallet" && owner.as_deref() == Some(revision))
                             {
@@ -35,6 +42,11 @@ impl Changes {
                                         revision.into()
                                     },
                                     resync: revision == "0",
+                                    scope: if kind == "wallet" {
+                                        Some(vec![revision.to_owned()])
+                                    } else {
+                                        names.map(|n| n.split(',').map(str::to_owned).collect())
+                                    },
                                 };
                                 return Some((item, (rx, level, owner)));
                             }
@@ -46,6 +58,7 @@ impl Changes {
                                 commitment: level.clone(),
                                 revision: "0".into(),
                                 resync: true,
+                                scope: None,
                             },
                             (rx, level, owner),
                         ))

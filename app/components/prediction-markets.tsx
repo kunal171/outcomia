@@ -1,7 +1,7 @@
 "use client";
 import { TokenSymbol } from "./token-symbol";
 import { useIndexerUpdates } from "./use-indexer-updates";
-import { TradingChart } from "./trading-chart";
+import { PredictionChart } from "./prediction-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
 import { useI18n } from "./preferences-provider";
 import { visibleMarket } from "../lib/market-visibility";
@@ -77,22 +77,37 @@ export function PredictionMarkets({ address }: { address?: string }) {
   /** Set when the requested address is a club market, which has its own page. */
   const [clubHref, setClubHref] = useState<string | null>(null);
   const lastConnection = useRef(connection);
-  useIndexerUpdates(() => setRefresh((v) => v + 1));
+  // Live updates refresh in the background: no loading state, and no
+  // re-render when nothing changed. A market page listens to its market only.
+  const background = useRef(false);
+  const shown = useRef("");
+  useIndexerUpdates(
+    () => {
+      background.current = true;
+      setRefresh((v) => v + 1);
+    },
+    address ? [address] : undefined,
+  );
 
   useEffect(() => {
     let canceled = false;
-    setLoading(true);
-    setError(null);
-    // Keep the current detail mounted during refresh so forms and confirmations survive.
+    const quiet = background.current;
+    background.current = false;
     const networkChanged = lastConnection.current !== connection;
     lastConnection.current = connection;
-    setRecords((current) =>
-      networkChanged
-        ? []
-        : current.filter((row) => row.address.toBase58() === address),
-    );
+    if (!quiet || networkChanged) {
+      setLoading(true);
+      setError(null);
+      shown.current = "";
+      // Keep the current detail mounted during refresh so forms and confirmations survive.
+      setRecords((current) =>
+        networkChanged
+          ? []
+          : current.filter((row) => row.address.toBase58() === address),
+      );
+    }
     async function load() {
-      setClubHref(null);
+      if (!quiet) setClubHref(null);
       try {
         const accounts = getOutcomiaAccounts(program);
         let markets: Array<{
@@ -139,12 +154,17 @@ export function PredictionMarkets({ address }: { address?: string }) {
             };
           }),
         );
-        if (!canceled)
-          setRecords(
-            rows.sort((a, b) =>
-              a.address.toBase58().localeCompare(b.address.toBase58()),
-            ),
-          );
+        rows.sort((a, b) =>
+          a.address.toBase58().localeCompare(b.address.toBase58()),
+        );
+        // BN and PublicKey serialize to stable strings, so equal JSON means
+        // equal accounts: skip the state update and its re-render.
+        const signature = JSON.stringify(rows);
+        if (!canceled && signature !== shown.current) {
+          shown.current = signature;
+          setRecords(rows);
+        }
+        if (!canceled) setError(null);
       } catch (cause) {
         if (!canceled)
           setError(
@@ -244,14 +264,14 @@ export function PredictionMarkets({ address }: { address?: string }) {
           onRefresh={() => setRefresh((v) => v + 1)}
           trade={(tradingOpen) => (
             <>
-              <TradingChart
+              <PredictionChart
                 market={key.toBase58()}
                 engine={
                   SHARED_BALANCES_ENABLED ? "SHARED_BINARY" : "LEGACY_BINARY"
                 }
                 priceDecimals={decimals}
-                symbol={metadata?.quoteSymbol ?? "collateral"}
                 outcomes={["YES", "NO"]}
+                binary
               />
               <SharedMarket
                 market={key}

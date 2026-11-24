@@ -10,6 +10,7 @@ export function openRevisionStream(owner: string, signal: AbortSignal) {
             commitment
             revision
             resync
+            scope
           }
         }
       `,

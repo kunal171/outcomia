@@ -10,7 +10,7 @@ import {
 } from "../lib/shared";
 import { SharedAssetFunds } from "./shared-wallet";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { BN } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
@@ -62,26 +62,32 @@ export function WalletWorkspace() {
   const [snapshot, setSnapshot] = useState<WalletOverview | null>(null);
   const [pending, setPending] = useState(false);
   const [revision, setRevision] = useState(0);
-  useIndexerUpdates(() => setRevision((v) => v + 1));
   const [fatal, setFatal] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [hideEmpty, setHideEmpty] = useState(true);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const owner = mounted ? (publicKey?.toBase58() ?? null) : null;
+  // Live updates reload in the background: balances, the search box and the
+  // copy state stay as they are. Only a wallet change starts over.
+  const quiet = useRef(-1);
+  useIndexerUpdates(() => setRevision((v) => (quiet.current = v + 1)), [owner]);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     let canceled = false;
-    setSnapshot(null);
-    setFatal(null);
-    setCopied(false);
-    setCopyError(false);
-    setQuery("");
+    const background = revision === quiet.current;
+    if (!background) {
+      setSnapshot(null);
+      setFatal(null);
+      setCopied(false);
+      setCopyError(false);
+      setQuery("");
+    }
     if (!owner) {
       setPending(false);
       return;
     }
-    setPending(true);
+    if (!background) setPending(true);
     void loadWalletOverview(connection, new PublicKey(owner))
       .then((result) => {
         if (!canceled) setSnapshot(result);

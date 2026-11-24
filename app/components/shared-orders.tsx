@@ -3,7 +3,7 @@ import { useIndexerUpdates } from "./use-indexer-updates";
 import { useI18n } from "./preferences-provider";
 
 /** Owner history includes all shared books; cancellation refreshes its exact queue first. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { AnchorProvider } from "@anchor-lang/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -56,11 +56,18 @@ function OwnerOrders() {
     [revision, setRevision] = useState(0),
     [busy, setBusy] = useState(false),
     [filter, setFilter] = useState<"open" | "history" | "all">("open");
-  useIndexerUpdates(() => setRevision((v) => v + 1));
+  // Live updates reload in the background; the list stays on screen.
+  const quiet = useRef(-1);
+  useIndexerUpdates(
+    () => setRevision((v) => (quiet.current = v + 1)),
+    [wallet.publicKey.toBase58()],
+  );
   useEffect(() => {
     let dead = false;
-    setPending(true);
-    setIssue(null);
+    if (revision !== quiet.current) {
+      setPending(true);
+      setIssue(null);
+    }
     void (async () => {
       const owned = await sharedAccounts(p).sharedOrder.all([
         { memcmp: { offset: 8, bytes: wallet.publicKey.toBase58() } },

@@ -191,121 +191,134 @@ export function MarketDetail({ address }: { address: string }) {
       ? deriveVaultPda(marketAddress, market.quoteMint)
       : null;
 
-  const loadMarket = useCallback(async () => {
-    if (!marketAddress) {
-      setMarket(null);
-      setError("Invalid market address");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const accounts = getOutcomiaAccounts(readProgram);
-      const [account, fees, faucet, metadata] = await Promise.all([
-        accounts.market.fetchNullable(marketAddress),
-        accounts.marketFees.fetchNullable(deriveMarketFeesPda(marketAddress)),
-        accounts.testFaucet.fetchNullable(deriveTestFaucetPda(marketAddress)),
-        accounts.marketMetadata.fetchNullable(
-          deriveMarketMetadataPda(marketAddress),
-        ),
-      ]);
-      setMarket(account);
-      setMarketFees(fees);
-      setTestFaucet(faucet);
-      setMarketMetadata(metadata);
-
-      if (!account) {
-        setBidLevels([]);
-        setAskLevels([]);
-        setLastTrade(null);
-        setError("Market account was not found on devnet");
+  /** `quiet` (live updates) reloads while the current market stays mounted. */
+  const loadMarket = useCallback(
+    async (quiet = false) => {
+      if (!marketAddress) {
+        setMarket(null);
+        setError("Invalid market address");
+        setLoading(false);
         return;
       }
 
-      // The book is canonical on-chain state. Trade history currently lives in
-      // FillEvent logs, so failure to fetch recent history must not hide the
-      // usable market or its order book.
-      setBookError(null);
-      try {
-        const [bids, asks] = await Promise.all([
-          fetchPriceLevelSide(
-            readProgram,
-            marketAddress,
-            "bid",
-            account.bestBid,
-          ),
-          fetchPriceLevelSide(
-            readProgram,
-            marketAddress,
-            "ask",
-            account.bestAsk,
-          ),
-        ]);
-        setBidLevels(bids);
-        setAskLevels(asks);
-      } catch (cause) {
-        setBidLevels([]);
-        setAskLevels([]);
-        setBookError(getErrorMessage(cause));
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
       }
 
-      setTradeError(null);
       try {
-        setLastTrade(
-          await fetchLatestTrade(connection, readProgram, marketAddress),
-        );
+        const accounts = getOutcomiaAccounts(readProgram);
+        const [account, fees, faucet, metadata] = await Promise.all([
+          accounts.market.fetchNullable(marketAddress),
+          accounts.marketFees.fetchNullable(deriveMarketFeesPda(marketAddress)),
+          accounts.testFaucet.fetchNullable(deriveTestFaucetPda(marketAddress)),
+          accounts.marketMetadata.fetchNullable(
+            deriveMarketMetadataPda(marketAddress),
+          ),
+        ]);
+        setMarket(account);
+        setMarketFees(fees);
+        setTestFaucet(faucet);
+        setMarketMetadata(metadata);
+
+        if (!account) {
+          setBidLevels([]);
+          setAskLevels([]);
+          setLastTrade(null);
+          setError("Market account was not found on devnet");
+          return;
+        }
+
+        // The book is canonical on-chain state. Trade history currently lives in
+        // FillEvent logs, so failure to fetch recent history must not hide the
+        // usable market or its order book.
+        setBookError(null);
+        try {
+          const [bids, asks] = await Promise.all([
+            fetchPriceLevelSide(
+              readProgram,
+              marketAddress,
+              "bid",
+              account.bestBid,
+            ),
+            fetchPriceLevelSide(
+              readProgram,
+              marketAddress,
+              "ask",
+              account.bestAsk,
+            ),
+          ]);
+          setBidLevels(bids);
+          setAskLevels(asks);
+        } catch (cause) {
+          setBidLevels([]);
+          setAskLevels([]);
+          setBookError(getErrorMessage(cause));
+        }
+
+        setTradeError(null);
+        try {
+          setLastTrade(
+            await fetchLatestTrade(connection, readProgram, marketAddress),
+          );
+        } catch (cause) {
+          setLastTrade(null);
+          setTradeError(
+            rpcErrorMessage(cause, "Recent trades could not be loaded"),
+          );
+        }
       } catch (cause) {
-        setLastTrade(null);
-        setTradeError(
-          rpcErrorMessage(cause, "Recent trades could not be loaded"),
-        );
+        setError(getErrorMessage(cause));
+      } finally {
+        setLoading(false);
       }
-    } catch (cause) {
-      setError(getErrorMessage(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, [connection, marketAddress, readProgram]);
+    },
+    [connection, marketAddress, readProgram],
+  );
 
   useEffect(() => {
     void loadMarket();
   }, [loadMarket]);
 
-  const loadBalances = useCallback(async () => {
-    if (!traderBalanceAddress || !wallet || !market) {
-      setTraderBalance(null);
-      setWalletBaseBalance(new BN(0));
-      setWalletQuoteBalance(new BN(0));
-      return;
-    }
+  const loadBalances = useCallback(
+    async (quiet = false) => {
+      if (!traderBalanceAddress || !wallet || !market) {
+        setTraderBalance(null);
+        setWalletBaseBalance(new BN(0));
+        setWalletQuoteBalance(new BN(0));
+        return;
+      }
 
-    setBalanceLoading(true);
-    setBalanceError(null);
-    try {
-      const [account, baseBalance, quoteBalance] = await Promise.all([
-        getOutcomiaAccounts(readProgram).traderBalance.fetchNullable(
-          traderBalanceAddress,
-        ),
-        getOwnedTokenBalance(connection, wallet.publicKey, market.baseMint),
-        getOwnedTokenBalance(connection, wallet.publicKey, market.quoteMint),
-      ]);
-      setTraderBalance(account);
-      setWalletBaseBalance(baseBalance);
-      setWalletQuoteBalance(quoteBalance);
-    } catch (cause) {
-      setBalanceError(getErrorMessage(cause));
-    } finally {
-      setBalanceLoading(false);
-    }
-  }, [connection, market, readProgram, traderBalanceAddress, wallet]);
+      if (!quiet) {
+        setBalanceLoading(true);
+        setBalanceError(null);
+      }
+      try {
+        const [account, baseBalance, quoteBalance] = await Promise.all([
+          getOutcomiaAccounts(readProgram).traderBalance.fetchNullable(
+            traderBalanceAddress,
+          ),
+          getOwnedTokenBalance(connection, wallet.publicKey, market.baseMint),
+          getOwnedTokenBalance(connection, wallet.publicKey, market.quoteMint),
+        ]);
+        setTraderBalance(account);
+        setWalletBaseBalance(baseBalance);
+        setWalletQuoteBalance(quoteBalance);
+      } catch (cause) {
+        setBalanceError(getErrorMessage(cause));
+      } finally {
+        setBalanceLoading(false);
+      }
+    },
+    [connection, market, readProgram, traderBalanceAddress, wallet],
+  );
 
+  // Only changes to this market or the connected wallet refresh the page,
+  // and they do so in the background.
   useIndexerUpdates(() => {
-    void loadMarket();
-    void loadBalances();
-  });
+    void loadMarket(true);
+    void loadBalances(true);
+  }, [marketAddress?.toBase58(), wallet?.publicKey.toBase58()]);
   useEffect(() => {
     void loadBalances();
   }, [loadBalances]);
@@ -590,9 +603,9 @@ export function MarketDetail({ address }: { address: string }) {
       const opposingBest = side === "bid" ? market.bestAsk : market.bestBid;
       const crossesBest = Boolean(
         opposingBest &&
-          (side === "bid"
-            ? rawPrice.gte(opposingBest)
-            : rawPrice.lte(opposingBest)),
+        (side === "bid"
+          ? rawPrice.gte(opposingBest)
+          : rawPrice.lte(opposingBest)),
       );
 
       if (crossesBest && opposingBest) {
@@ -1040,9 +1053,11 @@ export function MarketDetail({ address }: { address: string }) {
           <Link href="/markets">{t("← All markets")}</Link>
         </div>
 
-        {loading && <div className="access-card">{t("Loading market…")}</div>}
+        {loading && !market && (
+          <div className="access-card">{t("Loading market…")}</div>
+        )}
 
-        {!loading && market && marketAddress && status && (
+        {market && marketAddress && status && (
           <>
             <div className="route-heading market-detail-heading">
               <div>
@@ -1063,6 +1078,13 @@ export function MarketDetail({ address }: { address: string }) {
               </div>
             </div>
 
+            {/* Price first, as on prediction pages: chart, then book and ticket. */}
+            <TradingChart
+              market={address}
+              engine={SHARED_BALANCES_ENABLED ? "SHARED_SPOT" : "LEGACY_SPOT"}
+              priceDecimals={market.quoteDecimals}
+              symbol={labels.quote}
+            />
             <SharedMarket
               market={marketAddress}
               kind="spot"
@@ -1124,12 +1146,6 @@ export function MarketDetail({ address }: { address: string }) {
                 </details>
               </section>
             )}
-            <TradingChart
-              market={address}
-              engine={SHARED_BALANCES_ENABLED ? "SHARED_SPOT" : "LEGACY_SPOT"}
-              priceDecimals={market.quoteDecimals}
-              symbol={labels.quote}
-            />
             <div
               className={`market-detail-layout ${SHARED_BALANCES_ENABLED ? "shared-layout" : ""}`}
             >

@@ -66,32 +66,24 @@ pub async fn query(
             candles: vec![],
         });
     }
+    // Instruction-replay engines: replay is program-wide, so on a busy program a
+    // few transactions are almost always still being decoded or replayed. Keep
+    // serving the trades already indexed and mark the series PARTIAL until
+    // replay catches up, instead of blanking every chart.
+    let mut catching_up = false;
     if matches!(engine, "LEGACY_BINARY" | "SHARED_SPOT" | "SHARED_BINARY") {
         let replayed: bool = sqlx::query_scalar(
             "SELECT ready AND last_error IS NULL AND NOT EXISTS(SELECT 1 FROM decoded_instructions WHERE NOT replayed) AND NOT EXISTS(SELECT 1 FROM chain_transactions t LEFT JOIN instruction_decode_state d USING(signature) WHERE d.signature IS NULL OR t.transaction_index IS NULL) FROM execution_replay_state WHERE singleton",
         )
         .fetch_one(pool)
         .await?;
-        if !replayed {
-            return Ok(CandleSeries {
-                supported: true,
-                coverage: "INCOMPLETE".into(),
-                commitment: "finalized".into(),
-                error: Some("Execution history is being reconciled".into()),
-                candles: vec![],
-            });
-        }
+        catching_up = !replayed;
     }
     let ordered:bool=sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM indexed_trades WHERE market=$1 AND engine=$2 AND outcome=$3 AND (block_time IS NULL OR transaction_index IS NULL))").bind(market).bind(engine).bind(outcome).fetch_one(pool).await?;
-    if !ordered {
-        return Ok(CandleSeries {
-            supported: true,
-            coverage: "INCOMPLETE".into(),
-            commitment: "finalized".into(),
-            error: Some("Historical execution time or chain order is missing".into()),
-            candles: vec![],
-        });
-    }
+    // A trade projected a moment before its block time is known is left out
+    // of the buckets (block_time IS NULL never matches) and marks the series
+    // PARTIAL until enrichment fills it in, instead of blanking the chart.
+    catching_up |= !ordered;
     let complete:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM history_sync WHERE ready AND observed_at>NOW()-INTERVAL '90 seconds') AND (EXISTS(SELECT 1 FROM chain_events WHERE event_type='ProtocolInitializedEvent') OR EXISTS(SELECT 1 FROM decoded_instructions WHERE instruction_name='initialize_protocol')) AND EXISTS(SELECT 1 FROM backfill_checkpoints WHERE completed) AND EXISTS(SELECT 1 FROM trade_projection_checkpoint WHERE last_error IS NULL AND updated_at>NOW()-INTERVAL '90 seconds') AND NOT EXISTS(SELECT 1 FROM chain_events e WHERE event_type IN ('FillEvent','MultiOutcomeFillEvent') AND NOT EXISTS(SELECT 1 FROM indexed_trades t WHERE t.execution_id=e.signature||':'||e.log_index::text))").fetch_one(pool).await?;
     let rows=sqlx::query("SELECT (block_time/$4::bigint)*$4::bigint AS bucket,(array_agg(price ORDER BY slot,transaction_index,execution_index))[1]::text AS open,MAX(price)::text AS high,MIN(price)::text AS low,(array_agg(price ORDER BY slot DESC,transaction_index DESC,execution_index DESC))[1]::text AS close,SUM(quantity)::text AS quantity,SUM(quote_atoms)::text AS volume,COUNT(*) AS trades FROM indexed_trades WHERE market=$1 AND engine=$2 AND outcome=$3 AND block_time>=$5 AND block_time<$6 GROUP BY bucket ORDER BY bucket LIMIT 2000")
         .bind(market).bind(engine).bind(outcome).bind(interval).bind(from).bind(to).fetch_all(pool).await?;
@@ -112,7 +104,12 @@ pub async fn query(
         .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?;
     Ok(CandleSeries {
         supported: true,
-        coverage: if complete { "COMPLETE" } else { "PARTIAL" }.into(),
+        coverage: if complete && !catching_up {
+            "COMPLETE"
+        } else {
+            "PARTIAL"
+        }
+        .into(),
         commitment: "finalized".into(),
         error: None,
         candles,

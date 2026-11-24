@@ -101,6 +101,24 @@ pub async fn apply(pool: &PgPool, commitment: &str, snapshot: Snapshot) -> Resul
     if commitment == "finalized" && snapshot.slot < state.get::<i64, _>("slot") {
         return Err(invalid("finalized account scan moved backwards").into());
     }
+    // Periodic reconciliation usually finds nothing new. Then only record the
+    // fresher slot: no new revision, no row rewrites and no notification, so
+    // open pages do not refetch everything on every scan.
+    let current = state.get::<i64, _>("revision");
+    let scope = if current > 0 {
+        changed_scope(&mut tx, commitment, &snapshot.rows).await?
+    } else {
+        Some(Vec::new())
+    };
+    if scope.is_none() {
+        sqlx::query("UPDATE account_sync SET slot=GREATEST(slot,$2),observed_at=NOW(),ready=TRUE,last_error=NULL WHERE commitment=$1")
+            .bind(commitment)
+            .bind(snapshot.slot)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        return Ok(current);
+    }
     let revision = state
         .get::<i64, _>("revision")
         .checked_add(1)
@@ -115,13 +133,83 @@ pub async fn apply(pool: &PgPool, commitment: &str, snapshot: Snapshot) -> Resul
         .bind(commitment).bind(snapshot.slot).bind(revision).execute(&mut *tx).await?;
     sqlx::query("UPDATE account_sync SET slot=$2,revision=$3,observed_at=NOW(),ready=TRUE,last_error=NULL WHERE commitment=$1")
         .bind(commitment).bind(snapshot.slot).bind(revision).execute(&mut *tx).await?;
+    // "confirmed:42|addr,addr" names what changed; an empty or oversized scope
+    // is omitted, which clients treat as "anything may have changed".
+    let names = scope.unwrap_or_default().join(",");
+    let payload = if names.is_empty() || names.len() > 6000 {
+        format!("{commitment}:{revision}")
+    } else {
+        format!("{commitment}:{revision}|{names}")
+    };
     sqlx::query("SELECT pg_notify('outcomia_revisions',$1)")
-        .bind(format!("{commitment}:{revision}"))
+        .bind(payload)
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
     Ok(revision)
 }
+/// Addresses a scan changes, or None when the stored live accounts already
+/// equal the snapshot (same addresses, data and lamports). The scope holds
+/// each changed or deleted account plus the market, owner, wallet, club and
+/// authority it names, so pages can ignore changes to other markets.
+async fn changed_scope(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    commitment: &str,
+    rows: &[AccountRow],
+) -> Result<Option<Vec<String>>> {
+    let stored = sqlx::query(
+        "SELECT address,raw_base64,lamports::text AS lamports,account_type,data FROM indexed_accounts WHERE commitment=$1 AND NOT deleted",
+    )
+    .bind(commitment)
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut existing: std::collections::HashMap<String, (String, String, String, Value)> = stored
+        .into_iter()
+        .map(|r| {
+            (
+                r.get::<String, _>("address"),
+                (
+                    r.get::<String, _>("raw_base64"),
+                    r.get::<String, _>("lamports"),
+                    r.get::<String, _>("account_type"),
+                    r.get::<Json<Value>, _>("data").0,
+                ),
+            )
+        })
+        .collect();
+    let mut scope = std::collections::BTreeSet::new();
+    // Markets and books also name the protocol admin as `authority`; only an
+    // admin record's authority is the wallet it concerns.
+    let mut note = |address: &str, kind: &str, data: &Value| {
+        scope.insert(address.to_owned());
+        let authority = if kind == "AdminRecord" {
+            "authority"
+        } else {
+            ""
+        };
+        for field in ["market", "owner", "wallet", "club", authority] {
+            if let Some(value) = data.get(field).and_then(Value::as_str) {
+                scope.insert(value.to_owned());
+            }
+        }
+    };
+    for row in rows {
+        match existing.remove(&row.address) {
+            Some((raw, lamports, _, _)) if raw == row.raw && lamports == row.lamports => {}
+            _ => note(&row.address, &row.kind, &row.data),
+        }
+    }
+    // Whatever is left was closed since the last scan.
+    for (address, (_, _, kind, data)) in &existing {
+        note(address, kind, data);
+    }
+    Ok(if scope.is_empty() {
+        None
+    } else {
+        Some(scope.into_iter().collect())
+    })
+}
+
 pub async fn failed(pool: &PgPool, commitment: &str, message: &str) {
     let _ = sqlx::query("UPDATE account_sync SET ready=FALSE,last_error=$2 WHERE commitment=$1")
         .bind(commitment)

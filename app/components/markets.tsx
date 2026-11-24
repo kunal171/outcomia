@@ -54,84 +54,92 @@ export function Markets() {
     [connection],
   );
 
-  const loadMarkets = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setLabelNotice(null);
-
-    try {
-      const accounts = getOutcomiaAccounts(program);
-      const [marketRead, metadataRead, sharedRead] = await Promise.allSettled([
-        accounts.market.all(),
-        accounts.marketMetadata.all(),
-        SHARED_BALANCES_ENABLED
-          ? sharedAccounts(program).sharedBook.all()
-          : Promise.resolve([]),
-      ]);
-      if (marketRead.status === "rejected") throw marketRead.reason;
-      if (sharedRead.status === "rejected") throw sharedRead.reason;
-      const books = new Map<string, SharedBook>();
-      for (const r of sharedRead.value) {
-        // Club books are SharedBook accounts under club seeds; they belong on
-        // club pages, not in the public spot list.
-        if (!sharedBookPda(r.account.market).equals(r.publicKey)) continue;
-        books.set(r.account.market.toBase58(), r.account);
+  /** `quiet` (live updates) reloads without the loading state. */
+  const loadMarkets = useCallback(
+    async (quiet = false) => {
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+        setLabelNotice(null);
       }
-      setSharedBooks(books);
-      const records = marketRead.value;
-      const metadataRecords =
-        metadataRead.status === "fulfilled" ? metadataRead.value : [];
-      if (metadataRead.status === "rejected")
-        setLabelNotice(
-          "Market names could not be refreshed. Known test-token labels are shown where available.",
+
+      try {
+        const accounts = getOutcomiaAccounts(program);
+        const [marketRead, metadataRead, sharedRead] = await Promise.allSettled(
+          [
+            accounts.market.all(),
+            accounts.marketMetadata.all(),
+            SHARED_BALANCES_ENABLED
+              ? sharedAccounts(program).sharedBook.all()
+              : Promise.resolve([]),
+          ],
         );
-      setMetadataByMarket(
-        new Map(
+        if (marketRead.status === "rejected") throw marketRead.reason;
+        if (sharedRead.status === "rejected") throw sharedRead.reason;
+        const books = new Map<string, SharedBook>();
+        for (const r of sharedRead.value) {
+          // Club books are SharedBook accounts under club seeds; they belong on
+          // club pages, not in the public spot list.
+          if (!sharedBookPda(r.account.market).equals(r.publicKey)) continue;
+          books.set(r.account.market.toBase58(), r.account);
+        }
+        setSharedBooks(books);
+        const records = marketRead.value;
+        const metadataRecords =
+          metadataRead.status === "fulfilled" ? metadataRead.value : [];
+        if (metadataRead.status === "rejected")
+          setLabelNotice(
+            "Market names could not be refreshed. Known test-token labels are shown where available.",
+          );
+        setMetadataByMarket(
+          new Map(
+            metadataRecords.map(({ account }) => [
+              account.market.toBase58(),
+              account,
+            ]),
+          ),
+        );
+        const names = new Map(
           metadataRecords.map(({ account }) => [
             account.market.toBase58(),
-            account,
+            account.displayName,
           ]),
-        ),
-      );
-      const names = new Map(
-        metadataRecords.map(({ account }) => [
-          account.market.toBase58(),
-          account.displayName,
-        ]),
-      );
-      setMarkets(
-        records
-          .filter(({ publicKey }) =>
-            visibleMarket(
-              publicKey.toBase58(),
-              names.get(publicKey.toBase58()),
-            ),
-          )
-          .map(({ publicKey, account }) => ({
-            address: publicKey,
-            ...account,
-          }))
-          .sort((left, right) => {
-            const leftStatus = decodeMarketStatus(left.status);
-            const rightStatus = decodeMarketStatus(right.status);
+        );
+        setMarkets(
+          records
+            .filter(({ publicKey }) =>
+              visibleMarket(
+                publicKey.toBase58(),
+                names.get(publicKey.toBase58()),
+              ),
+            )
+            .map(({ publicKey, account }) => ({
+              address: publicKey,
+              ...account,
+            }))
+            .sort((left, right) => {
+              const leftStatus = decodeMarketStatus(left.status);
+              const rightStatus = decodeMarketStatus(right.status);
 
-            if (leftStatus !== rightStatus) {
-              return leftStatus === "active" ? -1 : 1;
-            }
+              if (leftStatus !== rightStatus) {
+                return leftStatus === "active" ? -1 : 1;
+              }
 
-            return left.address
-              .toBase58()
-              .localeCompare(right.address.toBase58());
-          }),
-      );
-    } catch (cause) {
-      setError(getErrorMessage(cause));
-    } finally {
-      setLoading(false);
-    }
-  }, [program]);
+              return left.address
+                .toBase58()
+                .localeCompare(right.address.toBase58());
+            }),
+        );
+      } catch (cause) {
+        setError(getErrorMessage(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [program],
+  );
 
-  useIndexerUpdates(() => void loadMarkets());
+  useIndexerUpdates(() => void loadMarkets(true));
   useEffect(() => {
     void loadMarkets();
   }, [loadMarkets]);
