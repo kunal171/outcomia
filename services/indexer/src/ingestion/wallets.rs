@@ -141,6 +141,33 @@ async fn refresh(pool: &PgPool, client: Arc<RpcClient>, owner: &str, level: &str
     .await??;
     let holdings = parse(owner, sol, tokens)?;
     let mut tx = pool.begin().await?;
+    // Unchanged balances: mark the wallet fresh without rewriting rows or
+    // notifying, so the owner's open pages do not refresh on every poll.
+    let mut stored: Vec<String> = sqlx::query_scalar("SELECT mint||'|'||token_program||'|'||amount::text||'|'||frozen::text||'|'||decimals::text||'|'||account_count::text FROM wallet_assets WHERE owner=$1 AND commitment=$2")
+        .bind(owner)
+        .bind(level)
+        .fetch_all(&mut *tx)
+        .await?;
+    let mut fresh: Vec<String> = holdings
+        .iter()
+        .map(|h| {
+            format!(
+                "{}|{}|{}|{}|{}|{}",
+                h.mint, h.program, h.amount, h.frozen, h.decimals, h.count
+            )
+        })
+        .collect();
+    fresh.sort();
+    stored.sort();
+    if !stored.is_empty() && stored == fresh {
+        sqlx::query("UPDATE wallet_sync SET observed_at=NOW(),ready=TRUE,last_error=NULL WHERE commitment=$1 AND owner=$2")
+            .bind(level)
+            .bind(owner)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        return Ok(());
+    }
     sqlx::query("DELETE FROM wallet_assets WHERE owner=$1 AND commitment=$2")
         .bind(owner)
         .bind(level)

@@ -101,6 +101,19 @@ pub async fn apply(pool: &PgPool, commitment: &str, snapshot: Snapshot) -> Resul
     if commitment == "finalized" && snapshot.slot < state.get::<i64, _>("slot") {
         return Err(invalid("finalized account scan moved backwards").into());
     }
+    // Periodic reconciliation usually finds nothing new. Then only record the
+    // fresher slot: no new revision, no row rewrites and no notification, so
+    // open pages do not refetch everything on every scan.
+    let current = state.get::<i64, _>("revision");
+    if current > 0 && unchanged(&mut tx, commitment, &snapshot.rows).await? {
+        sqlx::query("UPDATE account_sync SET slot=GREATEST(slot,$2),observed_at=NOW(),ready=TRUE,last_error=NULL WHERE commitment=$1")
+            .bind(commitment)
+            .bind(snapshot.slot)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        return Ok(current);
+    }
     let revision = state
         .get::<i64, _>("revision")
         .checked_add(1)
@@ -122,6 +135,41 @@ pub async fn apply(pool: &PgPool, commitment: &str, snapshot: Snapshot) -> Resul
     tx.commit().await?;
     Ok(revision)
 }
+/// True when the stored live accounts are exactly the snapshot's accounts
+/// (same addresses, data and lamports), so publishing would change nothing.
+async fn unchanged(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    commitment: &str,
+    rows: &[AccountRow],
+) -> Result<bool> {
+    let stored = sqlx::query(
+        "SELECT address,raw_base64,lamports::text AS lamports FROM indexed_accounts WHERE commitment=$1 AND NOT deleted",
+    )
+    .bind(commitment)
+    .fetch_all(&mut **tx)
+    .await?;
+    if stored.len() != rows.len() {
+        return Ok(false);
+    }
+    let existing: std::collections::HashMap<String, (String, String)> = stored
+        .into_iter()
+        .map(|r| {
+            (
+                r.get::<String, _>("address"),
+                (
+                    r.get::<String, _>("raw_base64"),
+                    r.get::<String, _>("lamports"),
+                ),
+            )
+        })
+        .collect();
+    Ok(rows.iter().all(|row| {
+        existing
+            .get(&row.address)
+            .is_some_and(|(raw, lamports)| raw == &row.raw && lamports == &row.lamports)
+    }))
+}
+
 pub async fn failed(pool: &PgPool, commitment: &str, message: &str) {
     let _ = sqlx::query("UPDATE account_sync SET ready=FALSE,last_error=$2 WHERE commitment=$1")
         .bind(commitment)
