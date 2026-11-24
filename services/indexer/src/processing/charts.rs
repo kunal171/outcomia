@@ -66,21 +66,18 @@ pub async fn query(
             candles: vec![],
         });
     }
+    // Instruction-replay engines: replay is program-wide, so on a busy program a
+    // few transactions are almost always still being decoded or replayed. Keep
+    // serving the trades already indexed and mark the series PARTIAL until
+    // replay catches up, instead of blanking every chart.
+    let mut catching_up = false;
     if matches!(engine, "LEGACY_BINARY" | "SHARED_SPOT" | "SHARED_BINARY") {
         let replayed: bool = sqlx::query_scalar(
             "SELECT ready AND last_error IS NULL AND NOT EXISTS(SELECT 1 FROM decoded_instructions WHERE NOT replayed) AND NOT EXISTS(SELECT 1 FROM chain_transactions t LEFT JOIN instruction_decode_state d USING(signature) WHERE d.signature IS NULL OR t.transaction_index IS NULL) FROM execution_replay_state WHERE singleton",
         )
         .fetch_one(pool)
         .await?;
-        if !replayed {
-            return Ok(CandleSeries {
-                supported: true,
-                coverage: "INCOMPLETE".into(),
-                commitment: "finalized".into(),
-                error: Some("Execution history is being reconciled".into()),
-                candles: vec![],
-            });
-        }
+        catching_up = !replayed;
     }
     let ordered:bool=sqlx::query_scalar("SELECT NOT EXISTS(SELECT 1 FROM indexed_trades WHERE market=$1 AND engine=$2 AND outcome=$3 AND (block_time IS NULL OR transaction_index IS NULL))").bind(market).bind(engine).bind(outcome).fetch_one(pool).await?;
     if !ordered {
@@ -112,7 +109,12 @@ pub async fn query(
         .collect::<std::result::Result<Vec<_>, std::num::TryFromIntError>>()?;
     Ok(CandleSeries {
         supported: true,
-        coverage: if complete { "COMPLETE" } else { "PARTIAL" }.into(),
+        coverage: if complete && !catching_up {
+            "COMPLETE"
+        } else {
+            "PARTIAL"
+        }
+        .into(),
         commitment: "finalized".into(),
         error: None,
         candles,
