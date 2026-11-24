@@ -47,19 +47,17 @@ export function SharedAssetFunds(props: {
     />
   );
 }
-function Funds({
+/** Live shared balance for one mint plus the deposit/withdraw transaction.
+ * Shared by the per-market card and the wallet page's funds panel. */
+export function useSharedFunds({
   mint,
   decimals,
-  symbol,
   onChanged,
 }: {
   mint: PublicKey;
   decimals: number;
-  symbol: string;
   onChanged?: () => void;
 }) {
-  const { t } = useI18n();
-
   const wallet = useAnchorWallet()!,
     { connection } = useConnection();
   const [balance, setBalance] = useState<AssetBalance | null>(null),
@@ -182,6 +180,41 @@ function Funds({
       setPending(false);
     }
   }
+  return {
+    balance,
+    loaded,
+    pending,
+    issue,
+    signature,
+    amount,
+    setAmount,
+    act,
+    refresh: () => setRevision((v) => v + 1),
+  };
+}
+function Funds({
+  mint,
+  decimals,
+  symbol,
+  onChanged,
+}: {
+  mint: PublicKey;
+  decimals: number;
+  symbol: string;
+  onChanged?: () => void;
+}) {
+  const { t } = useI18n();
+  const {
+    balance,
+    loaded,
+    pending,
+    issue,
+    signature,
+    amount,
+    setAmount,
+    act,
+    refresh,
+  } = useSharedFunds({ mint, decimals, onChanged });
   let parsed: BN | null = null;
   try {
     parsed = parseTokenAmount(amount, decimals, "Amount");
@@ -193,15 +226,11 @@ function Funds({
     <section className="admin-card shared-funds">
       <div className="section-heading">
         <h3>{t("{value0} · shared wallet", { value0: symbol })}</h3>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => setRevision((v) => v + 1)}
-        >
+        <button type="button" disabled={pending} onClick={refresh}>
           {t("Refresh")}
         </button>
       </div>
-      <TestUsdcFaucet mint={mint} onClaimed={() => setRevision((v) => v + 1)} />
+      <TestUsdcFaucet mint={mint} onClaimed={refresh} />
       <a
         className="market-explorer-link"
         href={accountExplorerUrl(mint)}
