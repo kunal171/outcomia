@@ -2412,6 +2412,11 @@ body:has(.prediction-guide[open]) {
   stroke: var(--accent);
   stroke-width: 2;
 }
+/* Latest price held to the end of the window, after the last trade. */
+.chart-line-held {
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
 .chart-area,
 .chart-volume {
   fill: var(--accent);
