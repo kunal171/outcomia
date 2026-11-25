@@ -228,3 +228,7 @@ export function WalletSessionStatus() {
     </div>
   );
 }
+/** The signed-in wallet session, or null outside the provider. */
+export function useWalletSession() {
+  return useContext(Context);
+}
