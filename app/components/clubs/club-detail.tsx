@@ -42,6 +42,10 @@ import {
   requestClubMembershipInstruction,
   requestExpired,
   setClubListingInstruction,
+  clubKind,
+  memberCap,
+  readClubRules,
+  type ClubRulesAccount,
   verifyClubListingInstruction,
   type ClubSnapshot,
 } from "../../lib/clubs";
@@ -75,6 +79,18 @@ export function ClubDetail({ address }: { address: string }) {
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
   const wallet = tx.wallet?.publicKey;
 
+  const [rules, setRules] = useState<ClubRulesAccount | null>(null);
+  useEffect(() => {
+    if (!CLUBS_ENABLED) return;
+    let dead = false;
+    void readClubRules(program)
+      .then((value) => !dead && setRules(value))
+      .catch(() => !dead && setRules(null));
+    return () => {
+      dead = true;
+    };
+  }, [program, revision]);
+
   useEffect(() => {
     if (!CLUBS_ENABLED) return;
     let dead = false;
@@ -100,6 +116,10 @@ export function ClubDetail({ address }: { address: string }) {
   const now = Math.floor(Date.now() / 1000);
 
   const listing = snapshot?.listing ?? null;
+  const kind = snapshot ? clubKind(snapshot.club) : null;
+  const cap = rules && kind ? memberCap(rules, kind) : null;
+  const adminsFull =
+    !!rules && !!snapshot && snapshot.club.adminCount >= rules.maxClubAdmins;
   const myRequest = wallet
     ? snapshot?.requests.find((r) => r.wallet.equals(wallet))
     : undefined;
@@ -201,6 +221,15 @@ export function ClubDetail({ address }: { address: string }) {
                 <p className="ui-eyebrow">{t("Club")}</p>
                 <h1 className="ui-title">{snapshot.club.name}</h1>
                 <div className="club-head-meta">
+                  {kind ? (
+                    <span className="ui-badge">
+                      {kind === "public" ? t("Public club") : t("Private club")}
+                    </span>
+                  ) : (
+                    <span className="ui-badge ui-badge-warn">
+                      {t("Awaiting upgrade")}
+                    </span>
+                  )}
                   {listing && (
                     <span
                       className={`ui-badge ${isOpenListing(listing) ? "ui-badge-yes" : "ui-badge-accent"}`}
@@ -223,10 +252,23 @@ export function ClubDetail({ address }: { address: string }) {
                     <span className="ui-badge">{listing.topic}</span>
                   )}
                   <span>
-                    {t("{value0} members", {
-                      value0: String(snapshot.club.memberCount),
-                    })}
+                    {cap
+                      ? t("{value0} of {value1} members", {
+                          value0: snapshot.club.memberCount.toLocaleString(),
+                          value1: cap.toLocaleString(),
+                        })
+                      : t("{value0} members", {
+                          value0: String(snapshot.club.memberCount),
+                        })}
                   </span>
+                  {rules && (
+                    <span>
+                      {t("{value0} of {value1} admins", {
+                        value0: snapshot.club.adminCount,
+                        value1: rules.maxClubAdmins,
+                      })}
+                    </span>
+                  )}
                   <span>
                     {"anyMember" in snapshot.club.marketPolicy
                       ? t("Any member can create markets")
@@ -448,7 +490,9 @@ export function ClubDetail({ address }: { address: string }) {
                   <div className="club-card-head">
                     <h2 className="ui-h3">{t("Members")}</h2>
                     <span className="ui-badge">
-                      {String(snapshot.club.memberCount)}
+                      {cap
+                        ? `${snapshot.club.memberCount.toLocaleString()} / ${cap.toLocaleString()}`
+                        : String(snapshot.club.memberCount)}
                     </span>
                   </div>
                   <ul className="ui-list">
@@ -487,7 +531,16 @@ export function ClubDetail({ address }: { address: string }) {
                               <button
                                 type="button"
                                 className="ui-btn ui-btn-sm"
-                                disabled={tx.pending}
+                                disabled={
+                                  tx.pending || (!isAdmin(m) && adminsFull)
+                                }
+                                title={
+                                  !isAdmin(m) && adminsFull
+                                    ? t(
+                                        "This club already has the maximum number of admins",
+                                      )
+                                    : undefined
+                                }
                                 onClick={() =>
                                   run(async (p, signer) => [
                                     await setClubMemberRoleInstruction(
@@ -582,6 +635,7 @@ export function ClubDetail({ address }: { address: string }) {
                                 p,
                                 signer,
                                 club,
+                                snapshot.club.owner,
                               ),
                             ])
                           }
@@ -753,7 +807,24 @@ export function ClubDetail({ address }: { address: string }) {
               {admin && (
                 <aside className="club-side" aria-label={t("Manage club")}>
                   <p className="ui-eyebrow">{t("Manage club")}</p>
-                  {owner && (
+                  {!kind && (
+                    <p className="ui-notice" role="status">
+                      {t(
+                        "This club was created before club types. An Outcomia admin will upgrade it shortly; until then it cannot accept members.",
+                      )}
+                    </p>
+                  )}
+                  {owner && kind === "private" && (
+                    <section className="ui-card">
+                      <h2 className="ui-h3">{t("Listing")}</h2>
+                      <p className="club-help">
+                        {t(
+                          "Private clubs are invite-only and cannot be listed for discovery.",
+                        )}
+                      </p>
+                    </section>
+                  )}
+                  {owner && kind === "public" && (
                     <section className="ui-card">
                       <h2 className="ui-h3">{t("Listing")}</h2>
                       <form
