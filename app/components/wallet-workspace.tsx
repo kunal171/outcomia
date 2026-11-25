@@ -9,6 +9,7 @@ import {
   SHARED_BALANCES_ENABLED,
 } from "../lib/shared";
 import { SharedFundsPanel } from "./shared-funds-panel";
+import { ProfileEditor } from "./social/profile-editor";
 
 import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
@@ -230,6 +231,7 @@ export function WalletWorkspace() {
                 </strong>
               </article>
             </section>
+            {owner && <ProfileEditor wallet={owner} />}
             {data && (
               <div className="wallet-errors">
                 {data.shared && (

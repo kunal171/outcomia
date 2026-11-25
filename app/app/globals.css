@@ -2731,3 +2731,97 @@ body:has(.prediction-guide[open]) {
 .faucet-limit { color: var(--muted); }
 .faucet-card [role="alert"] { margin: 0; color: var(--coral); }
 .faucet-next { margin-top: 1.5rem; color: var(--muted); }
+
+/* Profiles and leaderboards (components/social). */
+.wallet-avatar { flex: none; border-radius: 30%; image-rendering: pixelated; }
+.trader-name { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
+.trader-name span { display: grid; min-width: 0; }
+.trader-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.trader-name small { color: var(--muted); font-size: 12px; }
+.trader-name:hover strong { text-decoration: underline; }
+.leaderboard-page .route-heading p, .profile-page .profile-bio { color: var(--muted); max-width: 62ch; }
+.lb-boards { display: flex; gap: 6px; overflow-x: auto; margin: 20px 0 14px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.lb-boards button {
+  flex: none; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent;
+  background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer;
+}
+.lb-boards button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.lb-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 16px; }
+.lb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lb-chips button {
+  min-height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.lb-chips button[aria-pressed="true"] { border-color: var(--accent); background: rgb(var(--accent-rgb) / 0.14); }
+.lb-note { color: var(--muted); font-size: 14px; }
+.lb-token { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 14px; color: var(--muted); }
+.lb-token select {
+  min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-inset); color: var(--ink); font: inherit;
+}
+.lb-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.lb-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.lb-table th { padding: 10px 14px; text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); }
+.lb-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.lb-table tr:last-child td { border-bottom: 0; }
+.lb-table .lb-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lb-table td small { color: var(--muted); }
+.lb-rank { width: 44px; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.lb-table tr:nth-child(-n+3) .lb-rank { color: var(--accent); }
+.lb-up { color: var(--yes); }
+.lb-down { color: var(--no); }
+.lb-call { text-align: left !important; white-space: normal !important; }
+.lb-call a, .lb-market { display: block; color: var(--ink); font-weight: 600; text-decoration: none; }
+.lb-call small { display: block; }
+.lb-market { display: flex; align-items: center; gap: 8px; }
+.lb-kind {
+  flex: none; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: rgb(var(--accent-rgb) / 0.14); color: var(--ink);
+}
+.lb-kind-multi { background: rgb(var(--multi-rgb, var(--accent-rgb)) / 0.18); }
+.lb-empty { color: var(--muted); }
+.lb-asof { margin-top: 14px; color: var(--muted); font-size: 12px; }
+.profile-hero { display: flex; gap: 22px; align-items: center; margin: 8px 0 24px; }
+.profile-hero h1 { margin: 0; }
+.profile-handle { margin: 2px 0 6px; color: var(--muted); }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 12px; color: var(--muted); font-size: 14px; }
+.profile-meta a { color: inherit; }
+.profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0 20px; }
+.profile-stats article { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.profile-stats strong { font-size: 1.4rem; }
+.profile-stats small { color: var(--muted); }
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.profile-grid .admin-card { margin: 0; }
+.profile-grid h2 { margin: 0 0 10px; font-size: 1.05rem; }
+.profile-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.profile-list li {
+  display: grid; gap: 2px; padding: 8px 0;
+  border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.profile-list li:last-child { border-bottom: 0; }
+.profile-list a { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-list li > span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.profile-grid .text-button { margin-top: 8px; }
+.profile-editor form { display: grid; gap: 12px; margin-top: 12px; max-width: 520px; }
+.profile-editor label { display: grid; gap: 6px; font-weight: 600; }
+.profile-editor label small, .profile-editor-note { color: var(--muted); font-weight: 400; }
+.profile-editor :is(input:not([type]), input[type="text"], textarea) {
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface-inset); color: var(--ink); font: inherit;
+}
+.profile-editor .profile-editor-check { display: flex; align-items: center; gap: 8px; }
+.profile-editor-preview { display: flex; align-items: center; gap: 14px; }
+.profile-editor-preview div { display: grid; gap: 4px; }
+@media (max-width: 640px) {
+  .profile-hero { flex-direction: column; align-items: flex-start; }
+  .lb-token { margin-left: 0; }
+}
+.profile-editor input[type="range"] {
+  appearance: none; height: 10px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, hsl(0 70% 55%), hsl(60 70% 55%), hsl(120 70% 45%), hsl(180 70% 45%), hsl(240 70% 60%), hsl(300 70% 55%), hsl(359 70% 55%));
+}
+.profile-editor input[type="range"]::-webkit-slider-thumb {
+  appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--ink);
+}
+.profile-editor input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--panel); border: 2px solid var(--ink); }

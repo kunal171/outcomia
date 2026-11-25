@@ -4,6 +4,7 @@ import { useI18n } from "./preferences-provider";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { SharedWalletButton } from "./network-wallet-provider";
 import { WalletSessionStatus } from "./wallet-session-provider";
 import { DisplayPreferences } from "./display-preferences";
@@ -30,6 +31,8 @@ type NavigationItem = {
     | "spot"
     | "wallet"
     | "faucet"
+    | "leaderboard"
+    | "profile"
     | "orders"
     | "admins"
     | "create"
@@ -43,6 +46,10 @@ function NavigationIcon({ name }: { name: NavigationItem["icon"] }) {
     spot: "M4 8h15l-4-4 M20 16H5l4 4",
     wallet: "M20 8V5H5a2 2 0 0 0 0 4h15v11H5a2 2 0 0 1-2-2V7 M16 12h5v5h-5z",
     faucet: "M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11Z",
+    leaderboard:
+      "M8 21h8 M12 17v4 M7 4h10v5a5 5 0 0 1-10 0V4Z M7 6H4v1a3 3 0 0 0 3 3 M17 6h3v1a3 3 0 0 1-3 3",
+    profile:
+      "M4 4h16v16H4z M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6 M7 18a5 5 0 0 1 10 0",
     orders: "M8 6h12 M8 12h12 M8 18h12 M3 6h1 M3 12h1 M3 18h1",
     admins:
       "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 4a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87",
@@ -72,6 +79,7 @@ export function AppHeader() {
   const { t } = useI18n();
 
   const pathname = usePathname();
+  const owner = useWallet().publicKey?.toBase58() ?? null;
   const { role, loading } = useProtocolRole();
   const roleLabel = loading ? "Checking role" : roleLabels[role];
   const isSuperAdmin = !loading && role === "super-admin";
@@ -141,6 +149,22 @@ export function AppHeader() {
       icon: "wallet",
       active: pathname === "/wallet",
     },
+    {
+      href: "/leaderboard",
+      label: "Leaderboard",
+      icon: "leaderboard",
+      active: pathname === "/leaderboard",
+    },
+    ...(owner
+      ? [
+          {
+            href: `/u/${owner}`,
+            label: "My profile",
+            icon: "profile" as const,
+            active: pathname === `/u/${owner}`,
+          },
+        ]
+      : []),
     {
       href: "/faucet",
       label: "Faucet",
