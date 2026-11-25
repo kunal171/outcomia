@@ -1482,5 +1482,6 @@
   "{value0} of {value1} admins": "{value1} में से {value0} एडमिन",
   "This club already has the maximum number of admins": "इस क्लब में पहले से अधिकतम एडमिन हैं",
   "This club was created before club types. An Outcomia admin will upgrade it shortly; until then it cannot accept members.": "यह क्लब, क्लब टाइप से पहले बना था। Outcomia एडमिन इसे जल्द अपग्रेड करेगा; तब तक यह सदस्य नहीं ले सकता।",
-  "Private clubs are invite-only and cannot be listed for discovery.": "प्राइवेट क्लब केवल निमंत्रण से हैं और लिस्ट नहीं हो सकते।"
+  "Private clubs are invite-only and cannot be listed for discovery.": "प्राइवेट क्लब केवल निमंत्रण से हैं और लिस्ट नहीं हो सकते।",
+  "Clubs could not be read: {value0}": "क्लब पढ़े नहीं जा सके: {value0}"
 }
