@@ -38,7 +38,7 @@ export function NetworkHeader() {
  */
 /** Routes rendered without a wallet: the landing page, the password gate and
  * the design reference. */
-const PUBLIC_ROUTES = new Set(["/", "/unlock", "/design"]);
+const PUBLIC_ROUTES = new Set(["/", "/design"]);
 export { APP_HOME };
 
 export function NetworkBoundary({ children }: { children: ReactNode }) {
