@@ -10,6 +10,15 @@ import {
   type ProfileInput,
 } from "../../lib/graphql/social";
 import { walletHue, WalletAvatar } from "./social-ui";
+import { PROFILE_LINKS } from "./profile-links";
+import type { Profile } from "../../lib/graphql/social";
+
+/** Form values for every social link, empty when unset. */
+function linkValues(p: Profile | null | undefined) {
+  return Object.fromEntries(
+    PROFILE_LINKS.map((l) => [l.key, p?.[l.key] ?? ""]),
+  ) as Pick<ProfileInput, (typeof PROFILE_LINKS)[number]["key"]>;
+}
 
 /** Wallet page card: create or edit the signed-in wallet's public profile.
  * Saving needs a signed-in session, which proves the wallet owner is editing. */
@@ -40,8 +49,9 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
           displayName: p?.displayName ?? "",
           bio: p?.bio ?? "",
           avatarHue: p?.avatarHue ?? walletHue(wallet),
-          xHandle: p?.xHandle ?? "",
           showOnLeaderboards: p?.showOnLeaderboards ?? true,
+          location: p?.location ?? "",
+          ...linkValues(p),
         });
       })
       .catch(
@@ -65,14 +75,18 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
     try {
       const profile = await updateProfile({
         ...form,
-        xHandle: form.xHandle?.trim() || null,
+        location: form.location?.trim() || null,
+        ...Object.fromEntries(
+          PROFILE_LINKS.map((l) => [l.key, form[l.key]?.trim() || null]),
+        ),
       });
       setExists(true);
       setSaved(profile.username);
       setForm({
         ...form,
         username: profile.username,
-        xHandle: profile.xHandle ?? "",
+        location: profile.location ?? "",
+        ...linkValues(profile),
       });
     } catch (cause) {
       setIssue(cause instanceof Error ? cause.message : String(cause));
@@ -160,15 +174,35 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
             />
           </label>
           <label>
-            {t("X handle (optional)")}
+            {t("Location (optional)")}
             <input
-              value={form.xHandle ?? ""}
-              onChange={(e) => set("xHandle", e.target.value)}
-              placeholder="@handle"
-              maxLength={16}
+              value={form.location ?? ""}
+              onChange={(e) => set("location", e.target.value)}
+              placeholder={t("City or country")}
+              maxLength={40}
               disabled={pending}
             />
           </label>
+          <fieldset className="profile-editor-links">
+            <legend>{t("Links (optional)")}</legend>
+            <small>
+              {t("Paste a profile link or type the handle; both work.")}
+            </small>
+            {PROFILE_LINKS.map((l) => (
+              <label key={l.key}>
+                {t(l.label)}
+                <input
+                  value={form[l.key] ?? ""}
+                  onChange={(e) => set(l.key, e.target.value)}
+                  placeholder={l.placeholder}
+                  maxLength={
+                    l.key === "website" || l.key === "linkedin" ? 140 : 60
+                  }
+                  disabled={pending}
+                />
+              </label>
+            ))}
+          </fieldset>
           <label className="profile-editor-check">
             <input
               type="checkbox"

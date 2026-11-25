@@ -39,9 +39,20 @@ pub struct Profile {
     pub x_handle: Option<String>,
     pub show_on_leaderboards: bool,
     pub created_at: String,
+    pub location: Option<String>,
+    /// Full https URL.
+    pub website: Option<String>,
+    /// Handles below are stored without '@' or a site prefix.
+    pub telegram: Option<String>,
+    pub instagram: Option<String>,
+    /// LinkedIn profile slug, as in linkedin.com/in/<slug>.
+    pub linkedin: Option<String>,
+    pub discord: Option<String>,
+    pub github: Option<String>,
+    pub youtube: Option<String>,
 }
 
-pub const PROFILE_COLUMNS: &str = "wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at";
+pub const PROFILE_COLUMNS: &str = "wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at,location,website,telegram,instagram,linkedin,discord,github,youtube";
 
 pub fn profile_from_row(row: &PgRow) -> Profile {
     Profile {
@@ -53,6 +64,14 @@ pub fn profile_from_row(row: &PgRow) -> Profile {
         x_handle: row.get("x_handle"),
         show_on_leaderboards: row.get("show_on_leaderboards"),
         created_at: row.get("created_at"),
+        location: row.get("location"),
+        website: row.get("website"),
+        telegram: row.get("telegram"),
+        instagram: row.get("instagram"),
+        linkedin: row.get("linkedin"),
+        discord: row.get("discord"),
+        github: row.get("github"),
+        youtube: row.get("youtube"),
     }
 }
 
@@ -84,6 +103,14 @@ pub struct ProfileInput {
     pub avatar_hue: i32,
     pub x_handle: Option<String>,
     pub show_on_leaderboards: bool,
+    pub location: Option<String>,
+    pub website: Option<String>,
+    pub telegram: Option<String>,
+    pub instagram: Option<String>,
+    pub linkedin: Option<String>,
+    pub discord: Option<String>,
+    pub github: Option<String>,
+    pub youtube: Option<String>,
 }
 
 /// Normalized, validated profile fields ready to store.
@@ -95,6 +122,47 @@ pub struct ValidProfile {
     pub avatar_hue: i16,
     pub x_handle: Option<String>,
     pub show_on_leaderboards: bool,
+    pub location: Option<String>,
+    pub website: Option<String>,
+    pub telegram: Option<String>,
+    pub instagram: Option<String>,
+    pub linkedin: Option<String>,
+    pub discord: Option<String>,
+    pub github: Option<String>,
+    pub youtube: Option<String>,
+}
+
+/// A handle pasted as `@name`, `name` or a profile URL on one of `hosts`,
+/// reduced to `name` and checked against `allowed` and `len`.
+fn handle(
+    value: Option<&str>,
+    hosts: &[&str],
+    len: std::ops::RangeInclusive<usize>,
+    allowed: fn(u8) -> bool,
+    error: &'static str,
+) -> Result<Option<String>, &'static str> {
+    let Some(raw) = value.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    let mut name = raw
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_start_matches("www.");
+    for host in hosts {
+        if let Some(rest) = name.strip_prefix(host) {
+            name = rest;
+            break;
+        }
+    }
+    let name = name.trim_start_matches('@').trim_end_matches('/');
+    if !len.contains(&name.len()) || !name.bytes().all(allowed) {
+        return Err(error);
+    }
+    Ok(Some(name.to_owned()))
+}
+
+fn word(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
 }
 
 /// Inputs: raw profile input. Errors: a message the user can act on.
@@ -123,20 +191,82 @@ pub fn validate(input: ProfileInput) -> Result<ValidProfile, &'static str> {
         .ok()
         .filter(|hue| (0..360).contains(hue))
         .ok_or("Avatar colour must be between 0 and 359")?;
-    let x_handle = match input.x_handle.as_deref().map(str::trim) {
+    let x_handle = handle(
+        input.x_handle.as_deref(),
+        &["x.com/", "twitter.com/"],
+        1..=15,
+        word,
+        "X handles are up to 15 letters, numbers or _",
+    )?;
+    let location = match input.location.as_deref().map(str::trim) {
         None | Some("") => None,
-        Some(handle) => {
-            let handle = handle.trim_start_matches('@');
-            if !(1..=15).contains(&handle.len())
-                || !handle
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        Some(place) if place.chars().count() <= 40 && !place.chars().any(char::is_control) => {
+            Some(place.to_owned())
+        }
+        Some(_) => return Err("Locations are up to 40 characters on one line"),
+    };
+    let website = match input.website.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(url) => {
+            let url = if url.starts_with("https://") {
+                url.to_owned()
+            } else {
+                format!("https://{}", url.trim_start_matches("http://"))
+            };
+            if url.len() > 120
+                || url.len() <= "https://".len() + 3
+                || !url["https://".len()..].contains('.')
+                || url
+                    .chars()
+                    .any(|c| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"'))
             {
-                return Err("X handles are up to 15 letters, numbers or _");
+                return Err("Websites must be a valid https:// address up to 120 characters");
             }
-            Some(handle.to_owned())
+            Some(url)
         }
     };
+    let telegram = handle(
+        input.telegram.as_deref(),
+        &["t.me/", "telegram.me/"],
+        5..=32,
+        word,
+        "Telegram usernames are 5–32 letters, numbers or _",
+    )?;
+    let instagram = handle(
+        input.instagram.as_deref(),
+        &["instagram.com/"],
+        1..=30,
+        |b| word(b) || b == b'.',
+        "Instagram usernames are up to 30 letters, numbers, . or _",
+    )?;
+    let linkedin = handle(
+        input.linkedin.as_deref(),
+        &["linkedin.com/in/"],
+        3..=100,
+        |b| b.is_ascii_alphanumeric() || b == b'-',
+        "LinkedIn profile names are 3–100 letters, numbers or -",
+    )?;
+    let discord = handle(
+        input.discord.as_deref().map(str::to_lowercase).as_deref(),
+        &[],
+        2..=32,
+        |b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'.',
+        "Discord usernames are 2–32 lowercase letters, numbers, . or _",
+    )?;
+    let github = handle(
+        input.github.as_deref(),
+        &["github.com/"],
+        1..=39,
+        |b| b.is_ascii_alphanumeric() || b == b'-',
+        "GitHub usernames are up to 39 letters, numbers or -",
+    )?;
+    let youtube = handle(
+        input.youtube.as_deref(),
+        &["youtube.com/"],
+        3..=30,
+        |b| word(b) || b == b'.' || b == b'-',
+        "YouTube handles are 3–30 letters, numbers, ., - or _",
+    )?;
     Ok(ValidProfile {
         username,
         display_name,
@@ -144,6 +274,14 @@ pub fn validate(input: ProfileInput) -> Result<ValidProfile, &'static str> {
         avatar_hue,
         x_handle,
         show_on_leaderboards: input.show_on_leaderboards,
+        location,
+        website,
+        telegram,
+        instagram,
+        linkedin,
+        discord,
+        github,
+        youtube,
     })
 }
 
@@ -216,11 +354,13 @@ impl ProfilesMutation {
         let profile = validate(input).map_err(async_graphql::Error::new)?;
         let pool = &ctx.data::<ApiState>()?.pool;
         let result = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "INSERT INTO profiles(wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards)
-             VALUES($1,$2,$3,$4,$5,$6,$7)
+            "INSERT INTO profiles(wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,location,website,telegram,instagram,linkedin,discord,github,youtube)
+             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
              ON CONFLICT(wallet) DO UPDATE SET username=EXCLUDED.username,display_name=EXCLUDED.display_name,
                bio=EXCLUDED.bio,avatar_hue=EXCLUDED.avatar_hue,x_handle=EXCLUDED.x_handle,
-               show_on_leaderboards=EXCLUDED.show_on_leaderboards,updated_at=NOW()
+               show_on_leaderboards=EXCLUDED.show_on_leaderboards,location=EXCLUDED.location,website=EXCLUDED.website,
+               telegram=EXCLUDED.telegram,instagram=EXCLUDED.instagram,linkedin=EXCLUDED.linkedin,discord=EXCLUDED.discord,
+               github=EXCLUDED.github,youtube=EXCLUDED.youtube,updated_at=NOW()
              RETURNING {PROFILE_COLUMNS}"
         )))
         .bind(&user.wallet)
@@ -230,6 +370,14 @@ impl ProfilesMutation {
         .bind(profile.avatar_hue)
         .bind(&profile.x_handle)
         .bind(profile.show_on_leaderboards)
+        .bind(&profile.location)
+        .bind(&profile.website)
+        .bind(&profile.telegram)
+        .bind(&profile.instagram)
+        .bind(&profile.linkedin)
+        .bind(&profile.discord)
+        .bind(&profile.github)
+        .bind(&profile.youtube)
         .fetch_one(pool)
         .await;
         match result {
@@ -253,6 +401,14 @@ mod tests {
             avatar_hue: 120,
             x_handle: Some("@ada_l".into()),
             show_on_leaderboards: true,
+            location: None,
+            website: None,
+            telegram: None,
+            instagram: None,
+            linkedin: None,
+            discord: None,
+            github: None,
+            youtube: None,
         }
     }
 
@@ -263,6 +419,38 @@ mod tests {
         assert_eq!(profile.display_name, "Ada");
         assert_eq!(profile.x_handle.as_deref(), Some("ada_l"));
         assert_eq!(profile.avatar_hue, 120);
+    }
+
+    #[test]
+    fn accepts_links_as_handles_or_urls() {
+        let mut links = input("ada");
+        links.x_handle = Some("https://x.com/ada_l/".into());
+        links.website = Some("ada.dev/about".into());
+        links.telegram = Some("https://t.me/ada_trades".into());
+        links.instagram = Some("instagram.com/ada.l".into());
+        links.linkedin = Some("https://www.linkedin.com/in/ada-lovelace/".into());
+        links.discord = Some("Ada.L".into());
+        links.github = Some("github.com/ada-l".into());
+        links.youtube = Some("https://youtube.com/@AdaTrades".into());
+        links.location = Some(" Lisbon ".into());
+        let p = validate(links).unwrap();
+        assert_eq!(p.x_handle.as_deref(), Some("ada_l"));
+        assert_eq!(p.website.as_deref(), Some("https://ada.dev/about"));
+        assert_eq!(p.telegram.as_deref(), Some("ada_trades"));
+        assert_eq!(p.instagram.as_deref(), Some("ada.l"));
+        assert_eq!(p.linkedin.as_deref(), Some("ada-lovelace"));
+        assert_eq!(p.discord.as_deref(), Some("ada.l"));
+        assert_eq!(p.github.as_deref(), Some("ada-l"));
+        assert_eq!(p.youtube.as_deref(), Some("AdaTrades"));
+        assert_eq!(p.location.as_deref(), Some("Lisbon"));
+        for bad in ["javascript:alert(1)", "https://a b.com", "https://<x>.com"] {
+            let mut links = input("ada");
+            links.website = Some(bad.into());
+            assert!(validate(links).is_err(), "{bad}");
+        }
+        let mut links = input("ada");
+        links.telegram = Some("abc".into());
+        assert!(validate(links).is_err(), "telegram needs 5+ characters");
     }
 
     #[test]
