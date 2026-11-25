@@ -36,6 +36,35 @@
           "writable": true
         },
         {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "invite",
           "writable": true,
           "pda": {
@@ -128,6 +157,7 @@
       "accounts": [
         {
           "name": "candidate",
+          "writable": true,
           "signer": true
         },
         {
@@ -165,6 +195,94 @@
               }
             ]
           }
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "candidate_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "candidate"
+              }
+            ]
+          }
+        },
+        {
+          "name": "previous_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club.owner",
+                "account": "Club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -948,6 +1066,35 @@
           "relations": [
             "request"
           ]
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "admin_member",
@@ -3441,6 +3588,62 @@
           "signer": true
         },
         {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
           "name": "club",
           "writable": true,
           "pda": {
@@ -3511,6 +3714,14 @@
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "ClubKind"
+            }
+          }
         }
       ]
     },
@@ -7220,6 +7431,35 @@
         {
           "name": "club",
           "writable": true
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "listing",
@@ -13779,6 +14019,35 @@
               }
             ]
           }
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -15915,6 +16184,244 @@
           "type": "bytes"
         }
       ]
+    },
+    {
+      "name": "migrate_club",
+      "docs": [
+        "Lets the super-admin upgrade a club created before club types."
+      ],
+      "discriminator": [
+        31,
+        81,
+        150,
+        98,
+        96,
+        252,
+        172,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club",
+          "docs": [
+            "its own PDA. Verified in the handler before it is rewritten."
+          ],
+          "writable": true
+        },
+        {
+          "name": "listing",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "ClubKind"
+            }
+          }
+        },
+        {
+          "name": "owner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_club_rules",
+      "docs": [
+        "Lets the super-admin set member caps, owned-club and admin limits."
+      ],
+      "discriminator": [
+        80,
+        73,
+        37,
+        67,
+        245,
+        216,
+        5,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_rules",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "public_member_cap",
+          "type": "u32"
+        },
+        {
+          "name": "private_member_cap",
+          "type": "u32"
+        },
+        {
+          "name": "max_owned_clubs",
+          "type": "u16"
+        },
+        {
+          "name": "max_club_admins",
+          "type": "u16"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -16306,6 +16813,32 @@
         164,
         211,
         22
+      ]
+    },
+    {
+      "name": "ClubOwnerRecord",
+      "discriminator": [
+        78,
+        96,
+        232,
+        159,
+        171,
+        100,
+        60,
+        24
+      ]
+    },
+    {
+      "name": "ClubRulesConfig",
+      "discriminator": [
+        90,
+        38,
+        35,
+        242,
+        208,
+        15,
+        194,
+        255
       ]
     }
   ],
@@ -17656,6 +18189,36 @@
       "code": 6190,
       "name": "ClubJoinRequestNotExpired",
       "msg": "The club join request has not expired yet"
+    },
+    {
+      "code": 6191,
+      "name": "ClubMemberCapReached",
+      "msg": "This club has reached its member limit"
+    },
+    {
+      "code": 6192,
+      "name": "ClubOwnerLimitReached",
+      "msg": "This wallet already owns the maximum number of clubs"
+    },
+    {
+      "code": 6193,
+      "name": "ClubAdminLimitReached",
+      "msg": "This club already has the maximum number of admins"
+    },
+    {
+      "code": 6194,
+      "name": "PrivateClubCannotList",
+      "msg": "Only public clubs can be listed"
+    },
+    {
+      "code": 6195,
+      "name": "InvalidClubRules",
+      "msg": "Club rules must allow at least one member, one owned club and one admin"
+    },
+    {
+      "code": 6196,
+      "name": "ClubMigrationNotNeeded",
+      "msg": "This club account does not need migration or is not a club"
     }
   ],
   "types": [
@@ -17883,6 +18446,27 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "kind",
+            "type": {
+              "defined": {
+                "name": "ClubKind"
+              }
+            }
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Zeroed space for the security deposit (milestone 2), so adding it",
+              "needs no second account migration."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                96
+              ]
+            }
           }
         ]
       }
@@ -21369,6 +21953,101 @@
           }
         ]
       }
+    },
+    {
+      "name": "ClubKind",
+      "docs": [
+        "Whether a club may be listed publicly. Fixed at creation; the type sets",
+        "its member cap and (from milestone 2) its security deposit."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Private"
+          },
+          {
+            "name": "Public"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubOwnerRecord",
+      "docs": [
+        "How many clubs a wallet owns right now.",
+        "",
+        "PDA: [\"club_owner\", wallet]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "owned",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubRulesConfig",
+      "docs": [
+        "Platform limits for clubs, set by the super-admin.",
+        "",
+        "PDA: [\"club_rules_config\"]. Club creation, joining and admin promotion",
+        "require it, so a limit can never be bypassed by omitting the account."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "public_member_cap",
+            "type": "u32"
+          },
+          {
+            "name": "private_member_cap",
+            "type": "u32"
+          },
+          {
+            "name": "max_owned_clubs",
+            "docs": [
+              "Clubs one wallet may own at a time, any mix of types."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_club_admins",
+            "docs": [
+              "Admins per club, the owner included."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Zeroed space for later platform settings (deposits, disputes)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -21696,6 +22375,22 @@
       ],
       "type": "bytes",
       "value": "[118, 97, 117, 108, 116]"
+    },
+    {
+      "name": "CLUB_OWNER_SEED",
+      "docs": [
+        "Clubs a wallet currently owns: [\"club_owner\", wallet]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 111, 119, 110, 101, 114]"
+    },
+    {
+      "name": "CLUB_RULES_CONFIG_SEED",
+      "docs": [
+        "Platform club rules set by the super-admin: [\"club_rules_config\"]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 114, 117, 108, 101, 115, 95, 99, 111, 110, 102, 105, 103]"
     }
   ]
 }
