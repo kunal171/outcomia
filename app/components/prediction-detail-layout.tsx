@@ -15,7 +15,7 @@ import { PredictionMarketRules } from "./prediction/market-rules";
 import { PredictionGuide } from "./prediction-guide";
 import { useProtocolRole } from "./protocol-role-provider";
 
-type Tab = "trade" | "position" | "rules" | "manage";
+type Tab = "trade" | "position" | "rules" | "traders" | "manage";
 interface Props {
   market: PredictionMarketAccount;
   metadata: MarketMetadataAccount | null;
@@ -25,6 +25,8 @@ interface Props {
   position: ReactNode;
   rules: ReactNode;
   manage: ReactNode;
+  /** Optional "Top traders" panel; shown only when provided. */
+  traders?: ReactNode;
 }
 
 /** Task-based navigation keeps contract administration out of the trading ticket.
@@ -68,6 +70,9 @@ export function PredictionDetailLayout(props: Props) {
     { id: "trade", label: "Trade" },
     { id: "position", label: "Your position" },
     { id: "rules", label: "Rules & outcome" },
+    ...(props.traders
+      ? [{ id: "traders" as const, label: "Top traders" }]
+      : []),
     ...(canManage ? [{ id: "manage" as const, label: "Manage market" }] : []),
   ];
   const active = tab === "manage" && !canManage ? "trade" : tab;
@@ -206,6 +211,8 @@ export function PredictionDetailLayout(props: Props) {
                 </div>
                 {props.position}
               </>
+            ) : id === "traders" ? (
+              props.traders
             ) : id === "rules" ? (
               <PredictionMarketRules market={market} symbol={symbol}>
                 {props.rules}

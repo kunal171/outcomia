@@ -5,6 +5,27 @@ type AccountPage {
 	endCursor: String
 }
 
+type CallRow {
+	rank: Int!
+	wallet: String!
+	profile: Profile
+	market: String!
+	kind: String!
+	title: String
+	outcome: String!
+	outcomeLabel: String
+	price: String!
+	payout: String!
+	quantity: String!
+	profit: String!
+	"""
+	Payout divided by entry price, two decimals.
+	"""
+	multiple: String!
+	signature: String!
+	blockTime: String
+}
+
 type Candle {
 	time: String!
 	open: String!
@@ -28,6 +49,31 @@ type Changes {
 	revisions(commitment: String, owner: String): Revision!
 }
 
+type ClubMembership {
+	club: String!
+	name: String
+	role: String!
+}
+
+type ClubRow {
+	rank: Int!
+	club: String!
+	name: String!
+	members: Int!
+	markets: Int!
+	volume: String!
+	trades: Int!
+}
+
+type CreatorRow {
+	rank: Int!
+	wallet: String!
+	profile: Profile
+	markets: Int!
+	volume: String!
+	traders: Int!
+}
+
 type IndexedAccount {
 	address: String!
 	accountType: String!
@@ -43,9 +89,104 @@ A scalar that can represent any JSON value.
 """
 scalar JSON
 
+type MarketRow {
+	rank: Int!
+	market: String!
+	kind: String!
+	title: String
+	volume: String!
+	trades: Int!
+	traders: Int!
+}
+
+type MarketTraderRow {
+	rank: Int!
+	wallet: String!
+	profile: Profile
+	volume: String!
+	trades: Int!
+	holdings: [OutcomeHolding!]!
+	"""
+	Realized profit once the market is resolved.
+	"""
+	profit: String
+}
+
 input Memcmp {
 	offset: Int!
 	bytes: String!
+}
+
+type MintRow {
+	mint: String!
+	decimals: Int
+	"""
+	Most common quote symbol in its markets' metadata, if any.
+	"""
+	symbol: String
+	volume: String!
+}
+
+type MintStats {
+	mint: String!
+	decimals: Int
+	volume: String!
+	makerVolume: String!
+	trades: Int!
+	markets: Int!
+	profit: String!
+	wins: Int!
+	losses: Int!
+}
+
+type Mutation {
+	"""
+	Creates or replaces the signed-in wallet's profile.
+	"""
+	updateProfile(input: ProfileInput!): Profile!
+}
+
+type OpenPosition {
+	market: String!
+	kind: String!
+	title: String
+	mint: String
+	outcome: String!
+	outcomeLabel: String
+	contracts: String!
+}
+
+type OutcomeHolding {
+	outcome: String!
+	label: String
+	contracts: String!
+}
+
+enum Period {
+	DAY
+	WEEK
+	MONTH
+	ALL
+}
+
+type Profile {
+	wallet: String!
+	username: String!
+	displayName: String!
+	bio: String!
+	avatarHue: Int!
+	xHandle: String
+	showOnLeaderboards: Boolean!
+	createdAt: String!
+}
+
+input ProfileInput {
+	username: String!
+	displayName: String!
+	bio: String!
+	avatarHue: Int!
+	xHandle: String
+	showOnLeaderboards: Boolean!
 }
 
 type Query {
@@ -58,6 +199,52 @@ type Query {
 	walletAssets(owner: String!, commitment: String): JSON!
 	candles(market: String!, engine: String!, outcome: String!, interval: Int!, from: String!, to: String!): CandleSeries!
 	transaction(signature: String!): JSON!
+	"""
+	One profile by wallet address or username. Exactly one is required.
+	"""
+	profile(wallet: String, username: String): Profile
+	"""
+	Profiles for up to 100 wallets, so lists can show names in one request.
+	"""
+	profiles(wallets: [String!]!): [Profile!]!
+	"""
+	Mints that have trades, largest volume first, for the token switch.
+	"""
+	leaderboardMints: [MintRow!]!
+	"""
+	The latest indexed trade slot; leaderboards are current as of it.
+	"""
+	leaderboardSlot: String
+	"""
+	Ranks wallets for one mint. Profit and accuracy cover resolved
+	prediction markets and ignore `period`; accuracy needs `minMarkets`
+	decided (non-zero result) markets, default 3.
+	"""
+	traderLeaderboard(board: TraderBoard!, period: Period!, mint: String!, first: Int, offset: Int, minMarkets: Int): [TraderRow!]!
+	"""
+	Most traded markets for one mint.
+	"""
+	marketLeaderboard(period: Period!, mint: String!, first: Int, offset: Int): [MarketRow!]!
+	"""
+	Winning entries bought cheapest relative to their payout (all time).
+	"""
+	bestCalls(mint: String!, first: Int): [CallRow!]!
+	"""
+	Clubs by traded value in their markets for one mint, then members.
+	"""
+	clubLeaderboard(period: Period!, mint: String!, first: Int): [ClubRow!]!
+	"""
+	Market creators by the traded value their prediction markets drew.
+	"""
+	creatorLeaderboard(period: Period!, mint: String!, first: Int): [CreatorRow!]!
+	"""
+	Everything a profile page shows about one wallet's trading.
+	"""
+	traderStats(wallet: String!): TraderStats!
+	"""
+	Wallets that traded one market, by value traded, with their holdings.
+	"""
+	marketTraders(market: String!, first: Int): [MarketTraderRow!]!
 }
 
 type Revision {
@@ -71,6 +258,14 @@ type Revision {
 	scope: [String!]
 }
 
+type SettledMarket {
+	market: String!
+	kind: String!
+	title: String
+	mint: String!
+	profit: String!
+}
+
 type SyncInfo {
 	commitment: String!
 	slot: String!
@@ -78,6 +273,70 @@ type SyncInfo {
 	ready: Boolean!
 	observedAt: String
 	error: String
+}
+
+type TradeLeg {
+	signature: String!
+	blockTime: String
+	market: String!
+	kind: String
+	title: String
+	mint: String
+	outcome: String!
+	outcomeLabel: String
+	role: String!
+	"""
+	Contracts (or base units for spot) gained; negative when given.
+	"""
+	contracts: String!
+	price: String!
+}
+
+enum TraderBoard {
+	"""
+	Traded value, excluding trades against oneself.
+	"""
+	VOLUME
+	"""
+	Number of fills, then distinct markets.
+	"""
+	ACTIVITY
+	"""
+	Value filled as the resting (maker) order.
+	"""
+	MAKERS
+	"""
+	Realized profit on resolved prediction markets (all time).
+	"""
+	PROFIT
+	"""
+	Share of resolved markets closed in profit (all time).
+	"""
+	ACCURACY
+}
+
+type TraderRow {
+	rank: Int!
+	wallet: String!
+	profile: Profile
+	volume: String
+	makerVolume: String
+	trades: Int
+	markets: Int
+	profit: String
+	invested: String
+	wins: Int
+	losses: Int
+}
+
+type TraderStats {
+	wallet: String!
+	profile: Profile
+	perMint: [MintStats!]!
+	openPositions: [OpenPosition!]!
+	settled: [SettledMarket!]!
+	recentTrades: [TradeLeg!]!
+	clubs: [ClubMembership!]!
 }
 
 """
@@ -90,5 +349,6 @@ Directs the executor to skip this field or fragment when the `if` argument is tr
 directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
 schema {
 	query: Query
+	mutation: Mutation
 	subscription: Changes
 }

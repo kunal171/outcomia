@@ -1,0 +1,211 @@
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useI18n } from "../preferences-provider";
+import { useWalletSession } from "../wallet-session-provider";
+import { INDEXER_ENABLED } from "../../lib/graphql/client";
+import {
+  getProfile,
+  updateProfile,
+  type ProfileInput,
+} from "../../lib/graphql/social";
+import { walletHue, WalletAvatar } from "./social-ui";
+
+/** Wallet page card: create or edit the signed-in wallet's public profile.
+ * Saving needs a signed-in session, which proves the wallet owner is editing. */
+export function ProfileEditor({ wallet }: { wallet: string }) {
+  const { t } = useI18n();
+  const session = useWalletSession();
+  const signedIn = session?.user?.wallet === wallet;
+  const [form, setForm] = useState<ProfileInput | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [exists, setExists] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [issue, setIssue] = useState<string | null>(null);
+  // Opens by default only when there is no profile yet; saving never closes it.
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!INDEXER_ENABLED) return;
+    let dead = false;
+    setForm(null);
+    getProfile({ wallet })
+      .then((p) => {
+        if (dead) return;
+        setExists(!!p);
+        setOpen(!p);
+        setSaved(p?.username ?? null);
+        setForm({
+          username: p?.username ?? "",
+          displayName: p?.displayName ?? "",
+          bio: p?.bio ?? "",
+          avatarHue: p?.avatarHue ?? walletHue(wallet),
+          xHandle: p?.xHandle ?? "",
+          showOnLeaderboards: p?.showOnLeaderboards ?? true,
+        });
+      })
+      .catch(
+        () =>
+          !dead &&
+          setIssue("Profiles are unavailable right now. Try again shortly."),
+      );
+    return () => {
+      dead = true;
+    };
+  }, [wallet]);
+
+  if (!INDEXER_ENABLED) return null;
+  const set = <K extends keyof ProfileInput>(key: K, value: ProfileInput[K]) =>
+    setForm((f) => (f ? { ...f, [key]: value } : f));
+
+  async function save() {
+    if (!form) return;
+    setPending(true);
+    setIssue(null);
+    try {
+      const profile = await updateProfile({
+        ...form,
+        xHandle: form.xHandle?.trim() || null,
+      });
+      setExists(true);
+      setSaved(profile.username);
+      setForm({
+        ...form,
+        username: profile.username,
+        xHandle: profile.xHandle ?? "",
+      });
+    } catch (cause) {
+      setIssue(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <details
+      className="admin-card profile-editor"
+      id="profile"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary>
+        {exists ? t("Your public profile") : t("Create your public profile")}
+      </summary>
+      {!form ? (
+        <p role="status">{issue ? t(issue) : t("Loading…")}</p>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <div className="profile-editor-preview">
+            <WalletAvatar wallet={wallet} hue={form.avatarHue} size={64} />
+            <div>
+              <strong>
+                {form.displayName ||
+                  (form.username ? `@${form.username}` : t("Your name"))}
+              </strong>
+              {saved && (
+                <Link href={`/u/${saved}`}>{t("View public profile →")}</Link>
+              )}
+            </div>
+          </div>
+          <label>
+            {t("Username")}
+            <input
+              value={form.username}
+              onChange={(e) => set("username", e.target.value.toLowerCase())}
+              placeholder="satoshi_n"
+              maxLength={20}
+              pattern="[a-z0-9_]{3,20}"
+              required
+              disabled={pending}
+            />
+            <small>
+              {t(
+                "3–20 characters: letters, numbers and _. Your profile lives at /u/username.",
+              )}
+            </small>
+          </label>
+          <label>
+            {t("Display name")}
+            <input
+              value={form.displayName}
+              onChange={(e) => set("displayName", e.target.value)}
+              maxLength={40}
+              disabled={pending}
+            />
+          </label>
+          <label>
+            {t("Bio")}
+            <textarea
+              value={form.bio}
+              onChange={(e) => set("bio", e.target.value)}
+              maxLength={280}
+              rows={3}
+              disabled={pending}
+            />
+          </label>
+          <label>
+            {t("Avatar colour")}
+            <input
+              type="range"
+              min={0}
+              max={359}
+              value={form.avatarHue}
+              onChange={(e) => set("avatarHue", Number(e.target.value))}
+              disabled={pending}
+            />
+          </label>
+          <label>
+            {t("X handle (optional)")}
+            <input
+              value={form.xHandle ?? ""}
+              onChange={(e) => set("xHandle", e.target.value)}
+              placeholder="@handle"
+              maxLength={16}
+              disabled={pending}
+            />
+          </label>
+          <label className="profile-editor-check">
+            <input
+              type="checkbox"
+              checked={form.showOnLeaderboards}
+              onChange={(e) => set("showOnLeaderboards", e.target.checked)}
+              disabled={pending}
+            />
+            {t("Show me on leaderboards")}
+          </label>
+          {issue && <p role="alert">{t(issue)}</p>}
+          {signedIn ? (
+            <button type="submit" className="ui-btn" disabled={pending}>
+              {pending
+                ? t("Saving…")
+                : exists
+                  ? t("Save profile")
+                  : t("Create profile")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ui-btn"
+              disabled={!session || session.busy}
+              onClick={() => void session?.signIn()}
+            >
+              {session?.busy
+                ? t("Signing in…")
+                : t("Sign in with your wallet to save")}
+            </button>
+          )}
+          <small className="profile-editor-note">
+            {t(
+              "Profiles are public. Your trades are public on-chain either way; the profile only adds a name.",
+            )}
+          </small>
+        </form>
+      )}
+    </details>
+  );
+}

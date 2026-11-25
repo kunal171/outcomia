@@ -12,6 +12,7 @@ import {
 import { useI18n } from "../preferences-provider";
 import { useMultiMarket } from "./use-market";
 import { SharedAssetFunds } from "../shared-wallet";
+import { MarketTraders } from "../social/market-traders";
 import { MultiTrading } from "./trading";
 import { MultiPositions } from "./positions";
 import { MultiFees } from "./fees";
@@ -182,6 +183,17 @@ export function MultiOutcomeDetail({ address }: { address: string }) {
                         </details>
                       </div>
                     </MultiOutcomeRules>
+                  ),
+                },
+                {
+                  id: "traders",
+                  label: "Top traders",
+                  content: (
+                    <MarketTraders
+                      market={address}
+                      decimals={d.decimals}
+                      symbol={symbol}
+                    />
                   ),
                 },
                 // Fee withdrawal is the only market administration here and

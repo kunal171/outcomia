@@ -1,5 +1,6 @@
 "use client";
 import { TokenSymbol } from "./token-symbol";
+import { MarketTraders } from "./social/market-traders";
 import { useIndexerUpdates } from "./use-indexer-updates";
 import { PredictionChart } from "./prediction-chart";
 import { SHARED_BALANCES_ENABLED } from "../lib/shared";
@@ -361,6 +362,13 @@ export function PredictionMarkets({ address }: { address?: string }) {
                 </a>
               </details>
             </>
+          }
+          traders={
+            <MarketTraders
+              market={key.toBase58()}
+              decimals={decimals}
+              symbol={metadata?.quoteSymbol ?? "collateral"}
+            />
           }
           manage={
             <>
