@@ -965,41 +965,6 @@ body:has(.lp) {
   }
 }
 
-/* ---------- Password gate ---------- */
-.gate {
-  position: relative;
-  isolation: isolate;
-  min-height: 100svh;
-  display: grid;
-  place-items: center;
-  padding: var(--space-4);
-  overflow: hidden;
-  background: var(--bg);
-}
-.gate-card {
-  display: grid;
-  gap: var(--space-4);
-  width: min(400px, 100%);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-2);
-  animation: lp-rise 700ms var(--ease-out) both;
-}
-.gate-card .lp-brand {
-  margin-bottom: var(--space-3);
-}
-.gate-card .ui-row-meta {
-  margin: calc(-1 * var(--space-2)) 0 var(--space-2);
-}
-.gate-back {
-  justify-self: center;
-  color: var(--muted);
-  font-size: var(--text-small);
-  text-decoration: none;
-}
-.gate-back:hover {
-  color: var(--ink);
-}
-
 /* ---------- App entry (/app) ---------- */
 .entry {
   position: relative;

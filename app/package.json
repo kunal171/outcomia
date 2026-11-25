@@ -25,8 +25,7 @@
     "idl:sync": "node scripts/sync-idl.mjs",
     "test:multi-outcome:browser": "node scripts/multi-outcome-browser.test.mjs",
     "idl:check": "node scripts/sync-idl.mjs --check",
-    "test:indexer": "node scripts/generate-indexer-fixtures.mjs && node scripts/indexer-client.test.mjs && node scripts/indexer-proxy.test.mjs",
-    "test:gate": "node scripts/gate.test.mjs"
+    "test:indexer": "node scripts/generate-indexer-fixtures.mjs && node scripts/indexer-client.test.mjs && node scripts/indexer-proxy.test.mjs"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",
