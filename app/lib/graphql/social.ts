@@ -11,9 +11,17 @@ export type Profile = {
   xHandle: string | null;
   showOnLeaderboards: boolean;
   createdAt: string;
+  location: string | null;
+  website: string | null;
+  telegram: string | null;
+  instagram: string | null;
+  linkedin: string | null;
+  discord: string | null;
+  github: string | null;
+  youtube: string | null;
 };
 const PROFILE =
-  "wallet username displayName bio avatarHue xHandle showOnLeaderboards createdAt";
+  "wallet username displayName bio avatarHue xHandle showOnLeaderboards createdAt location website telegram instagram linkedin discord github youtube";
 
 export type ProfileInput = Omit<Profile, "wallet" | "createdAt">;
 export type Period = "DAY" | "WEEK" | "MONTH" | "ALL";
@@ -92,6 +100,10 @@ export type MintStats = {
   profit: string;
   wins: number;
   losses: number;
+  unrealized: string;
+  openMarkets: number;
+  biggestWin: string | null;
+  biggestLoss: string | null;
 };
 export type TraderStats = {
   wallet: string;
@@ -285,7 +297,7 @@ export async function getTraderStats(wallet: string) {
     `query Stats($wallet: String!) {
       traderStats(wallet: $wallet) {
         wallet profile { ${PROFILE} }
-        perMint { mint decimals volume makerVolume trades markets profit wins losses }
+        perMint { mint decimals volume makerVolume trades markets profit wins losses unrealized openMarkets biggestWin biggestLoss }
         openPositions { market kind title mint outcome outcomeLabel contracts }
         settled { market kind title mint profit }
         recentTrades { signature blockTime market kind title mint outcome outcomeLabel role contracts price }

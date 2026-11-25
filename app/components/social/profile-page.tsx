@@ -1,25 +1,27 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { AppHeader } from "../app-header";
 import { useI18n } from "../preferences-provider";
 import { useWalletSession } from "../wallet-session-provider";
-import { accountExplorerUrl, transactionExplorerUrl } from "../../lib/outcomia";
+import { accountExplorerUrl } from "../../lib/outcomia";
 import { INDEXER_ENABLED } from "../../lib/graphql/client";
 import {
   getLeaderboardMints,
   getProfile,
   getTraderStats,
+  type MintStats,
   type TraderStats,
 } from "../../lib/graphql/social";
-import { marketHref } from "./leaderboard-page";
+import { ProfileLinks } from "./profile-links";
 import {
   formatAtoms,
   shortAddress,
   tokenLabel,
   useQuietData,
   WalletAvatar,
+  walletHue,
 } from "./social-ui";
 
 function isAddress(value: string) {
@@ -31,7 +33,8 @@ function isAddress(value: string) {
   }
 }
 
-/** `/u/<username | wallet>`: public profile and trading record. */
+/** `/u/<username | wallet>`: who the trader is and how they have done.
+ * Orders, positions, clubs and balances live on their own pages. */
 export function ProfilePage({ id }: { id: string }) {
   const { t } = useI18n();
   const session = useWalletSession();
@@ -83,6 +86,11 @@ export function ProfilePage({ id }: { id: string }) {
   );
 }
 
+function sign(value: string | null | undefined) {
+  if (!value) return 0;
+  return value.startsWith("-") ? -1 : value.replace(/0/g, "") === "" ? 0 : 1;
+}
+
 function ProfileBody({
   stats,
   symbols,
@@ -97,78 +105,53 @@ function ProfileBody({
   const [mint, setMint] = useState(stats.perMint[0]?.mint ?? null);
   const current =
     stats.perMint.find((m) => m.mint === mint) ?? stats.perMint[0];
-  const decimalsOf = (m: string | null) =>
-    stats.perMint.find((s) => s.mint === m)?.decimals ?? 6;
-  const label = (m: string | null) => (m ? tokenLabel(m, symbols[m]) : "");
-  const decided = current ? current.wins + current.losses : 0;
-  const [showAll, setShowAll] = useState(false);
-  const [allTrades, setAllTrades] = useState(false);
-  // One row per market, listing every outcome held there.
-  const positions = Object.values(
-    stats.openPositions.reduce<
-      Record<
-        string,
-        {
-          market: string;
-          kind: string;
-          title: string | null;
-          holdings: TraderStats["openPositions"];
-        }
-      >
-    >((groups, p) => {
-      (groups[p.market] ??= {
-        market: p.market,
-        kind: p.kind,
-        title: p.title,
-        holdings: [],
-      }).holdings.push(p);
-      return groups;
-    }, {}),
-  );
+  const label = (m: string) => tokenLabel(m, symbols[m]);
+  const hue = profile?.avatarHue ?? walletHue(wallet);
   return (
     <>
       <section className="profile-hero">
-        <WalletAvatar wallet={wallet} hue={profile?.avatarHue} size={88} />
-        <div>
-          <h1>
-            {profile?.displayName ||
-              (profile ? `@${profile.username}` : shortAddress(wallet))}
-          </h1>
-          {profile && <p className="profile-handle">@{profile.username}</p>}
-          {profile?.bio && <p className="profile-bio">{profile.bio}</p>}
-          <p className="profile-meta">
-            <a
-              href={accountExplorerUrl(new PublicKey(wallet))}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <code>{shortAddress(wallet)}</code> ↗
-            </a>
-            {profile?.xHandle && (
+        <div
+          className="profile-banner"
+          style={{
+            background: `linear-gradient(120deg, hsl(${hue} 70% 55% / .55), hsl(${(hue + 60) % 360} 70% 55% / .2))`,
+          }}
+        />
+        <div className="profile-hero-body">
+          <WalletAvatar wallet={wallet} hue={profile?.avatarHue} size={96} />
+          <div className="profile-identity">
+            <h1>
+              {profile?.displayName ||
+                (profile ? `@${profile.username}` : shortAddress(wallet))}
+            </h1>
+            {profile && <p className="profile-handle">@{profile.username}</p>}
+            {profile?.bio && <p className="profile-bio">{profile.bio}</p>}
+            <p className="profile-meta">
+              {profile?.location && <span>{profile.location}</span>}
+              {profile && (
+                <span>
+                  {t("Joined {value0}", {
+                    value0: new Date(profile.createdAt).toLocaleDateString(
+                      locale,
+                      {
+                        month: "short",
+                        year: "numeric",
+                      },
+                    ),
+                  })}
+                </span>
+              )}
               <a
-                href={`https://x.com/${profile.xHandle}`}
+                href={accountExplorerUrl(new PublicKey(wallet))}
                 target="_blank"
                 rel="noreferrer"
               >
-                @{profile.xHandle} ↗
+                <code>{shortAddress(wallet)}</code> ↗
               </a>
-            )}
-            {profile && (
-              <span>
-                {t("Joined {value0}", {
-                  value0: new Date(profile.createdAt).toLocaleDateString(
-                    locale,
-                    {
-                      month: "short",
-                      year: "numeric",
-                    },
-                  ),
-                })}
-              </span>
-            )}
-          </p>
+            </p>
+            {profile && <ProfileLinks profile={profile} />}
+          </div>
           {own && (
-            <Link className="ui-btn" href="/wallet#profile">
+            <Link className="ui-btn profile-edit" href="/wallet#profile">
               {profile ? t("Edit profile") : t("Create your profile")}
             </Link>
           )}
@@ -176,7 +159,11 @@ function ProfileBody({
       </section>
 
       {stats.perMint.length > 1 && (
-        <div className="lb-chips" role="group" aria-label={t("Token")}>
+        <div
+          className="lb-chips profile-tokens"
+          role="group"
+          aria-label={t("Token")}
+        >
           {stats.perMint.map((m) => (
             <button
               key={m.mint}
@@ -190,188 +177,110 @@ function ProfileBody({
         </div>
       )}
       {current ? (
-        <section className="profile-stats">
-          <article>
-            <span className="card-label">{t("Volume")}</span>
-            <strong>
-              {formatAtoms(current.volume, current.decimals ?? 6)}{" "}
-              <small>{label(current.mint)}</small>
-            </strong>
-          </article>
-          <article>
-            <span className="card-label">{t("Trades")}</span>
-            <strong>{current.trades.toLocaleString()}</strong>
-            <small>
-              {t("in {value0} markets", { value0: current.markets })}
-            </small>
-          </article>
-          <article>
-            <span className="card-label">{t("Realized profit")}</span>
-            <strong
-              className={Number(current.profit) >= 0 ? "lb-up" : "lb-down"}
-            >
-              {formatAtoms(current.profit, current.decimals ?? 6)}{" "}
-              <small>{label(current.mint)}</small>
-            </strong>
-            <small>{t("Settled markets only")}</small>
-          </article>
-          <article>
-            <span className="card-label">{t("Win rate")}</span>
-            <strong>
-              {decided ? `${Math.round((current.wins / decided) * 100)}%` : "—"}
-            </strong>
-            <small>
-              {t("{value0} won · {value1} lost", {
-                value0: current.wins,
-                value1: current.losses,
-              })}
-            </small>
-          </article>
-        </section>
+        <PnlPanel stats={current} unit={label(current.mint)} />
       ) : (
         <p className="lb-empty">{t("No trades yet.")}</p>
       )}
-
-      <div className="profile-grid">
-        <section className="admin-card">
-          <h2>{t("Open positions")}</h2>
-          {stats.openPositions.length === 0 ? (
-            <p className="lb-empty">{t("No open positions.")}</p>
-          ) : (
-            <>
-              <ul className="profile-list">
-                {(showAll ? positions : positions.slice(0, 8)).map((p) => (
-                  <li key={p.market}>
-                    <Link href={marketHref(p.kind, p.market)}>
-                      {p.title ?? shortAddress(p.market)}
-                    </Link>
-                    <span>
-                      {p.holdings.map((h, i) => (
-                        <span key={h.outcome}>
-                          {i > 0 && " · "}
-                          <span
-                            className={
-                              Number(h.contracts) >= 0 ? "lb-up" : "lb-down"
-                            }
-                          >
-                            {Number(h.contracts).toLocaleString()}
-                          </span>{" "}
-                          {h.outcomeLabel ?? h.outcome}
-                        </span>
-                      ))}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {positions.length > 8 && (
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => setShowAll((v) => !v)}
-                >
-                  {showAll
-                    ? t("Show fewer")
-                    : t("Show all {value0} markets", {
-                        value0: positions.length,
-                      })}
-                </button>
-              )}
-            </>
-          )}
-        </section>
-        <section className="admin-card">
-          <h2>{t("Settled markets")}</h2>
-          {stats.settled.length === 0 ? (
-            <p className="lb-empty">{t("No settled markets yet.")}</p>
-          ) : (
-            <ul className="profile-list">
-              {stats.settled.map((s) => (
-                <li key={s.market}>
-                  <Link href={marketHref(s.kind, s.market)}>
-                    {s.title ?? shortAddress(s.market)}
-                  </Link>
-                  <span className={Number(s.profit) >= 0 ? "lb-up" : "lb-down"}>
-                    {formatAtoms(s.profit, decimalsOf(s.mint))} {label(s.mint)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        <section className="admin-card">
-          <h2>{t("Recent trades")}</h2>
-          {stats.recentTrades.length === 0 ? (
-            <p className="lb-empty">{t("No trades yet.")}</p>
-          ) : (
-            <ul className="profile-list">
-              {(allTrades
-                ? stats.recentTrades
-                : stats.recentTrades.slice(0, 10)
-              ).map((r) => (
-                <li
-                  key={`${r.signature}:${r.market}:${r.outcome}:${r.role}:${r.contracts}`}
-                >
-                  <Link href={marketHref(r.kind, r.market)}>
-                    {r.title ?? shortAddress(r.market)}
-                  </Link>
-                  <span>
-                    {Number(r.contracts) >= 0 ? t("Bought") : t("Sold")}{" "}
-                    {Math.abs(Number(r.contracts)).toLocaleString()}{" "}
-                    {r.outcomeLabel ?? ""} @{" "}
-                    {formatAtoms(r.price, decimalsOf(r.mint), 4)}{" "}
-                    <a
-                      href={transactionExplorerUrl(r.signature)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={t("Transaction")}
-                    >
-                      ↗
-                    </a>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {stats.recentTrades.length > 10 && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => setAllTrades((v) => !v)}
-            >
-              {allTrades
-                ? t("Show fewer")
-                : t("Show all {value0} trades", {
-                    value0: stats.recentTrades.length,
-                  })}
-            </button>
-          )}
-        </section>
-        <section className="admin-card">
-          <h2>{t("Clubs")}</h2>
-          {stats.clubs.length === 0 ? (
-            <p className="lb-empty">{t("Not in any club.")}</p>
-          ) : (
-            <ul className="profile-list">
-              {stats.clubs.map((c) => (
-                <li key={c.club}>
-                  <Link href={`/clubs/${c.club}`}>
-                    {c.name ?? shortAddress(c.club)}
-                  </Link>
-                  <span className="lb-kind">
-                    {t(
-                      c.role === "owner"
-                        ? "Owner"
-                        : c.role === "admin"
-                          ? "Admin"
-                          : "Member",
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      <p className="profile-footnote">
+        {t(
+          "Realized P&L counts settled markets. Unrealized P&L values open positions at each outcome’s last traded price.",
+        )}{" "}
+        <Link href="/leaderboard">{t("See the leaderboard →")}</Link>
+      </p>
     </>
+  );
+}
+
+function PnlPanel({ stats, unit }: { stats: MintStats; unit: string }) {
+  const { t } = useI18n();
+  const decimals = stats.decimals ?? 6;
+  const money = (v: string | null | undefined) =>
+    formatAtoms(v ?? "0", decimals);
+  const total = (BigInt(stats.profit) + BigInt(stats.unrealized)).toString();
+  const decided = stats.wins + stats.losses;
+  const tone = (v: string | null | undefined) =>
+    sign(v) >= 0 ? "lb-up" : "lb-down";
+  const makerShare =
+    stats.volume !== "0"
+      ? `${Math.round((Number(stats.makerVolume) / Number(stats.volume)) * 100)}%`
+      : "—";
+  const cards: { label: string; value: ReactNode; note?: string }[] = [
+    {
+      label: "Volume",
+      value: (
+        <>
+          {money(stats.volume)} <small>{unit}</small>
+        </>
+      ),
+    },
+    {
+      label: "Trades",
+      value: stats.trades.toLocaleString(),
+      note: t("in {value0} markets", { value0: stats.markets }),
+    },
+    { label: "Open markets", value: stats.openMarkets.toLocaleString() },
+    {
+      label: "Win rate",
+      value: decided ? `${Math.round((stats.wins / decided) * 100)}%` : "—",
+      note: t("{value0} won · {value1} lost", {
+        value0: stats.wins,
+        value1: stats.losses,
+      }),
+    },
+    {
+      label: "Biggest win",
+      value: stats.biggestWin ? (
+        <span className="lb-up">
+          {money(stats.biggestWin)} <small>{unit}</small>
+        </span>
+      ) : (
+        "—"
+      ),
+    },
+    {
+      label: "Biggest loss",
+      value: stats.biggestLoss ? (
+        <span className="lb-down">
+          {money(stats.biggestLoss)} <small>{unit}</small>
+        </span>
+      ) : (
+        "—"
+      ),
+    },
+    {
+      label: "Maker share",
+      value: makerShare,
+      note: t("of volume as the resting order"),
+    },
+  ];
+  return (
+    <section className="profile-pnl">
+      <article className="profile-pnl-total">
+        <span className="card-label">{t("Total P&L")}</span>
+        <strong className={tone(total)}>
+          {sign(total) > 0 ? "+" : ""}
+          {money(total)} <small>{unit}</small>
+        </strong>
+        <div className="profile-pnl-split">
+          <span>
+            {t("Realized")}{" "}
+            <b className={tone(stats.profit)}>{money(stats.profit)}</b>
+          </span>
+          <span>
+            {t("Unrealized")}{" "}
+            <b className={tone(stats.unrealized)}>{money(stats.unrealized)}</b>
+          </span>
+        </div>
+      </article>
+      <div className="profile-stats">
+        {cards.map((c) => (
+          <article key={c.label}>
+            <span className="card-label">{t(c.label)}</span>
+            <strong>{c.value}</strong>
+            {c.note && <small>{c.note}</small>}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
