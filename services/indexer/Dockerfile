@@ -9,6 +9,8 @@ COPY services/indexer/Cargo.toml services/indexer/Cargo.lock ./
 COPY services/indexer/migrations ./migrations
 COPY services/indexer/src ./src
 COPY app/idl/outcomia.json /build/app/idl/outcomia.json
+# Earlier deployed IDLs: history and unmigrated accounts decode with them.
+COPY app/idl/history /build/app/idl/history
 
 RUN cargo build --locked --release
 

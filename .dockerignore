@@ -8,3 +8,4 @@
 !services/indexer/src/**
 !services/indexer/migrations/**
 !app/idl/outcomia.json
+!app/idl/history/*.json
