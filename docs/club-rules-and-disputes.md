@@ -173,13 +173,33 @@ follow CIP-0103. Each row moves to "done" only with its Canton UI.
 
 | Rule | Solana | Canton |
 | --- | --- | --- |
-| Club type (public / private) chosen at creation | M1 | To do |
-| Member caps 100,000 / 1,000 (configurable) | M1 | To do |
-| Max 2 owned clubs per wallet | M1 | To do |
-| Max 5 admins per club | M1 | To do |
-| Platform config (super admin) | M1 | To do |
+| Club type (public / private) chosen at creation | M1 (built) | To do |
+| Member caps 100,000 / 1,000 (configurable) | M1 (built) | To do |
+| Max 2 owned clubs per wallet | M1 (built) | To do |
+| Max 5 admins per club | M1 (built) | To do |
+| Platform config (super admin) | M1 (built) | To do |
 | Security deposit $100 / $200, USDC or SOL-equivalent | M2 | To do (Canton deposit asset to be decided) |
 | Close club and refund the deposit | M2 | To do |
 | Dispute window: 5 days club markets / 3 days regular markets | M3 | To do |
 | Disputes: $1 bond, pause, ruling by an eligible admin, 7-day timeout → invalid | M3 | To do |
 | $50 penalty, split 50/50 between disputer and treasury; below-minimum gating | M4 | To do |
+
+## 10. Milestone 1 deployment order (devnet)
+
+The new indexer decodes both the old and the new program (it keeps the
+previous IDL as history), but the old indexer cannot decode the new
+instructions. The app's club forms need the new program. So:
+
+1. **Indexer first.** Merge, then rebuild the Northflank indexer from
+   `master`. It moves its database to the new IDL automatically and keeps
+   working against the current program.
+2. **Program upgrade.** `anchor build`, then upgrade program
+   `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL` on devnet with the upgrade
+   authority.
+3. **Club rules.** As super admin: Admin → Platform config → Set club rules
+   (100,000 / 1,000 / 2 / 5). Until then nobody can create or join clubs.
+4. **Upgrade existing clubs.** In the same tab, upgrade each club listed under
+   "Clubs awaiting upgrade" (listed clubs as public). Until a club is upgraded
+   it cannot accept members.
+5. **App.** Vercel deploys from `master`. If the app deploys before step 2,
+   creating or joining a club fails until the program is upgraded.
