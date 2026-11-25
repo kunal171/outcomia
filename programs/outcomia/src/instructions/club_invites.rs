@@ -9,9 +9,11 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{CLUB_INVITE_SEED, CLUB_INVITE_TTL_SECONDS, CLUB_MEMBER_SEED},
+    constants::{
+        CLUB_INVITE_SEED, CLUB_INVITE_TTL_SECONDS, CLUB_MEMBER_SEED, CLUB_RULES_CONFIG_SEED,
+    },
     errors::club,
-    state::{Club, ClubInvite, ClubMember, ClubRole},
+    state::{Club, ClubInvite, ClubMember, ClubRole, ClubRulesConfig},
 };
 
 #[derive(Accounts)]
@@ -40,6 +42,8 @@ pub struct AcceptClubInvite<'info> {
     pub wallet: Signer<'info>,
     #[account(mut)]
     pub club: Account<'info, Club>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Account<'info, ClubRulesConfig>,
     #[account(mut, close = inviter, has_one = wallet @ club::InvalidClubMember,
         seeds = [CLUB_INVITE_SEED, club.key().as_ref(), wallet.key().as_ref()],
         bump = invite.bump)]
@@ -106,10 +110,7 @@ pub fn handle_accept_club_invite(ctx: Context<AcceptClubInvite>) -> Result<()> {
         club::ClubInviteExpired
     );
     let club = &mut ctx.accounts.club;
-    club.member_count = club
-        .member_count
-        .checked_add(1)
-        .ok_or(club::ClubCounterMismatch)?;
+    club.admit(&ctx.accounts.club_rules)?;
     ctx.accounts.member.set_inner(ClubMember {
         club: club.key(),
         wallet: ctx.accounts.wallet.key(),

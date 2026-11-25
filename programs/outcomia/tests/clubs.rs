@@ -42,6 +42,39 @@ fn invite_pda(club: &Pubkey, wallet: &Pubkey) -> Pubkey {
     )
     .0
 }
+fn club_rules_pda() -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID).0
+}
+fn owner_record_pda(wallet: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_OWNER_SEED, wallet.as_ref()], &outcomia::ID).0
+}
+/// Writes the platform club rules directly, as the super-admin would set them.
+fn install_club_rules(svm: &mut LiteSVM, public: u32, private: u32, owned: u16, admins: u16) {
+    let (address, bump) = Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    ClubRulesConfig {
+        public_member_cap: public,
+        private_member_cap: private,
+        max_owned_clubs: owned,
+        max_club_admins: admins,
+        bump,
+        reserved: [0; 128],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        solana_account::Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
 fn ix(accounts: impl ToAccountMetas, data: impl InstructionData) -> Instruction {
     Instruction::new_with_bytes(outcomia::ID, &data.data(), accounts.to_account_metas(None))
 }
@@ -50,6 +83,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM_BYTES).unwrap();
+        install_club_rules(&mut svm, 100_000, 1_000, 2, 5);
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 10_000_000_000).unwrap();
         let mut f = Fixture {
@@ -140,6 +174,8 @@ fn create_club(owner: &Pubkey, club_id: [u8; 32], name: &str) -> Instruction {
     ix(
         outcomia::accounts::CreateClub {
             owner: *owner,
+            club_rules: club_rules_pda(),
+            owner_record: owner_record_pda(owner),
             club,
             owner_member: member_pda(&club, owner),
             system_program: system_program::ID,
@@ -147,6 +183,7 @@ fn create_club(owner: &Pubkey, club_id: [u8; 32], name: &str) -> Instruction {
         outcomia::instruction::CreateClub {
             club_id,
             name: name.into(),
+            kind: ClubKind::Public,
         },
     )
 }
@@ -233,6 +270,7 @@ fn accept(club: &Pubkey, wallet: &Pubkey, inviter: &Pubkey) -> Instruction {
         outcomia::accounts::AcceptClubInvite {
             wallet: *wallet,
             club: *club,
+            club_rules: club_rules_pda(),
             invite: invite_pda(club, wallet),
             inviter: *inviter,
             member: member_pda(club, wallet),
@@ -431,6 +469,7 @@ fn set_role(club: &Pubkey, owner: &Pubkey, wallet: &Pubkey, role: ClubRole) -> I
             owner: *owner,
             club: *club,
             member: member_pda(club, wallet),
+            club_rules: club_rules_pda(),
         },
         outcomia::instruction::SetClubMemberRole { role },
     )
@@ -585,12 +624,16 @@ fn nominate(club: &Pubkey, owner: &Pubkey, candidate: &Pubkey) -> Instruction {
         outcomia::instruction::NominateClubOwner {},
     )
 }
-fn take_ownership(club: &Pubkey, candidate: &Pubkey) -> Instruction {
+fn take_ownership(club: &Pubkey, candidate: &Pubkey, previous: &Pubkey) -> Instruction {
     ix(
         outcomia::accounts::AcceptClubOwnership {
             candidate: *candidate,
             club: *club,
             candidate_member: member_pda(club, candidate),
+            club_rules: club_rules_pda(),
+            candidate_record: owner_record_pda(candidate),
+            previous_record: owner_record_pda(previous),
+            system_program: system_program::ID,
         },
         outcomia::instruction::AcceptClubOwnership {},
     )
@@ -614,7 +657,7 @@ fn ownership_moves_only_when_a_nominated_member_accepts() {
     );
     f.fails(
         &heir,
-        take_ownership(&f.club, &heir.pubkey()),
+        take_ownership(&f.club, &heir.pubkey(), &owner.pubkey()),
         "InvalidClubMember",
     );
 
@@ -622,7 +665,7 @@ fn ownership_moves_only_when_a_nominated_member_accepts() {
     assert_eq!(f.club().pending_owner, Some(heir.pubkey()));
     f.fails(
         &other,
-        take_ownership(&f.club, &other.pubkey()),
+        take_ownership(&f.club, &other.pubkey(), &owner.pubkey()),
         "InvalidClubMember",
     );
     // Nominating the owner cancels.
@@ -630,12 +673,15 @@ fn ownership_moves_only_when_a_nominated_member_accepts() {
     assert_eq!(f.club().pending_owner, None);
     f.fails(
         &heir,
-        take_ownership(&f.club, &heir.pubkey()),
+        take_ownership(&f.club, &heir.pubkey(), &owner.pubkey()),
         "InvalidClubMember",
     );
 
     f.ok(&owner, nominate(&f.club, &owner.pubkey(), &heir.pubkey()));
-    f.ok(&heir, take_ownership(&f.club, &heir.pubkey()));
+    f.ok(
+        &heir,
+        take_ownership(&f.club, &heir.pubkey(), &owner.pubkey()),
+    );
     let club = f.club();
     assert_eq!((club.owner, club.pending_owner), (heir.pubkey(), None));
     assert_eq!((club.member_count, club.admin_count), (3, 2));
@@ -669,7 +715,7 @@ fn a_departing_nominee_cancels_the_nomination() {
     f.ok(&b, accept(&f.club, &b.pubkey(), &owner.pubkey()));
     f.fails(
         &b,
-        take_ownership(&f.club, &b.pubkey()),
+        take_ownership(&f.club, &b.pubkey(), &owner.pubkey()),
         "InvalidClubMember",
     );
 }

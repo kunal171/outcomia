@@ -1,5 +1,5 @@
 //! A complete contextual scan becomes one atomic, queryable revision.
-use crate::account_data::{decode_account, IDL_BYTES};
+use crate::account_data::{decode_account, IDL_BYTES, IDL_HISTORY};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -80,9 +80,27 @@ pub async fn bind_identity(pool: &PgPool, genesis: &str, program: &str) -> Resul
     )
     .fetch_one(pool)
     .await?;
+    let stored: String = row.get("idl_hash");
+    // A database bound to an earlier deployed IDL of the same program moves to
+    // the current one: history and unmigrated accounts still decode through
+    // IDL_HISTORY, and every account row is re-projected by the next scan.
+    if row.get::<String, _>("genesis_hash") == genesis
+        && row.get::<String, _>("program_id") == program
+        && stored != hash
+        && IDL_HISTORY
+            .iter()
+            .any(|old| format!("{:x}", Sha256::digest(old.as_bytes())) == stored)
+    {
+        sqlx::query("UPDATE indexer_identity SET idl_hash=$1 WHERE singleton AND idl_hash=$2")
+            .bind(&hash)
+            .bind(&stored)
+            .execute(pool)
+            .await?;
+        return Ok(());
+    }
     if row.get::<String, _>("genesis_hash") != genesis
         || row.get::<String, _>("program_id") != program
-        || row.get::<String, _>("idl_hash") != hash
+        || stored != hash
     {
         return Err(invalid(
             "database network/program/IDL identity mismatch; explicit migration required",

@@ -19,6 +19,7 @@ import {
 import { PROGRAM_ID } from "../lib/solana";
 import { AppHeader } from "./app-header";
 import { useProtocolRole } from "./protocol-role-provider";
+import { PlatformConfig } from "./platform-config";
 
 type AdminAction = "add" | "disable" | "enable" | "remove";
 
@@ -50,6 +51,7 @@ export function AdminManagement() {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [tab, setTab] = useState<"admins" | "platform">("admins");
 
   const program = useMemo(
     () => (wallet ? getOutcomiaProgram(connection, wallet) : null),
@@ -273,148 +275,184 @@ export function AdminManagement() {
           )}
 
         {wallet && !roleLoading && role === "super-admin" && (
-          <div className="admin-layout">
-            <section className="admin-card">
-              <div className="card-label">{t("Trading fees")}</div>
-              <h2>{t("Global taker fee")}</h2>
-              <p>
-                {t("Current rate: {value0} bps{value1}", {
-                  value0: takerFeeBps ?? "—",
-                  value1:
-                    takerFeeBps === null
-                      ? ""
-                      : ` (${(takerFeeBps / 100).toFixed(2)}%)`,
-                })}
-              </p>
-              <form className="admin-form" onSubmit={updateTakerFee}>
-                <label>
-                  {t("Basis points (0–1,000)")}
-                  <input
-                    inputMode="numeric"
-                    value={feeRateInput}
-                    onChange={(event) => setFeeRateInput(event.target.value)}
-                    autoComplete="off"
-                  />
-                </label>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={pending !== null}
-                >
-                  {pending === "set-fee" ? t("Updating…") : t("Update fee")}
-                </button>
-              </form>
-            </section>
-
-            <section className="admin-card">
-              <div className="card-label">{t("Add administrator")}</div>
-              <form
-                className="admin-form"
-                onSubmit={(event) => void submitNewAdmin(event)}
+          <div
+            className="admin-tabs"
+            role="tablist"
+            aria-label={t("Administrator control")}
+          >
+            {(
+              [
+                ["admins", "Admins & fees"],
+                ["platform", "Platform config"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
               >
-                <label>
-                  {t("Wallet address")}
-                  <input
-                    value={newAdmin}
-                    onChange={(event) => setNewAdmin(event.target.value)}
-                    placeholder={t("Administrator public key")}
-                    autoComplete="off"
-                  />
-                </label>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={!newAdmin.trim() || pending !== null}
-                >
-                  {pending?.startsWith("add:") ? t("Adding…") : t("Add admin")}
-                </button>
-              </form>
-            </section>
-
-            <section className="admin-card admin-list-card">
-              <div className="admin-list-heading">
-                <div>
-                  <div className="card-label">{t("On-chain records")}</div>
-                  <h2>{t("Administrators")}</h2>
-                </div>
-                <button
-                  className="text-button"
-                  type="button"
-                  disabled={loadingAdmins}
-                  onClick={() => void loadAdmins()}
-                >
-                  {loadingAdmins ? t("Refreshing…") : t("Refresh")}
-                </button>
-              </div>
-
-              <div className="admin-list">
-                {!loadingAdmins && !error && admins.length === 0 && (
-                  <p>{t("No admin records found.")}</p>
-                )}
-                {admins.map((admin) => {
-                  const isSuperAdmin = admin.authority.equals(wallet.publicKey);
-                  const actionKey = `${admin.status === "active" ? "disable" : "enable"}:${admin.authority.toBase58()}`;
-
-                  return (
-                    <article
-                      className="admin-row"
-                      key={admin.address.toBase58()}
-                    >
-                      <div>
-                        <strong>{shortAddress(admin.authority)}</strong>
-                        <span className={`role-badge role-${admin.status}`}>
-                          {isSuperAdmin ? t("Super admin") : t(admin.status)}
-                        </span>
-                        <p>
-                          {t("Added by {value0}", {
-                            value0: shortAddress(admin.addedBy),
-                          })}
-                        </p>
-                      </div>
-                      {!isSuperAdmin && (
-                        <div className="admin-actions">
-                          <button
-                            className="admin-action-button"
-                            type="button"
-                            disabled={pending !== null}
-                            onClick={() =>
-                              void runAdminAction(
-                                admin.status === "active"
-                                  ? "disable"
-                                  : "enable",
-                                admin.authority,
-                              )
-                            }
-                          >
-                            {pending === actionKey
-                              ? t("Submitting…")
-                              : admin.status === "active"
-                                ? t("Disable")
-                                : t("Enable")}
-                          </button>
-                          <button
-                            className="danger-button"
-                            type="button"
-                            disabled={
-                              admin.status !== "disabled" || pending !== null
-                            }
-                            onClick={() =>
-                              void runAdminAction("remove", admin.authority)
-                            }
-                          >
-                            {pending === `remove:${admin.authority.toBase58()}`
-                              ? t("Removing…")
-                              : t("Remove")}
-                          </button>
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
+                {t(label)}
+              </button>
+            ))}
           </div>
         )}
+        {wallet &&
+          !roleLoading &&
+          role === "super-admin" &&
+          tab === "platform" && <PlatformConfig />}
+        {wallet &&
+          !roleLoading &&
+          role === "super-admin" &&
+          tab === "admins" && (
+            <div className="admin-layout">
+              <section className="admin-card">
+                <div className="card-label">{t("Trading fees")}</div>
+                <h2>{t("Global taker fee")}</h2>
+                <p>
+                  {t("Current rate: {value0} bps{value1}", {
+                    value0: takerFeeBps ?? "—",
+                    value1:
+                      takerFeeBps === null
+                        ? ""
+                        : ` (${(takerFeeBps / 100).toFixed(2)}%)`,
+                  })}
+                </p>
+                <form className="admin-form" onSubmit={updateTakerFee}>
+                  <label>
+                    {t("Basis points (0–1,000)")}
+                    <input
+                      inputMode="numeric"
+                      value={feeRateInput}
+                      onChange={(event) => setFeeRateInput(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={pending !== null}
+                  >
+                    {pending === "set-fee" ? t("Updating…") : t("Update fee")}
+                  </button>
+                </form>
+              </section>
+
+              <section className="admin-card">
+                <div className="card-label">{t("Add administrator")}</div>
+                <form
+                  className="admin-form"
+                  onSubmit={(event) => void submitNewAdmin(event)}
+                >
+                  <label>
+                    {t("Wallet address")}
+                    <input
+                      value={newAdmin}
+                      onChange={(event) => setNewAdmin(event.target.value)}
+                      placeholder={t("Administrator public key")}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={!newAdmin.trim() || pending !== null}
+                  >
+                    {pending?.startsWith("add:")
+                      ? t("Adding…")
+                      : t("Add admin")}
+                  </button>
+                </form>
+              </section>
+
+              <section className="admin-card admin-list-card">
+                <div className="admin-list-heading">
+                  <div>
+                    <div className="card-label">{t("On-chain records")}</div>
+                    <h2>{t("Administrators")}</h2>
+                  </div>
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={loadingAdmins}
+                    onClick={() => void loadAdmins()}
+                  >
+                    {loadingAdmins ? t("Refreshing…") : t("Refresh")}
+                  </button>
+                </div>
+
+                <div className="admin-list">
+                  {!loadingAdmins && !error && admins.length === 0 && (
+                    <p>{t("No admin records found.")}</p>
+                  )}
+                  {admins.map((admin) => {
+                    const isSuperAdmin = admin.authority.equals(
+                      wallet.publicKey,
+                    );
+                    const actionKey = `${admin.status === "active" ? "disable" : "enable"}:${admin.authority.toBase58()}`;
+
+                    return (
+                      <article
+                        className="admin-row"
+                        key={admin.address.toBase58()}
+                      >
+                        <div>
+                          <strong>{shortAddress(admin.authority)}</strong>
+                          <span className={`role-badge role-${admin.status}`}>
+                            {isSuperAdmin ? t("Super admin") : t(admin.status)}
+                          </span>
+                          <p>
+                            {t("Added by {value0}", {
+                              value0: shortAddress(admin.addedBy),
+                            })}
+                          </p>
+                        </div>
+                        {!isSuperAdmin && (
+                          <div className="admin-actions">
+                            <button
+                              className="admin-action-button"
+                              type="button"
+                              disabled={pending !== null}
+                              onClick={() =>
+                                void runAdminAction(
+                                  admin.status === "active"
+                                    ? "disable"
+                                    : "enable",
+                                  admin.authority,
+                                )
+                              }
+                            >
+                              {pending === actionKey
+                                ? t("Submitting…")
+                                : admin.status === "active"
+                                  ? t("Disable")
+                                  : t("Enable")}
+                            </button>
+                            <button
+                              className="danger-button"
+                              type="button"
+                              disabled={
+                                admin.status !== "disabled" || pending !== null
+                              }
+                              onClick={() =>
+                                void runAdminAction("remove", admin.authority)
+                              }
+                            >
+                              {pending ===
+                              `remove:${admin.authority.toBase58()}`
+                                ? t("Removing…")
+                                : t("Remove")}
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+          )}
 
         {(roleError || error) && (
           <div className="transaction-message transaction-error">

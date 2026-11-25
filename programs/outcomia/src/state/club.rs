@@ -13,6 +13,14 @@ pub enum ClubMarketPolicy {
     AnyMember,
 }
 
+/// Whether a club may be listed publicly. Fixed at creation; the type sets
+/// its member cap and (from milestone 2) its security deposit.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum ClubKind {
+    Private,
+    Public,
+}
+
 /// Role of an active member. The owner always holds `Admin`.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
 pub enum ClubRole {
@@ -39,6 +47,10 @@ pub struct Club {
     pub admin_count: u32,
     pub created_at: i64,
     pub bump: u8,
+    pub kind: ClubKind,
+    /// Zeroed space for the security deposit (milestone 2), so adding it
+    /// needs no second account migration.
+    pub reserved: [u8; 96],
 }
 
 /// Proof of active membership. It exists only while the wallet is a member;
@@ -148,4 +160,61 @@ pub struct ClubJoinRequest {
     pub note: String,
     pub expires_at: i64,
     pub bump: u8,
+}
+
+/// Platform limits for clubs, set by the super-admin.
+///
+/// PDA: ["club_rules_config"]. Club creation, joining and admin promotion
+/// require it, so a limit can never be bypassed by omitting the account.
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubRulesConfig {
+    pub public_member_cap: u32,
+    pub private_member_cap: u32,
+    /// Clubs one wallet may own at a time, any mix of types.
+    pub max_owned_clubs: u16,
+    /// Admins per club, the owner included.
+    pub max_club_admins: u16,
+    pub bump: u8,
+    /// Zeroed space for later platform settings (deposits, disputes).
+    pub reserved: [u8; 128],
+}
+
+impl ClubRulesConfig {
+    pub fn member_cap(&self, kind: ClubKind) -> u32 {
+        match kind {
+            ClubKind::Public => self.public_member_cap,
+            ClubKind::Private => self.private_member_cap,
+        }
+    }
+}
+
+/// How many clubs a wallet owns right now.
+///
+/// PDA: ["club_owner", wallet]
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubOwnerRecord {
+    pub wallet: Pubkey,
+    pub owned: u16,
+    pub bump: u8,
+}
+
+impl ClubOwnerRecord {
+    /// Counts one more owned club, within `max`.
+    pub(crate) fn take(&mut self, wallet: Pubkey, bump: u8, max: u16) -> Result<()> {
+        require!(self.owned < max, crate::errors::club::ClubOwnerLimitReached);
+        self.wallet = wallet;
+        self.bump = bump;
+        self.owned += 1;
+        Ok(())
+    }
+    /// Counts one fewer owned club.
+    pub(crate) fn give_up(&mut self) -> Result<()> {
+        self.owned = self
+            .owned
+            .checked_sub(1)
+            .ok_or(crate::errors::club::ClubCounterMismatch)?;
+        Ok(())
+    }
 }

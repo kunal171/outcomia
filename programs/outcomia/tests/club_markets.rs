@@ -27,6 +27,39 @@ const CLUB_ID: [u8; 32] = [7; 32];
 const MARKET_ID: [u8; 32] = [3; 32];
 const PAYOUT: u64 = 1_000_000;
 
+fn club_rules_pda() -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID).0
+}
+fn owner_record_pda(wallet: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_OWNER_SEED, wallet.as_ref()], &outcomia::ID).0
+}
+/// Writes the platform club rules directly, as the super-admin would set them.
+fn install_club_rules(svm: &mut LiteSVM) {
+    let (address, bump) = Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    ClubRulesConfig {
+        public_member_cap: 100_000,
+        private_member_cap: 1_000,
+        max_owned_clubs: 2,
+        max_club_admins: 5,
+        bump,
+        reserved: [0; 128],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        solana_account::Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
 fn pda(seed: &[u8], parts: &[&[u8]]) -> Pubkey {
     let mut seeds = vec![seed];
     seeds.extend_from_slice(parts);
@@ -47,6 +80,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM_BYTES).unwrap();
+        install_club_rules(&mut svm);
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 10_000_000_000).unwrap();
         let mint = Pubkey::new_unique();
@@ -87,6 +121,8 @@ impl Fixture {
             ix(
                 outcomia::accounts::CreateClub {
                     owner: owner.pubkey(),
+                    club_rules: club_rules_pda(),
+                    owner_record: owner_record_pda(&owner.pubkey()),
                     club: f.club,
                     owner_member: f.member_pda(&owner.pubkey()),
                     system_program: system_program::ID,
@@ -94,6 +130,7 @@ impl Fixture {
                 outcomia::instruction::CreateClub {
                     club_id: CLUB_ID,
                     name: "Club".into(),
+                    kind: ClubKind::Public,
                 },
             ),
         );
@@ -137,6 +174,7 @@ impl Fixture {
                 outcomia::accounts::AcceptClubInvite {
                     wallet: wallet.pubkey(),
                     club: self.club,
+                    club_rules: club_rules_pda(),
                     invite,
                     inviter: owner.pubkey(),
                     member: self.member_pda(&wallet.pubkey()),
@@ -153,6 +191,7 @@ impl Fixture {
                         owner: owner.pubkey(),
                         club: self.club,
                         member: self.member_pda(&wallet.pubkey()),
+                        club_rules: club_rules_pda(),
                     },
                     outcomia::instruction::SetClubMemberRole {
                         role: ClubRole::Admin,
@@ -1094,6 +1133,8 @@ fn members_only_splits_need_current_membership_but_merges_never_do() {
         ix(
             outcomia::accounts::CreateClub {
                 owner: rival.pubkey(),
+                club_rules: club_rules_pda(),
+                owner_record: owner_record_pda(&rival.pubkey()),
                 club: rival_club,
                 owner_member: pda(
                     CLUB_MEMBER_SEED,
@@ -1104,6 +1145,7 @@ fn members_only_splits_need_current_membership_but_merges_never_do() {
             outcomia::instruction::CreateClub {
                 club_id: [9; 32],
                 name: "Rival".into(),
+                kind: ClubKind::Public,
             },
         ),
     );

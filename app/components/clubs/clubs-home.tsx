@@ -19,7 +19,11 @@ import {
   joinOpenClubInstruction,
   closeClubRequestInstruction,
   readClubListings,
+  readClubRules,
+  readOwnedClubCount,
   readWalletClubs,
+  type ClubKind,
+  type ClubRulesAccount,
   requestClubMembershipInstruction,
 } from "../../lib/clubs";
 import { ClubFeedback, useClubTransaction } from "./club-transaction";
@@ -39,6 +43,11 @@ export function ClubsHome() {
     [loadIssue, setLoadIssue] = useState<string | null>(null),
     [revision, setRevision] = useState(0),
     [name, setName] = useState(""),
+    [kind, setKind] = useState<ClubKind>("private"),
+    [rules, setRules] = useState<ClubRulesAccount | null | undefined>(
+      undefined,
+    ),
+    [owned, setOwned] = useState<number | null>(null),
     [listings, setListings] = useState<Listings | null>(null);
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
   const wallet = tx.wallet?.publicKey;
@@ -54,6 +63,23 @@ export function ClubsHome() {
       dead = true;
     };
   }, [program, wallet, revision]);
+
+  // Platform limits decide what this wallet may create.
+  useEffect(() => {
+    if (!CLUBS_ENABLED) return;
+    let dead = false;
+    void readClubRules(program)
+      .then((value) => !dead && setRules(value))
+      .catch(() => !dead && setRules(null));
+    if (wallet)
+      void readOwnedClubCount(program, wallet)
+        .then((value) => !dead && setOwned(value))
+        .catch(() => !dead && setOwned(null));
+    return () => {
+      dead = true;
+    };
+  }, [program, wallet, revision]);
+  const atLimit = !!rules && owned !== null && owned >= rules.maxOwnedClubs;
 
   // Verified public and open clubs are discoverable without a wallet.
   useEffect(() => {
@@ -77,6 +103,7 @@ export function ClubsHome() {
         p,
         signer,
         name,
+        kind,
       );
       created = club.toBase58();
       return [instruction];
@@ -372,15 +399,71 @@ export function ClubsHome() {
                       onChange={(e) => setName(e.target.value)}
                     />
                   </label>
+                  <fieldset className="club-kind" disabled={tx.pending}>
+                    <legend>{t("Club type")}</legend>
+                    {(["private", "public"] as const).map((value) => (
+                      <label key={value} className="club-kind-option">
+                        <input
+                          type="radio"
+                          name="club-kind"
+                          checked={kind === value}
+                          onChange={() => setKind(value)}
+                        />
+                        <span>
+                          <strong>
+                            {value === "public" ? t("Public") : t("Private")}
+                          </strong>
+                          <small>
+                            {value === "public"
+                              ? t(
+                                  "Can be listed for discovery. Up to {value0} members.",
+                                  {
+                                    value0: (
+                                      rules?.publicMemberCap ?? 100000
+                                    ).toLocaleString(),
+                                  },
+                                )
+                              : t("Invite-only. Up to {value0} members.", {
+                                  value0: (
+                                    rules?.privateMemberCap ?? 1000
+                                  ).toLocaleString(),
+                                })}
+                          </small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
                   <p className="club-help">
                     {t(
                       "You become the owner and pay the account rent. Your wallet's club roles never grant protocol administration.",
                     )}
                   </p>
+                  {rules && owned !== null && (
+                    <p className="club-help">
+                      {t("You own {value0} of {value1} clubs allowed.", {
+                        value0: owned,
+                        value1: rules.maxOwnedClubs,
+                      })}
+                    </p>
+                  )}
+                  {rules === null && (
+                    <p className="ui-notice" role="status">
+                      {t(
+                        "Club creation opens once Outcomia sets the platform club rules.",
+                      )}
+                    </p>
+                  )}
+                  {atLimit && (
+                    <p className="ui-notice" role="status">
+                      {t(
+                        "You already own the maximum number of clubs. Close or hand over a club to create another.",
+                      )}
+                    </p>
+                  )}
                   <button
                     className="ui-btn ui-btn-primary ui-btn-block"
                     type="submit"
-                    disabled={tx.pending || !name}
+                    disabled={tx.pending || !name || !rules || atLimit}
                   >
                     {t("Create club")}
                   </button>

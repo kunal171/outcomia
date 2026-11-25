@@ -2849,3 +2849,18 @@ body:has(.prediction-guide[open]) {
   .profile-identity { padding-top: 0; }
   .profile-edit { margin-top: 8px; }
 }
+
+/* Administrator control: section tabs. */
+.admin-tabs { display: flex; gap: 6px; margin: 4px 0 18px; border-bottom: 1px solid var(--line); }
+.admin-tabs button {
+  padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--muted); font: inherit; font-weight: 600; cursor: pointer;
+}
+.admin-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+/* Club type choice on the create-club form. */
+.club-kind { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.club-kind legend { margin-bottom: 6px; font-weight: 600; }
+.club-kind-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.club-kind-option:has(input:checked) { border-color: var(--accent); background: rgb(var(--accent-rgb) / 0.08); }
+.club-kind-option span { display: grid; gap: 2px; }
+.club-kind-option small { color: var(--muted); }

@@ -49,7 +49,26 @@ export interface ClubAccount {
   memberCount: number;
   adminCount: number;
   createdAt: BN;
+  /** Missing on clubs created before club types until they are upgraded. */
+  kind?: { private?: object; public?: object };
 }
+export type ClubKind = "public" | "private";
+/** A club's type, or null for a club awaiting the one-time upgrade. */
+export const clubKind = (club: Pick<ClubAccount, "kind">): ClubKind | null =>
+  club.kind ? ("public" in club.kind ? "public" : "private") : null;
+/** Platform limits set by the super-admin (docs/club-rules-and-disputes.md). */
+export interface ClubRulesAccount {
+  publicMemberCap: number;
+  privateMemberCap: number;
+  maxOwnedClubs: number;
+  maxClubAdmins: number;
+}
+export interface ClubOwnerRecordAccount {
+  wallet: PublicKey;
+  owned: number;
+}
+export const memberCap = (rules: ClubRulesAccount, kind: ClubKind) =>
+  kind === "public" ? rules.publicMemberCap : rules.privateMemberCap;
 export interface ClubMemberAccount {
   club: PublicKey;
   wallet: PublicKey;
@@ -104,6 +123,8 @@ export function clubAccounts(p: Program) {
     clubMarket: Reader<ClubMarketAccount>;
     clubListing: Reader<ClubListingAccount>;
     clubJoinRequest: Reader<ClubJoinRequestAccount>;
+    clubRulesConfig: Reader<ClubRulesAccount>;
+    clubOwnerRecord: Reader<ClubOwnerRecordAccount>;
     predictionMarket: Reader<PredictionMarketAccount>;
     marketMetadata: Reader<MarketMetadata>;
   };
@@ -115,6 +136,20 @@ const address = (seed: string, ...parts: Uint8Array[]) =>
     PROGRAM_ID,
   )[0];
 export const clubPda = (clubId: Uint8Array) => address("club", clubId);
+export const clubRulesPda = () => address("club_rules_config");
+export const clubOwnerRecordPda = (wallet: PublicKey) =>
+  address("club_owner", wallet.toBytes());
+/** Platform club rules, or null before the super-admin sets them. */
+export async function readClubRules(p: Program) {
+  return clubAccounts(p).clubRulesConfig.fetchNullable(clubRulesPda());
+}
+/** How many clubs `wallet` owns right now. */
+export async function readOwnedClubCount(p: Program, wallet: PublicKey) {
+  const record = await clubAccounts(p).clubOwnerRecord.fetchNullable(
+    clubOwnerRecordPda(wallet),
+  );
+  return record?.owned ?? 0;
+}
 export const clubInvitePda = (club: PublicKey, wallet: PublicKey) =>
   address("club_invite", club.toBytes(), wallet.toBytes());
 export const clubListingPda = (club: PublicKey) =>
@@ -317,13 +352,20 @@ export async function createClubInstruction(
   p: Program,
   owner: PublicKey,
   name: string,
+  kind: ClubKind,
   clubId: Uint8Array = crypto.getRandomValues(new Uint8Array(32)),
 ) {
   const club = clubPda(clubId);
   const instruction = await p.methods
-    .createClub(Array.from(clubId), name)
+    .createClub(
+      Array.from(clubId),
+      name,
+      kind === "public" ? { public: {} } : { private: {} },
+    )
     .accountsPartial({
       owner,
+      clubRules: clubRulesPda(),
+      ownerRecord: clubOwnerRecordPda(owner),
       club,
       ownerMember: memberOf(club, owner),
       systemProgram: SystemProgram.programId,
@@ -368,6 +410,7 @@ export const acceptClubInviteInstruction = (
     .accountsPartial({
       wallet,
       club: invite.club,
+      clubRules: clubRulesPda(),
       invite: clubInvitePda(invite.club, wallet),
       inviter: invite.inviter,
       member: memberOf(invite.club, wallet),
@@ -401,7 +444,12 @@ export const setClubMemberRoleInstruction = (
 ) =>
   p.methods
     .setClubMemberRole(admin ? { admin: {} } : { member: {} })
-    .accountsPartial({ owner, club, member: memberOf(club, wallet) })
+    .accountsPartial({
+      owner,
+      club,
+      member: memberOf(club, wallet),
+      clubRules: clubRulesPda(),
+    })
     .instruction();
 export const removeClubMemberInstruction = (
   p: Program,
@@ -447,6 +495,7 @@ export const acceptClubOwnershipInstruction = (
   p: Program,
   candidate: PublicKey,
   club: PublicKey,
+  currentOwner: PublicKey,
 ) =>
   p.methods
     .acceptClubOwnership()
@@ -454,6 +503,10 @@ export const acceptClubOwnershipInstruction = (
       candidate,
       club,
       candidateMember: memberOf(club, candidate),
+      clubRules: clubRulesPda(),
+      candidateRecord: clubOwnerRecordPda(candidate),
+      previousRecord: clubOwnerRecordPda(currentOwner),
+      systemProgram: SystemProgram.programId,
     })
     .instruction();
 export const withdrawClubFeesInstruction = (
@@ -787,6 +840,7 @@ export const approveClubRequestInstruction = (
     .accountsPartial({
       admin,
       club,
+      clubRules: clubRulesPda(),
       adminMember: memberOf(club, admin),
       request: clubJoinRequestPda(club, wallet),
       wallet,
@@ -823,8 +877,47 @@ export const joinOpenClubInstruction = (
     .accountsPartial({
       wallet,
       club,
+      clubRules: clubRulesPda(),
       listing: clubListingPda(club),
       member: memberOf(club, wallet),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+// ----- Platform club rules (super-admin) -----
+export const setClubRulesInstruction = (
+  p: Program,
+  superAdmin: PublicKey,
+  rules: ClubRulesAccount,
+) =>
+  p.methods
+    .setClubRules(
+      rules.publicMemberCap,
+      rules.privateMemberCap,
+      rules.maxOwnedClubs,
+      rules.maxClubAdmins,
+    )
+    .accountsPartial({
+      superAdmin,
+      clubRules: clubRulesPda(),
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+/** One-time upgrade of a club created before club types. */
+export const migrateClubInstruction = (
+  p: Program,
+  superAdmin: PublicKey,
+  club: PublicKey,
+  owner: PublicKey,
+  kind: ClubKind,
+) =>
+  p.methods
+    .migrateClub(kind === "public" ? { public: {} } : { private: {} }, owner)
+    .accountsPartial({
+      superAdmin,
+      club,
+      listing: clubListingPda(club),
+      ownerRecord: clubOwnerRecordPda(owner),
       systemProgram: SystemProgram.programId,
     })
     .instruction();

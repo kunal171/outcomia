@@ -520,4 +520,17 @@ pub enum OutcomiaError {
     ClubJoinRequestExpired = 189,
     #[msg("The club join request has not expired yet")]
     ClubJoinRequestNotExpired = 190,
+
+    #[msg("This club has reached its member limit")]
+    ClubMemberCapReached = 191,
+    #[msg("This wallet already owns the maximum number of clubs")]
+    ClubOwnerLimitReached = 192,
+    #[msg("This club already has the maximum number of admins")]
+    ClubAdminLimitReached = 193,
+    #[msg("Only public clubs can be listed")]
+    PrivateClubCannotList = 194,
+    #[msg("Club rules must allow at least one member, one owned club and one admin")]
+    InvalidClubRules = 195,
+    #[msg("This club account does not need migration or is not a club")]
+    ClubMigrationNotNeeded = 196,
 }

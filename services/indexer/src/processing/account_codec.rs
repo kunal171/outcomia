@@ -3,9 +3,26 @@ use serde_json::{json, Map, Value};
 use std::{io, sync::OnceLock};
 
 pub const IDL_BYTES: &str = include_str!("../../../../app/idl/outcomia.json");
+/// Earlier deployed IDLs, newest first. Program upgrades can change an
+/// instruction's arguments or accounts and an account's layout; history and
+/// not-yet-migrated accounts written under an older IDL still decode with it.
+/// Each entry must stay byte-identical to the IDL it records, because its
+/// hash also lets a database bound to it move to the current IDL.
+pub const IDL_HISTORY: &[&str] = &[include_str!(
+    "../../../../app/idl/history/outcomia-2026-11-23.json"
+)];
 pub fn idl() -> &'static Value {
-    static IDL: OnceLock<Value> = OnceLock::new();
-    IDL.get_or_init(|| serde_json::from_str(IDL_BYTES).expect("checked-in IDL"))
+    &idl_versions()[0]
+}
+/// The current IDL followed by `IDL_HISTORY`.
+pub fn idl_versions() -> &'static [Value] {
+    static IDLS: OnceLock<Vec<Value>> = OnceLock::new();
+    IDLS.get_or_init(|| {
+        std::iter::once(IDL_BYTES)
+            .chain(IDL_HISTORY.iter().copied())
+            .map(|bytes| serde_json::from_str(bytes).expect("checked-in IDL"))
+            .collect()
+    })
 }
 pub fn camel(name: &str) -> String {
     let mut upper = false;
@@ -37,11 +54,11 @@ fn take<'a>(input: &mut &'a [u8], n: usize) -> io::Result<&'a [u8]> {
     *input = rest;
     Ok(value)
 }
-fn fields(fields: &[Value], input: &mut &[u8], depth: usize) -> io::Result<Value> {
+fn fields(idl: &Value, fields: &[Value], input: &mut &[u8], depth: usize) -> io::Result<Value> {
     if fields.first().is_some_and(|f| f.get("name").is_none()) {
         return fields
             .iter()
-            .map(|f| decode(f, input, depth + 1))
+            .map(|f| decode_in(idl, f, input, depth + 1))
             .collect::<io::Result<Vec<_>>>()
             .map(Value::Array);
     }
@@ -53,12 +70,16 @@ fn fields(fields: &[Value], input: &mut &[u8], depth: usize) -> io::Result<Value
                     .as_str()
                     .ok_or_else(|| invalid("field name"))?,
             ),
-            decode(&field["type"], input, depth + 1)?,
+            decode_in(idl, &field["type"], input, depth + 1)?,
         );
     }
     Ok(Value::Object(object))
 }
+#[cfg(test)]
 pub fn decode(ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> {
+    decode_in(idl(), ty, input, depth)
+}
+fn decode_in(idl: &Value, ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> {
     if depth > 32 {
         return Err(invalid("IDL recursion limit"));
     }
@@ -106,7 +127,7 @@ pub fn decode(ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> 
     if let Some(inner) = ty.get("option") {
         return match take(input, 1)?[0] {
             0 => Ok(Value::Null),
-            1 => decode(inner, input, depth + 1),
+            1 => decode_in(idl, inner, input, depth + 1),
             _ => Err(invalid("invalid option")),
         };
     }
@@ -126,12 +147,12 @@ pub fn decode(ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> 
             return Err(invalid("invalid collection length"));
         }
         return (0..n)
-            .map(|_| decode(inner, input, depth + 1))
+            .map(|_| decode_in(idl, inner, input, depth + 1))
             .collect::<io::Result<Vec<_>>>()
             .map(Value::Array);
     }
     if let Some(name) = ty.pointer("/defined/name").and_then(Value::as_str) {
-        let definition = idl()["types"]
+        let definition = idl["types"]
             .as_array()
             .unwrap()
             .iter()
@@ -140,6 +161,7 @@ pub fn decode(ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> 
         let body = &definition["type"];
         return match body["kind"].as_str() {
             Some("struct") => fields(
+                idl,
                 body["fields"]
                     .as_array()
                     .ok_or_else(|| invalid("struct fields"))?,
@@ -152,7 +174,7 @@ pub fn decode(ty: &Value, input: &mut &[u8], depth: usize) -> io::Result<Value> 
                     .get(index)
                     .ok_or_else(|| invalid("invalid enum variant"))?;
                 let payload = if let Some(f) = variant["fields"].as_array() {
-                    fields(f, input, depth + 1)?
+                    fields(idl, f, input, depth + 1)?
                 } else {
                     json!({})
                 };
@@ -169,54 +191,83 @@ pub fn decode_account(bytes: &[u8]) -> io::Result<(String, Value)> {
     if bytes.len() > 131072 || bytes.len() < 8 {
         return Err(invalid("invalid account data length"));
     }
-    let definition = idl()["accounts"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|a| {
+    let mut last = invalid("unknown account discriminator; check deployed IDL");
+    for idl in idl_versions() {
+        let Some(definition) = idl["accounts"].as_array().unwrap().iter().find(|a| {
             a["discriminator"]
                 .as_array()
                 .unwrap()
                 .iter()
                 .enumerate()
                 .all(|(i, n)| n.as_u64() == Some(bytes[i] as u64))
-        })
-        .ok_or_else(|| invalid("unknown account discriminator; check deployed IDL"))?;
-    let name = definition["name"].as_str().unwrap();
-    let mut input = &bytes[8..];
-    // Bytes after a complete decode are ignored, as Anchor's own account
-    // deserialization does. Accounts keep their original allocation, and
-    // Anchor does not zero the tail when an encoding shrinks: an Option that
-    // returns to None or a shorter string leaves stale bytes behind. Rejecting
-    // them made one emptied order book fail every account scan. Truncated or
-    // malformed data still fails inside decode.
-    let value = decode(&json!({"defined":{"name":name}}), &mut input, 0)?;
-    Ok((name.to_owned(), value))
+        }) else {
+            continue;
+        };
+        let name = definition["name"].as_str().unwrap();
+        let mut input = &bytes[8..];
+        // Bytes after a complete decode are ignored, as Anchor's own account
+        // deserialization does. Accounts keep their original allocation, and
+        // Anchor does not zero the tail when an encoding shrinks: an Option that
+        // returns to None or a shorter string leaves stale bytes behind. Rejecting
+        // them made one emptied order book fail every account scan. Truncated or
+        // malformed data still fails inside decode. An account written under an
+        // older layout (not migrated yet) decodes with the IDL that wrote it.
+        match decode_in(idl, &json!({"defined":{"name":name}}), &mut input, 0) {
+            Ok(value) => return Ok((name.to_owned(), value)),
+            Err(error) => last = error,
+        }
+    }
+    Err(last)
 }
 
-pub fn decode_instruction(bytes: &[u8]) -> io::Result<(String, Value)> {
+/// Decodes an instruction with the newest IDL whose arguments decode exactly
+/// and whose account list fits in `accounts`, returning its account roles.
+/// The current IDL is tried first, so a newer instruction never decodes with
+/// an older role list.
+pub fn decode_instruction_roles(
+    bytes: &[u8],
+    accounts: usize,
+) -> io::Result<(String, Value, Vec<String>)> {
     if bytes.len() < 8 || bytes.len() > 131072 {
         return Err(invalid("invalid instruction length"));
     }
-    let definition = idl()["instructions"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|a| {
+    let mut last = invalid("unknown instruction discriminator");
+    for idl in idl_versions() {
+        let Some(definition) = idl["instructions"].as_array().unwrap().iter().find(|a| {
             a["discriminator"]
                 .as_array()
                 .unwrap()
                 .iter()
                 .enumerate()
                 .all(|(i, n)| n.as_u64() == Some(bytes[i] as u64))
-        })
-        .ok_or_else(|| invalid("unknown instruction discriminator"))?;
-    let mut body = &bytes[8..];
-    let args = fields(definition["args"].as_array().unwrap(), &mut body, 0)?;
-    if !body.is_empty() {
-        return Err(invalid("trailing instruction bytes"));
+        }) else {
+            continue;
+        };
+        let roles = definition["accounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| {
+                r["name"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| invalid("grouped instruction accounts unsupported"))
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        if roles.len() > accounts {
+            last = invalid("truncated instruction account list");
+            continue;
+        }
+        let mut body = &bytes[8..];
+        match fields(idl, definition["args"].as_array().unwrap(), &mut body, 0) {
+            Ok(args) if body.is_empty() => {
+                return Ok((definition["name"].as_str().unwrap().to_owned(), args, roles))
+            }
+            Ok(_) => last = invalid("trailing instruction bytes"),
+            Err(error) => last = error,
+        }
     }
-    Ok((definition["name"].as_str().unwrap().to_owned(), args))
+    Err(last)
 }
 
 /// Common public-key filters use projection indexes; other memcmp filters retain
@@ -376,5 +427,69 @@ mod tests {
             Some("owner")
         );
         assert!(indexed_filter_field("AssetBalance", 8, 31).is_none());
+    }
+    fn discriminator(idl: &Value, section: &str, name: &str) -> Vec<u8> {
+        idl[section]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["name"] == name)
+            .unwrap()["discriminator"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n.as_u64().unwrap() as u8)
+            .collect()
+    }
+
+    #[test]
+    fn older_instructions_and_accounts_decode_with_the_idl_that_wrote_them() {
+        let current = &idl_versions()[0];
+        // create_club before club types: id and name only, four accounts.
+        let mut legacy = discriminator(current, "instructions", "create_club");
+        legacy.extend([7_u8; 32]);
+        legacy.extend(4_u32.to_le_bytes());
+        legacy.extend(b"Club");
+        let (name, args, roles) = decode_instruction_roles(&legacy, 4).unwrap();
+        assert_eq!(name, "create_club");
+        assert_eq!(args["name"], "Club");
+        assert_eq!(roles, ["owner", "club", "owner_member", "system_program"]);
+        // The same instruction today carries the club type and two more accounts.
+        let mut typed = legacy.clone();
+        typed.push(1);
+        let (_, args, roles) = decode_instruction_roles(&typed, 6).unwrap();
+        assert_eq!(args["kind"], json!({"public":{}}));
+        assert_eq!(roles[1], "club_rules");
+        // Too few accounts for every known version is still an error.
+        assert!(decode_instruction_roles(&typed, 3).is_err());
+
+        // A join instruction keeps its arguments but gained the rules account:
+        // the account count selects the role list.
+        let accept = discriminator(current, "instructions", "accept_club_invite");
+        assert_eq!(decode_instruction_roles(&accept, 6).unwrap().2.len(), 6);
+        assert_eq!(
+            decode_instruction_roles(&accept, 7).unwrap().2[2],
+            "club_rules"
+        );
+
+        // A club not migrated yet still decodes, with its old fields.
+        let mut club = discriminator(current, "accounts", "Club");
+        club.extend([7_u8; 32]);
+        club.extend([1_u8; 32]);
+        club.push(0); // no pending owner
+        club.extend(4_u32.to_le_bytes());
+        club.extend(b"Club");
+        club.push(0); // admins-only policy
+        club.extend(3_u32.to_le_bytes());
+        club.extend(1_u32.to_le_bytes());
+        club.extend(9_i64.to_le_bytes());
+        club.push(254);
+        let (_, old) = decode_account(&club).unwrap();
+        assert_eq!(old["memberCount"], 3);
+        assert!(old.get("kind").is_none());
+        club.push(1);
+        club.extend([0_u8; 96]);
+        let (_, migrated) = decode_account(&club).unwrap();
+        assert_eq!(migrated["kind"], json!({"public":{}}));
     }
 }
