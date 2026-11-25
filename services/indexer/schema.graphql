@@ -137,6 +137,14 @@ type MintStats {
 	profit: String!
 	wins: Int!
 	losses: Int!
+	"""
+	Unresolved prediction markets: cash flows so far plus contracts held,
+	valued at each outcome's last traded price (never traded counts as 0).
+	"""
+	unrealized: String!
+	openMarkets: Int!
+	biggestWin: String
+	biggestLoss: String
 }
 
 type Mutation {
@@ -178,6 +186,23 @@ type Profile {
 	xHandle: String
 	showOnLeaderboards: Boolean!
 	createdAt: String!
+	location: String
+	"""
+	Full https URL.
+	"""
+	website: String
+	"""
+	Handles below are stored without '@' or a site prefix.
+	"""
+	telegram: String
+	instagram: String
+	"""
+	LinkedIn profile slug, as in linkedin.com/in/<slug>.
+	"""
+	linkedin: String
+	discord: String
+	github: String
+	youtube: String
 }
 
 input ProfileInput {
@@ -187,6 +212,14 @@ input ProfileInput {
 	avatarHue: Int!
 	xHandle: String
 	showOnLeaderboards: Boolean!
+	location: String
+	website: String
+	telegram: String
+	instagram: String
+	linkedin: String
+	discord: String
+	github: String
+	youtube: String
 }
 
 type Query {

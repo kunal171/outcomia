@@ -147,6 +147,12 @@ pub struct MintStats {
     pub profit: String,
     pub wins: i64,
     pub losses: i64,
+    /// Unresolved prediction markets: cash flows so far plus contracts held,
+    /// valued at each outcome's last traded price (never traded counts as 0).
+    pub unrealized: String,
+    pub open_markets: i64,
+    pub biggest_win: Option<String>,
+    pub biggest_loss: Option<String>,
 }
 
 #[derive(SimpleObject)]
@@ -647,15 +653,38 @@ impl LeaderboardsQuery {
              settled AS (
                  SELECT mint, SUM(profit) AS profit,
                         COUNT(*) FILTER (WHERE profit > 0) AS wins,
-                        COUNT(*) FILTER (WHERE profit < 0) AS losses
-                   FROM resolved_market_results WHERE wallet = $1 GROUP BY mint)
-             SELECT COALESCE(t.mint, s.mint) AS mint, mc.decimals,
+                        COUNT(*) FILTER (WHERE profit < 0) AS losses,
+                        MAX(profit) FILTER (WHERE profit > 0) AS biggest_win,
+                        MIN(profit) FILTER (WHERE profit < 0) AS biggest_loss
+                   FROM resolved_market_results WHERE wallet = $1 GROUP BY mint),
+             marks AS (
+                 SELECT DISTINCT ON (t.market, t.outcome) t.market, t.outcome, t.price
+                   FROM indexed_trades t
+                  WHERE t.market IN (SELECT market FROM position_legs WHERE wallet = $1)
+                  ORDER BY t.market, t.outcome, t.slot DESC, t.transaction_index DESC NULLS LAST, t.execution_index DESC),
+             open_markets AS (
+                 SELECT a.mint, p.market,
+                        SUM(p.cash) + SUM(p.contracts * COALESCE(m.price, 0)) AS value,
+                        EXISTS (SELECT 1 FROM position_legs q WHERE q.wallet = $1 AND q.market = p.market
+                                 GROUP BY q.outcome HAVING SUM(q.contracts) <> 0) AS held
+                   FROM position_legs p
+                   JOIN market_assets a ON a.market = p.market
+                   LEFT JOIN marks m ON m.market = p.market AND m.outcome = p.outcome
+                  WHERE p.wallet = $1 AND NOT (COALESCE(a.status, '{}'::jsonb) ? 'resolved')
+                  GROUP BY a.mint, p.market),
+             open AS (
+                 SELECT mint, SUM(value) AS unrealized, COUNT(*) FILTER (WHERE held) AS markets
+                   FROM open_markets GROUP BY mint)
+             SELECT COALESCE(t.mint, s.mint, o.mint) AS mint, mc.decimals,
+                    COALESCE(o.unrealized, 0)::text AS unrealized, COALESCE(o.markets, 0) AS open_markets,
+                    s.biggest_win::text AS biggest_win, s.biggest_loss::text AS biggest_loss,
                     COALESCE(t.volume, 0)::text AS volume, COALESCE(t.maker_volume, 0)::text AS maker_volume,
                     COALESCE(t.trades, 0) AS trades, COALESCE(t.markets, 0) AS markets,
                     COALESCE(s.profit, 0)::text AS profit,
                     COALESCE(s.wins, 0) AS wins, COALESCE(s.losses, 0) AS losses
                FROM traded t FULL JOIN settled s ON s.mint = t.mint
-               LEFT JOIN mint_cache mc ON mc.address = COALESCE(t.mint, s.mint)
+               FULL JOIN open o ON o.mint = COALESCE(t.mint, s.mint)
+               LEFT JOIN mint_cache mc ON mc.address = COALESCE(t.mint, s.mint, o.mint)
               ORDER BY COALESCE(t.volume, 0) DESC, 1",
         )
         .bind(&wallet)
@@ -672,6 +701,10 @@ impl LeaderboardsQuery {
             profit: r.get("profit"),
             wins: r.get("wins"),
             losses: r.get("losses"),
+            unrealized: r.get("unrealized"),
+            open_markets: r.get("open_markets"),
+            biggest_win: r.get("biggest_win"),
+            biggest_loss: r.get("biggest_loss"),
         })
         .collect();
         let open_positions = sqlx::query(
