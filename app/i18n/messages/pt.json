@@ -1482,5 +1482,6 @@
   "{value0} of {value1} admins": "{value0} de {value1} admins",
   "This club already has the maximum number of admins": "Este clube já tem o máximo de admins",
   "This club was created before club types. An Outcomia admin will upgrade it shortly; until then it cannot accept members.": "Este clube foi criado antes dos tipos. Um admin da Outcomia vai atualizá-lo em breve; até lá ele não aceita membros.",
-  "Private clubs are invite-only and cannot be listed for discovery.": "Clubes privados são só por convite e não podem ser listados."
+  "Private clubs are invite-only and cannot be listed for discovery.": "Clubes privados são só por convite e não podem ser listados.",
+  "Clubs could not be read: {value0}": "Não foi possível ler os clubes: {value0}"
 }

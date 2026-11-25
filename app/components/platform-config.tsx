@@ -76,6 +76,7 @@ export function PlatformConfig() {
       ) as Record<keyof ClubRulesAccount, string>,
   );
   const [legacy, setLegacy] = useState<LegacyClub[] | null>(null);
+  const [legacyIssue, setLegacyIssue] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export function PlatformConfig() {
 
   useEffect(() => {
     let dead = false;
+    setLegacyIssue(null);
     void readClubRules(reader)
       .then((value) => {
         if (dead) return;
@@ -115,7 +117,11 @@ export function PlatformConfig() {
             })),
           );
       })
-      .catch(() => !dead && setLegacy([]));
+      .catch((cause) => {
+        if (dead) return;
+        setLegacy(null);
+        setLegacyIssue(cause instanceof Error ? cause.message : String(cause));
+      });
     return () => {
       dead = true;
     };
@@ -227,7 +233,11 @@ export function PlatformConfig() {
             "Clubs created before club types need a one-time upgrade. Listed clubs must become public. You pay the small extra rent.",
           )}
         </p>
-        {legacy === null ? (
+        {legacyIssue && !legacy ? (
+          <p role="alert">
+            {t("Clubs could not be read: {value0}", { value0: legacyIssue })}
+          </p>
+        ) : legacy === null ? (
           <p role="status">{t("Loading…")}</p>
         ) : legacy.length === 0 ? (
           <p className="lb-empty">{t("Every club is up to date.")}</p>

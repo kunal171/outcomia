@@ -50,6 +50,16 @@ test("indexed JSON hydrates every Anchor account without rounding or changing tu
   for (const fixture of fixtures)
     assert.deepEqual(exact(client.hydrate({ defined: { name: fixture.name } }, fixture.expected)), fixture.expected, fixture.name);
 });
+test("a club written before club types hydrates with its type left undefined", () => {
+  const client = load();
+  // Exactly what the indexer returns for a club that awaits the upgrade.
+  const legacy = { adminCount: 1, bump: 255, clubId: Array(32).fill(7), createdAt: "1795433617", marketPolicy: { adminsOnly: {} }, memberCount: 3, name: "Outcomia Founders", owner: new PublicKey(Buffer.alloc(32, 1)).toBase58(), pendingOwner: null };
+  const club = client.hydrate({ defined: { name: "Club" } }, legacy);
+  assert.equal(club.name, "Outcomia Founders");
+  assert.equal(club.memberCount, 3);
+  assert.equal(club.kind, undefined);
+  assert.equal(club.reserved, undefined);
+});
 test("only marked read programs use GraphQL; signed programs keep the RPC account reader", async () => {
   let calls = 0;
   const fixture = fixtures.find(f => f.name === "AssetBalance");

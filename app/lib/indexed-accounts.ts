@@ -36,7 +36,10 @@ type WireType =
     };
 /** Convert exact JSON strings back into the existing Anchor client value types. */
 export function hydrate(type: WireType, value: unknown): unknown {
-  if (value === null) return null;
+  // A field missing entirely belongs to a newer layout than the account was
+  // written with (for example a club created before club types, until it is
+  // upgraded). Keep it undefined so callers can tell; never guess a value.
+  if (value === null || value === undefined) return value;
   if (typeof type === "string") {
     if (type === "pubkey") return new PublicKey(value as string);
     if (type === "bytes") return Buffer.from(value as number[]);
