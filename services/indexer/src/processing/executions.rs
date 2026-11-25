@@ -1,6 +1,6 @@
 //! Ordered instruction replay supplies fills missing from the program event catalog.
 use crate::{
-    account_data::{camel, decode_instruction, idl},
+    account_data::{camel, decode_instruction_roles},
     rpc::{fetch_transaction, transaction_position, SignatureRecord},
     storage::persist_transaction,
 };
@@ -54,33 +54,16 @@ fn parse(body: &Value, program: &str) -> Result<Vec<Instruction>> {
                 .ok_or("missing instruction data")?,
         )
         .into_vec()?;
-        let (name, args) = decode_instruction(&bytes)?;
-        let definition = idl()["instructions"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|i| i["name"] == name)
-            .unwrap();
         let indexes = instruction["accounts"]
             .as_array()
             .ok_or("missing instruction accounts")?;
-        let roles = definition["accounts"].as_array().unwrap();
-        if indexes.len() < roles.len() {
-            return Err("truncated instruction account list".into());
-        }
+        let (name, args, roles) = decode_instruction_roles(&bytes, indexes.len())?;
         let mut accounts = Map::new();
         for (role, key) in roles.iter().zip(indexes) {
             let key = keys
                 .get(key.as_u64().ok_or("invalid instruction key")? as usize)
                 .ok_or("invalid account index")?;
-            accounts.insert(
-                camel(
-                    role["name"]
-                        .as_str()
-                        .ok_or("grouped instruction accounts unsupported")?,
-                ),
-                json!(key),
-            );
+            accounts.insert(camel(role), json!(key));
         }
         output.push(Instruction {
             index,
@@ -470,6 +453,8 @@ pub async fn run(pool: PgPool, client: Arc<RpcClient>, program: Pubkey) {
     }
 }
 
+#[cfg(test)]
+use crate::account_data::idl;
 #[cfg(test)]
 mod tests {
     use super::*;
