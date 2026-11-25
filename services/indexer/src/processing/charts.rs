@@ -235,13 +235,13 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        assert_eq!(
-            query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
-                .await
-                .unwrap()
-                .coverage,
-            "INCOMPLETE"
-        );
+        // A trade whose chain order is not known yet keeps the chart served
+        // and marks it PARTIAL until enrichment fills the order in.
+        let pending = query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
+            .await
+            .unwrap();
+        assert_eq!(pending.coverage, "PARTIAL");
+        assert_eq!(pending.candles.len(), 1);
         project(&pool).await.unwrap();
         assert_eq!(
             query(&pool, "market", "LEGACY_SPOT", "spot", 60, "0", "240")
