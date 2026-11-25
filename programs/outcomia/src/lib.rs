@@ -45,8 +45,35 @@ pub mod outcomia {
     use super::*;
 
     /// Creates a club owned by the signer, who also becomes its first admin.
-    pub fn create_club(ctx: Context<CreateClub>, club_id: [u8; 32], name: String) -> Result<()> {
-        crate::instructions::club_settings::handle_create_club(ctx, club_id, name)
+    pub fn create_club(
+        ctx: Context<CreateClub>,
+        club_id: [u8; 32],
+        name: String,
+        kind: ClubKind,
+    ) -> Result<()> {
+        crate::instructions::club_settings::handle_create_club(ctx, club_id, name, kind)
+    }
+
+    /// Lets the super-admin set member caps, owned-club and admin limits.
+    pub fn set_club_rules(
+        ctx: Context<SetClubRules>,
+        public_member_cap: u32,
+        private_member_cap: u32,
+        max_owned_clubs: u16,
+        max_club_admins: u16,
+    ) -> Result<()> {
+        crate::instructions::club_rules::handle_set_club_rules(
+            ctx,
+            public_member_cap,
+            private_member_cap,
+            max_owned_clubs,
+            max_club_admins,
+        )
+    }
+
+    /// Lets the super-admin upgrade a club created before club types.
+    pub fn migrate_club(ctx: Context<MigrateClub>, kind: ClubKind, owner: Pubkey) -> Result<()> {
+        crate::instructions::club_rules::handle_migrate_club(ctx, kind, owner)
     }
 
     /// Lets a club admin choose who may create club markets.

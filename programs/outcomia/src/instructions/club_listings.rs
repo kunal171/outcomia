@@ -14,12 +14,12 @@ use crate::{
     constants::{
         ADMIN_SEED, CLUB_DESCRIPTION_MAX_LENGTH, CLUB_JOIN_REQUEST_SEED,
         CLUB_JOIN_REQUEST_TTL_SECONDS, CLUB_LISTING_SEED, CLUB_MEMBER_SEED,
-        CLUB_REQUEST_NOTE_MAX_LENGTH, CLUB_TOPIC_MAX_LENGTH,
+        CLUB_REQUEST_NOTE_MAX_LENGTH, CLUB_RULES_CONFIG_SEED, CLUB_TOPIC_MAX_LENGTH,
     },
     errors::{admin, club},
     state::{
-        AdminRecord, AdminStatus, Club, ClubJoinRequest, ClubListing, ClubMember, ClubRole,
-        ClubVisibility,
+        AdminRecord, AdminStatus, Club, ClubJoinRequest, ClubKind, ClubListing, ClubMember,
+        ClubRole, ClubRulesConfig, ClubVisibility,
     },
 };
 
@@ -29,14 +29,6 @@ fn trimmed(text: &str, max: usize, allow_empty: bool) -> bool {
 
 fn admits(listing: &ClubListing, club: &Pubkey, visibility: ClubVisibility) -> bool {
     listing.club == *club && listing.visibility == visibility && listing.verified_by.is_some()
-}
-
-fn add_member(club: &mut Club) -> Result<()> {
-    club.member_count = club
-        .member_count
-        .checked_add(1)
-        .ok_or(club::ClubCounterMismatch)?;
-    Ok(())
 }
 
 #[derive(Accounts)]
@@ -96,6 +88,8 @@ pub struct ApproveClubRequest<'info> {
     pub admin: Signer<'info>,
     #[account(mut)]
     pub club: Account<'info, Club>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Account<'info, ClubRulesConfig>,
     #[account(seeds = [CLUB_MEMBER_SEED, club.key().as_ref(), admin.key().as_ref()],
         bump = admin_member.bump,
         constraint = admin_member.role == ClubRole::Admin @ club::UnauthorizedClubAdmin)]
@@ -134,6 +128,8 @@ pub struct JoinOpenClub<'info> {
     pub wallet: Signer<'info>,
     #[account(mut)]
     pub club: Account<'info, Club>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Account<'info, ClubRulesConfig>,
     #[account(seeds = [CLUB_LISTING_SEED, club.key().as_ref()], bump = listing.bump)]
     pub listing: Account<'info, ClubListing>,
     #[account(init, payer = wallet, space = 8 + ClubMember::INIT_SPACE,
@@ -157,6 +153,10 @@ pub fn handle_set_club_listing(
     topic: String,
     description: String,
 ) -> Result<()> {
+    require!(
+        ctx.accounts.club.kind == ClubKind::Public,
+        club::PrivateClubCannotList
+    );
     require!(
         trimmed(&topic, CLUB_TOPIC_MAX_LENGTH, false)
             && trimmed(&description, CLUB_DESCRIPTION_MAX_LENGTH, true),
@@ -253,7 +253,7 @@ pub fn handle_approve_club_request(ctx: Context<ApproveClubRequest>) -> Result<(
         now < ctx.accounts.request.expires_at,
         club::ClubJoinRequestExpired
     );
-    add_member(&mut ctx.accounts.club)?;
+    ctx.accounts.club.admit(&ctx.accounts.club_rules)?;
     ctx.accounts.member.set_inner(ClubMember {
         club: ctx.accounts.club.key(),
         wallet: ctx.accounts.request.wallet,
@@ -306,7 +306,7 @@ pub fn handle_join_open_club(ctx: Context<JoinOpenClub>) -> Result<()> {
         ),
         club::ClubNotOpen
     );
-    add_member(&mut ctx.accounts.club)?;
+    ctx.accounts.club.admit(&ctx.accounts.club_rules)?;
     ctx.accounts.member.set_inner(ClubMember {
         club: ctx.accounts.club.key(),
         wallet: ctx.accounts.wallet.key(),

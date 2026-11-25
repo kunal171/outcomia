@@ -8,12 +8,41 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::CLUB_MEMBER_SEED,
+    constants::{CLUB_MEMBER_SEED, CLUB_RULES_CONFIG_SEED},
     errors::club,
-    state::{Club, ClubMember, ClubRole},
+    state::{Club, ClubMember, ClubRole, ClubRulesConfig},
 };
 
 impl Club {
+    /// Counts one more member, within the club type's member cap.
+    pub(crate) fn admit(&mut self, rules: &ClubRulesConfig) -> Result<()> {
+        require!(
+            self.member_count < rules.member_cap(self.kind),
+            club::ClubMemberCapReached
+        );
+        self.member_count = self
+            .member_count
+            .checked_add(1)
+            .ok_or(club::ClubCounterMismatch)?;
+        Ok(())
+    }
+
+    /// Promotes or demotes, holding promotions to the admin limit.
+    pub(crate) fn set_role(
+        &mut self,
+        member: &mut ClubMember,
+        role: ClubRole,
+        rules: &ClubRulesConfig,
+    ) -> Result<()> {
+        if member.role == ClubRole::Member && role == ClubRole::Admin {
+            require!(
+                self.admin_count < u32::from(rules.max_club_admins),
+                club::ClubAdminLimitReached
+            );
+        }
+        self.change_role(member, role)
+    }
+
     /// Updates counters for a membership that is closing.
     pub(crate) fn release(&mut self, member: &ClubMember) -> Result<()> {
         self.member_count = self
@@ -63,6 +92,8 @@ pub struct SetClubMemberRole<'info> {
         bump = member.bump,
         constraint = member.wallet != club.owner @ club::ClubOwnerProtected)]
     pub member: Account<'info, ClubMember>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Account<'info, ClubRulesConfig>,
 }
 
 #[derive(Accounts)]
@@ -101,12 +132,15 @@ pub struct LeaveClub<'info> {
 /// # Inputs
 /// The club owner, a membership other than the owner's and the target role.
 /// # Errors
-/// Signer is not the owner, the target is the owner, or counters are inconsistent.
+/// Signer is not the owner, the target is the owner, promotion past the admin
+/// limit, or counters are inconsistent.
 /// # Returns
 /// `Ok(())` with the role stored; setting the current role is a no-op.
 pub fn handle_set_club_member_role(ctx: Context<SetClubMemberRole>, role: ClubRole) -> Result<()> {
     let accounts = ctx.accounts;
-    accounts.club.change_role(&mut accounts.member, role)
+    accounts
+        .club
+        .set_role(&mut accounts.member, role, &accounts.club_rules)
 }
 
 /// Removes a member immediately.

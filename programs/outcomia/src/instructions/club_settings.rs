@@ -6,9 +6,13 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{CLUB_MEMBER_SEED, CLUB_NAME_MAX_LENGTH, CLUB_SEED},
+    constants::{
+        CLUB_MEMBER_SEED, CLUB_NAME_MAX_LENGTH, CLUB_OWNER_SEED, CLUB_RULES_CONFIG_SEED, CLUB_SEED,
+    },
     errors::club,
-    state::{Club, ClubMarketPolicy, ClubMember, ClubRole},
+    state::{
+        Club, ClubKind, ClubMarketPolicy, ClubMember, ClubOwnerRecord, ClubRole, ClubRulesConfig,
+    },
 };
 
 #[derive(Accounts)]
@@ -16,6 +20,11 @@ use crate::{
 pub struct CreateClub<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Account<'info, ClubRulesConfig>,
+    #[account(init_if_needed, payer = owner, space = 8 + ClubOwnerRecord::INIT_SPACE,
+        seeds = [CLUB_OWNER_SEED, owner.key().as_ref()], bump)]
+    pub owner_record: Account<'info, ClubOwnerRecord>,
     #[account(init, payer = owner, space = 8 + Club::INIT_SPACE,
         seeds = [CLUB_SEED, club_id.as_ref()], bump)]
     pub club: Account<'info, Club>,
@@ -51,11 +60,23 @@ pub(crate) fn validate_club_name(name: &str) -> Result<()> {
 /// # Inputs
 /// Paying owner, new club and owner-membership PDAs; a unique id and display name.
 /// # Errors
-/// Invalid name, an id already in use or insufficient rent.
+/// Invalid name, an id already in use, the owner already owning the maximum
+/// number of clubs, missing club rules or insufficient rent.
 /// # Returns
-/// A club with one admin member (the owner) and the admins-only market policy.
-pub fn handle_create_club(ctx: Context<CreateClub>, club_id: [u8; 32], name: String) -> Result<()> {
+/// A club of the chosen type with one admin member (the owner) and the
+/// admins-only market policy; the owner's record counts it.
+pub fn handle_create_club(
+    ctx: Context<CreateClub>,
+    club_id: [u8; 32],
+    name: String,
+    kind: ClubKind,
+) -> Result<()> {
     validate_club_name(&name)?;
+    let max = ctx.accounts.club_rules.max_owned_clubs;
+    let bump = ctx.bumps.owner_record;
+    ctx.accounts
+        .owner_record
+        .take(ctx.accounts.owner.key(), bump, max)?;
     let now = Clock::get()?.unix_timestamp;
     let owner = ctx.accounts.owner.key();
     let club_key = ctx.accounts.club.key();
@@ -70,6 +91,8 @@ pub fn handle_create_club(ctx: Context<CreateClub>, club_id: [u8; 32], name: Str
         admin_count: 1,
         created_at: now,
         bump: ctx.bumps.club,
+        kind,
+        reserved: [0; 96],
     });
     ctx.accounts.owner_member.set_inner(ClubMember {
         club: club_key,

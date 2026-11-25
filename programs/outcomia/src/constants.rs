@@ -137,6 +137,14 @@ pub const CLUB_MEMBER_SEED: &[u8] = b"club_member";
 #[constant]
 pub const CLUB_INVITE_SEED: &[u8] = b"club_invite";
 
+/// Platform club rules set by the super-admin: ["club_rules_config"].
+#[constant]
+pub const CLUB_RULES_CONFIG_SEED: &[u8] = b"club_rules_config";
+
+/// Clubs a wallet currently owns: ["club_owner", wallet].
+#[constant]
+pub const CLUB_OWNER_SEED: &[u8] = b"club_owner";
+
 /// Maximum UTF-8 byte length of a club name.
 pub const CLUB_NAME_MAX_LENGTH: usize = 64;
 

@@ -39,6 +39,39 @@ fn request_pda(club: &Pubkey, wallet: &Pubkey) -> Pubkey {
 fn admin_pda(wallet: &Pubkey) -> Pubkey {
     pda(&[ADMIN_SEED, wallet.as_ref()])
 }
+fn club_rules_pda() -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID).0
+}
+fn owner_record_pda(wallet: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[CLUB_OWNER_SEED, wallet.as_ref()], &outcomia::ID).0
+}
+/// Writes the platform club rules directly, as the super-admin would set them.
+fn install_club_rules(svm: &mut LiteSVM) {
+    let (address, bump) = Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    ClubRulesConfig {
+        public_member_cap: 100_000,
+        private_member_cap: 1_000,
+        max_owned_clubs: 2,
+        max_club_admins: 5,
+        bump,
+        reserved: [0; 128],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        solana_account::Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
 fn ix(accounts: impl ToAccountMetas, data: impl InstructionData) -> Instruction {
     Instruction::new_with_bytes(outcomia::ID, &data.data(), accounts.to_account_metas(None))
 }
@@ -54,6 +87,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM_BYTES).unwrap();
+        install_club_rules(&mut svm);
         let mut f = Fixture {
             svm,
             owner: Keypair::new(),
@@ -72,6 +106,8 @@ impl Fixture {
             ix(
                 outcomia::accounts::CreateClub {
                     owner: owner.pubkey(),
+                    club_rules: club_rules_pda(),
+                    owner_record: owner_record_pda(&owner.pubkey()),
                     club: f.club,
                     owner_member: member_pda(&f.club, &owner.pubkey()),
                     system_program: system_program::ID,
@@ -79,6 +115,7 @@ impl Fixture {
                 outcomia::instruction::CreateClub {
                     club_id: CLUB_ID,
                     name: "Barcelona fans".into(),
+                    kind: ClubKind::Public,
                 },
             ),
         );
@@ -235,6 +272,7 @@ fn approve(club: &Pubkey, admin: &Pubkey, wallet: &Pubkey) -> Instruction {
         outcomia::accounts::ApproveClubRequest {
             admin: *admin,
             club: *club,
+            club_rules: club_rules_pda(),
             admin_member: member_pda(club, admin),
             request: request_pda(club, wallet),
             wallet: *wallet,
@@ -260,6 +298,7 @@ fn join(club: &Pubkey, wallet: &Pubkey) -> Instruction {
         outcomia::accounts::JoinOpenClub {
             wallet: *wallet,
             club: *club,
+            club_rules: club_rules_pda(),
             listing: listing_pda(club),
             member: member_pda(club, wallet),
             system_program: system_program::ID,
