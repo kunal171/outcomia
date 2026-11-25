@@ -20,7 +20,7 @@ mod account_queries {
         .await
         .unwrap();
         let (revisions, _) = broadcast::channel(4);
-        let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+        let schema = Schema::build(Query::default(), Mutation::default(), Changes)
             .data(ApiState {
                 pool: pool.clone(),
                 revisions,
@@ -238,7 +238,7 @@ mod receipt_tests {
     #[ignore = "requires isolated PostgreSQL"]
     async fn receipt_requires_an_applied_snapshot_and_finalized_source(pool: PgPool) {
         let (revisions, _) = broadcast::channel(4);
-        let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+        let schema = Schema::build(Query::default(), Mutation::default(), Changes)
             .data(ApiState {
                 pool: pool.clone(),
                 revisions,
@@ -316,7 +316,7 @@ async fn known_chain_wallet_reads_resume_tracking_without_a_session(pool: PgPool
     .await
     .unwrap();
     let (revisions, _) = broadcast::channel(4);
-    let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+    let schema = Schema::build(Query::default(), Mutation::default(), Changes)
         .data(ApiState {
             pool: pool.clone(),
             revisions,
@@ -350,4 +350,275 @@ async fn known_chain_wallet_reads_resume_tracking_without_a_session(pool: PgPool
             .unwrap(),
         0
     );
+}
+
+#[cfg(test)]
+mod profiles_and_leaderboards {
+    use super::*;
+    use crate::auth::User;
+
+    fn key(byte: u8) -> String {
+        bs58::encode([byte; 32]).into_string()
+    }
+
+    fn schema(pool: &PgPool) -> AppSchema {
+        let (revisions, _) = broadcast::channel(4);
+        Schema::build(Query::default(), Mutation::default(), Changes)
+            .data(ApiState {
+                pool: pool.clone(),
+                revisions,
+            })
+            .finish()
+    }
+
+    async fn run(schema: &AppSchema, query: String) -> Value {
+        let response = schema.execute(query).await;
+        assert!(response.errors.is_empty(), "{:?}", response.errors);
+        response.data.into_json().unwrap()
+    }
+
+    async fn sql(pool: &PgPool, statement: &str) {
+        sqlx::query(sqlx::AssertSqlSafe(statement.to_owned()))
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    /// Binary market M (payout 100, resolved YES) and multi-outcome market N
+    /// (3 outcomes, payout 90, resolved invalid so each outcome pays 30).
+    /// Expected binary results, worked by hand:
+    ///   A: bought 10 YES @30 (+fee 3) and 5 YES @40 as a complement maker:
+    ///      -300-3-200 + 15*100 = +997
+    ///   B: split 10 sets (-1000), sold 10 YES @30 (+300), keeps 10 NO: -700
+    ///   C: bought 5 NO @60 as complement taker (+fee 3): -303
+    /// The market nets to minus the 6 atoms of fees.
+    async fn seed(pool: &PgPool) {
+        let (mint, market, multi) = (key(9), key(10), key(11));
+        let (a, b, c, d, e, f) = (key(1), key(2), key(3), key(4), key(5), key(6));
+        sql(pool, &format!(
+            "INSERT INTO indexed_accounts(commitment,address,account_type,data,raw_base64,lamports,slot,revision) VALUES
+             ('confirmed','{market}','PredictionMarket','{{\"collateralMint\":\"{mint}\",\"payoutPerContract\":\"100\",\"status\":{{\"resolved\":{{}}}},\"finalOutcome\":{{\"yes\":{{}}}},\"authority\":\"{d}\"}}','',0,5,1),
+             ('confirmed','{multi}','MultiOutcomeMarket','{{\"collateralMint\":\"{mint}\",\"terms\":{{\"payoutPerContract\":\"90\",\"outcomeLabels\":[\"Red\",\"Blue\",\"Green\"]}},\"status\":{{\"resolved\":{{}}}},\"finalOutcome\":{{\"invalid\":{{}}}},\"authority\":\"{d}\"}}','',0,5,1),
+             ('confirmed','{key}','MarketMetadata','{{\"market\":\"{market}\",\"displayName\":\"Will it rain?\"}}','',0,5,1)",
+            key = key(12),
+        )).await;
+        for (signature, slot) in [("s1", 1), ("s2", 2), ("s3", 3), ("s4", 4), ("s5", 5)] {
+            sql(pool, &format!(
+                "INSERT INTO chain_transactions(signature,slot,transaction_index,block_time,raw_logs) VALUES('{signature}',{slot},0,EXTRACT(EPOCH FROM NOW())::bigint,'[]')"
+            )).await;
+        }
+        sql(
+            pool,
+            "INSERT INTO transaction_execution(signature,body) VALUES('s1','{}'),('s4','{}')",
+        )
+        .await;
+        sql(pool, &format!(
+            "INSERT INTO decoded_instructions(signature,execution_index,instruction_name,arguments,accounts) VALUES
+             ('s1',0,'shared_complete_set','{{\"split\":true,\"quantity\":\"10\"}}','{{\"owner\":\"{b}\",\"market\":\"{market}\"}}'),
+             ('s4',0,'multi_outcome_complete_set','{{\"split\":true,\"quantity\":\"2\"}}','{{\"owner\":\"{d}\",\"market\":\"{multi}\"}}')"
+        )).await;
+        let set = "11111111111111111111111111111111";
+        sql(pool, &format!(
+            "INSERT INTO indexed_trades(execution_id,signature,slot,transaction_index,execution_index,block_time,market,engine,outcome,maker,taker,taker_side,price,quantity,quote_atoms,fee_atoms) VALUES
+             ('s2:ix:0','s2',2,0,0,EXTRACT(EPOCH FROM NOW())::bigint,'{market}','SHARED_BINARY','0','{b}','{a}','bid',30,10,300,3),
+             ('s3:ix:0','s3',3,0,0,EXTRACT(EPOCH FROM NOW())::bigint,'{market}','SHARED_BINARY','1','{a}','{c}','bid',60,5,300,3),
+             ('s3:ix:0:maker','s3',3,0,0,EXTRACT(EPOCH FROM NOW())::bigint,'{market}','SHARED_BINARY','0','{a}','{c}','bid',40,5,200,0),
+             ('s5:1','s5',5,0,1,EXTRACT(EPOCH FROM NOW())::bigint,'{multi}','MULTI_OUTCOME','1','{e}','{f}','bid',20,1,20,0),
+             ('s5:2','s5',5,0,2,EXTRACT(EPOCH FROM NOW())::bigint,'{multi}','MULTI_OUTCOME','0','{set}','{f}','bid',50,1,50,1)"
+        )).await;
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn positions_profit_and_rankings_follow_every_leg(pool: PgPool) {
+        seed(&pool).await;
+        let (mint, market, multi) = (key(9), key(10), key(11));
+        let (a, b, c, d, e, f) = (key(1), key(2), key(3), key(4), key(5), key(6));
+        let profit = |wallet: &str, market: &str| {
+            let (pool, wallet, market) = (pool.clone(), wallet.to_owned(), market.to_owned());
+            async move {
+                sqlx::query_scalar::<_, String>(
+                    "SELECT profit::text FROM resolved_market_results WHERE wallet=$1 AND market=$2",
+                )
+                .bind(wallet)
+                .bind(market)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(profit(&a, &market).await, "997");
+        assert_eq!(profit(&b, &market).await, "-700");
+        assert_eq!(profit(&c, &market).await, "-303");
+        // Invalid pays 30 per outcome: the split sets are worth their cost,
+        // the complement maker leg is a purchase, the taker paid its fee.
+        assert_eq!(profit(&d, &multi).await, "0");
+        assert_eq!(profit(&e, &multi).await, "10");
+        assert_eq!(profit(&f, &multi).await, "-21");
+        let total: String = sqlx::query_scalar(
+            "SELECT SUM(profit)::text FROM resolved_market_results WHERE market=$1",
+        )
+        .bind(&market)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(total, "-6", "a market nets to minus its fees");
+
+        let schema = schema(&pool);
+        let volume = run(&schema, format!("{{traderLeaderboard(board:VOLUME,period:DAY,mint:\"{mint}\"){{rank wallet volume trades}}}}")).await;
+        let rows = volume["traderLeaderboard"].as_array().unwrap();
+        assert_eq!(rows[0]["wallet"], a.as_str());
+        assert_eq!(rows[0]["volume"], "500");
+        assert_eq!(rows[0]["trades"], 2);
+        let makers = run(&schema, format!("{{traderLeaderboard(board:MAKERS,period:ALL,mint:\"{mint}\"){{wallet makerVolume}}}}")).await;
+        let makers: Vec<&str> = makers["traderLeaderboard"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["wallet"].as_str().unwrap())
+            .collect();
+        assert_eq!(makers[..2], [b.as_str(), a.as_str()]);
+        let top = run(&schema, format!("{{traderLeaderboard(board:PROFIT,period:ALL,mint:\"{mint}\"){{wallet profit wins losses}}}}")).await;
+        assert_eq!(top["traderLeaderboard"][0]["wallet"], a.as_str());
+        assert_eq!(top["traderLeaderboard"][0]["profit"], "997");
+        let accuracy = run(
+            &schema,
+            format!("{{traderLeaderboard(board:ACCURACY,period:ALL,mint:\"{mint}\",minMarkets:1){{wallet wins losses}}}}"),
+        )
+        .await;
+        let accuracy = accuracy["traderLeaderboard"].as_array().unwrap();
+        // A and E both won their only decided market; losers rank after them.
+        assert_eq!(accuracy[0]["losses"], 0);
+        assert!(accuracy[..2].iter().any(|r| r["wallet"] == a.as_str()));
+        assert_eq!(accuracy.last().unwrap()["wins"], 0);
+        let calls = run(
+            &schema,
+            format!(
+                "{{bestCalls(mint:\"{mint}\"){{wallet price multiple profit outcomeLabel title}}}}"
+            ),
+        )
+        .await;
+        assert_eq!(calls["bestCalls"][0]["price"], "30");
+        assert_eq!(calls["bestCalls"][0]["multiple"], "3.33");
+        assert_eq!(calls["bestCalls"][0]["profit"], "700");
+        assert_eq!(calls["bestCalls"][0]["title"], "Will it rain?");
+        assert_eq!(
+            calls["bestCalls"].as_array().unwrap().len(),
+            2,
+            "invalid markets have no winning calls"
+        );
+        let traders = run(&schema, format!("{{marketTraders(market:\"{market}\"){{wallet profit holdings{{label contracts}}}}}}")).await;
+        let b_row = traders["marketTraders"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["wallet"] == b.as_str())
+            .unwrap();
+        assert_eq!(
+            b_row["holdings"],
+            serde_json::json!([{"label":"No","contracts":"10"}])
+        );
+        let stats = run(&schema, format!("{{traderStats(wallet:\"{a}\"){{perMint{{mint volume profit wins}} settled{{title profit}} recentTrades{{role contracts}}}}}}")).await;
+        assert_eq!(stats["traderStats"]["perMint"][0]["profit"], "997");
+        assert_eq!(stats["traderStats"]["settled"][0]["title"], "Will it rain?");
+
+        // Opting out removes a wallet from every public ranking.
+        sql(
+            &pool,
+            &format!("INSERT INTO users(wallet_address,verified_at) VALUES('{b}',NOW())"),
+        )
+        .await;
+        sql(&pool, &format!("INSERT INTO profiles(wallet,username,show_on_leaderboards) VALUES('{b}','bee',FALSE)")).await;
+        let volume = run(
+            &schema,
+            format!("{{traderLeaderboard(board:VOLUME,period:ALL,mint:\"{mint}\"){{wallet}}}}"),
+        )
+        .await;
+        assert!(volume["traderLeaderboard"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|r| r["wallet"] != b.as_str()));
+        let _ = d;
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn only_the_signed_in_wallet_edits_its_profile_from_the_app(pool: PgPool) {
+        let (alice, bob) = (key(1), key(2));
+        for wallet in [&alice, &bob] {
+            sql(
+                &pool,
+                &format!("INSERT INTO users(wallet_address,verified_at) VALUES('{wallet}',NOW())"),
+            )
+            .await;
+        }
+        let schema = schema(&pool);
+        let edit = |username: &str| {
+            format!(
+            "mutation{{updateProfile(input:{{username:\"{username}\",displayName:\"Alice\",bio:\"hi\",avatarHue:12,xHandle:\"@alice\",showOnLeaderboards:true}}){{wallet username xHandle}}}}"
+        )
+        };
+        let user = |wallet: &str| {
+            Some(User {
+                id: "id".into(),
+                wallet: wallet.into(),
+            })
+        };
+
+        let anonymous = schema
+            .execute(
+                async_graphql::Request::new(edit("alice"))
+                    .data(None::<User>)
+                    .data(SameOrigin(true)),
+            )
+            .await;
+        assert!(!anonymous.errors.is_empty());
+        let cross_site = schema
+            .execute(
+                async_graphql::Request::new(edit("alice"))
+                    .data(user(&alice))
+                    .data(SameOrigin(false)),
+            )
+            .await;
+        assert!(
+            !cross_site.errors.is_empty(),
+            "another origin must not edit with the cookie"
+        );
+
+        let saved = schema
+            .execute(
+                async_graphql::Request::new(edit("Alice"))
+                    .data(user(&alice))
+                    .data(SameOrigin(true)),
+            )
+            .await;
+        assert!(saved.errors.is_empty(), "{:?}", saved.errors);
+        let saved = saved.data.into_json().unwrap();
+        assert_eq!(saved["updateProfile"]["wallet"], alice.as_str());
+        assert_eq!(saved["updateProfile"]["username"], "alice");
+        assert_eq!(saved["updateProfile"]["xHandle"], "alice");
+
+        let taken = schema
+            .execute(
+                async_graphql::Request::new(edit("alice"))
+                    .data(user(&bob))
+                    .data(SameOrigin(true)),
+            )
+            .await;
+        assert_eq!(taken.errors[0].message, "That username is taken");
+
+        let found = run(
+            &schema,
+            "{profile(username:\"ALICE\"){wallet displayName}}".into(),
+        )
+        .await;
+        assert_eq!(found["profile"]["wallet"], alice.as_str());
+        let many = run(
+            &schema,
+            format!("{{profiles(wallets:[\"{alice}\",\"{bob}\"]){{username}}}}"),
+        )
+        .await;
+        assert_eq!(many["profiles"].as_array().unwrap().len(), 1);
+    }
 }

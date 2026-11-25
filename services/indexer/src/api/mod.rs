@@ -1,7 +1,7 @@
 //! HTTP transport and service wiring; query logic is grouped in graphql/.
 mod graphql;
 use crate::auth;
-use async_graphql::{EmptyMutation, Schema};
+use async_graphql::Schema;
 use axum::{
     extract::{DefaultBodyLimit, State},
     http::{HeaderMap, StatusCode},
@@ -13,7 +13,7 @@ use axum::{
     Json, Router,
 };
 use futures_util::{Stream, StreamExt};
-use graphql::{Changes, Query};
+use graphql::{Changes, Mutation, Query};
 use sqlx::{postgres::PgListener, PgPool};
 use std::{convert::Infallible, time::Duration};
 use tokio::sync::broadcast;
@@ -22,11 +22,16 @@ pub struct ApiState {
     pub pool: PgPool,
     pub revisions: broadcast::Sender<String>,
 }
-type AppSchema = Schema<Query, EmptyMutation, Changes>;
+type AppSchema = Schema<Query, Mutation, Changes>;
+/// Whether the request came from the app's own origin. Cookie-authenticated
+/// mutations require it, so another site cannot act for a signed-in user.
+#[derive(Clone, Copy)]
+pub struct SameOrigin(pub bool);
 #[derive(Clone)]
 struct HttpState {
     schema: AppSchema,
     pool: PgPool,
+    origin: std::sync::Arc<str>,
 }
 async fn execute(
     State(state): State<HttpState>,
@@ -44,7 +49,16 @@ async fn execute(
             )
         }
     };
-    graphql_response(state.schema.execute(request.data(user)).await)
+    let same_origin = headers
+        .get(axum::http::header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        == Some(state.origin.as_ref());
+    graphql_response(
+        state
+            .schema
+            .execute(request.data(user).data(SameOrigin(same_origin)))
+            .await,
+    )
 }
 
 fn graphql_response(
@@ -80,7 +94,7 @@ pub fn router(pool: PgPool, auth: auth::AuthState) -> Router {
         pool: pool.clone(),
         revisions: revisions.clone(),
     };
-    let schema = Schema::build(Query::default(), EmptyMutation, Changes)
+    let schema = Schema::build(Query::default(), Mutation::default(), Changes)
         .data(state)
         .limit_depth(8)
         .limit_complexity(2500)
@@ -109,6 +123,7 @@ pub fn router(pool: PgPool, auth: auth::AuthState) -> Router {
         .with_state(HttpState {
             schema,
             pool: auth.pool.clone(),
+            origin: auth.origin.clone(),
         })
         .merge(auth::router(auth))
         .layer(DefaultBodyLimit::max(32768))
@@ -124,7 +139,7 @@ pub fn router(pool: PgPool, auth: auth::AuthState) -> Router {
 }
 
 pub fn schema_sdl() -> String {
-    Schema::build(Query::default(), EmptyMutation, Changes)
+    Schema::build(Query::default(), Mutation::default(), Changes)
         .finish()
         .sdl()
 }
