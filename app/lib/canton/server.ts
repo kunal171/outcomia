@@ -179,6 +179,9 @@ export async function registryContext(
       "redeem",
       "withdrawFees",
       "clubWithdrawFees",
+      "multiSplit",
+      "multiMerge",
+      "multiRedeem",
     ].includes(action) ||
     party === d.vault
   )

@@ -75,7 +75,15 @@ export type Action =
   | "clubCloseRequest"
   | "clubJoinOpen"
   | "clubSetShare"
-  | "clubWithdrawFees";
+  | "clubWithdrawFees"
+  | "multiSplit"
+  | "multiMerge"
+  | "multiRedeem"
+  | "multiClose"
+  | "multiPropose"
+  | "multiCorrect"
+  | "multiFinalize"
+  | "multiBind";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -167,6 +175,14 @@ export function buildPlan(
     clubJoinOpen: "Club",
     clubSetShare: "OrderBook",
     clubWithdrawFees: "OrderBook",
+    multiSplit: "MultiReserve",
+    multiMerge: "MultiReserve",
+    multiRedeem: "MultiSettledReserve",
+    multiClose: "MultiMarket",
+    multiPropose: "MultiMarket",
+    multiCorrect: "MultiProposal",
+    multiFinalize: "MultiProposal",
+    multiBind: "MultiReserve",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -329,6 +345,15 @@ export function buildPlan(
     if (target.data.factory)
       throw new Error("This market is managed through its factory.");
   };
+  const multiLots = () => {
+    const rows = owned.filter(
+      (c) =>
+        c.kind === "MultiLot" && c.data.owner === party && sameMarket(c, key),
+    );
+    if (!rows.length) throw new Error("No available position lots.");
+    return rows.slice(0, 16);
+  };
+  const outcomeCount = () => (terms ? list(terms.outcomes).length : 0);
   let interfaceRoot: string | null = null;
   switch (intent.action) {
     case "enroll":
@@ -724,6 +749,83 @@ export function buildPlan(
         args = { replacementAdmins: admins };
       }
       break;
+    case "multiSplit":
+    case "multiMerge": {
+      args = { owner: party, balance: use(account()), quantity: quantity() };
+      if (intent.action === "multiSplit") {
+        const m = find("MultiMarket");
+        if (
+          m.data.status !== "Open" ||
+          Date.parse(text(obj(m.data.terms).closeAt)) <= Date.now()
+        )
+          throw new Error("Market is not open for new positions.");
+        choice = "MultiReserve_Split";
+        args.market = use(m);
+        args.eligibility = eligibilityFor(m, party);
+      } else {
+        choice = "MultiReserve_Merge";
+        args.positions = multiLots().map(use);
+      }
+      context = true;
+      break;
+    }
+    case "multiRedeem":
+      choice = "MultiSettled_Redeem";
+      args = {
+        owner: party,
+        balance: use(account()),
+        positions: multiLots().map(use),
+      };
+      context = true;
+      break;
+    case "multiClose":
+    case "multiPropose": {
+      const factory = factoryFor(obj(target.data.key).scope);
+      factoryAdmin(factory);
+      if (intent.action === "multiClose") {
+        if (target.data.status !== "Open")
+          throw new Error("Only an open market can close.");
+        choice = "Multi_Close";
+        args = { actor: party, roles: use(factory), reason: text(v.reason) };
+      } else {
+        const t = obj(target.data.terms);
+        if (Date.now() < Date.parse(text(t.earliestResolutionAt ?? t.closeAt)))
+          throw new Error("Resolution is not available yet.");
+        choice = "Multi_Propose";
+        args = {
+          actor: party,
+          roles: use(factory),
+          result: multiResultArg(v.result, outcomeCount()),
+          evidence: evidence(v.evidence),
+        };
+      }
+      break;
+    }
+    case "multiCorrect": {
+      const factory = factoryFor(obj(target.data.key).scope);
+      factoryAdmin(factory);
+      if (Date.now() >= Date.parse(text(target.data.finalizableAt)))
+        throw new Error("Correction window is closed.");
+      choice = "MultiProposal_Correct";
+      args = {
+        resolver: party,
+        roles: use(factory),
+        replacementResult: multiResultArg(v.result, outcomeCount()),
+        replacementEvidence: evidence(v.evidence),
+      };
+      break;
+    }
+    case "multiFinalize":
+      operator();
+      if (Date.now() < Date.parse(text(target.data.finalizableAt)))
+        throw new Error("Review delay has not elapsed.");
+      choice = "MultiProposal_Finalize";
+      break;
+    case "multiBind":
+      operator();
+      choice = "MultiReserve_BindResolution";
+      args = { resolution: use(find("MultiFinal")) };
+      break;
     case "factoryCreate": {
       const creation = obj(target.data.policy);
       let proof: RecordValue | null = null,
@@ -1089,6 +1191,14 @@ function resolutionOutcome(value: unknown) {
     throw new Error("Choose YES, NO or invalid.");
   return value;
 }
+/** UI result value: an outcome index ("0".."7") or "invalid". */
+export function multiResultArg(value: unknown, outcomes: number) {
+  if (value === "invalid") return { tag: "InvalidResult", value: {} };
+  const index = Number(value);
+  if (!Number.isInteger(index) || index < 0 || index >= outcomes)
+    throw new Error("Choose one of this market's outcomes or invalid.");
+  return { tag: "Winner", value: String(index) };
+}
 function evidence(value: unknown) {
   const e = obj(value);
   if (
@@ -1134,14 +1244,23 @@ function invitees(value: unknown) {
     throw new Error("Invite lists hold at most 256 unique parties.");
   return parties;
 }
-/** Standard MarketTerms for a binary factory market: outcomes YES then NO. */
-function standardTerms(value: unknown) {
+/** Standard MarketTerms. Exactly YES, NO creates a binary market; any other
+ * 2–8 unique labels create a multi-outcome market. */
+export function standardTerms(value: unknown) {
   const t = obj(value);
+  const outcomes = list(t.outcomes).map(text);
   if (
-    JSON.stringify(list(t.outcomes)) !== JSON.stringify(["YES", "NO"]) ||
-    list(t.outcomeCriteria).length !== 2
+    outcomes.length < 2 ||
+    outcomes.length > 8 ||
+    new Set(outcomes).size !== outcomes.length ||
+    outcomes.some((o) => o.trim() !== o || o.length > 64) ||
+    list(t.outcomeCriteria).length !== outcomes.length
   )
-    throw new Error("Binary factory markets use the outcomes YES and NO.");
+    throw new Error(
+      "Use 2 to 8 unique outcome labels, each with its own criterion.",
+    );
+  if (JSON.stringify(outcomes) === JSON.stringify(["NO", "YES"]))
+    throw new Error("Binary markets list YES before NO.");
   list(t.outcomeCriteria).forEach(text);
   text(t.question);
   text(t.invalidCriteria);
