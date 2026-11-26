@@ -10,6 +10,7 @@ import {
   integer,
   clubScoped,
   factoryRefKey,
+  finalRecord,
   marketKey,
   obj,
   impliedQuotes,
@@ -30,6 +31,7 @@ import {
 } from "../../lib/canton/commands";
 import { walletError } from "../../lib/console-wallet";
 import { ResolutionPolicy } from "../resolution-policy";
+import { MultiMarketDetail } from "./multi-market";
 
 export function TradingFrame({
   title,
@@ -214,11 +216,18 @@ export function ActionForm({
   );
 }
 export function marketRecord(c: Contract): RecordValue {
-  return c.kind === "FinalResolution" ? obj(c.data.proposal) : c.data;
+  return finalRecord(c);
 }
 export function marketRecords(contracts: Contract[]) {
   const result = new Map<string, Contract>();
-  for (const kind of ["BinaryMarket", "ResolutionProposal", "FinalResolution"])
+  for (const kind of [
+    "BinaryMarket",
+    "ResolutionProposal",
+    "FinalResolution",
+    "MultiMarket",
+    "MultiProposal",
+    "MultiFinal",
+  ])
     for (const c of contracts.filter((c) => c.kind === kind))
       result.set(marketKey(marketRecord(c)), c);
   return [...result.values()];
@@ -291,9 +300,10 @@ export function MarketList() {
               <span>
                 <span
                   className={`ui-badge ${
-                    c.kind === "FinalResolution"
+                    c.kind === "FinalResolution" || c.kind === "MultiFinal"
                       ? ""
-                      : c.kind === "ResolutionProposal"
+                      : c.kind === "ResolutionProposal" ||
+                          c.kind === "MultiProposal"
                         ? "ui-badge-warn"
                         : data.status === "Open"
                           ? "ui-badge-accent"
@@ -301,13 +311,21 @@ export function MarketList() {
                   }`}
                 >
                   {t(
-                    c.kind === "FinalResolution"
+                    c.kind === "FinalResolution" || c.kind === "MultiFinal"
                       ? "Finalized"
-                      : c.kind === "ResolutionProposal"
+                      : c.kind === "ResolutionProposal" ||
+                          c.kind === "MultiProposal"
                         ? "Review period"
                         : String(data.status),
                   )}
                 </span>
+                {Array.isArray(terms.outcomes) ? (
+                  <span className="ui-badge">
+                    {t("{value0} outcomes", {
+                      value0: String(terms.outcomes.length),
+                    })}
+                  </span>
+                ) : null}
                 <span className="ui-num">{text(obj(terms.collateral).id)}</span>
                 {data.access ? (
                   <span className="ui-badge">{t("Invite only")}</span>
@@ -532,6 +550,8 @@ export function MarketDetail({ marketId }: { marketId: string }) {
         <p>{t("Market unavailable. Refresh and try again.")}</p>
       </TradingFrame>
     );
+  if (current.kind.startsWith("Multi"))
+    return <MultiMarketDetail current={current} />;
   const data = marketRecord(current),
     terms = obj(data.terms),
     key = marketKey(data),

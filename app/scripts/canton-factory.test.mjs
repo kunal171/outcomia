@@ -148,7 +148,7 @@ test("creation goes through the standard interface under the creation policy", (
       plan("alice", "factoryCreate", "factory-cid", {
         terms: { ...standard, outcomes: ["NO", "YES"] },
       }),
-    /YES and NO/,
+    /YES before NO/,
   );
   const invite = plan("alice", "factoryCreate", "factory-cid", {
     terms: standard,

@@ -1512,5 +1512,20 @@
   "Owed to the club: {value0}": "Owed to the club: {value0}",
   "Share: {value0} bps": "Share: {value0} bps",
   "Withdraw club fees": "Withdraw club fees",
-  "No club markets yet.": "No club markets yet."
+  "No club markets yet.": "No club markets yet.",
+  "{value0} outcomes": "{value0} outcomes",
+  "Wins when": "Wins when",
+  "Winner": "Winner",
+  "One complete set costs 1 {value0} and holds one contract of every outcome. The winning contract pays 1; if the market is invalid, every contract pays an equal share.": "One complete set costs 1 {value0} and holds one contract of every outcome. The winning contract pays 1; if the market is invalid, every contract pays an equal share.",
+  "Mint complete sets": "Mint complete sets",
+  "Sets": "Sets",
+  "Return complete sets": "Return complete sets",
+  "Claim": "Claim",
+  "You receive {value0}": "You receive {value0}",
+  "Redeem": "Redeem",
+  "Resolution opens at the earliest resolution time.": "Resolution opens at the earliest resolution time.",
+  "Trading individual outcomes on an order book is coming next.": "Trading individual outcomes on an order book is coming next.",
+  "YES / NO": "YES / NO",
+  "Multiple outcomes": "Multiple outcomes",
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Outcomes: one per line, as Label: how it wins (2 to 8)"
 }

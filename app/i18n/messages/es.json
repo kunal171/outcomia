@@ -1512,5 +1512,20 @@
   "Owed to the club: {value0}": "Adeudado al club: {value0}",
   "Share: {value0} bps": "Parte: {value0} bps",
   "Withdraw club fees": "Retirar comisiones del club",
-  "No club markets yet.": "Aún no hay mercados del club."
+  "No club markets yet.": "Aún no hay mercados del club.",
+  "{value0} outcomes": "{value0} resultados",
+  "Wins when": "Gana cuando",
+  "Winner": "Ganador",
+  "One complete set costs 1 {value0} and holds one contract of every outcome. The winning contract pays 1; if the market is invalid, every contract pays an equal share.": "Un set completo cuesta 1 {value0} e incluye un contrato de cada resultado. El contrato ganador paga 1; si el mercado es inválido, cada contrato paga una parte igual.",
+  "Mint complete sets": "Crear sets completos",
+  "Sets": "Sets",
+  "Return complete sets": "Devolver sets completos",
+  "Claim": "Cobro",
+  "You receive {value0}": "Recibes {value0}",
+  "Redeem": "Cobrar",
+  "Resolution opens at the earliest resolution time.": "La resolución se abre en la fecha más temprana de resolución.",
+  "Trading individual outcomes on an order book is coming next.": "Pronto podrás operar cada resultado en un libro de órdenes.",
+  "YES / NO": "SÍ / NO",
+  "Multiple outcomes": "Varios resultados",
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Resultados: uno por línea, como Etiqueta: cuándo gana (2 a 8)"
 }

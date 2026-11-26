@@ -20,6 +20,12 @@ export const templates = {
   InviteListPolicy: "Outcomia.Factory:InviteListPolicy",
   ClubRegistry: "Outcomia.Clubs:ClubRegistry",
   Club: "Outcomia.Clubs:Club",
+  MultiMarket: "Outcomia.MultiOutcome:MultiMarket",
+  MultiReserve: "Outcomia.MultiOutcome:MultiReserve",
+  MultiSettledReserve: "Outcomia.MultiOutcome:MultiSettledReserve",
+  MultiLot: "Outcomia.MultiOutcome:MultiLot",
+  MultiProposal: "Outcomia.MultiOutcome:MultiProposal",
+  MultiFinal: "Outcomia.MultiOutcome:MultiFinal",
 } as const;
 /** Interfaces of the open market-factory standard (separate package). */
 export const interfaces = {
@@ -71,7 +77,37 @@ export const publicKinds: Kind[] = [
   "FinalResolution",
   "OutcomiaMarketFactory",
   "ClubRegistry",
+  "MultiMarket",
+  "MultiReserve",
+  "MultiSettledReserve",
+  "MultiProposal",
+  "MultiFinal",
 ];
+/** Market-level records of a multi-outcome market (2–8 named outcomes). */
+export const multiKinds: Kind[] = [
+  "MultiMarket",
+  "MultiReserve",
+  "MultiSettledReserve",
+  "MultiLot",
+  "MultiProposal",
+  "MultiFinal",
+];
+export function isMulti(c: Contract): boolean {
+  return multiKinds.includes(c.kind);
+}
+/** Final records hold their proposal; every other record is its own. */
+export function finalRecord(c: Contract): RecordValue {
+  return c.kind === "FinalResolution" || c.kind === "MultiFinal"
+    ? obj(c.data.proposal)
+    : c.data;
+}
+/** A multi-outcome result: `Winner` with a zero-based index, or invalid. */
+export function multiResult(value: unknown): { winner: number | null } {
+  const r = obj(value);
+  if (r.tag === "InvalidResult") return { winner: null };
+  if (r.tag !== "Winner") throw new Error("Invalid multi-outcome result.");
+  return { winner: Number(integer(r.value)) };
+}
 export function obj(value: unknown): RecordValue {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid ledger record.");
@@ -207,7 +243,7 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
     seen.add(id);
     const data = obj(e.createArgument);
     const identity =
-      kind === "FinalResolution"
+      kind === "FinalResolution" || kind === "MultiFinal"
         ? obj(data.proposal)
         : kind === "InviteListPolicy" || kind === "Club"
           ? { operator: data.operator, protocolName: obj(data.ref).namespace }
@@ -220,6 +256,24 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
       continue;
     if (kind === "BinaryMarket" || kind === "ResolutionProposal")
       text(obj(data.terms).question);
+    if (kind === "MultiMarket" || kind === "MultiProposal") {
+      const t = obj(data.terms);
+      text(t.question);
+      const n = list(t.outcomes).map(text).length;
+      if (n < 2 || n > 8 || list(t.outcomeCriteria).length !== n)
+        throw new Error("Invalid multi-outcome terms.");
+    }
+    if (kind === "MultiProposal") multiResult(data.result);
+    if (kind === "MultiSettledReserve") {
+      multiResult(data.result);
+      list(data.outstanding).forEach(integer);
+    }
+    if (kind === "MultiLot") {
+      text(data.owner);
+      const counts = list(data.counts).map(integer);
+      if (counts.length < 2 || counts.length > 8)
+        throw new Error("Invalid multi-outcome position.");
+    }
     if (kind === "AssetBalance") {
       text(data.owner);
       raw(data.available);
@@ -310,11 +364,7 @@ export function single(contracts: Contract[], kind: Kind): Contract {
 }
 export function sameMarket(c: Contract, key: string): boolean {
   try {
-    return (
-      marketKey(
-        c.kind === "FinalResolution" ? obj(c.data.proposal) : c.data,
-      ) === key
-    );
+    return marketKey(finalRecord(c)) === key;
   } catch {
     return false;
   }
