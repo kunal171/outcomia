@@ -73,7 +73,9 @@ export type Action =
   | "clubRequestJoin"
   | "clubApproveRequest"
   | "clubCloseRequest"
-  | "clubJoinOpen";
+  | "clubJoinOpen"
+  | "clubSetShare"
+  | "clubWithdrawFees";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -163,6 +165,8 @@ export function buildPlan(
     clubApproveRequest: "Club",
     clubCloseRequest: "Club",
     clubJoinOpen: "Club",
+    clubSetShare: "OrderBook",
+    clubWithdrawFees: "OrderBook",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -604,10 +608,45 @@ export function buildPlan(
       operator();
       choice = "OrderBook_WithdrawFees";
       args = { amount: positive() };
-      if (raw(v.amount) > raw(obj(target.data.fees).amount))
-        throw new Error("Amount exceeds earned fees.");
+      if (
+        raw(v.amount) >
+        raw(obj(target.data.fees).amount) - raw(target.data.clubFees ?? "0")
+      )
+        throw new Error("Amount exceeds the fees not owed to a club.");
       context = true;
       break;
+    case "clubSetShare": {
+      operator();
+      const bps = Number(text(v.bps));
+      if (!Number.isInteger(bps) || bps < 0 || bps > 5000)
+        throw new Error("The club share must be 0 to 5,000 basis points.");
+      if (bps > 0 && !obj(target.data.key).scope)
+        throw new Error("Only club markets carry a club share.");
+      choice = "OrderBook_SetClubShare";
+      args = { bps: String(bps) };
+      break;
+    }
+    case "clubWithdrawFees": {
+      // The owner withdraws through their club, which proves the book is one
+      // of the club's markets; the wallet receives the club's fees.
+      const scope = obj(target.data.key).scope;
+      const club = owned.find(
+        (c) =>
+          c.kind === "Club" &&
+          !!scope &&
+          factoryRefKey(c.data.factoryRef) === factoryRefKey(scope),
+      );
+      if (!club || club.data.owner !== party)
+        throw new Error("Only the club owner can withdraw club fees.");
+      const amount = positive();
+      if (raw(amount) > raw(target.data.clubFees ?? "0"))
+        throw new Error("Amount exceeds the fees owed to the club.");
+      root = club;
+      choice = "Club_WithdrawFees";
+      args = { book: use(target), amount };
+      context = true;
+      break;
+    }
     case "create":
       admin();
       root = policy;
@@ -1185,5 +1224,11 @@ export function clubRules(values: RecordValue) {
     privateMemberCap: read("privateMemberCap", 256),
     maxOwnedClubs: read("maxOwnedClubs", 1000),
     maxClubAdmins: read("maxClubAdmins", 64),
+    clubShareBps: (() => {
+      const n = Number(text(values.clubShareBps ?? "0"));
+      if (!Number.isInteger(n) || n < 0 || n > 5000)
+        throw new Error("Club rules: clubShareBps must be between 0 and 5000.");
+      return String(n);
+    })(),
   };
 }

@@ -1503,5 +1503,14 @@
   "Listed and verified.": "Listed and verified.",
   "Awaiting verification by an Outcomia admin.": "Awaiting verification by an Outcomia admin.",
   "Update listing": "Update listing",
-  "List club": "List club"
+  "List club": "List club",
+  "Club share of taker fees (bps, max 5,000)": "Club share of taker fees (bps, max 5,000)",
+  "Club markets with a different fee share": "Club markets with a different fee share",
+  "Apply share": "Apply share",
+  "Club fees": "Club fees",
+  "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.": "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.",
+  "Owed to the club: {value0}": "Owed to the club: {value0}",
+  "Share: {value0} bps": "Share: {value0} bps",
+  "Withdraw club fees": "Withdraw club fees",
+  "No club markets yet.": "No club markets yet."
 }

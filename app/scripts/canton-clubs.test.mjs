@@ -525,7 +525,32 @@ test("admins are capped and only the operator sets club rules", () => {
   };
   const p = plan(d.operator, "setClubRules", rules, "registry", []);
   assert.equal(choice(p), "ClubRegistry_SetRules");
-  assert.deepEqual(args(p), { replacementRules: rules });
+  assert.deepEqual(args(p), {
+    replacementRules: { ...rules, clubShareBps: "0" },
+  });
+  assert.equal(
+    args(
+      plan(
+        d.operator,
+        "setClubRules",
+        { ...rules, clubShareBps: "1000" },
+        "registry",
+        [],
+      ),
+    ).replacementRules.clubShareBps,
+    "1000",
+  );
+  assert.throws(
+    () =>
+      plan(
+        d.operator,
+        "setClubRules",
+        { ...rules, clubShareBps: "5001" },
+        "registry",
+        [],
+      ),
+    /clubShareBps/,
+  );
   assert.throws(
     () => plan(owner, "setClubRules", rules, "registry", []),
     /Operator wallet/,
@@ -544,5 +569,61 @@ test("admins are capped and only the operator sets club rules", () => {
   assert.equal(
     choice(plan(d.operator, "clubApplyRules", {})),
     "Club_ApplyRules",
+  );
+});
+
+const clubBook = c("OrderBook", "club-book", {
+  key: scopedKey,
+  vault: d.vault,
+  creator: owner,
+  terms,
+  marketCreatedAt: "2026-01-01T00:00:00Z",
+  factory: "factory",
+  assetDecimals: "6",
+  nextOrderId: "1",
+  orders: [],
+  fees: { amount: "0.003", cash: "fee-cash" },
+  clubShareBps: "2000",
+  clubFees: "0.0006",
+});
+const withBook = { ...snapshot, contracts: [...snapshot.contracts, clubBook] };
+const bookPlan = (party, action, values) =>
+  buildPlan(party, withBook, [club], { action, target: "club-book", values });
+
+test("the club owner withdraws the club's fees; the operator only the rest", () => {
+  const p = bookPlan(owner, "clubWithdrawFees", { amount: "0.0006" });
+  assert.equal(choice(p), "Club_WithdrawFees");
+  assert.equal(p.command.ExerciseCommand.contractId, "club");
+  assert.deepEqual(args(p), { book: "club-book", amount: "0.0006" });
+  assert.equal(p.context, true);
+  assert.throws(
+    () => bookPlan(bob, "clubWithdrawFees", { amount: "0.0006" }),
+    /club owner/,
+  );
+  assert.throws(
+    () => bookPlan(owner, "clubWithdrawFees", { amount: "0.0007" }),
+    /owed to the club/,
+  );
+  assert.equal(
+    choice(bookPlan(d.operator, "withdrawFees", { amount: "0.0024" })),
+    "OrderBook_WithdrawFees",
+  );
+  assert.throws(
+    () => bookPlan(d.operator, "withdrawFees", { amount: "0.003" }),
+    /not owed to a club/,
+  );
+});
+
+test("only the operator sets a bounded club share on club books", () => {
+  assert.deepEqual(args(bookPlan(d.operator, "clubSetShare", { bps: "500" })), {
+    bps: "500",
+  });
+  assert.throws(
+    () => bookPlan(owner, "clubSetShare", { bps: "500" }),
+    /Operator wallet/,
+  );
+  assert.throws(
+    () => bookPlan(d.operator, "clubSetShare", { bps: "5001" }),
+    /0 to 5,000/,
   );
 });
