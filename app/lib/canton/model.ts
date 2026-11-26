@@ -260,8 +260,21 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
       list(data.admins).forEach(text);
       list(data.members).forEach(text);
       list(data.invitations).forEach((i) => text(obj(i).invitee));
+      list(data.requests).forEach((r) => text(obj(r).requester));
       factoryRefKey(data.ref);
       factoryRefKey(data.factoryRef);
+      if (!["PrivateClub", "PublicClub"].includes(String(data.kind)))
+        throw new Error("Invalid club type.");
+      integer(data.memberCap);
+      integer(data.adminCap);
+    }
+    if (kind === "ClubRegistry") {
+      const r = obj(data.rules);
+      integer(r.publicMemberCap);
+      integer(r.privateMemberCap);
+      integer(r.maxOwnedClubs);
+      integer(r.maxClubAdmins);
+      list(data.owned);
     }
     if (kind === "Protocol") {
       list(data.admins).forEach(text);
@@ -381,4 +394,15 @@ export function resolverEligible(
     now >= Date.parse(text(fallback.availableAt)) &&
     (!fallback.deadlineAt || now < Date.parse(text(fallback.deadlineAt)))
   );
+}
+
+/** A public club with a listing. The app's catalog discloses these (and
+ * never private clubs) so wallets can discover them and protocol admins can
+ * review pending listings. */
+export function isListedClub(c: Contract) {
+  return c.kind === "Club" && c.data.kind === "PublicClub" && !!c.data.listing;
+}
+/** A listed club a protocol admin has verified: shown in discovery. */
+export function isVerifiedListing(c: Contract) {
+  return isListedClub(c) && !!obj(c.data.listing).verifiedBy;
 }

@@ -64,7 +64,16 @@ export type Action =
   | "clubRemove"
   | "clubLeave"
   | "clubNominate"
-  | "clubAcceptOwnership";
+  | "clubAcceptOwnership"
+  | "setClubRules"
+  | "clubApplyRules"
+  | "clubSetListing"
+  | "clubCloseListing"
+  | "clubVerifyListing"
+  | "clubRequestJoin"
+  | "clubApproveRequest"
+  | "clubCloseRequest"
+  | "clubJoinOpen";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -145,6 +154,15 @@ export function buildPlan(
     clubLeave: "Club",
     clubNominate: "Club",
     clubAcceptOwnership: "Club",
+    setClubRules: "ClubRegistry",
+    clubApplyRules: "Club",
+    clubSetListing: "Club",
+    clubCloseListing: "Club",
+    clubVerifyListing: "Club",
+    clubRequestJoin: "Club",
+    clubApproveRequest: "Club",
+    clubCloseRequest: "Club",
+    clubJoinOpen: "Club",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -762,8 +780,21 @@ export function buildPlan(
         throw new Error(
           "Club names need 1 to 64 characters without outer spaces.",
         );
+      const owned = Number(
+        (list(target.data.owned)
+          .map(list)
+          .find((e) => e[0] === party) ?? [])[1] ?? 0,
+      );
+      if (owned >= Number(text(obj(target.data.rules).maxOwnedClubs)))
+        throw new Error(
+          "This wallet already owns the maximum number of clubs.",
+        );
       choice = "ClubRegistry_CreateClub";
-      args = { owner: party, name };
+      args = {
+        owner: party,
+        name,
+        kind: v.kind === "PublicClub" ? "PublicClub" : "PrivateClub",
+      };
       break;
     }
     case "clubInvite": {
@@ -821,6 +852,12 @@ export function buildPlan(
       clubMember(target, member);
       if (member === target.data.owner)
         throw new Error("The owner always stays an admin.");
+      if (
+        v.makeAdmin === "true" &&
+        !list(target.data.admins).includes(member) &&
+        list(target.data.admins).length >= Number(text(target.data.adminCap))
+      )
+        throw new Error("This club already has the maximum number of admins.");
       choice = "Club_SetAdmin";
       args = {
         wallet: member,
@@ -871,9 +908,123 @@ export function buildPlan(
     case "clubAcceptOwnership":
       if (target.data.pendingOwner !== party)
         throw new Error("This wallet is not the nominated owner.");
-      choice = "Club_AcceptOwnership";
-      args = { factory: use(clubFactory(target)) };
+      if (
+        list(target.data.admins).length >= Number(text(target.data.adminCap)) &&
+        !list(target.data.admins).includes(party)
+      )
+        throw new Error("This club already has the maximum number of admins.");
+      // Ownership moves through the registry, which keeps owned-club counts.
+      root = single(catalog.contracts, "ClubRegistry");
+      choice = "ClubRegistry_AcceptOwnership";
+      args = {
+        nominee: party,
+        club: use(target),
+        factory: use(clubFactory(target)),
+      };
       break;
+    case "setClubRules": {
+      operator();
+      const rules = clubRules(v);
+      choice = "ClubRegistry_SetRules";
+      args = { replacementRules: rules };
+      break;
+    }
+    case "clubApplyRules": {
+      operator();
+      choice = "Club_ApplyRules";
+      args = {
+        rules: obj(single(catalog.contracts, "ClubRegistry").data.rules),
+      };
+      break;
+    }
+    case "clubSetListing": {
+      if (target.data.owner !== party)
+        throw new Error("Only the club owner can list the club.");
+      if (target.data.kind !== "PublicClub")
+        throw new Error("Only public clubs can be listed.");
+      const topic = text(v.topic),
+        description = typeof v.description === "string" ? v.description : "";
+      if (!topic || topic.trim() !== topic || topic.length > 32)
+        throw new Error("Topics need 1 to 32 characters without outer spaces.");
+      if (description.length > 280)
+        throw new Error("Descriptions are at most 280 characters.");
+      choice = "Club_SetListing";
+      args = {
+        visibility:
+          v.visibility === "OpenToAll" ? "OpenToAll" : "RequestToJoin",
+        topic,
+        description,
+      };
+      break;
+    }
+    case "clubCloseListing":
+      if (target.data.owner !== party)
+        throw new Error("Only the club owner can close the listing.");
+      if (!target.data.listing) throw new Error("This club is not listed.");
+      choice = "Club_CloseListing";
+      break;
+    case "clubVerifyListing":
+      admin();
+      if (!target.data.listing) throw new Error("This club is not listed.");
+      choice = "Club_VerifyListing";
+      args = {
+        verifier: party,
+        protocol: use(policy),
+        verified: v.verified !== "false",
+      };
+      break;
+    case "clubRequestJoin": {
+      const listing = target.data.listing ? obj(target.data.listing) : null;
+      if (!listing?.verifiedBy || listing.visibility !== "RequestToJoin")
+        throw new Error("This club does not accept join requests.");
+      if (list(target.data.members).includes(party))
+        throw new Error("This wallet is already a member.");
+      const note = typeof v.note === "string" ? v.note : "";
+      if (note.length > 140)
+        throw new Error("Notes are at most 140 characters.");
+      choice = "Club_RequestJoin";
+      args = { requester: party, note };
+      break;
+    }
+    case "clubApproveRequest":
+    case "clubCloseRequest": {
+      const requester = walletValue();
+      const pending = list(target.data.requests)
+        .map(obj)
+        .find((r) => r.requester === requester);
+      if (!pending)
+        throw new Error("There is no join request from that wallet.");
+      if (intent.action === "clubApproveRequest") {
+        clubAdmin(target);
+        if (Date.parse(text(pending.expiresAt)) <= Date.now())
+          throw new Error("This join request has expired.");
+        if (
+          list(target.data.members).length >=
+          Number(text(target.data.memberCap))
+        )
+          throw new Error("This club has reached its member limit.");
+        choice = "Club_ApproveRequest";
+      } else {
+        if (requester !== party) clubAdmin(target);
+        choice = "Club_CloseRequest";
+      }
+      args = { actor: party, requester };
+      break;
+    }
+    case "clubJoinOpen": {
+      const listing = target.data.listing ? obj(target.data.listing) : null;
+      if (!listing?.verifiedBy || listing.visibility !== "OpenToAll")
+        throw new Error("This club is not open to join.");
+      if (list(target.data.members).includes(party))
+        throw new Error("This wallet is already a member.");
+      if (
+        list(target.data.members).length >= Number(text(target.data.memberCap))
+      )
+        throw new Error("This club has reached its member limit.");
+      choice = "Club_JoinOpen";
+      args = { wallet: party };
+      break;
+    }
     default:
       throw new Error("Unsupported Canton action.");
   }
@@ -1018,4 +1169,21 @@ export function excludedBy(policy: Contract, who: string) {
   return policy.kind === "Club"
     ? !list(policy.data.members).includes(who)
     : policy.data.manager !== who && !list(policy.data.parties).includes(who);
+}
+
+/** Club rules from a form: every limit a whole number within the contract
+ * bounds (member caps up to 256, admins up to 64). */
+export function clubRules(values: RecordValue) {
+  const read = (name: string, max: number) => {
+    const n = Number(text(values[name]));
+    if (!Number.isInteger(n) || n < 1 || n > max)
+      throw new Error(`Club rules: ${name} must be between 1 and ${max}.`);
+    return String(n);
+  };
+  return {
+    publicMemberCap: read("publicMemberCap", 256),
+    privateMemberCap: read("privateMemberCap", 256),
+    maxOwnedClubs: read("maxOwnedClubs", 1000),
+    maxClubAdmins: read("maxClubAdmins", 64),
+  };
 }

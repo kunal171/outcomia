@@ -96,9 +96,11 @@ export function TradingFrame({
 export function ActionButton({
   label,
   intent,
+  disabled = false,
 }: {
   label: string;
   intent: Intent;
+  disabled?: boolean;
 }) {
   const s = useCantonTrading(),
     { t } = useI18n();
@@ -107,7 +109,11 @@ export function ActionButton({
       className="canton-action"
       type="button"
       disabled={
-        s.busy || s.loading || s.syncing || !s.catalog?.deployment.trading
+        disabled ||
+        s.busy ||
+        s.loading ||
+        s.syncing ||
+        !s.catalog?.deployment.trading
       }
       onClick={() => void s.execute(intent).catch(() => {})}
     >
