@@ -1503,5 +1503,14 @@
   "Listed and verified.": "लिस्टेड और सत्यापित।",
   "Awaiting verification by an Outcomia admin.": "Outcomia एडमिन के सत्यापन की प्रतीक्षा।",
   "Update listing": "लिस्टिंग अपडेट करें",
-  "List club": "क्लब लिस्ट करें"
+  "List club": "क्लब लिस्ट करें",
+  "Club share of taker fees (bps, max 5,000)": "टेकर फ़ीस में क्लब का हिस्सा (bps, अधिकतम 5,000)",
+  "Club markets with a different fee share": "अलग फ़ीस हिस्से वाले क्लब मार्केट",
+  "Apply share": "हिस्सा लागू करें",
+  "Club fees": "क्लब फ़ीस",
+  "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.": "क्लब अपने मार्केट की टेकर फ़ीस का हिस्सा कमाता है। इसे अपने वॉलेट में निकालें।",
+  "Owed to the club: {value0}": "क्लब का बकाया: {value0}",
+  "Share: {value0} bps": "हिस्सा: {value0} bps",
+  "Withdraw club fees": "क्लब फ़ीस निकालें",
+  "No club markets yet.": "अभी कोई क्लब मार्केट नहीं।"
 }

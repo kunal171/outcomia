@@ -1503,5 +1503,14 @@
   "Listed and verified.": "Listé et vérifié.",
   "Awaiting verification by an Outcomia admin.": "En attente de vérification par un admin Outcomia.",
   "Update listing": "Mettre à jour l’annonce",
-  "List club": "Lister le club"
+  "List club": "Lister le club",
+  "Club share of taker fees (bps, max 5,000)": "Part du club sur les frais taker (bps, max 5 000)",
+  "Club markets with a different fee share": "Marchés de clubs avec une autre part des frais",
+  "Apply share": "Appliquer la part",
+  "Club fees": "Frais du club",
+  "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.": "Le club reçoit une part des frais taker de ses marchés. Retirez-la vers votre portefeuille.",
+  "Owed to the club: {value0}": "Dû au club : {value0}",
+  "Share: {value0} bps": "Part : {value0} bps",
+  "Withdraw club fees": "Retirer les frais du club",
+  "No club markets yet.": "Aucun marché de club pour l’instant."
 }

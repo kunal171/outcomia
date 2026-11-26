@@ -82,6 +82,16 @@ function ClubFacts({ club }: { club: Contract }) {
   );
 }
 
+/** Order books of a club's markets (scoped to the club's factory). */
+function clubBooks(contracts: Contract[], club: Contract) {
+  const wanted = factoryRefKey(club.data.factoryRef);
+  return contracts.filter((c) => {
+    if (c.kind !== "OrderBook") return false;
+    const scope = obj(c.data.key).scope;
+    return !!scope && factoryRefKey(scope) === wanted;
+  });
+}
+
 const ownedCount = (registry: Contract | undefined, party?: string) =>
   Number(
     (list(registry?.data.owned)
@@ -348,6 +358,11 @@ export function CantonClubs() {
                   label: "Admins per club (owner included)",
                   value: text(rules.maxClubAdmins),
                 },
+                {
+                  name: "clubShareBps",
+                  label: "Club share of taker fees (bps, max 5,000)",
+                  value: text(rules.clubShareBps ?? "0"),
+                },
               ]}
               build={(v) => ({
                 action: "setClubRules",
@@ -355,6 +370,28 @@ export function CantonClubs() {
                 values: v,
               })}
             />
+            <h3>{t("Club markets with a different fee share")}</h3>
+            {clubs
+              .flatMap((c) => clubBooks(s.catalog?.contracts ?? [], c))
+              .filter(
+                (b) =>
+                  text(b.data.clubShareBps ?? "0") !==
+                  text(rules.clubShareBps ?? "0"),
+              )
+              .map((b) => (
+                <p key={b.id}>
+                  <strong>{text(obj(b.data.terms).question)}</strong> ·{" "}
+                  {text(b.data.clubShareBps ?? "0")} bps{" "}
+                  <ActionButton
+                    label="Apply share"
+                    intent={{
+                      action: "clubSetShare",
+                      target: b.id,
+                      values: { bps: text(rules.clubShareBps ?? "0") },
+                    }}
+                  />
+                </p>
+              ))}
             <h3>{t("Clubs behind the current rules")}</h3>
             {clubs
               .filter(
@@ -620,6 +657,46 @@ export function CantonClub({ clubId }: { clubId: string }) {
                 </div>
               ))}
             </dl>
+          </section>
+        ) : null}
+        {isOwner ? (
+          <section className="canton-panel">
+            <h2>{t("Club fees")}</h2>
+            <p>
+              {t(
+                "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.",
+              )}
+            </p>
+            {clubBooks(s.catalog?.contracts ?? [], club).map((b) => {
+              const owed = text(b.data.clubFees ?? "0");
+              return (
+                <div key={b.id}>
+                  <p>
+                    <strong>{text(obj(b.data.terms).question)}</strong> ·{" "}
+                    {t("Owed to the club: {value0}", { value0: owed })} ·{" "}
+                    {t("Share: {value0} bps", {
+                      value0: text(b.data.clubShareBps ?? "0"),
+                    })}
+                  </p>
+                  {Number(owed) > 0 ? (
+                    <ActionForm
+                      label="Withdraw club fees"
+                      fields={[
+                        { name: "amount", label: "Amount", value: owed },
+                      ]}
+                      build={(v) => ({
+                        action: "clubWithdrawFees",
+                        target: b.id,
+                        values: { amount: v.amount },
+                      })}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+            {!clubBooks(s.catalog?.contracts ?? [], club).length ? (
+              <p>{t("No club markets yet.")}</p>
+            ) : null}
           </section>
         ) : null}
         {isOwner ? (

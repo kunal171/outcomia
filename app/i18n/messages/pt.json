@@ -1503,5 +1503,14 @@
   "Listed and verified.": "Listado e verificado.",
   "Awaiting verification by an Outcomia admin.": "Aguardando verificação por um admin da Outcomia.",
   "Update listing": "Atualizar listagem",
-  "List club": "Listar clube"
+  "List club": "Listar clube",
+  "Club share of taker fees (bps, max 5,000)": "Parcela do clube nas taxas taker (bps, máx. 5.000)",
+  "Club markets with a different fee share": "Mercados de clubes com outra parcela de taxas",
+  "Apply share": "Aplicar parcela",
+  "Club fees": "Taxas do clube",
+  "The club earns a share of the taker fees in its markets. Withdraw it to your wallet.": "O clube ganha uma parcela das taxas taker dos seus mercados. Saque para sua carteira.",
+  "Owed to the club: {value0}": "Devido ao clube: {value0}",
+  "Share: {value0} bps": "Parcela: {value0} bps",
+  "Withdraw club fees": "Sacar taxas do clube",
+  "No club markets yet.": "Ainda não há mercados do clube."
 }
