@@ -13,6 +13,8 @@ import {
 import { FactoryMarketForm } from "./manage";
 import {
   factoryRefKey,
+  isListedClub,
+  isVerifiedListing,
   list,
   obj,
   text,
@@ -55,6 +57,38 @@ function pendingInvite(club: Contract, party?: string) {
     .find((i) => i.invitee === party);
 }
 
+function pendingRequest(club: Contract, party?: string) {
+  return list(club.data.requests)
+    .map(obj)
+    .find((r) => r.requester === party);
+}
+
+/** "Public club · 3 of 256 members · 1 of 5 admins" */
+function ClubFacts({ club }: { club: Contract }) {
+  const { t } = useI18n();
+  return (
+    <span>
+      {t(club.data.kind === "PublicClub" ? "Public club" : "Private club")} ·{" "}
+      {t("{value0} of {value1} members", {
+        value0: list(club.data.members).length,
+        value1: text(club.data.memberCap),
+      })}{" "}
+      ·{" "}
+      {t("{value0} of {value1} admins", {
+        value0: list(club.data.admins).length,
+        value1: text(club.data.adminCap),
+      })}
+    </span>
+  );
+}
+
+const ownedCount = (registry: Contract | undefined, party?: string) =>
+  Number(
+    (list(registry?.data.owned)
+      .map(list)
+      .find((e) => e[0] === party) ?? [])[1] ?? 0,
+  );
+
 /** Clubs this wallet belongs to or is invited to, and club creation. */
 export function CantonClubs() {
   const s = useCantonTrading(),
@@ -64,10 +98,97 @@ export function CantonClubs() {
     clubs = s.owned.filter((c) => c.kind === "Club"),
     mine = clubs.filter((c) => list(c.data.members).includes(party)),
     invited = clubs.filter((c) => pendingInvite(c, party)),
-    registry = s.catalog?.contracts.find((c) => c.kind === "ClubRegistry");
+    requested = clubs.filter((c) => pendingRequest(c, party)),
+    registry = s.catalog?.contracts.find((c) => c.kind === "ClubRegistry"),
+    catalogClubs = (s.catalog?.contracts ?? []).filter(isListedClub),
+    discover = catalogClubs.filter(
+      (c) => isVerifiedListing(c) && !list(c.data.members).includes(party),
+    ),
+    protocol = s.catalog?.contracts.find((c) => c.kind === "Protocol"),
+    protocolAdmin = !!party && list(protocol?.data.admins).includes(party),
+    operator = !!party && party === s.catalog?.deployment.operator,
+    rules = registry ? obj(registry.data.rules) : null,
+    owned = ownedCount(registry, party);
   return (
     <TradingFrame title="Clubs">
       <div className="canton-grid">
+        <section className="canton-panel">
+          <h2>{t("Discover clubs")}</h2>
+          <div className="canton-market-list">
+            {discover.map((c) => {
+              const listing = obj(c.data.listing),
+                open = listing.visibility === "OpenToAll",
+                mine = clubs.find(
+                  (x) => x.id === c.id && pendingRequest(x, party),
+                );
+              return (
+                <div className="canton-market-row" key={c.id}>
+                  <h2>{text(c.data.name)}</h2>
+                  <p>
+                    <strong>{text(listing.topic)}</strong>
+                    {text(listing.description ?? "") ? (
+                      <> · {text(listing.description)}</>
+                    ) : null}
+                  </p>
+                  <ClubFacts club={c} />
+                  {mine ? (
+                    <ActionButton
+                      label="Cancel request"
+                      intent={{
+                        action: "clubCloseRequest",
+                        target: mine.id,
+                        values: { wallet: party ?? "" },
+                      }}
+                    />
+                  ) : open ? (
+                    <ActionButton
+                      label="Join"
+                      intent={{ action: "clubJoinOpen", target: c.id }}
+                    />
+                  ) : (
+                    <ActionForm
+                      label="Request to join"
+                      disabled={!party}
+                      fields={[
+                        {
+                          name: "note",
+                          label: "Note to the admins (optional)",
+                        },
+                      ]}
+                      build={(v) => ({
+                        action: "clubRequestJoin",
+                        target: c.id,
+                        values: { note: v.note ?? "" },
+                      })}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            {!discover.length ? <p>{t("No public clubs yet.")}</p> : null}
+          </div>
+        </section>
+        {requested.length ? (
+          <section className="canton-panel">
+            <h2>{t("Your join requests")}</h2>
+            {requested.map((c) => (
+              <p key={c.id}>
+                <strong>{text(c.data.name)}</strong> · {t("Expires")}{" "}
+                {new Date(
+                  text(pendingRequest(c, party)?.expiresAt),
+                ).toLocaleString()}{" "}
+                <ActionButton
+                  label="Cancel request"
+                  intent={{
+                    action: "clubCloseRequest",
+                    target: c.id,
+                    values: { wallet: party ?? "" },
+                  }}
+                />
+              </p>
+            ))}
+          </section>
+        ) : null}
         <section className="canton-panel">
           <h2>{t("Your clubs")}</h2>
           <div className="canton-market-list">
@@ -79,7 +200,7 @@ export function CantonClubs() {
               >
                 <h2>{text(c.data.name)}</h2>
                 <span>
-                  {list(c.data.members).length} {t("members")}
+                  <ClubFacts club={c} />
                   {c.data.owner === party ? <> · {t("Owner")}</> : null}
                   {c.data.owner !== party &&
                   list(c.data.admins).includes(party) ? (
@@ -117,20 +238,146 @@ export function CantonClubs() {
         <section className="canton-panel">
           <h2>{t("Create a club")}</h2>
           {registry ? (
-            <ActionForm
-              label="Create club"
-              fields={[{ name: "name", label: "Club name" }]}
-              disabled={!party}
-              build={(v) => ({
-                action: "createClub",
-                target: registry.id,
-                values: { name: v.name },
-              })}
-            />
+            <>
+              <ActionForm
+                label="Create club"
+                fields={[
+                  { name: "name", label: "Club name" },
+                  {
+                    name: "kind",
+                    label: "Club type",
+                    value: "PrivateClub",
+                    options: [
+                      { value: "PrivateClub", label: "Private: invite-only" },
+                      { value: "PublicClub", label: "Public: can be listed" },
+                    ],
+                  },
+                ]}
+                disabled={
+                  !party ||
+                  (!!rules && owned >= Number(text(rules.maxOwnedClubs)))
+                }
+                build={(v) => ({
+                  action: "createClub",
+                  target: registry.id,
+                  values: { name: v.name, kind: v.kind },
+                })}
+              />
+              {rules ? (
+                <p>
+                  {t("You own {value0} of {value1} clubs allowed.", {
+                    value0: owned,
+                    value1: text(rules.maxOwnedClubs),
+                  })}{" "}
+                  {t(
+                    "Members: up to {value0} in a public club, {value1} in a private club.",
+                    {
+                      value0: text(rules.publicMemberCap),
+                      value1: text(rules.privateMemberCap),
+                    },
+                  )}
+                </p>
+              ) : null}
+            </>
           ) : (
             <p>{t("Clubs are not deployed yet.")}</p>
           )}
         </section>
+        {protocolAdmin ? (
+          <section className="canton-panel">
+            <h2>{t("Listings awaiting verification")}</h2>
+            {catalogClubs
+              .filter((c) => !isVerifiedListing(c))
+              .map((c) => {
+                const listing = obj(c.data.listing);
+                return (
+                  <p key={c.id}>
+                    <strong>{text(c.data.name)}</strong> · {text(listing.topic)}{" "}
+                    ·{" "}
+                    {t(
+                      listing.visibility === "OpenToAll"
+                        ? "Open to all"
+                        : "Request to join",
+                    )}{" "}
+                    <ActionButton
+                      label="Verify"
+                      intent={{ action: "clubVerifyListing", target: c.id }}
+                    />
+                  </p>
+                );
+              })}
+            {catalogClubs.filter(isVerifiedListing).map((c) => (
+              <p key={c.id}>
+                <strong>{text(c.data.name)}</strong> · {t("Verified")}{" "}
+                <ActionButton
+                  label="Withdraw verification"
+                  intent={{
+                    action: "clubVerifyListing",
+                    target: c.id,
+                    values: { verified: "false" },
+                  }}
+                />
+              </p>
+            ))}
+            {!catalogClubs.length ? <p>{t("No listings to review.")}</p> : null}
+          </section>
+        ) : null}
+        {operator && registry && rules ? (
+          <section className="canton-panel">
+            <h2>{t("Club rules")}</h2>
+            <ActionForm
+              label="Save club rules"
+              fields={[
+                {
+                  name: "publicMemberCap",
+                  label: "Public club member cap (max 256)",
+                  value: text(rules.publicMemberCap),
+                },
+                {
+                  name: "privateMemberCap",
+                  label: "Private club member cap (max 256)",
+                  value: text(rules.privateMemberCap),
+                },
+                {
+                  name: "maxOwnedClubs",
+                  label: "Clubs one wallet may own",
+                  value: text(rules.maxOwnedClubs),
+                },
+                {
+                  name: "maxClubAdmins",
+                  label: "Admins per club (owner included)",
+                  value: text(rules.maxClubAdmins),
+                },
+              ]}
+              build={(v) => ({
+                action: "setClubRules",
+                target: registry.id,
+                values: v,
+              })}
+            />
+            <h3>{t("Clubs behind the current rules")}</h3>
+            {clubs
+              .filter(
+                (c) =>
+                  text(c.data.adminCap) !== text(rules.maxClubAdmins) ||
+                  text(c.data.memberCap) !==
+                    text(
+                      c.data.kind === "PublicClub"
+                        ? rules.publicMemberCap
+                        : rules.privateMemberCap,
+                    ),
+              )
+              .map((c) => (
+                <p key={c.id}>
+                  <strong>{text(c.data.name)}</strong>{" "}
+                  <ActionButton
+                    label="Apply rules"
+                    intent={{ action: "clubApplyRules", target: c.id }}
+                  />
+                </p>
+              ))}
+          </section>
+        ) : null}
       </div>
     </TradingFrame>
   );
@@ -163,12 +410,18 @@ export function CantonClub({ clubId }: { clubId: string }) {
         factoryRefKey(c.data.ref) === wantedFactory,
     ),
     mayCreate = isAdmin || club.data.marketPolicy === "AnyMember",
-    markets = clubMarkets(s.catalog?.contracts ?? [], club);
+    markets = clubMarkets(s.catalog?.contracts ?? [], club),
+    listing = club.data.listing ? obj(club.data.listing) : null,
+    requests = list(club.data.requests).map(obj),
+    adminsFull = admins.length >= Number(text(club.data.adminCap));
   return (
     <TradingFrame
       title={text(club.data.name)}
       tools={<Link href="/canton/clubs">{t("Clubs")}</Link>}
     >
+      <p>
+        <ClubFacts club={club} />
+      </p>
       <div className="canton-grid">
         <section className="canton-panel">
           <h2>{t("Markets")}</h2>
@@ -211,6 +464,7 @@ export function CantonClub({ clubId }: { clubId: string }) {
                     {isOwner && member !== owner ? (
                       <>
                         <ActionButton
+                          disabled={!admin && adminsFull}
                           label={admin ? "Remove admin" : "Make admin"}
                           intent={{
                             action: "clubSetAdmin",
@@ -331,6 +585,100 @@ export function CantonClub({ clubId }: { clubId: string }) {
                 values: { policy: v.policy },
               })}
             />
+          </section>
+        ) : null}
+        {isAdmin && requests.length ? (
+          <section className="canton-panel">
+            <h2>{t("Join requests")}</h2>
+            <dl>
+              {requests.map((r) => (
+                <div key={text(r.requester)}>
+                  <dt>
+                    {t("Expires")}{" "}
+                    {new Date(text(r.expiresAt)).toLocaleString()}
+                    {text(r.note ?? "") ? <> · “{text(r.note)}”</> : null}
+                  </dt>
+                  <dd>
+                    <Party id={r.requester} />{" "}
+                    <ActionButton
+                      label="Approve"
+                      intent={{
+                        action: "clubApproveRequest",
+                        target: club.id,
+                        values: { wallet: text(r.requester) },
+                      }}
+                    />{" "}
+                    <ActionButton
+                      label="Reject"
+                      intent={{
+                        action: "clubCloseRequest",
+                        target: club.id,
+                        values: { wallet: text(r.requester) },
+                      }}
+                    />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
+        {isOwner ? (
+          <section className="canton-panel">
+            <h2>{t("Listing")}</h2>
+            {club.data.kind !== "PublicClub" ? (
+              <p>
+                {t(
+                  "Private clubs are invite-only and cannot be listed for discovery.",
+                )}
+              </p>
+            ) : (
+              <>
+                <p>
+                  {listing
+                    ? t(
+                        listing.verifiedBy
+                          ? "Listed and verified."
+                          : "Awaiting verification by an Outcomia admin.",
+                      )
+                    : t("Not listed. List the club so wallets can find it.")}
+                </p>
+                <ActionForm
+                  label={listing ? "Update listing" : "List club"}
+                  fields={[
+                    {
+                      name: "visibility",
+                      label: "Who can join",
+                      value: text(listing?.visibility ?? "RequestToJoin"),
+                      options: [
+                        { value: "RequestToJoin", label: "Request to join" },
+                        { value: "OpenToAll", label: "Open to all" },
+                      ],
+                    },
+                    {
+                      name: "topic",
+                      label: "Topic",
+                      value: text(listing?.topic ?? ""),
+                    },
+                    {
+                      name: "description",
+                      label: "Description",
+                      value: text(listing?.description ?? ""),
+                    },
+                  ]}
+                  build={(v) => ({
+                    action: "clubSetListing",
+                    target: club.id,
+                    values: v,
+                  })}
+                />
+                {listing ? (
+                  <ActionButton
+                    label="Close listing"
+                    intent={{ action: "clubCloseListing", target: club.id }}
+                  />
+                ) : null}
+              </>
+            )}
           </section>
         ) : null}
         {factory && mayCreate ? (

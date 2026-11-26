@@ -17,7 +17,9 @@ import {
 const d = { ...base, factoryPackageId: "f".repeat(64) };
 const owner = "owner::1",
   bob = "bob::2",
-  carol = "carol::3";
+  carol = "carol::3",
+  // A protocol-root admin in the shared fixture's Protocol contract.
+  admin = "alice";
 const clubRef = {
   operator: d.operator,
   namespace: d.namespace,
@@ -34,6 +36,14 @@ const registry = c("ClubRegistry", "registry", {
   protocolName: d.namespace,
   assets: [],
   nextClub: "2",
+  rules: {
+    publicMemberCap: "256",
+    privateMemberCap: "256",
+    maxOwnedClubs: "2",
+    maxClubAdmins: "5",
+  },
+  // DA.Map encodes as [key, value] pairs.
+  owned: [[owner, "2"]],
 });
 const club = c("Club", "club", {
   operator: d.operator,
@@ -49,6 +59,11 @@ const club = c("Club", "club", {
   ref: clubRef,
   factoryRef,
   createdAt: "2026-01-01T00:00:00Z",
+  kind: "PublicClub",
+  memberCap: "256",
+  adminCap: "5",
+  listing: null,
+  requests: [],
 });
 const factory = c("OutcomiaMarketFactory", "club-factory", {
   operator: d.operator,
@@ -117,7 +132,28 @@ const standard = {
 test("any wallet creates a club through the registry", () => {
   const p = plan(carol, "createClub", { name: "Book club" }, "registry", []);
   assert.equal(choice(p), "ClubRegistry_CreateClub");
-  assert.deepEqual(args(p), { owner: carol, name: "Book club" });
+  assert.deepEqual(args(p), {
+    owner: carol,
+    name: "Book club",
+    kind: "PrivateClub",
+  });
+  assert.equal(
+    args(
+      plan(
+        carol,
+        "createClub",
+        { name: "Fans", kind: "PublicClub" },
+        "registry",
+        [],
+      ),
+    ).kind,
+    "PublicClub",
+  );
+  // The owner already owns the maximum (2) clubs.
+  assert.throws(
+    () => plan(owner, "createClub", { name: "Third" }, "registry", []),
+    /maximum number of clubs/,
+  );
   assert.throws(
     () => plan(carol, "createClub", { name: " padded" }, "registry", []),
     /Club names/,
@@ -339,4 +375,174 @@ test("the operator clears orders of wallets that left the club", () => {
   // Bob is still a member, and only the operator clears.
   assert.throws(() => clear(d.operator, "bob-ask"), /can still trade/);
   assert.throws(() => clear(owner, "carol-bid"), /Operator wallet required/);
+});
+
+const listed = (visibility, verifiedBy = admin) => ({
+  ...club,
+  data: {
+    ...club.data,
+    listing: {
+      visibility,
+      topic: "Chess",
+      description: "",
+      verifiedBy,
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  },
+});
+
+test("ownership moves through the registry, which keeps owned counts", () => {
+  const nominated = { ...club, data: { ...club.data, pendingOwner: bob } };
+  const p = plan(bob, "clubAcceptOwnership", {}, "club", [nominated]);
+  assert.equal(choice(p), "ClubRegistry_AcceptOwnership");
+  assert.equal(p.command.ExerciseCommand.contractId, "registry");
+  assert.deepEqual(args(p), {
+    nominee: bob,
+    club: "club",
+    factory: "club-factory",
+  });
+});
+
+test("owners list public clubs; root admins verify; private clubs never list", () => {
+  assert.deepEqual(
+    args(
+      plan(owner, "clubSetListing", {
+        visibility: "OpenToAll",
+        topic: "Chess",
+        description: "Puzzles",
+      }),
+    ),
+    { visibility: "OpenToAll", topic: "Chess", description: "Puzzles" },
+  );
+  assert.throws(
+    () => plan(bob, "clubSetListing", { topic: "Chess" }),
+    /club owner/,
+  );
+  assert.throws(
+    () => plan(owner, "clubSetListing", { topic: " pad" }),
+    /Topics/,
+  );
+  const hidden = { ...club, data: { ...club.data, kind: "PrivateClub" } };
+  assert.throws(
+    () => plan(owner, "clubSetListing", { topic: "Chess" }, "club", [hidden]),
+    /Only public clubs/,
+  );
+  const v = plan(admin, "clubVerifyListing", {}, "club", [
+    listed("RequestToJoin", null),
+  ]);
+  assert.equal(choice(v), "Club_VerifyListing");
+  assert.deepEqual(args(v), {
+    verifier: admin,
+    protocol: "policy",
+    verified: true,
+  });
+  assert.throws(
+    () =>
+      plan(bob, "clubVerifyListing", {}, "club", [
+        listed("RequestToJoin", null),
+      ]),
+    /administrator/,
+  );
+});
+
+test("join requests and open joins follow the verified listing and caps", () => {
+  const requestable = listed("RequestToJoin");
+  assert.deepEqual(
+    args(plan(carol, "clubRequestJoin", { note: "hi" }, "club", [requestable])),
+    { requester: carol, note: "hi" },
+  );
+  assert.throws(
+    () =>
+      plan(carol, "clubRequestJoin", {}, "club", [
+        listed("RequestToJoin", null),
+      ]),
+    /does not accept/,
+  );
+  assert.throws(
+    () => plan(carol, "clubJoinOpen", {}, "club", [requestable]),
+    /not open/,
+  );
+  const pending = {
+    ...requestable,
+    data: {
+      ...requestable.data,
+      requests: [
+        { requester: "dave::4", note: "", expiresAt: "2099-01-01T00:00:00Z" },
+      ],
+    },
+  };
+  assert.equal(
+    choice(
+      plan(owner, "clubApproveRequest", { wallet: "dave::4" }, "club", [
+        pending,
+      ]),
+    ),
+    "Club_ApproveRequest",
+  );
+  assert.throws(
+    () =>
+      plan(bob, "clubApproveRequest", { wallet: "dave::4" }, "club", [pending]),
+    /club admins/,
+  );
+  const full = { ...pending, data: { ...pending.data, memberCap: "2" } };
+  assert.throws(
+    () =>
+      plan(owner, "clubApproveRequest", { wallet: "dave::4" }, "club", [full]),
+    /member limit/,
+  );
+  assert.equal(
+    choice(
+      plan("dave::4", "clubCloseRequest", { wallet: "dave::4" }, "club", [
+        pending,
+      ]),
+    ),
+    "Club_CloseRequest",
+  );
+  const open = listed("OpenToAll");
+  assert.deepEqual(args(plan(carol, "clubJoinOpen", {}, "club", [open])), {
+    wallet: carol,
+  });
+  assert.throws(
+    () => plan(bob, "clubJoinOpen", {}, "club", [open]),
+    /already a member/,
+  );
+});
+
+test("admins are capped and only the operator sets club rules", () => {
+  const capped = { ...club, data: { ...club.data, adminCap: "1" } };
+  assert.throws(
+    () =>
+      plan(owner, "clubSetAdmin", { wallet: bob, makeAdmin: "true" }, "club", [
+        capped,
+      ]),
+    /maximum number of admins/,
+  );
+  const rules = {
+    publicMemberCap: "200",
+    privateMemberCap: "50",
+    maxOwnedClubs: "3",
+    maxClubAdmins: "4",
+  };
+  const p = plan(d.operator, "setClubRules", rules, "registry", []);
+  assert.equal(choice(p), "ClubRegistry_SetRules");
+  assert.deepEqual(args(p), { replacementRules: rules });
+  assert.throws(
+    () => plan(owner, "setClubRules", rules, "registry", []),
+    /Operator wallet/,
+  );
+  assert.throws(
+    () =>
+      plan(
+        d.operator,
+        "setClubRules",
+        { ...rules, publicMemberCap: "300" },
+        "registry",
+        [],
+      ),
+    /between 1 and 256/,
+  );
+  assert.equal(
+    choice(plan(d.operator, "clubApplyRules", {})),
+    "Club_ApplyRules",
+  );
 });

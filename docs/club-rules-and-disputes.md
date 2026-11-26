@@ -173,11 +173,11 @@ follow CIP-0103. Each row moves to "done" only with its Canton UI.
 
 | Rule | Solana | Canton |
 | --- | --- | --- |
-| Club type (public / private) chosen at creation | M1 (built) | To do |
-| Member caps 100,000 / 1,000 (configurable) | M1 (built) | To do |
-| Max 2 owned clubs per wallet | M1 (built) | To do |
-| Max 5 admins per club | M1 (built) | To do |
-| Platform config (super admin) | M1 (built) | To do |
+| Club type (public / private) chosen at creation | M1 (built) | Built (listing on public clubs only) |
+| Member caps 100,000 / 1,000 (configurable) | M1 (built) | Built, capped at 256 per club until membership moves to per-member contracts |
+| Max 2 owned clubs per wallet | M1 (built) | Built (registry counts owned clubs) |
+| Max 5 admins per club | M1 (built) | Built |
+| Platform config (super admin) | M1 (built) | Built (operator sets rules in the Canton clubs page) |
 | Security deposit $100 / $200, USDC or SOL-equivalent | M2 | To do (Canton deposit asset to be decided) |
 | Close club and refund the deposit | M2 | To do |
 | Dispute window: 5 days club markets / 3 days regular markets | M3 | To do |

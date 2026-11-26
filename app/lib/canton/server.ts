@@ -3,6 +3,7 @@
 import {
   decodeContracts,
   disclosure,
+  isListedClub,
   list,
   marketKey,
   obj,
@@ -93,7 +94,8 @@ export async function catalog(
   const offset = obj(await request("/v2/state/ledger-end")).offset;
   if (!/^[0-9]+$/.test(String(offset)))
     throw new Error("Invalid ledger offset.");
-  const kinds = [...publicKinds, "LimitOrder"] as const;
+  // Clubs are read only to pick out verified public listings for discovery.
+  const kinds = [...publicKinds, "LimitOrder", "Club"] as const;
   const raw = await request("/v2/state/active-contracts", {
     eventFormat: {
       filtersByParty: {
@@ -133,7 +135,7 @@ export async function catalog(
   return {
     deployment: d,
     contracts: all
-      .filter((c) => publicKinds.includes(c.kind))
+      .filter((c) => publicKinds.includes(c.kind) || isListedClub(c))
       .map((c) => {
         disclosure(c);
         return c;
