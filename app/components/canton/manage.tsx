@@ -1,9 +1,11 @@
 "use client";
+import { useState } from "react";
 import { useCantonWallet } from "../canton-wallet-provider";
 import { useCantonTrading } from "./trading-provider";
 import { ActionForm, TradingFrame, type Field } from "./trading-ui";
 import { list, obj, text, type Contract } from "../../lib/canton/model";
 import { mayCreate } from "../../lib/canton/commands";
+import { parseOutcomes } from "../../lib/canton/multi";
 import { useI18n } from "../preferences-provider";
 export function CantonManage() {
   const s = useCantonTrading(),
@@ -264,82 +266,117 @@ export function FactoryMarketForm({
   access: { value: string; label: string }[];
   disabled?: boolean;
 }) {
+  const { t } = useI18n(),
+    [multi, setMulti] = useState(false);
   const assets = list(factory.data.assets).map((a) => obj(obj(a).instrument));
   const at = (v: string) => new Date(v).toISOString();
-  return (
-    <ActionForm
-      label="Create market"
-      fields={[
-        { name: "question", label: "Question", type: "textarea" },
+  const outcomeFields: Field[] = multi
+    ? [
         {
-          name: "asset",
-          label: "Collateral",
-          options: assets.map((a, i) => ({
-            value: String(i),
-            label: text(a.id),
-          })),
+          name: "outcomes",
+          label: "Outcomes: one per line, as Label: how it wins (2 to 8)",
+          type: "textarea",
         },
+      ]
+    : [
         { name: "yesCriteria", label: "YES criteria", type: "textarea" },
         { name: "noCriteria", label: "NO criteria", type: "textarea" },
-        {
-          name: "invalidCriteria",
-          label: "Invalid criteria",
-          type: "textarea",
-        },
-        {
-          name: "evidenceRequirements",
-          label: "Evidence required",
-          type: "textarea",
-        },
-        { name: "documentUri", label: "Rules URL", type: "url" },
-        { name: "documentSha256", label: "SHA-256" },
-        { name: "closeAt", label: "Closes", type: "datetime-local" },
-        {
-          name: "earliestResolutionAt",
-          label: "Earliest resolution",
-          type: "datetime-local",
-          optional: true,
-        },
-        {
-          name: "resolutionDelaySeconds",
-          label: "Review delay (seconds)",
-          value: "3600",
-        },
-        { name: "priceTick", label: "Price increment", value: "0.01" },
-        { name: "quantityLot", label: "Contract lot", value: "1" },
-        { name: "access", label: "Who can trade", options: access },
-      ]}
-      disabled={disabled}
-      build={(v) => ({
-        action: "factoryCreate",
-        target: factory.id,
-        values: {
-          access:
-            v.access === "public"
-              ? "public"
-              : v.access === "club"
-                ? "club"
-                : "invite",
-          policy: v.access,
-          terms: {
-            question: v.question,
-            outcomes: ["YES", "NO"],
-            outcomeCriteria: [v.yesCriteria, v.noCriteria],
-            invalidCriteria: v.invalidCriteria,
-            evidenceRequirements: v.evidenceRequirements,
-            rulesUri: v.documentUri,
-            rulesHash: v.documentSha256,
-            collateral: assets[Number(v.asset)],
-            closeAt: at(v.closeAt),
-            earliestResolutionAt: v.earliestResolutionAt
-              ? at(v.earliestResolutionAt)
-              : null,
-            resolutionDelaySeconds: v.resolutionDelaySeconds,
-            priceTick: v.priceTick,
-            quantityLot: v.quantityLot,
+      ];
+  return (
+    <>
+      <nav className="canton-tabs" aria-label={t("Market type")}>
+        {[
+          { value: false, label: "YES / NO" },
+          { value: true, label: "Multiple outcomes" },
+        ].map((o) => (
+          <button
+            key={o.label}
+            type="button"
+            aria-pressed={multi === o.value}
+            onClick={() => setMulti(o.value)}
+          >
+            {t(o.label)}
+          </button>
+        ))}
+      </nav>
+      <ActionForm
+        key={multi ? "multi" : "binary"}
+        label="Create market"
+        fields={[
+          { name: "question", label: "Question", type: "textarea" },
+          {
+            name: "asset",
+            label: "Collateral",
+            options: assets.map((a, i) => ({
+              value: String(i),
+              label: text(a.id),
+            })),
           },
-        },
-      })}
-    />
+          ...outcomeFields,
+          {
+            name: "invalidCriteria",
+            label: "Invalid criteria",
+            type: "textarea",
+          },
+          {
+            name: "evidenceRequirements",
+            label: "Evidence required",
+            type: "textarea",
+          },
+          { name: "documentUri", label: "Rules URL", type: "url" },
+          { name: "documentSha256", label: "SHA-256" },
+          { name: "closeAt", label: "Closes", type: "datetime-local" },
+          {
+            name: "earliestResolutionAt",
+            label: "Earliest resolution",
+            type: "datetime-local",
+            optional: true,
+          },
+          {
+            name: "resolutionDelaySeconds",
+            label: "Review delay (seconds)",
+            value: "3600",
+          },
+          { name: "priceTick", label: "Price increment", value: "0.01" },
+          { name: "quantityLot", label: "Contract lot", value: "1" },
+          { name: "access", label: "Who can trade", options: access },
+        ]}
+        disabled={disabled}
+        build={(v) => ({
+          action: "factoryCreate",
+          target: factory.id,
+          values: {
+            access:
+              v.access === "public"
+                ? "public"
+                : v.access === "club"
+                  ? "club"
+                  : "invite",
+            policy: v.access,
+            terms: {
+              question: v.question,
+              ...(multi
+                ? parseOutcomes(v.outcomes)
+                : {
+                    outcomes: ["YES", "NO"],
+                    outcomeCriteria: [v.yesCriteria, v.noCriteria],
+                  }),
+              invalidCriteria: v.invalidCriteria,
+              evidenceRequirements: v.evidenceRequirements,
+              rulesUri: v.documentUri,
+              rulesHash: v.documentSha256,
+              collateral: assets[Number(v.asset)],
+              closeAt: at(v.closeAt),
+              earliestResolutionAt: v.earliestResolutionAt
+                ? at(v.earliestResolutionAt)
+                : null,
+              resolutionDelaySeconds: v.resolutionDelaySeconds,
+              priceTick: v.priceTick,
+              quantityLot: v.quantityLot,
+            },
+          },
+        })}
+      />
+    </>
   );
 }

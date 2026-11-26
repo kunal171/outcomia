@@ -1512,5 +1512,20 @@
   "Owed to the club: {value0}": "क्लब का बकाया: {value0}",
   "Share: {value0} bps": "हिस्सा: {value0} bps",
   "Withdraw club fees": "क्लब फ़ीस निकालें",
-  "No club markets yet.": "अभी कोई क्लब मार्केट नहीं।"
+  "No club markets yet.": "अभी कोई क्लब मार्केट नहीं।",
+  "{value0} outcomes": "{value0} परिणाम",
+  "Wins when": "कब जीतता है",
+  "Winner": "विजेता",
+  "One complete set costs 1 {value0} and holds one contract of every outcome. The winning contract pays 1; if the market is invalid, every contract pays an equal share.": "एक पूरा सेट 1 {value0} का है और इसमें हर परिणाम का एक कॉन्ट्रैक्ट होता है। जीतने वाला कॉन्ट्रैक्ट 1 देता है; मार्केट अमान्य हो तो हर कॉन्ट्रैक्ट बराबर हिस्सा देता है।",
+  "Mint complete sets": "पूरे सेट बनाएँ",
+  "Sets": "सेट",
+  "Return complete sets": "पूरे सेट लौटाएँ",
+  "Claim": "क्लेम",
+  "You receive {value0}": "आपको {value0} मिलेंगे",
+  "Redeem": "रिडीम करें",
+  "Resolution opens at the earliest resolution time.": "रिज़ॉल्यूशन सबसे शुरुआती रिज़ॉल्यूशन समय पर खुलता है।",
+  "Trading individual outcomes on an order book is coming next.": "हर परिणाम की ऑर्डर बुक पर ट्रेडिंग जल्द आ रही है।",
+  "YES / NO": "हाँ / नहीं",
+  "Multiple outcomes": "कई परिणाम",
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "परिणाम: हर लाइन में एक, लेबल: कब जीतता है (2 से 8)"
 }
