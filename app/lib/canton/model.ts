@@ -26,6 +26,8 @@ export const templates = {
   MultiLot: "Outcomia.MultiOutcome:MultiLot",
   MultiProposal: "Outcomia.MultiOutcome:MultiProposal",
   MultiFinal: "Outcomia.MultiOutcome:MultiFinal",
+  MultiBook: "Outcomia.MultiOrders:MultiBook",
+  MultiOrder: "Outcomia.MultiOrders:MultiOrder",
 } as const;
 /** Interfaces of the open market-factory standard (separate package). */
 export const interfaces = {
@@ -82,6 +84,7 @@ export const publicKinds: Kind[] = [
   "MultiSettledReserve",
   "MultiProposal",
   "MultiFinal",
+  "MultiBook",
 ];
 /** Market-level records of a multi-outcome market (2–8 named outcomes). */
 export const multiKinds: Kind[] = [
@@ -91,6 +94,8 @@ export const multiKinds: Kind[] = [
   "MultiLot",
   "MultiProposal",
   "MultiFinal",
+  "MultiBook",
+  "MultiOrder",
 ];
 export function isMulti(c: Contract): boolean {
   return multiKinds.includes(c.kind);
@@ -267,6 +272,14 @@ export function decodeContracts(value: unknown, d: Deployment): Contract[] {
     if (kind === "MultiSettledReserve") {
       multiResult(data.result);
       list(data.outstanding).forEach(integer);
+    }
+    if (kind === "MultiOrder") {
+      text(data.owner);
+      raw(data.price);
+      integer(data.quantity);
+      integer(data.outcome);
+      if (!["Buy", "Sell"].includes(String(data.side)))
+        throw new Error("Invalid order side.");
     }
     if (kind === "MultiLot") {
       text(data.owner);

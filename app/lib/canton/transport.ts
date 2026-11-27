@@ -81,7 +81,13 @@ export async function readContracts(session: CantonSession, d: Deployment) {
   );
   const decoded = decodeContracts(response, d);
   const privateContracts = decoded.filter((c) =>
-    ["AssetBalance", "PositionLot", "MultiLot", "LimitOrder"].includes(c.kind),
+    [
+      "AssetBalance",
+      "PositionLot",
+      "MultiLot",
+      "LimitOrder",
+      "MultiOrder",
+    ].includes(c.kind),
   );
   return session.partyId === d.operator
     ? privateContracts

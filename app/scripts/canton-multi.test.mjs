@@ -299,3 +299,137 @@ test("ledger snapshots decode multi-outcome records", () => {
     /multi-outcome position/,
   );
 });
+
+test("per-outcome orders place, cancel and match on the multi book", () => {
+  const order = (id, owner, side, price, outcome = "2") =>
+    c("MultiOrder", id, {
+      key,
+      vault: d.vault,
+      owner,
+      instrument,
+      factory: "factory",
+      outcomeCount: "4",
+      outcome,
+      side,
+      price,
+      quantity: "1",
+      orderId: id === "bid" ? "2" : "1",
+    });
+  const ask = order("ask", "bob", "Sell", "0.30"),
+    bid = order("bid", "alice", "Buy", "0.40");
+  const book = c("MultiBook", "mbook", {
+    key,
+    vault: d.vault,
+    creator: "alice",
+    terms,
+    factory: "factory",
+    assetDecimals: "6",
+    nextOrderId: "3",
+    orders: [
+      { orderId: "1", order: "ask", outcome: "2", side: "Sell", price: "0.30" },
+      { orderId: "2", order: "bid", outcome: "2", side: "Buy", price: "0.40" },
+    ],
+    fees: { amount: "0.003", cash: "fees" },
+    clubShareBps: "0",
+    clubFees: "0.001",
+  });
+  const contracts = snapshot(book);
+  const run = (party, action, target, values, o) =>
+    buildPlan(party, contracts, o, { action, target, values });
+  const bobBalance = {
+    ...balance,
+    id: "bob-balance",
+    data: { ...balance.data, owner: "bob" },
+  };
+
+  const placed = exercise(
+    run(
+      "alice",
+      "multiBuy",
+      "mbook",
+      { outcome: "2", price: "0.40", quantity: "1" },
+      [balance],
+    ),
+  );
+  assert.equal(placed.choice, "MultiBook_PlaceBuy");
+  assert.equal(placed.choiceArgument.outcome, "2");
+  assert.equal(placed.choiceArgument.balance, "balance");
+  assert.equal(placed.choiceArgument.expectedFeeRevision, "3");
+  assert.throws(
+    () =>
+      run(
+        "alice",
+        "multiBuy",
+        "mbook",
+        { outcome: "4", price: "0.40", quantity: "1" },
+        [balance],
+      ),
+    /outcomes/,
+  );
+  const sold = exercise(
+    run(
+      "alice",
+      "multiSell",
+      "mbook",
+      { outcome: "1", price: "0.50", quantity: "2" },
+      [balance, lot],
+    ),
+  );
+  assert.equal(sold.choice, "MultiBook_PlaceSell");
+  assert.deepEqual(sold.choiceArgument.positions, ["mlot"]);
+  // Alice holds no contracts of outcome 2.
+  assert.throws(
+    () =>
+      run(
+        "alice",
+        "multiSell",
+        "mbook",
+        { outcome: "2", price: "0.50", quantity: "1" },
+        [balance, lot],
+      ),
+    /Insufficient/,
+  );
+
+  const cancel = run("alice", "multiCancel", "bid", {}, [balance, bid]);
+  assert.equal(exercise(cancel).choice, "MultiBook_Cancel");
+  assert.equal(exercise(cancel).contractId, "mbook");
+  assert.throws(
+    () => run("alice", "multiCancel", "ask", {}, [balance, ask]),
+    /another wallet/,
+  );
+
+  const matched = exercise(
+    run(d.operator, "multiMatch", "mbook", { outcome: "2" }, [
+      balance,
+      bobBalance,
+      ask,
+      bid,
+    ]),
+  );
+  assert.equal(matched.choice, "MultiBook_MatchBest");
+  assert.deepEqual(
+    [matched.choiceArgument.buyerBalance, matched.choiceArgument.sellerBalance],
+    ["balance", "bob-balance"],
+  );
+  assert.throws(
+    () =>
+      run(d.operator, "multiMatch", "mbook", { outcome: "1" }, [
+        balance,
+        bobBalance,
+        ask,
+        bid,
+      ]),
+    /No crossed/,
+  );
+  assert.throws(
+    () =>
+      run(d.operator, "multiWithdrawFees", "mbook", { amount: "0.003" }, []),
+    /owed to a club/,
+  );
+  assert.equal(
+    exercise(
+      run(d.operator, "multiWithdrawFees", "mbook", { amount: "0.002" }, []),
+    ).choice,
+    "MultiBook_WithdrawFees",
+  );
+});

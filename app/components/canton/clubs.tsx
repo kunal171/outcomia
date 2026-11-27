@@ -86,7 +86,7 @@ function ClubFacts({ club }: { club: Contract }) {
 function clubBooks(contracts: Contract[], club: Contract) {
   const wanted = factoryRefKey(club.data.factoryRef);
   return contracts.filter((c) => {
-    if (c.kind !== "OrderBook") return false;
+    if (c.kind !== "OrderBook" && c.kind !== "MultiBook") return false;
     const scope = obj(c.data.key).scope;
     return !!scope && factoryRefKey(scope) === wanted;
   });
@@ -385,7 +385,10 @@ export function CantonClubs() {
                   <ActionButton
                     label="Apply share"
                     intent={{
-                      action: "clubSetShare",
+                      action:
+                        b.kind === "MultiBook"
+                          ? "multiSetShare"
+                          : "clubSetShare",
                       target: b.id,
                       values: { bps: text(rules.clubShareBps ?? "0") },
                     }}
@@ -685,7 +688,10 @@ export function CantonClub({ clubId }: { clubId: string }) {
                         { name: "amount", label: "Amount", value: owed },
                       ]}
                       build={(v) => ({
-                        action: "clubWithdrawFees",
+                        action:
+                          b.kind === "MultiBook"
+                            ? "clubWithdrawMultiFees"
+                            : "clubWithdrawFees",
                         target: b.id,
                         values: { amount: v.amount },
                       })}

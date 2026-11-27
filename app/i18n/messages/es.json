@@ -1527,5 +1527,6 @@
   "Trading individual outcomes on an order book is coming next.": "Pronto podrás operar cada resultado en un libro de órdenes.",
   "YES / NO": "SÍ / NO",
   "Multiple outcomes": "Varios resultados",
-  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Resultados: uno por línea, como Etiqueta: cuándo gana (2 a 8)"
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Resultados: uno por línea, como Etiqueta: cuándo gana (2 a 8)",
+  "Place order": "Colocar orden"
 }

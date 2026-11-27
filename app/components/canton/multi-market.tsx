@@ -1,6 +1,6 @@
 "use client";
-/** Multi-outcome Canton market (2–8 named outcomes): complete sets, admin
- * resolution and redemption. The per-outcome order book arrives with MO2
+/** Multi-outcome Canton market (2–8 named outcomes): per-outcome order books,
+ * complete sets, admin resolution and redemption
  * (outcomia-canton docs/multi-outcome-markets.md). */
 import Link from "next/link";
 import { useI18n } from "../preferences-provider";
@@ -23,6 +23,7 @@ import {
   type Contract,
 } from "../../lib/canton/model";
 import { lotTotals, multiClaim } from "../../lib/canton/multi";
+import { accessPolicy, excludedBy } from "../../lib/canton/commands";
 
 export function MultiMarketDetail({ current }: { current: Contract }) {
   const s = useCantonTrading(),
@@ -36,6 +37,7 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
     contracts = s.catalog?.contracts.filter((c) => sameMarket(c, key)) ?? [],
     reserve = contracts.find((c) => c.kind === "MultiReserve"),
     settled = contracts.find((c) => c.kind === "MultiSettledReserve"),
+    book = contracts.find((c) => c.kind === "MultiBook"),
     party = wallet.session?.partyId,
     operator = party === s.catalog?.deployment.operator,
     factory = issuingFactory(s.catalog?.contracts ?? [], data),
@@ -46,6 +48,37 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
       factory.data.admins.includes(party);
   const result =
     current.kind === "MultiMarket" ? null : multiResult(data.result);
+  const quotes = (s.catalog?.quotes ?? []).filter((q) => q.market === key);
+  const mine = s.owned.filter(
+    (c) =>
+      c.kind === "MultiOrder" && c.data.owner === party && sameMarket(c, key),
+  );
+  // Resting orders whose owners lost access cannot fill; the operator clears them.
+  const departed = (() => {
+    if (!operator || !book) return [];
+    try {
+      const access = accessPolicy(
+        [...(s.catalog?.contracts ?? []), ...s.owned],
+        current,
+      );
+      if (!access) return [];
+      const open = new Set(
+        list(book.data.orders).map((r) => text(obj(r).order)),
+      );
+      return s.owned.filter(
+        (c) =>
+          c.kind === "MultiOrder" &&
+          open.has(c.id) &&
+          excludedBy(access, text(c.data.owner)),
+      );
+    } catch {
+      return [];
+    }
+  })();
+  const outcomeOptions = outcomes.map((label, i) => ({
+    value: String(i),
+    label,
+  }));
   const lots = s.owned.filter(
     (c) =>
       c.kind === "MultiLot" && c.data.owner === party && sameMarket(c, key),
@@ -117,6 +150,140 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
         </p>
       </section>
 
+      {book ? (
+        <section className="canton-book">
+          <h2>{t("Order book")}</h2>
+          <table>
+            <thead>
+              <tr>
+                {["Outcome", "Side", "Price", "Quantity"].map((k) => (
+                  <th key={k}>{t(k)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...quotes]
+                .sort(
+                  (a, b) =>
+                    Number(a.outcome) - Number(b.outcome) ||
+                    a.side.localeCompare(b.side) ||
+                    Number(b.price) - Number(a.price),
+                )
+                .map((q) => (
+                  <tr key={q.orderId}>
+                    <td>{outcomes[Number(q.outcome)] ?? q.outcome}</td>
+                    <td>{t(q.side)}</td>
+                    <td className="ui-num">{q.price}</td>
+                    <td className="ui-num">{q.quantity}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {!quotes.length ? <p>{t("No open orders.")}</p> : null}
+        </section>
+      ) : null}
+      {book && open ? (
+        <section className="canton-panel">
+          <h2>{t("Trade")}</h2>
+          <ActionForm
+            label="Place order"
+            fields={[
+              { name: "outcome", label: "Outcome", options: outcomeOptions },
+              {
+                name: "side",
+                label: "Side",
+                options: [
+                  { value: "multiBuy", label: "Buy" },
+                  { value: "multiSell", label: "Sell" },
+                ],
+              },
+              { name: "price", label: "Price", value: text(terms.priceTick) },
+              {
+                name: "quantity",
+                label: "Quantity",
+                value: text(terms.quantityLot),
+              },
+            ]}
+            build={(v) => ({
+              action: v.side === "multiSell" ? "multiSell" : "multiBuy",
+              target: book.id,
+              values: {
+                outcome: v.outcome,
+                price: v.price,
+                quantity: v.quantity,
+              },
+            })}
+          />
+        </section>
+      ) : null}
+      {mine.length ? (
+        <section className="canton-panel">
+          <h2>{t("Your orders")}</h2>
+          <ul>
+            {mine.map((o) => (
+              <li key={o.id}>
+                <span className="ui-num">
+                  {t(text(o.data.side))}{" "}
+                  {outcomes[Number(o.data.outcome)] ?? text(o.data.outcome)}{" "}
+                  {text(o.data.quantity)} @ {text(o.data.price)}
+                </span>
+                <ActionButton
+                  label="Cancel"
+                  intent={{ action: "multiCancel", target: o.id }}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {operator && book ? (
+        <section className="canton-panel">
+          {open ? (
+            <ActionForm
+              label="Match next"
+              fields={[
+                { name: "outcome", label: "Outcome", options: outcomeOptions },
+              ]}
+              build={(v) => ({
+                action: "multiMatch",
+                target: book.id,
+                values: v,
+              })}
+            />
+          ) : null}
+          {departed.length ? (
+            <div className="canton-departed">
+              <h3>{t("Orders from departed members")}</h3>
+              <ul>
+                {departed.map((o) => (
+                  <li key={o.id}>
+                    <span className="ui-num">
+                      {t(text(o.data.side))} {outcomes[Number(o.data.outcome)]}{" "}
+                      {text(o.data.quantity)} @ {text(o.data.price)}
+                    </span>
+                    <ActionButton
+                      label="Clear order"
+                      intent={{ action: "multiClearDeparted", target: o.id }}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <p>
+            {t("Earned fees")}: {text(obj(book.data.fees).amount)}
+          </p>
+          <ActionForm
+            label="Withdraw fees"
+            fields={[{ name: "amount", label: "Amount" }]}
+            build={(v) => ({
+              action: "multiWithdrawFees",
+              target: book.id,
+              values: v,
+            })}
+          />
+        </section>
+      ) : null}
       {reserve && open ? (
         <section className="canton-panel">
           <h2>{t("Complete sets")}</h2>
@@ -243,9 +410,6 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
           <dt>{t("Contract lot")}</dt>
           <dd>{text(terms.quantityLot)}</dd>
         </dl>
-        <p className="club-help">
-          {t("Trading individual outcomes on an order book is coming next.")}
-        </p>
       </section>
     </TradingFrame>
   );

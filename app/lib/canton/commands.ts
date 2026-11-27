@@ -83,7 +83,15 @@ export type Action =
   | "multiPropose"
   | "multiCorrect"
   | "multiFinalize"
-  | "multiBind";
+  | "multiBind"
+  | "multiBuy"
+  | "multiSell"
+  | "multiCancel"
+  | "multiClearDeparted"
+  | "multiMatch"
+  | "multiWithdrawFees"
+  | "multiSetShare"
+  | "clubWithdrawMultiFees";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -183,6 +191,14 @@ export function buildPlan(
     multiCorrect: "MultiProposal",
     multiFinalize: "MultiProposal",
     multiBind: "MultiReserve",
+    multiBuy: "MultiBook",
+    multiSell: "MultiBook",
+    multiCancel: "MultiOrder",
+    multiClearDeparted: "MultiOrder",
+    multiMatch: "MultiBook",
+    multiWithdrawFees: "MultiBook",
+    multiSetShare: "MultiBook",
+    clubWithdrawMultiFees: "MultiBook",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -354,6 +370,38 @@ export function buildPlan(
     return rows.slice(0, 16);
   };
   const outcomeCount = () => (terms ? list(terms.outcomes).length : 0);
+  /** An outcome index of this market, as the ledger's Int text. */
+  const outcomeIndex = () => {
+    const i = Number(v.outcome);
+    if (!Number.isInteger(i) || i < 0 || i >= outcomeCount())
+      throw new Error("Choose one of this market's outcomes.");
+    return String(i);
+  };
+  const openMulti = () => {
+    const m = find("MultiMarket");
+    if (
+      m.data.status !== "Open" ||
+      Date.parse(text(obj(m.data.terms).closeAt)) <= Date.now()
+    )
+      throw new Error("Market is not open for new orders.");
+    return m;
+  };
+  /** Every indexed order of the target multi book, from wallet-visible contracts. */
+  const multiSnapshot = () =>
+    list(target.data.orders)
+      .map(obj)
+      .map((ref) => {
+        const o = owned.find(
+          (c) => c.kind === "MultiOrder" && c.id === ref.order,
+        );
+        if (!o) throw new Error("Incomplete matching snapshot. Refresh.");
+        use(o);
+        return o;
+      });
+  const indexedIn = (book: Contract) => {
+    if (!list(book.data.orders).some((r) => obj(r).order === target.id))
+      throw new Error("Order is no longer open.");
+  };
   let interfaceRoot: string | null = null;
   switch (intent.action) {
     case "enroll":
@@ -826,6 +874,144 @@ export function buildPlan(
       choice = "MultiReserve_BindResolution";
       args = { resolution: use(find("MultiFinal")) };
       break;
+    case "multiBuy":
+    case "multiSell": {
+      const q = quantity(),
+        outcome = outcomeIndex(),
+        m = openMulti();
+      const quote = orderQuote(
+        text(v.price),
+        q,
+        text(terms!.priceTick),
+        text(terms!.quantityLot),
+        text(policy.data.takerFeeBps),
+        text(target.data.assetDecimals),
+      );
+      args = {
+        owner: party,
+        market: use(m),
+        outcome,
+        price: text(v.price),
+        quantity: q,
+        ...approval(),
+        eligibility: eligibilityFor(m, party),
+      };
+      if (intent.action === "multiBuy") {
+        const balance = account();
+        if (raw(quote.debit) > raw(balance.data.available))
+          throw new Error(
+            "Deposit enough collateral for the order and fee reserve.",
+          );
+        args.balance = use(balance);
+        choice = "MultiBook_PlaceBuy";
+        context = true;
+      } else {
+        const positions = multiLots();
+        if (
+          positions.reduce(
+            (sum, c) => sum + integer(list(c.data.counts)[Number(outcome)]),
+            BigInt(0),
+          ) < integer(q)
+        )
+          throw new Error("Insufficient outcome contracts.");
+        args.positions = positions.map(use);
+        choice = "MultiBook_PlaceSell";
+      }
+      break;
+    }
+    case "multiCancel":
+      owner(target);
+      root = find("MultiBook");
+      indexedIn(root);
+      choice = "MultiBook_Cancel";
+      args = {
+        owner: party,
+        order: target.id,
+        balance: target.data.side === "Buy" ? use(account()) : null,
+      };
+      context = true;
+      break;
+    case "multiClearDeparted": {
+      operator();
+      root = find("MultiBook");
+      indexedIn(root);
+      const m = openMulti(),
+        orderOwner = text(target.data.owner),
+        access = accessPolicy(all, m);
+      if (!access || !excludedBy(access, orderOwner))
+        throw new Error("This owner can still trade in this market.");
+      choice = "MultiBook_CancelIneligible";
+      args = {
+        market: use(m),
+        order: target.id,
+        policy: use(access),
+        balance: target.data.side === "Buy" ? use(account(orderOwner)) : null,
+      };
+      context = true;
+      break;
+    }
+    case "multiMatch": {
+      operator();
+      const outcome = outcomeIndex(),
+        m = openMulti(),
+        orders = multiSnapshot().filter(
+          (o) => String(o.data.outcome) === outcome,
+        );
+      const buy = bestOrder(orders, "Buy"),
+        sell = bestOrder(orders, "Sell");
+      if (!buy || !sell || raw(buy.data.price) < raw(sell.data.price))
+        throw new Error("No crossed orders to match.");
+      choice = "MultiBook_MatchBest";
+      args = {
+        market: use(m),
+        outcome,
+        buyerBalance: use(account(text(buy.data.owner))),
+        sellerBalance: use(account(text(sell.data.owner))),
+        buyerEligibility: eligibilityFor(m, text(buy.data.owner)),
+        sellerEligibility: eligibilityFor(m, text(sell.data.owner)),
+      };
+      context = true;
+      break;
+    }
+    case "multiWithdrawFees":
+      operator();
+      choice = "MultiBook_WithdrawFees";
+      args = { amount: positive() };
+      if (
+        raw(v.amount) >
+        raw(obj(target.data.fees).amount) - raw(target.data.clubFees ?? "0")
+      )
+        throw new Error("Amount exceeds the fees not owed to a club.");
+      context = true;
+      break;
+    case "multiSetShare": {
+      operator();
+      const bps = Number(text(v.bps));
+      if (!Number.isInteger(bps) || bps < 0 || bps > 5000)
+        throw new Error("The club share must be 0 to 5,000 basis points.");
+      choice = "MultiBook_SetClubShare";
+      args = { bps: String(bps) };
+      break;
+    }
+    case "clubWithdrawMultiFees": {
+      const scope = obj(target.data.key).scope;
+      const club = owned.find(
+        (c) =>
+          c.kind === "Club" &&
+          !!scope &&
+          factoryRefKey(c.data.factoryRef) === factoryRefKey(scope),
+      );
+      if (!club || club.data.owner !== party)
+        throw new Error("Only the club owner can withdraw club fees.");
+      const amount = positive();
+      if (raw(amount) > raw(target.data.clubFees ?? "0"))
+        throw new Error("Amount exceeds the fees owed to the club.");
+      root = club;
+      choice = "Club_WithdrawMultiFees";
+      args = { book: use(target), amount };
+      context = true;
+      break;
+    }
     case "factoryCreate": {
       const creation = obj(target.data.policy);
       let proof: RecordValue | null = null,

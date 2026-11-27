@@ -1527,5 +1527,6 @@
   "Trading individual outcomes on an order book is coming next.": "L’échange de chaque issue sur un carnet d’ordres arrive bientôt.",
   "YES / NO": "OUI / NON",
   "Multiple outcomes": "Plusieurs issues",
-  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Issues : une par ligne, sous la forme Libellé : quand elle gagne (2 à 8)"
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Issues : une par ligne, sous la forme Libellé : quand elle gagne (2 à 8)",
+  "Place order": "Passer l’ordre"
 }

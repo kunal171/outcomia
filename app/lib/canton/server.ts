@@ -95,7 +95,7 @@ export async function catalog(
   if (!/^[0-9]+$/.test(String(offset)))
     throw new Error("Invalid ledger offset.");
   // Clubs are read only to pick out verified public listings for discovery.
-  const kinds = [...publicKinds, "LimitOrder", "Club"] as const;
+  const kinds = [...publicKinds, "LimitOrder", "MultiOrder", "Club"] as const;
   const raw = await request("/v2/state/active-contracts", {
     eventFormat: {
       filtersByParty: {
@@ -121,8 +121,12 @@ export async function catalog(
   single(all, "VaultAuthority");
   single(all, "PositionRegistry");
   single(all, "OrderRegistry");
-  const orders = all.filter((c) => c.kind === "LimitOrder");
-  for (const book of all.filter((c) => c.kind === "OrderBook"))
+  const orders = all.filter(
+    (c) => c.kind === "LimitOrder" || c.kind === "MultiOrder",
+  );
+  for (const book of all.filter(
+    (c) => c.kind === "OrderBook" || c.kind === "MultiBook",
+  ))
     for (const ref of list(book.data.orders))
       if (
         !orders.some(
@@ -182,6 +186,12 @@ export async function registryContext(
       "multiSplit",
       "multiMerge",
       "multiRedeem",
+      "multiBuy",
+      "multiCancel",
+      "multiClearDeparted",
+      "multiMatch",
+      "multiWithdrawFees",
+      "clubWithdrawMultiFees",
     ].includes(action) ||
     party === d.vault
   )

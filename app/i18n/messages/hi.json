@@ -1527,5 +1527,6 @@
   "Trading individual outcomes on an order book is coming next.": "हर परिणाम की ऑर्डर बुक पर ट्रेडिंग जल्द आ रही है।",
   "YES / NO": "हाँ / नहीं",
   "Multiple outcomes": "कई परिणाम",
-  "Outcomes: one per line, as Label: how it wins (2 to 8)": "परिणाम: हर लाइन में एक, लेबल: कब जीतता है (2 से 8)"
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "परिणाम: हर लाइन में एक, लेबल: कब जीतता है (2 से 8)",
+  "Place order": "ऑर्डर लगाएँ"
 }
