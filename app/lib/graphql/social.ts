@@ -3,7 +3,10 @@
 import { graphql } from "./client";
 
 export type Profile = {
-  wallet: string;
+  /** The owner's Solana wallet; null for a Canton-only profile. */
+  wallet: string | null;
+  /** Canton parties linked to this profile. */
+  cantonParties: string[];
   username: string;
   displayName: string;
   bio: string;
@@ -21,9 +24,12 @@ export type Profile = {
   youtube: string | null;
 };
 const PROFILE =
-  "wallet username displayName bio avatarHue xHandle showOnLeaderboards createdAt location website telegram instagram linkedin discord github youtube";
+  "wallet cantonParties username displayName bio avatarHue xHandle showOnLeaderboards createdAt location website telegram instagram linkedin discord github youtube";
 
-export type ProfileInput = Omit<Profile, "wallet" | "createdAt">;
+export type ProfileInput = Omit<
+  Profile,
+  "wallet" | "cantonParties" | "createdAt"
+>;
 export type Period = "DAY" | "WEEK" | "MONTH" | "ALL";
 export type TraderBoard =
   "VOLUME" | "ACTIVITY" | "MAKERS" | "PROFIT" | "ACCURACY";
@@ -150,10 +156,14 @@ export type MarketTraderRow = {
   profit: string | null;
 };
 
-export async function getProfile(by: { wallet?: string; username?: string }) {
+export async function getProfile(by: {
+  wallet?: string;
+  username?: string;
+  party?: string;
+}) {
   const data = await graphql<{ profile: Profile | null }>(
-    `query Profile($wallet: String, $username: String) {
-      profile(wallet: $wallet, username: $username) { ${PROFILE} }
+    `query Profile($wallet: String, $username: String, $party: String) {
+      profile(wallet: $wallet, username: $username, party: $party) { ${PROFILE} }
     }`,
     by,
   );
