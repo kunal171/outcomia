@@ -1557,5 +1557,7 @@
   "Sign in with Solana": "Sign in with Solana",
   "Sign in with Canton": "Sign in with Canton",
   "Canton trading is not included yet; it is added once Canton history is indexed.": "Canton trading is not included yet; it is added once Canton history is indexed.",
-  "Create or link a profile →": "Create or link a profile →"
+  "Create or link a profile →": "Create or link a profile →",
+  "Not priced, left out: {value0}": "Not priced, left out: {value0}",
+  "Realized plus unrealized P&L at current USD prices (Pyth); test stablecoins count as one dollar.": "Realized plus unrealized P&L at current USD prices (Pyth); test stablecoins count as one dollar."
 }

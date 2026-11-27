@@ -1557,5 +1557,7 @@
   "Sign in with Solana": "Entrar com Solana",
   "Sign in with Canton": "Entrar com Canton",
   "Canton trading is not included yet; it is added once Canton history is indexed.": "As negociações na Canton ainda não estão incluídas; serão adicionadas quando o histórico da Canton for indexado.",
-  "Create or link a profile →": "Crie ou vincule um perfil →"
+  "Create or link a profile →": "Crie ou vincule um perfil →",
+  "Not priced, left out: {value0}": "Sem preço, deixado de fora: {value0}",
+  "Realized plus unrealized P&L at current USD prices (Pyth); test stablecoins count as one dollar.": "P&L realizado mais não realizado a preços atuais em USD (Pyth); stablecoins de teste valem um dólar."
 }
