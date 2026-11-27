@@ -179,6 +179,18 @@ export async function getProfiles(wallets: string[]) {
   return data.profiles;
 }
 
+/** Profiles linked to up to 100 Canton parties; unlinked parties are left out. */
+export async function getPartyProfiles(parties: string[]) {
+  if (parties.length === 0) return [];
+  const data = await graphql<{
+    partyProfiles: { party: string; profile: Profile }[];
+  }>(
+    `query PartyProfiles($parties: [String!]!) { partyProfiles(parties: $parties) { party profile { ${PROFILE} } } }`,
+    { parties: parties.slice(0, 100) },
+  );
+  return data.partyProfiles;
+}
+
 export async function updateProfile(input: ProfileInput) {
   const data = await graphql<{ updateProfile: Profile }>(
     `mutation UpdateProfile($input: ProfileInput!) {
