@@ -91,7 +91,8 @@ export type Action =
   | "multiMatch"
   | "multiWithdrawFees"
   | "multiSetShare"
-  | "clubWithdrawMultiFees";
+  | "clubWithdrawMultiFees"
+  | "multiMatchFullSet";
 export type Intent = { action: Action; target: string; values?: RecordValue };
 export type Command = {
   ExerciseCommand: {
@@ -199,6 +200,7 @@ export function buildPlan(
     multiWithdrawFees: "MultiBook",
     multiSetShare: "MultiBook",
     clubWithdrawMultiFees: "MultiBook",
+    multiMatchFullSet: "MultiBook",
   };
   if (target.kind !== expected[intent.action])
     throw new Error("Action does not match this contract type.");
@@ -969,6 +971,42 @@ export function buildPlan(
         sellerBalance: use(account(text(sell.data.owner))),
         buyerEligibility: eligibilityFor(m, text(buy.data.owner)),
         sellerEligibility: eligibilityFor(m, text(sell.data.owner)),
+      };
+      context = true;
+      break;
+    }
+    case "multiMatchFullSet": {
+      // One head per outcome on one side: buys mint sets when their limits
+      // sum to at least 1, sells merge them when the sum is at most 1.
+      operator();
+      const side = v.side === "Sell" ? "Sell" : "Buy",
+        m = openMulti(),
+        orders = multiSnapshot(),
+        heads = Array.from({ length: outcomeCount() }, (_, i) =>
+          bestOrder(
+            orders.filter((o) => String(o.data.outcome) === String(i)),
+            side,
+          ),
+        );
+      if (heads.some((h) => !h))
+        throw new Error("Every outcome needs an order on this side.");
+      const total = heads.reduce(
+        (sum, h) => sum + raw(h!.data.price),
+        BigInt(0),
+      );
+      if (side === "Buy" ? total < scale : total > scale)
+        throw new Error(
+          side === "Buy"
+            ? "Best bids sum to less than 1: no set to mint."
+            : "Best asks sum to more than 1: no set to merge.",
+        );
+      choice = "MultiBook_MatchFullSet";
+      args = {
+        market: use(m),
+        reserve: use(find("MultiReserve")),
+        side,
+        balances: heads.map((h) => use(account(text(h!.data.owner)))),
+        eligibility: heads.map((h) => eligibilityFor(m, text(h!.data.owner))),
       };
       context = true;
       break;

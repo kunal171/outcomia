@@ -1528,5 +1528,17 @@
   "YES / NO": "OUI / NON",
   "Multiple outcomes": "Plusieurs issues",
   "Outcomes: one per line, as Label: how it wins (2 to 8)": "Issues : une par ligne, sous la forme Libellé : quand elle gagne (2 à 8)",
-  "Place order": "Passer l’ordre"
+  "Place order": "Passer l’ordre",
+  "Bid": "Achat",
+  "Ask": "Vente",
+  "Last": "Dernier",
+  "Through a full set": "Via un lot complet",
+  "set": "lot",
+  "Match full set": "Apparier un lot complet",
+  "Bids of every outcome: mint sets": "Achats de chaque issue : créer des lots",
+  "Asks of every outcome: merge sets": "Ventes de chaque issue : fusionner des lots",
+  "Recent activity": "Activité récente",
+  "Time": "Heure",
+  "Full sets merged": "Lots complets fusionnés",
+  "Full sets minted": "Lots complets créés"
 }

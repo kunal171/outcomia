@@ -665,3 +665,47 @@ test("revocation keeps withdrawal accounts visible while removing new deposits",
   );
   assert.equal(plan.command.ExerciseCommand.choice, "AssetBalance_Withdraw");
 });
+test("catalog publishes party-free multi-outcome fill history, newest first", async () => {
+  const fill = (id, at, plan) =>
+    c(id === "set" ? "MultiFullSetFill" : "MultiTradeFill", id, {
+      key: { ...key, scope: null },
+      vault: d.vault,
+      buyer: "alice",
+      seller: "bob",
+      owners: ["alice", "bob"],
+      instrument,
+      plan,
+      executedAt: at,
+      feeAmount: "0",
+    });
+  const rows = [
+    fill("old", "2026-11-20T01:00:00Z", {
+      outcome: "1",
+      price: "0.4",
+      quantity: "2",
+    }),
+    fill("set", "2026-11-20T03:00:00Z", { side: "Buy", quantity: "5" }),
+    fill("new", "2026-11-20T02:00:00Z", {
+      outcome: "2",
+      price: "0.6",
+      quantity: "1",
+    }),
+  ];
+  const out = await catalog(env, async (url) =>
+    Response.json(
+      String(url).endsWith("ledger-end")
+        ? { offset: "100" }
+        : [...snapshot.contracts, ...rows].map(event),
+    ),
+  );
+  assert.deepEqual(
+    out.fills.map((f) => [f.kind, f.outcome ?? f.side, f.quantity]),
+    [
+      ["set", "Buy", "5"],
+      ["trade", "2", "1"],
+      ["trade", "1", "2"],
+    ],
+  );
+  assert.ok(!JSON.stringify(out.fills).includes("alice"));
+  assert.ok(!out.contracts.some((c) => c.kind.endsWith("Fill")));
+});

@@ -8,7 +8,12 @@ import {
   standardTerms,
 } from "../lib/canton/commands.ts";
 import { decodeContracts, multiResult } from "../lib/canton/model.ts";
-import { lotTotals, multiClaim, parseOutcomes } from "../lib/canton/multi.ts";
+import {
+  lotTotals,
+  multiClaim,
+  outcomeQuotes,
+  parseOutcomes,
+} from "../lib/canton/multi.ts";
 import {
   d as base,
   instrument,
@@ -432,4 +437,118 @@ test("per-outcome orders place, cancel and match on the multi book", () => {
     ).choice,
     "MultiBook_WithdrawFees",
   );
+});
+
+test("full sets match one head per outcome and quotes show implied prices", () => {
+  const owners = ["alice", "bob", "carol", "dave"];
+  const bids = owners.map((owner, i) =>
+    c("MultiOrder", `b${i}`, {
+      key,
+      vault: d.vault,
+      owner,
+      instrument,
+      factory: "factory",
+      outcomeCount: "4",
+      outcome: String(i),
+      side: "Buy",
+      price: ["0.30", "0.20", "0.20", "0.40"][i],
+      quantity: "1",
+      orderId: String(i + 1),
+    }),
+  );
+  const book = c("MultiBook", "fbook", {
+    key,
+    vault: d.vault,
+    creator: "alice",
+    terms,
+    factory: "factory",
+    assetDecimals: "6",
+    nextOrderId: "5",
+    orders: bids.map((b) => ({
+      orderId: b.data.orderId,
+      order: b.id,
+      outcome: b.data.outcome,
+      side: "Buy",
+      price: b.data.price,
+    })),
+    fees: { amount: "0", cash: null },
+    clubShareBps: "0",
+    clubFees: "0",
+  });
+  const accounts = owners.map((owner) => ({
+    ...balance,
+    id: `${owner}-balance`,
+    data: { ...balance.data, owner },
+  }));
+  const contracts = snapshot(book);
+  const run = (side, o) =>
+    buildPlan(d.operator, contracts, o, {
+      action: "multiMatchFullSet",
+      target: "fbook",
+      values: { side },
+    });
+  const matched = exercise(run("Buy", [...accounts, ...bids]));
+  assert.equal(matched.choice, "MultiBook_MatchFullSet");
+  assert.equal(matched.choiceArgument.reserve, "mreserve");
+  assert.deepEqual(
+    matched.choiceArgument.balances,
+    owners.map((o) => `${o}-balance`),
+  );
+  assert.deepEqual(matched.choiceArgument.eligibility, [
+    null,
+    null,
+    null,
+    null,
+  ]);
+  // No asks: nothing to merge. Without the Gold bid, nothing to mint.
+  assert.throws(() => run("Sell", [...accounts, ...bids]), /Every outcome/);
+  assert.throws(
+    () =>
+      buildPlan(
+        d.operator,
+        snapshot({
+          ...book,
+          data: { ...book.data, orders: book.data.orders.slice(0, 3) },
+        }),
+        [...accounts, ...bids],
+        {
+          action: "multiMatchFullSet",
+          target: "fbook",
+          values: { side: "Buy" },
+        },
+      ),
+    /Every outcome/,
+  );
+  assert.throws(
+    () =>
+      buildPlan("alice", contracts, [...accounts, ...bids], {
+        action: "multiMatchFullSet",
+        target: "fbook",
+        values: { side: "Buy" },
+      }),
+    /Operator wallet/,
+  );
+
+  const q = outcomeQuotes(
+    4,
+    [
+      { side: "Buy", outcome: "0", price: "0.30" },
+      { side: "Buy", outcome: "1", price: "0.20" },
+      { side: "Buy", outcome: "2", price: "0.20" },
+      { side: "Sell", outcome: "3", price: "0.45" },
+    ],
+    [
+      { kind: "trade", outcome: "3", price: "0.4100000000" },
+      { kind: "trade", outcome: "3", price: "0.3900000000" },
+    ],
+  );
+  // Gold costs 1 - 0.70 = 0.30 through a set; its last trade is the newest fill.
+  assert.deepEqual(q[3], {
+    bid: undefined,
+    ask: "0.45",
+    impliedAsk: "0.3",
+    impliedBid: undefined,
+    last: "0.41",
+  });
+  assert.equal(q[0].impliedAsk, undefined);
 });
