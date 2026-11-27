@@ -2787,6 +2787,8 @@ body:has(.prediction-guide[open]) {
 .profile-stats article { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .profile-stats strong { font-size: 1.4rem; }
 .profile-stats small { color: var(--muted); }
+.profile-editor { width: min(100%, 640px); }
+.profile-editor h1 { margin: 0; font-size: 1.35rem; }
 .profile-editor form { display: grid; gap: 12px; margin-top: 12px; max-width: 520px; }
 .profile-editor label { display: grid; gap: 6px; font-weight: 600; }
 .profile-editor label small, .profile-editor-note { color: var(--muted); font-weight: 400; }

@@ -1540,5 +1540,8 @@
   "Recent activity": "Activité récente",
   "Time": "Heure",
   "Full sets merged": "Lots complets fusionnés",
-  "Full sets minted": "Lots complets créés"
+  "Full sets minted": "Lots complets créés",
+  "← Back to profile": "← Retour au profil",
+  "Connect your wallet to edit your profile.": "Connectez votre portefeuille pour modifier votre profil.",
+  "You can only edit your own profile.": "Vous ne pouvez modifier que votre propre profil."
 }
