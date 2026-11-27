@@ -170,6 +170,14 @@ type OutcomeHolding {
 	contracts: String!
 }
 
+"""
+A Canton party and the profile it is linked to.
+"""
+type PartyProfile {
+	party: String!
+	profile: Profile!
+}
+
 enum Period {
 	DAY
 	WEEK
@@ -248,6 +256,11 @@ type Query {
 	Profiles for up to 100 wallets, so lists can show names in one request.
 	"""
 	profiles(wallets: [String!]!): [Profile!]!
+	"""
+	The profile linked to each of up to 100 Canton parties, in request
+	order; parties without a profile are left out.
+	"""
+	partyProfiles(parties: [String!]!): [PartyProfile!]!
 	"""
 	Mints that have trades, largest volume first, for the token switch.
 	"""

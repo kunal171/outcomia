@@ -675,5 +675,13 @@ mod profiles_and_leaderboards {
         )
         .await;
         assert_eq!(missing["profile"], serde_json::Value::Null);
+        let batch = run(
+            &schema,
+            format!("{{partyProfiles(parties:[\"nobody::12345678\",\"{party}\"]){{party profile{{username}}}}}}"),
+        )
+        .await;
+        assert_eq!(batch["partyProfiles"].as_array().unwrap().len(), 1);
+        assert_eq!(batch["partyProfiles"][0]["party"], party);
+        assert_eq!(batch["partyProfiles"][0]["profile"]["username"], "carol");
     }
 }

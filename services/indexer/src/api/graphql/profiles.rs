@@ -349,6 +349,47 @@ impl ProfilesQuery {
         let mut found = profiles_for(pool, &wallets).await?;
         Ok(wallets.iter().filter_map(|w| found.remove(w)).collect())
     }
+
+    /// The profile linked to each of up to 100 Canton parties, in request
+    /// order; parties without a profile are left out.
+    async fn party_profiles(
+        &self,
+        ctx: &Context<'_>,
+        parties: Vec<String>,
+    ) -> async_graphql::Result<Vec<PartyProfile>> {
+        if parties.len() > 100 || parties.iter().any(|p| p.len() > 255) {
+            return Err("Ask for at most 100 parties".into());
+        }
+        let pool = &ctx.data::<ApiState>()?.pool;
+        let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "SELECT DISTINCT ON (a.party) a.party AS linked_party,{PROFILE_COLUMNS}
+               FROM canton_accounts a JOIN profiles ON profiles.user_id=a.user_id
+              WHERE a.party = ANY($1) ORDER BY a.party"
+        )))
+        .bind(&parties)
+        .fetch_all(pool)
+        .await?;
+        let mut found: std::collections::HashMap<String, Profile> = rows
+            .iter()
+            .map(|row| (row.get("linked_party"), profile_from_row(row)))
+            .collect();
+        Ok(parties
+            .iter()
+            .filter_map(|party| {
+                found.remove(party).map(|profile| PartyProfile {
+                    party: party.clone(),
+                    profile,
+                })
+            })
+            .collect())
+    }
+}
+
+/// A Canton party and the profile it is linked to.
+#[derive(SimpleObject)]
+pub struct PartyProfile {
+    pub party: String,
+    pub profile: Profile,
 }
 
 #[derive(Default)]
