@@ -20,7 +20,7 @@ function linkValues(p: Profile | null | undefined) {
   ) as Pick<ProfileInput, (typeof PROFILE_LINKS)[number]["key"]>;
 }
 
-/** Wallet page card: create or edit the signed-in wallet's public profile.
+/** `/u/<id>/edit` card: create or edit the connected wallet's public profile.
  * Saving needs a signed-in session, which proves the wallet owner is editing. */
 export function ProfileEditor({ wallet }: { wallet: string }) {
   const { t } = useI18n();
@@ -31,8 +31,6 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
   const [exists, setExists] = useState(false);
   const [pending, setPending] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
-  // Opens by default only when there is no profile yet; saving never closes it.
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!INDEXER_ENABLED) return;
@@ -42,7 +40,6 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
       .then((p) => {
         if (dead) return;
         setExists(!!p);
-        setOpen(!p);
         setSaved(p?.username ?? null);
         setForm({
           username: p?.username ?? "",
@@ -96,15 +93,10 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
   }
 
   return (
-    <details
-      className="admin-card profile-editor"
-      id="profile"
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary>
+    <section className="admin-card profile-editor">
+      <h1>
         {exists ? t("Your public profile") : t("Create your public profile")}
-      </summary>
+      </h1>
       {!form ? (
         <p role="status">{issue ? t(issue) : t("Loading…")}</p>
       ) : (
@@ -240,6 +232,6 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
           </small>
         </form>
       )}
-    </details>
+    </section>
   );
 }

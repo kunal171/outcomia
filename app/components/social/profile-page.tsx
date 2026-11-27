@@ -24,7 +24,7 @@ import {
   walletHue,
 } from "./social-ui";
 
-function isAddress(value: string) {
+export function isAddress(value: string) {
   try {
     new PublicKey(value);
     return value.length >= 32;
@@ -151,7 +151,10 @@ function ProfileBody({
             {profile && <ProfileLinks profile={profile} />}
           </div>
           {own && (
-            <Link className="ui-btn profile-edit" href="/wallet#profile">
+            <Link
+              className="ui-btn profile-edit"
+              href={`/u/${encodeURIComponent(profile?.username ?? wallet)}/edit`}
+            >
               {profile ? t("Edit profile") : t("Create your profile")}
             </Link>
           )}
