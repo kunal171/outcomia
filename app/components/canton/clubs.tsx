@@ -1,4 +1,5 @@
 "use client";
+import { PartyName } from "../social/party-name";
 import Link from "next/link";
 import { useCantonWallet } from "../canton-wallet-provider";
 import { useCantonTrading } from "./trading-provider";
@@ -42,13 +43,9 @@ export function clubMarkets(contracts: Contract[], club: Contract) {
   });
 }
 
+/** A member, invitee or requester: their profile name when linked. */
 function Party({ id }: { id: unknown }) {
-  const value = text(id);
-  return (
-    <code title={value}>
-      {value.length > 28 ? `${value.slice(0, 12)}…${value.slice(-10)}` : value}
-    </code>
-  );
+  return <PartyName party={text(id)} />;
 }
 
 function pendingInvite(club: Contract, party?: string) {

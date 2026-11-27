@@ -1556,5 +1556,6 @@
   "Use the Solana wallet or the Canton wallet this profile belongs to.": "Use a carteira Solana ou Canton à qual este perfil pertence.",
   "Sign in with Solana": "Entrar com Solana",
   "Sign in with Canton": "Entrar com Canton",
-  "Canton trading is not included yet; it is added once Canton history is indexed.": "As negociações na Canton ainda não estão incluídas; serão adicionadas quando o histórico da Canton for indexado."
+  "Canton trading is not included yet; it is added once Canton history is indexed.": "As negociações na Canton ainda não estão incluídas; serão adicionadas quando o histórico da Canton for indexado.",
+  "Create or link a profile →": "Crie ou vincule um perfil →"
 }

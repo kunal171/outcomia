@@ -1,4 +1,5 @@
 "use client";
+import { usePartyProfile } from "../social/party-name";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -46,6 +47,7 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(false);
+  const profile = usePartyProfile(state.session?.partyId);
   if (!state.session) return null;
   const session = state.session;
   const identity = `${session.wallet}:${session.networkId}:${session.partyId}`;
@@ -118,9 +120,11 @@ export function CantonWorkspace({ children }: { children: ReactNode }) {
               title={session.partyId}
               aria-label={`${t("Connected wallet")}: ${session.partyId}`}
             >
-              {session.partyId.length > 24
-                ? `${session.partyId.slice(0, 10)}…${session.partyId.slice(-6)}`
-                : session.partyId}
+              {profile
+                ? `@${profile.username}`
+                : session.partyId.length > 24
+                  ? `${session.partyId.slice(0, 10)}…${session.partyId.slice(-6)}`
+                  : session.partyId}
             </Link>
           </div>
           <div className="network-header-actions">
