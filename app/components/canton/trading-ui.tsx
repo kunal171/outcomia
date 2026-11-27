@@ -32,6 +32,7 @@ import {
 import { walletError } from "../../lib/console-wallet";
 import { ResolutionPolicy } from "../resolution-policy";
 import { MultiMarketDetail } from "./multi-market";
+import { multiPositions } from "../../lib/canton/multi";
 
 export function TradingFrame({
   title,
@@ -404,6 +405,11 @@ export function PositionsList() {
     const key = marketKey(c.data);
     groups.set(key, [...(groups.get(key) ?? []), c]);
   }
+  const multi = multiPositions(
+    s.catalog?.contracts ?? [],
+    s.owned,
+    wallet.session?.partyId,
+  );
   return (
     <TradingFrame title="Positions">
       <div className="canton-market-list">
@@ -457,7 +463,45 @@ export function PositionsList() {
             </section>
           );
         })}
-        {!groups.size ? (
+        {multi.map((p) => (
+          <section className="canton-position" key={p.key}>
+            <div className="canton-position-main">
+              <Link
+                className="canton-position-title"
+                href={`/canton/markets/${marketRouteId(p.lots[0].data)}`}
+              >
+                {marketLabel(s.catalog?.contracts ?? [], p.key)}
+              </Link>
+              <span className="canton-position-holdings">
+                {p.holdings
+                  .filter((h) => h.count > BigInt(0))
+                  .map((h) => (
+                    <span className="ui-badge" key={h.label}>
+                      {h.label}{" "}
+                      <span className="ui-num">{h.count.toString()}</span>
+                    </span>
+                  ))}
+              </span>
+            </div>
+            {p.claim ? (
+              <div className="canton-position-action">
+                <span className="ui-stat">
+                  <span>{t("Next claim")}</span>
+                  <strong>
+                    {p.claim.value} {p.collateral}
+                  </strong>
+                </span>
+                <ActionButton
+                  label={p.claim.value === "0" ? "Clear positions" : "Claim"}
+                  intent={{ action: "multiRedeem", target: p.claim.settled }}
+                />
+              </div>
+            ) : (
+              <span className="ui-badge">{t("Awaiting final settlement")}</span>
+            )}
+          </section>
+        ))}
+        {!groups.size && !multi.length ? (
           <p className="canton-empty">{t("No positions yet.")}</p>
         ) : null}
       </div>
