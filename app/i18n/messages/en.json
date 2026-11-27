@@ -1528,5 +1528,17 @@
   "YES / NO": "YES / NO",
   "Multiple outcomes": "Multiple outcomes",
   "Outcomes: one per line, as Label: how it wins (2 to 8)": "Outcomes: one per line, as Label: how it wins (2 to 8)",
-  "Place order": "Place order"
+  "Place order": "Place order",
+  "Bid": "Bid",
+  "Ask": "Ask",
+  "Last": "Last",
+  "Through a full set": "Through a full set",
+  "set": "set",
+  "Match full set": "Match full set",
+  "Bids of every outcome: mint sets": "Bids of every outcome: mint sets",
+  "Asks of every outcome: merge sets": "Asks of every outcome: merge sets",
+  "Recent activity": "Recent activity",
+  "Time": "Time",
+  "Full sets merged": "Full sets merged",
+  "Full sets minted": "Full sets minted"
 }

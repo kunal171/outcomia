@@ -22,7 +22,7 @@ import {
   text,
   type Contract,
 } from "../../lib/canton/model";
-import { lotTotals, multiClaim } from "../../lib/canton/multi";
+import { lotTotals, multiClaim, outcomeQuotes } from "../../lib/canton/multi";
 import { accessPolicy, excludedBy } from "../../lib/canton/commands";
 
 export function MultiMarketDetail({ current }: { current: Contract }) {
@@ -49,6 +49,8 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
   const result =
     current.kind === "MultiMarket" ? null : multiResult(data.result);
   const quotes = (s.catalog?.quotes ?? []).filter((q) => q.market === key);
+  const fills = (s.catalog?.fills ?? []).filter((f) => f.market === key);
+  const prices = outcomeQuotes(outcomes.length, quotes, fills);
   const mine = s.owned.filter(
     (c) =>
       c.kind === "MultiOrder" && c.data.owner === party && sameMarket(c, key),
@@ -121,9 +123,11 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
         <table>
           <thead>
             <tr>
-              {["Outcome", "Wins when", "You hold"].map((k) => (
-                <th key={k}>{t(k)}</th>
-              ))}
+              {["Outcome", "Wins when", "Bid", "Ask", "Last", "You hold"].map(
+                (k) => (
+                  <th key={k}>{t(k)}</th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -137,6 +141,25 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
                   {result?.winner === i ? ` · ${t("Winner")}` : ""}
                 </td>
                 <td>{criteria[i]}</td>
+                <td className="ui-num">
+                  {prices[i].bid ?? "–"}
+                  {prices[i].impliedBid ? (
+                    <small title={t("Through a full set")}>
+                      {" "}
+                      ({t("set")} {prices[i].impliedBid})
+                    </small>
+                  ) : null}
+                </td>
+                <td className="ui-num">
+                  {prices[i].ask ?? "–"}
+                  {prices[i].impliedAsk ? (
+                    <small title={t("Through a full set")}>
+                      {" "}
+                      ({t("set")} {prices[i].impliedAsk})
+                    </small>
+                  ) : null}
+                </td>
+                <td className="ui-num">{prices[i].last ?? "–"}</td>
                 <td className="ui-num">{totals[i].toString()}</td>
               </tr>
             ))}
@@ -246,6 +269,29 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
               ]}
               build={(v) => ({
                 action: "multiMatch",
+                target: book.id,
+                values: v,
+              })}
+            />
+          ) : null}
+          {open && reserve ? (
+            <ActionForm
+              label="Match full set"
+              fields={[
+                {
+                  name: "side",
+                  label: "Side",
+                  options: [
+                    { value: "Buy", label: "Bids of every outcome: mint sets" },
+                    {
+                      value: "Sell",
+                      label: "Asks of every outcome: merge sets",
+                    },
+                  ],
+                },
+              ]}
+              build={(v) => ({
+                action: "multiMatchFullSet",
                 target: book.id,
                 values: v,
               })}
@@ -392,6 +438,38 @@ export function MultiMarketDetail({ current }: { current: Contract }) {
         />
       ) : null}
 
+      {fills.length ? (
+        <section className="canton-panel">
+          <h2>{t("Recent activity")}</h2>
+          <table>
+            <thead>
+              <tr>
+                {["Time", "Trade", "Price", "Quantity"].map((k) => (
+                  <th key={k}>{t(k)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {fills.slice(0, 20).map((f, i) => (
+                <tr key={`${f.executedAt}-${i}`}>
+                  <td>{new Date(f.executedAt).toLocaleString()}</td>
+                  <td>
+                    {f.kind === "trade"
+                      ? (outcomes[Number(f.outcome)] ?? f.outcome)
+                      : t(
+                          f.side === "Sell"
+                            ? "Full sets merged"
+                            : "Full sets minted",
+                        )}
+                  </td>
+                  <td className="ui-num">{f.price ?? "–"}</td>
+                  <td className="ui-num">{f.quantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
       <section className="canton-panel">
         <h2>{t("Rules")}</h2>
         <dl>

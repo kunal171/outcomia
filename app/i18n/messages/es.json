@@ -1528,5 +1528,17 @@
   "YES / NO": "SÍ / NO",
   "Multiple outcomes": "Varios resultados",
   "Outcomes: one per line, as Label: how it wins (2 to 8)": "Resultados: uno por línea, como Etiqueta: cuándo gana (2 a 8)",
-  "Place order": "Colocar orden"
+  "Place order": "Colocar orden",
+  "Bid": "Compra",
+  "Ask": "Venta",
+  "Last": "Último",
+  "Through a full set": "Mediante un set completo",
+  "set": "set",
+  "Match full set": "Emparejar set completo",
+  "Bids of every outcome: mint sets": "Compras de cada resultado: crear sets",
+  "Asks of every outcome: merge sets": "Ventas de cada resultado: unir sets",
+  "Recent activity": "Actividad reciente",
+  "Time": "Hora",
+  "Full sets merged": "Sets completos unidos",
+  "Full sets minted": "Sets completos creados"
 }

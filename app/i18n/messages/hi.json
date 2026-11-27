@@ -1528,5 +1528,17 @@
   "YES / NO": "हाँ / नहीं",
   "Multiple outcomes": "कई परिणाम",
   "Outcomes: one per line, as Label: how it wins (2 to 8)": "परिणाम: हर लाइन में एक, लेबल: कब जीतता है (2 से 8)",
-  "Place order": "ऑर्डर लगाएँ"
+  "Place order": "ऑर्डर लगाएँ",
+  "Bid": "बोली",
+  "Ask": "माँग",
+  "Last": "अंतिम",
+  "Through a full set": "पूरे सेट के ज़रिए",
+  "set": "सेट",
+  "Match full set": "पूरा सेट मैच करें",
+  "Bids of every outcome: mint sets": "हर परिणाम की बोलियाँ: सेट बनाएँ",
+  "Asks of every outcome: merge sets": "हर परिणाम की माँगें: सेट मिलाएँ",
+  "Recent activity": "हाल की गतिविधि",
+  "Time": "समय",
+  "Full sets merged": "पूरे सेट मिलाए गए",
+  "Full sets minted": "पूरे सेट बनाए गए"
 }
