@@ -95,7 +95,14 @@ export async function catalog(
   if (!/^[0-9]+$/.test(String(offset)))
     throw new Error("Invalid ledger offset.");
   // Clubs are read only to pick out verified public listings for discovery.
-  const kinds = [...publicKinds, "LimitOrder", "MultiOrder", "Club"] as const;
+  const kinds = [
+    ...publicKinds,
+    "LimitOrder",
+    "MultiOrder",
+    "Club",
+    "MultiTradeFill",
+    "MultiFullSetFill",
+  ] as const;
   const raw = await request("/v2/state/active-contracts", {
     eventFormat: {
       filtersByParty: {
@@ -144,6 +151,32 @@ export async function catalog(
         disclosure(c);
         return c;
       }),
+    // Receipts become party-free history rows, newest first, at most 200.
+    fills: all
+      .filter(
+        (c) => c.kind === "MultiTradeFill" || c.kind === "MultiFullSetFill",
+      )
+      .map((c) => {
+        const plan = obj(c.data.plan);
+        return c.kind === "MultiTradeFill"
+          ? {
+              market: marketKey(c.data),
+              kind: "trade" as const,
+              outcome: text(plan.outcome),
+              price: text(plan.price),
+              quantity: text(plan.quantity),
+              executedAt: text(c.data.executedAt),
+            }
+          : {
+              market: marketKey(c.data),
+              kind: "set" as const,
+              side: text(plan.side),
+              quantity: text(plan.quantity),
+              executedAt: text(c.data.executedAt),
+            };
+      })
+      .sort((a, b) => b.executedAt.localeCompare(a.executedAt))
+      .slice(0, 200),
     quotes: orders.map((c) => ({
       market: marketKey(c.data),
       side: text(c.data.side),
@@ -190,6 +223,7 @@ export async function registryContext(
       "multiCancel",
       "multiClearDeparted",
       "multiMatch",
+      "multiMatchFullSet",
       "multiWithdrawFees",
       "clubWithdrawMultiFees",
     ].includes(action) ||

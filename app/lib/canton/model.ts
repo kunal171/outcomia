@@ -28,6 +28,8 @@ export const templates = {
   MultiFinal: "Outcomia.MultiOutcome:MultiFinal",
   MultiBook: "Outcomia.MultiOrders:MultiBook",
   MultiOrder: "Outcomia.MultiOrders:MultiOrder",
+  MultiTradeFill: "Outcomia.MultiOrders:MultiTradeFill",
+  MultiFullSetFill: "Outcomia.MultiOrders:MultiFullSetFill",
 } as const;
 /** Interfaces of the open market-factory standard (separate package). */
 export const interfaces = {
@@ -53,9 +55,21 @@ export type Deployment = {
   synchronizerId: string;
   trading: boolean;
 };
+/** Public trade history without parties: one row per fill receipt. */
+export type Fill = {
+  market: string;
+  kind: "trade" | "set";
+  /** Outcome index (trades) or side (full sets: Buy mints, Sell merges). */
+  outcome?: string;
+  side?: string;
+  price?: string;
+  quantity: string;
+  executedAt: string;
+};
 export type Catalog = {
   deployment: Deployment;
   contracts: Contract[];
+  fills?: Fill[];
   quotes: {
     market: string;
     side: string;
