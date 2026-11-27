@@ -58,7 +58,15 @@ fn install_club_rules(svm: &mut LiteSVM, public: u32, private: u32, owned: u16, 
         max_owned_clubs: owned,
         max_club_admins: admins,
         bump,
-        reserved: [0; 128],
+        reserved: [0; 39],
+        deposit_mint: Pubkey::default(),
+        deposit_mint_decimals: 0,
+        private_min_deposit_usd: 0,
+        public_min_deposit_usd: 0,
+        sol_buffer_bps: 0,
+        sol_usd_feed_id: [0; 32],
+        max_price_age_seconds: 0,
+        max_price_conf_bps: 0,
     }
     .try_serialize(&mut data)
     .unwrap();

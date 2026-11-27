@@ -533,4 +533,25 @@ pub enum OutcomiaError {
     InvalidClubRules = 195,
     #[msg("This club account does not need migration or is not a club")]
     ClubMigrationNotNeeded = 196,
+
+    #[msg("Club deposit rules are not set yet")]
+    ClubDepositRulesNotSet = 197,
+    #[msg("Deposit minimums must be positive, the SOL buffer 100-300%, price age 1-300 seconds and confidence at most 10%")]
+    InvalidClubDepositRules = 198,
+    #[msg("This club's deposit is held in a different token")]
+    ClubDepositAssetMismatch = 199,
+    #[msg("The deposit must bring the club to at least its minimum (SOL: with the price buffer)")]
+    ClubDepositTooLow = 200,
+    #[msg("This club's deposit is below the minimum; top it up to create or open markets")]
+    ClubDepositBelowMinimum = 201,
+    #[msg("A fresh SOL/USD price update is required for a club with a SOL deposit")]
+    ClubPriceUpdateRequired = 202,
+    #[msg("The SOL/USD price is for another feed, too old, not fully verified or not positive")]
+    InvalidPriceUpdate = 203,
+    #[msg("The SOL/USD price confidence band is too wide")]
+    PriceConfidenceTooWide = 204,
+    #[msg("This club's market count is already set")]
+    ClubMarketCountAlreadySet = 205,
+    #[msg("Deposit arithmetic overflowed")]
+    ClubDepositOverflow = 206,
 }

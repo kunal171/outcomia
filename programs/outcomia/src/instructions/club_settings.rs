@@ -11,7 +11,8 @@ use crate::{
     },
     errors::club,
     state::{
-        Club, ClubKind, ClubMarketPolicy, ClubMember, ClubOwnerRecord, ClubRole, ClubRulesConfig,
+        Club, ClubDepositAsset, ClubKind, ClubMarketPolicy, ClubMember, ClubOwnerRecord, ClubRole,
+        ClubRulesConfig,
     },
 };
 
@@ -92,7 +93,11 @@ pub fn handle_create_club(
         created_at: now,
         bump: ctx.bumps.club,
         kind,
-        reserved: [0; 96],
+        deposit_asset: ClubDepositAsset::None,
+        deposit_amount: 0,
+        live_markets: 0,
+        live_markets_ready: true,
+        reserved: [0; 82],
     });
     ctx.accounts.owner_member.set_inner(ClubMember {
         club: club_key,

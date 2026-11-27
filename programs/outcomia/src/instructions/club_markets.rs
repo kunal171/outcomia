@@ -11,11 +11,12 @@
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
+use pyth_solana_receiver_sdk::price_update::PriceUpdateV2;
 
 use crate::{
     constants::{
-        CLUB_MARKET_SEED, CLUB_MEMBER_SEED, CLUB_PREDICTION_MARKET_SEED, MARKET_METADATA_SEED,
-        PREDICTION_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
+        CLUB_MARKET_SEED, CLUB_MEMBER_SEED, CLUB_PREDICTION_MARKET_SEED, CLUB_RULES_CONFIG_SEED,
+        MARKET_METADATA_SEED, PREDICTION_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED,
     },
     errors::{club, prediction},
     prediction_config::{validate_prediction_market_config, PredictionMarketConfig},
@@ -27,6 +28,7 @@ use crate::{
 pub struct CreateClubPredictionMarket<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
+    #[account(mut)]
     pub club: Box<Account<'info, Club>>,
     #[account(seeds = [CLUB_MEMBER_SEED, club.key().as_ref(), creator.key().as_ref()],
         bump = creator_member.bump)]
@@ -50,6 +52,32 @@ pub struct CreateClubPredictionMarket<'info> {
     pub market_metadata: Box<Account<'info, MarketMetadata>>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Box<Account<'info, ClubRulesConfig>>,
+    /// Fresh Pyth SOL/USD price; required only when the club's deposit is SOL.
+    pub price_update: Option<Box<Account<'info, PriceUpdateV2>>>,
+}
+
+/// Opening a draft club market: the management checks plus the club's deposit.
+#[derive(Accounts)]
+pub struct OpenClubPredictionMarket<'info> {
+    pub actor: Signer<'info>,
+    #[account(seeds = [CLUB_MARKET_SEED, market.key().as_ref()], bump = club_market.bump,
+        has_one = market @ club::InvalidClubMarket, has_one = club @ club::InvalidClubMarket)]
+    pub club_market: Box<Account<'info, ClubMarket>>,
+    #[account(mut, seeds = [CLUB_PREDICTION_MARKET_SEED, market.market_id.as_ref()],
+        bump = market.bump)]
+    pub market: Box<Account<'info, PredictionMarket>>,
+    #[account(seeds = [CLUB_MEMBER_SEED, club_market.club.as_ref(), actor.key().as_ref()],
+        bump = actor_member.bump,
+        constraint = actor_member.role == ClubRole::Admin
+            || actor_member.wallet == club_market.creator @ club::UnauthorizedClubAdmin)]
+    pub actor_member: Box<Account<'info, ClubMember>>,
+    pub club: Box<Account<'info, Club>>,
+    #[account(seeds = [CLUB_RULES_CONFIG_SEED], bump = club_rules.bump)]
+    pub club_rules: Box<Account<'info, ClubRulesConfig>>,
+    /// Fresh Pyth SOL/USD price; required only when the club's deposit is SOL.
+    pub price_update: Option<Box<Account<'info, PriceUpdateV2>>>,
 }
 
 /// A club admin, or the market's creator while still a member, managing a club market.
@@ -110,12 +138,13 @@ pub(crate) fn require_club_access(
 ///
 /// # Inputs
 /// A member allowed by the club's market policy, the collateral mint, new market accounts, the
-/// 32-byte id, rules config (resolver = creator, no fallback), labels and access mode.
+/// 32-byte id, rules config (resolver = creator, no fallback), labels and access mode, plus the
+/// club rules and, for a SOL deposit, a fresh SOL/USD price.
 /// # Errors
 /// Policy forbids the creator, a fallback or foreign resolver, invalid terms, labels or payout,
-/// or an id already in use.
+/// an id already in use, or the club's deposit below its minimum.
 /// # Returns
-/// A Draft market with empty supplies and its `ClubMarket` binding.
+/// A Draft market with empty supplies and its `ClubMarket` binding; the club counts it as live.
 pub fn handle_create_club_prediction_market(
     ctx: Context<CreateClubPredictionMarket>,
     market_id: [u8; 32],
@@ -140,6 +169,16 @@ pub fn handle_create_club_prediction_market(
         &config,
         ctx.accounts.collateral_mint.decimals,
     )?;
+    super::club_deposits::require_club_funded(
+        &ctx.accounts.club,
+        &ctx.accounts.club_rules,
+        ctx.accounts.price_update.as_deref().map(|a| &**a),
+    )?;
+    let club = &mut ctx.accounts.club;
+    club.live_markets = club
+        .live_markets
+        .checked_add(1)
+        .ok_or(club::ClubCounterMismatch)?;
 
     let market_key = ctx.accounts.market.key();
     let creator = ctx.accounts.creator.key();
@@ -191,11 +230,16 @@ pub fn handle_create_club_prediction_market(
 /// Opens an unexpired draft club market.
 ///
 /// # Errors
-/// Signer is neither a club admin nor the creator-member, the market is not a Draft, or it is
-/// already past its close time.
+/// Signer is neither a club admin nor the creator-member, the market is not a Draft, it is
+/// already past its close time, or the club's deposit is below its minimum.
 /// # Returns
 /// `Ok(())` with status Open; terms are unchanged.
-pub fn handle_open_club_prediction_market(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+pub fn handle_open_club_prediction_market(ctx: Context<OpenClubPredictionMarket>) -> Result<()> {
+    super::club_deposits::require_club_funded(
+        &ctx.accounts.club,
+        &ctx.accounts.club_rules,
+        ctx.accounts.price_update.as_deref().map(|a| &**a),
+    )?;
     let market = &mut ctx.accounts.market;
     require!(
         market.status == PredictionStatus::Draft,
