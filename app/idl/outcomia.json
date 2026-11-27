@@ -3747,7 +3747,8 @@
           "signer": true
         },
         {
-          "name": "club"
+          "name": "club",
+          "writable": true
         },
         {
           "name": "creator_member",
@@ -3946,6 +3947,42 @@
         {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_update",
+          "docs": [
+            "Fresh Pyth SOL/USD price; required only when the club's deposit is SOL."
+          ],
+          "optional": true
         }
       ],
       "args": [
@@ -11061,6 +11098,48 @@
               }
             ]
           }
+        },
+        {
+          "name": "club",
+          "relations": [
+            "club_market"
+          ]
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_update",
+          "docs": [
+            "Fresh Pyth SOL/USD price; required only when the club's deposit is SOL."
+          ],
+          "optional": true
         }
       ],
       "args": []
@@ -16422,6 +16501,350 @@
           "type": "u16"
         }
       ]
+    },
+    {
+      "name": "deposit_club_sol",
+      "docs": [
+        "Lets the club owner pay or top up the club's deposit in SOL."
+      ],
+      "discriminator": [
+        0,
+        30,
+        235,
+        13,
+        156,
+        129,
+        99,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_update"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "lamports",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit_club_usdc",
+      "docs": [
+        "Lets the club owner pay or top up the club's deposit in USDC."
+      ],
+      "discriminator": [
+        195,
+        17,
+        185,
+        57,
+        16,
+        134,
+        247,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deposit_mint"
+        },
+        {
+          "name": "owner_token",
+          "writable": true
+        },
+        {
+          "name": "deposit_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_club_deposit_rules",
+      "docs": [
+        "Lets the super-admin set the deposit mint, minimums and SOL price limits."
+      ],
+      "discriminator": [
+        120,
+        206,
+        89,
+        236,
+        255,
+        10,
+        29,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_rules",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deposit_mint"
+        }
+      ],
+      "args": [
+        {
+          "name": "rules",
+          "type": {
+            "defined": {
+              "name": "ClubDepositRules"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_club_live_markets",
+      "docs": [
+        "Lets the super-admin backfill the market count of a club created before it existed."
+      ],
+      "discriminator": [
+        151,
+        166,
+        120,
+        252,
+        81,
+        155,
+        132,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "count",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -18219,6 +18642,56 @@
       "code": 6196,
       "name": "ClubMigrationNotNeeded",
       "msg": "This club account does not need migration or is not a club"
+    },
+    {
+      "code": 6197,
+      "name": "ClubDepositRulesNotSet",
+      "msg": "Club deposit rules are not set yet"
+    },
+    {
+      "code": 6198,
+      "name": "InvalidClubDepositRules",
+      "msg": "Deposit minimums must be positive, the SOL buffer 100-300%, price age 1-300 seconds and confidence at most 10%"
+    },
+    {
+      "code": 6199,
+      "name": "ClubDepositAssetMismatch",
+      "msg": "This club's deposit is held in a different token"
+    },
+    {
+      "code": 6200,
+      "name": "ClubDepositTooLow",
+      "msg": "The deposit must bring the club to at least its minimum (SOL: with the price buffer)"
+    },
+    {
+      "code": 6201,
+      "name": "ClubDepositBelowMinimum",
+      "msg": "This club's deposit is below the minimum; top it up to create or open markets"
+    },
+    {
+      "code": 6202,
+      "name": "ClubPriceUpdateRequired",
+      "msg": "A fresh SOL/USD price update is required for a club with a SOL deposit"
+    },
+    {
+      "code": 6203,
+      "name": "InvalidPriceUpdate",
+      "msg": "The SOL/USD price is for another feed, too old, not fully verified or not positive"
+    },
+    {
+      "code": 6204,
+      "name": "PriceConfidenceTooWide",
+      "msg": "The SOL/USD price confidence band is too wide"
+    },
+    {
+      "code": 6205,
+      "name": "ClubMarketCountAlreadySet",
+      "msg": "This club's market count is already set"
+    },
+    {
+      "code": 6206,
+      "name": "ClubDepositOverflow",
+      "msg": "Deposit arithmetic overflowed"
     }
   ],
   "types": [
@@ -18456,15 +18929,47 @@
             }
           },
           {
+            "name": "deposit_asset",
+            "docs": [
+              "Token of the security deposit; `None` until the first deposit."
+            ],
+            "type": {
+              "defined": {
+                "name": "ClubDepositAsset"
+              }
+            }
+          },
+          {
+            "name": "deposit_amount",
+            "docs": [
+              "Deposit balance in the asset's base units (token units or lamports)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "live_markets",
+            "docs": [
+              "Club markets created and not yet settled. Closing a club needs zero."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "live_markets_ready",
+            "docs": [
+              "Whether `live_markets` is trustworthy. Clubs created before the counter",
+              "existed stay `false` until the super-admin backfills it."
+            ],
+            "type": "bool"
+          },
+          {
             "name": "reserved",
             "docs": [
-              "Zeroed space for the security deposit (milestone 2), so adding it",
-              "needs no second account migration."
+              "Zeroed space for later club settings."
             ],
             "type": {
               "array": [
                 "u8",
-                96
+                82
               ]
             }
           }
@@ -22035,16 +22540,273 @@
             "type": "u8"
           },
           {
-            "name": "reserved",
+            "name": "deposit_mint",
             "docs": [
-              "Zeroed space for later platform settings (deposits, disputes)."
+              "Mint of USDC deposits. The default key means deposit rules are not set,",
+              "and no club market can be created or opened."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "deposit_mint_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "private_min_deposit_usd",
+            "docs": [
+              "Minimum deposit value in USD with 6 decimals ($100 = 100_000_000)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "public_min_deposit_usd",
+            "type": "u64"
+          },
+          {
+            "name": "sol_buffer_bps",
+            "docs": [
+              "SOL deposits must be worth this share of the minimum when paid (12_000 = 120%)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "sol_usd_feed_id",
+            "docs": [
+              "Pyth SOL/USD price feed id."
             ],
             "type": {
               "array": [
                 "u8",
-                128
+                32
               ]
             }
+          },
+          {
+            "name": "max_price_age_seconds",
+            "docs": [
+              "Oldest accepted Pyth price, in seconds."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "max_price_conf_bps",
+            "docs": [
+              "Widest accepted Pyth confidence band, in basis points of the price."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Zeroed space for later platform settings."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                39
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubDepositAsset",
+      "docs": [
+        "Token a club's security deposit is held in. Fixed by the first deposit."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Usdc"
+          },
+          {
+            "name": "Sol"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClubDepositRules",
+      "docs": [
+        "Deposit-rule values set by the super-admin."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "private_min_deposit_usd",
+            "type": "u64"
+          },
+          {
+            "name": "public_min_deposit_usd",
+            "type": "u64"
+          },
+          {
+            "name": "sol_buffer_bps",
+            "type": "u16"
+          },
+          {
+            "name": "sol_usd_feed_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_price_age_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "max_price_conf_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeedMessage",
+      "repr": {
+        "kind": "c"
+      },
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feed_id",
+            "docs": [
+              "`FeedId` but avoid the type alias because of compatibility issues with Anchor's `idl-build` feature."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price",
+            "type": "i64"
+          },
+          {
+            "name": "conf",
+            "type": "u64"
+          },
+          {
+            "name": "exponent",
+            "type": "i32"
+          },
+          {
+            "name": "publish_time",
+            "docs": [
+              "The timestamp of this price update in seconds"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "prev_publish_time",
+            "docs": [
+              "The timestamp of the previous price update. This field is intended to allow users to",
+              "identify the single unique price update for any moment in time:",
+              "for any time t, the unique update is the one such that prev_publish_time < t <= publish_time.",
+              "",
+              "Note that there may not be such an update while we are migrating to the new message-sending logic,",
+              "as some price updates on pythnet may not be sent to other chains (because the message-sending",
+              "logic may not have triggered). We can solve this problem by making the message-sending mandatory",
+              "(which we can do once publishers have migrated over).",
+              "",
+              "Additionally, this field may be equal to publish_time if the message is sent on a slot where",
+              "where the aggregation was unsuccesful. This problem will go away once all publishers have",
+              "migrated over to a recent version of pyth-agent."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "ema_price",
+            "type": "i64"
+          },
+          {
+            "name": "ema_conf",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdateV2",
+      "docs": [
+        "A price update account. This account is used by the Pyth Receiver program to store a verified price update from a Pyth price feed.",
+        "It contains:",
+        "- `write_authority`: The write authority for this account. This authority can close this account to reclaim rent or update the account to contain a different price update.",
+        "- `verification_level`: The [`VerificationLevel`] of this price update. This represents how many Wormhole guardian signatures have been verified for this price update.",
+        "- `price_message`: The actual price update.",
+        "- `posted_slot`: The slot at which this price update was posted."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "write_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "verification_level",
+            "type": {
+              "defined": {
+                "name": "VerificationLevel"
+              }
+            }
+          },
+          {
+            "name": "price_message",
+            "type": {
+              "defined": {
+                "name": "PriceFeedMessage"
+              }
+            }
+          },
+          {
+            "name": "posted_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VerificationLevel",
+      "docs": [
+        "Pyth price updates are bridged to all blockchains via Wormhole.",
+        "Using the price updates on another chain requires verifying the signatures of the Wormhole guardians.",
+        "The usual process is to check the signatures for two thirds of the total number of guardians, but this can be cumbersome on Solana because of the transaction size limits,",
+        "so we also allow for partial verification.",
+        "",
+        "This enum represents how much a price update has been verified:",
+        "- If `Full`, we have verified the signatures for two thirds of the current guardians.",
+        "- If `Partial`, only `num_signatures` guardian signatures have been checked.",
+        "",
+        "# Warning",
+        "Using partially verified price updates is dangerous, as it lowers the threshold of guardians that need to collude to produce a malicious price update."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Partial",
+            "fields": [
+              {
+                "name": "num_signatures",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "Full"
           }
         ]
       }
@@ -22391,6 +23153,15 @@
       ],
       "type": "bytes",
       "value": "[99, 108, 117, 98, 95, 114, 117, 108, 101, 115, 95, 99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "CLUB_DEPOSIT_VAULT_SEED",
+      "docs": [
+        "Token vault of a club's USDC security deposit: [\"club_deposit_vault\", club].",
+        "Its token authority is the club account."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 100, 101, 112, 111, 115, 105, 116, 95, 118, 97, 117, 108, 116]"
     }
   ]
 }
