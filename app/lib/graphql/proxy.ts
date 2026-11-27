@@ -6,6 +6,10 @@ const paths = new Set([
   "auth/verify",
   "auth/me",
   "auth/logout",
+  "auth/solana/link",
+  "auth/canton/challenge",
+  "auth/canton/verify",
+  "auth/canton/unlink",
 ]);
 /** Rate-limit identity for the indexer's sign-in limits.
  * Vercel sets x-real-ip / x-forwarded-for from the connection, replacing any
