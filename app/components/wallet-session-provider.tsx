@@ -160,13 +160,18 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
     if (previous.current && previous.current !== address)
       logout.current = call("logout", {}).catch(() => {});
     previous.current = address;
-    // Without a Solana wallet, a session can still come from a Canton sign-in.
+    // Without a Solana wallet, only a Canton sign-in counts: a session proven
+    // by a Solana signature needs that wallet connected again.
     if (!address) {
       const request = new AbortController();
       void logout.current
         .then(() => call<User | null>("me", undefined, request.signal))
         .then((session) => {
-          if (!request.signal.aborted && live.current === "" && session)
+          if (
+            !request.signal.aborted &&
+            live.current === "" &&
+            session?.signedInWith === "canton"
+          )
             setUser(session);
         })
         .catch(() => {});
@@ -216,7 +221,10 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
         // A session belongs to the connected Solana wallet, or came from a
         // Canton sign-in (no Solana wallet connected, or none linked yet).
         user:
-          user && (user.wallet === address || !address || user.wallet === null)
+          user &&
+          (user.wallet === address ||
+            user.wallet === null ||
+            (!address && user.signedInWith === "canton"))
             ? user
             : null,
         busy,
