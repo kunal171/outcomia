@@ -31,7 +31,10 @@ const RESERVED: &[&str] = &[
 
 #[derive(SimpleObject, Clone)]
 pub struct Profile {
-    pub wallet: String,
+    /// The owner's Solana wallet; `None` for a Canton-only profile.
+    pub wallet: Option<String>,
+    /// Canton parties the owner proved on the ledger and linked, oldest first.
+    pub canton_parties: Vec<String>,
     pub username: String,
     pub display_name: String,
     pub bio: String,
@@ -52,11 +55,12 @@ pub struct Profile {
     pub youtube: Option<String>,
 }
 
-pub const PROFILE_COLUMNS: &str = "wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at,location,website,telegram,instagram,linkedin,discord,github,youtube";
+pub const PROFILE_COLUMNS: &str = "wallet,ARRAY(SELECT a.party FROM canton_accounts a WHERE a.user_id=profiles.user_id ORDER BY a.linked_at,a.party) AS canton_parties,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at,location,website,telegram,instagram,linkedin,discord,github,youtube";
 
 pub fn profile_from_row(row: &PgRow) -> Profile {
     Profile {
         wallet: row.get("wallet"),
+        canton_parties: row.get("canton_parties"),
         username: row.get("username"),
         display_name: row.get("display_name"),
         bio: row.get("bio"),
@@ -88,9 +92,9 @@ pub async fn profiles_for(
     .await?;
     Ok(rows
         .iter()
-        .map(|row| {
+        .filter_map(|row| {
             let profile = profile_from_row(row);
-            (profile.wallet.clone(), profile)
+            Some((profile.wallet.clone()?, profile))
         })
         .collect())
 }
@@ -289,16 +293,29 @@ pub fn validate(input: ProfileInput) -> Result<ValidProfile, &'static str> {
 pub struct ProfilesQuery;
 #[Object]
 impl ProfilesQuery {
-    /// One profile by wallet address or username. Exactly one is required.
+    /// One profile by Solana wallet, username or linked Canton party.
+    /// Exactly one is required.
     async fn profile(
         &self,
         ctx: &Context<'_>,
         wallet: Option<String>,
         username: Option<String>,
+        party: Option<String>,
     ) -> async_graphql::Result<Option<Profile>> {
         let pool = &ctx.data::<ApiState>()?.pool;
-        let row = match (wallet, username) {
-            (Some(wallet), None) => {
+        let row = match (wallet, username, party) {
+            (None, None, Some(party)) => {
+                if party.len() > 255 {
+                    return Ok(None);
+                }
+                sqlx::query(sqlx::AssertSqlSafe(format!(
+                    "SELECT {PROFILE_COLUMNS} FROM profiles WHERE user_id IN (SELECT user_id FROM canton_accounts WHERE party=$1)"
+                )))
+                .bind(party)
+                .fetch_optional(pool)
+                .await?
+            }
+            (Some(wallet), None, None) => {
                 sqlx::query(sqlx::AssertSqlSafe(format!(
                     "SELECT {PROFILE_COLUMNS} FROM profiles WHERE wallet=$1"
                 )))
@@ -306,7 +323,7 @@ impl ProfilesQuery {
                 .fetch_optional(pool)
                 .await?
             }
-            (None, Some(username)) => {
+            (None, Some(username), None) => {
                 sqlx::query(sqlx::AssertSqlSafe(format!(
                     "SELECT {PROFILE_COLUMNS} FROM profiles WHERE username=$1"
                 )))
@@ -314,7 +331,7 @@ impl ProfilesQuery {
                 .fetch_optional(pool)
                 .await?
             }
-            _ => return Err("Provide either a wallet or a username".into()),
+            _ => return Err("Provide exactly one of wallet, username or party".into()),
         };
         Ok(row.as_ref().map(profile_from_row))
     }
@@ -338,7 +355,7 @@ impl ProfilesQuery {
 pub struct ProfilesMutation;
 #[Object]
 impl ProfilesMutation {
-    /// Creates or replaces the signed-in wallet's profile.
+    /// Creates or replaces the signed-in user's profile (Solana or Canton sign-in).
     async fn update_profile(
         &self,
         ctx: &Context<'_>,
@@ -354,9 +371,9 @@ impl ProfilesMutation {
         let profile = validate(input).map_err(async_graphql::Error::new)?;
         let pool = &ctx.data::<ApiState>()?.pool;
         let result = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "INSERT INTO profiles(wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,location,website,telegram,instagram,linkedin,discord,github,youtube)
-             VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-             ON CONFLICT(wallet) DO UPDATE SET username=EXCLUDED.username,display_name=EXCLUDED.display_name,
+            "INSERT INTO profiles(user_id,wallet,username,display_name,bio,avatar_hue,x_handle,show_on_leaderboards,location,website,telegram,instagram,linkedin,discord,github,youtube)
+             VALUES($16::uuid,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+             ON CONFLICT(user_id) DO UPDATE SET wallet=EXCLUDED.wallet,username=EXCLUDED.username,display_name=EXCLUDED.display_name,
                bio=EXCLUDED.bio,avatar_hue=EXCLUDED.avatar_hue,x_handle=EXCLUDED.x_handle,
                show_on_leaderboards=EXCLUDED.show_on_leaderboards,location=EXCLUDED.location,website=EXCLUDED.website,
                telegram=EXCLUDED.telegram,instagram=EXCLUDED.instagram,linkedin=EXCLUDED.linkedin,discord=EXCLUDED.discord,
@@ -378,6 +395,7 @@ impl ProfilesMutation {
         .bind(&profile.discord)
         .bind(&profile.github)
         .bind(&profile.youtube)
+        .bind(&user.id)
         .fetch_one(pool)
         .await;
         match result {

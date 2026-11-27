@@ -149,7 +149,7 @@ type MintStats {
 
 type Mutation {
 	"""
-	Creates or replaces the signed-in wallet's profile.
+	Creates or replaces the signed-in user's profile (Solana or Canton sign-in).
 	"""
 	updateProfile(input: ProfileInput!): Profile!
 }
@@ -178,7 +178,14 @@ enum Period {
 }
 
 type Profile {
-	wallet: String!
+	"""
+	The owner's Solana wallet; `None` for a Canton-only profile.
+	"""
+	wallet: String
+	"""
+	Canton parties the owner proved on the ledger and linked, oldest first.
+	"""
+	cantonParties: [String!]!
 	username: String!
 	displayName: String!
 	bio: String!
@@ -233,9 +240,10 @@ type Query {
 	candles(market: String!, engine: String!, outcome: String!, interval: Int!, from: String!, to: String!): CandleSeries!
 	transaction(signature: String!): JSON!
 	"""
-	One profile by wallet address or username. Exactly one is required.
+	One profile by Solana wallet, username or linked Canton party.
+	Exactly one is required.
 	"""
-	profile(wallet: String, username: String): Profile
+	profile(wallet: String, username: String, party: String): Profile
 	"""
 	Profiles for up to 100 wallets, so lists can show names in one request.
 	"""

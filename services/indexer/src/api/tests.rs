@@ -528,7 +528,7 @@ mod profiles_and_leaderboards {
             &format!("INSERT INTO users(wallet_address,verified_at) VALUES('{b}',NOW())"),
         )
         .await;
-        sql(&pool, &format!("INSERT INTO profiles(wallet,username,show_on_leaderboards) VALUES('{b}','bee',FALSE)")).await;
+        sql(&pool, &format!("INSERT INTO profiles(user_id,wallet,username,show_on_leaderboards) SELECT id,'{b}','bee',FALSE FROM users WHERE wallet_address='{b}'")).await;
         let volume = run(
             &schema,
             format!("{{traderLeaderboard(board:VOLUME,period:ALL,mint:\"{mint}\"){{wallet}}}}"),
@@ -559,10 +559,21 @@ mod profiles_and_leaderboards {
             "mutation{{updateProfile(input:{{username:\"{username}\",displayName:\"Alice\",bio:\"hi\",avatarHue:12,xHandle:\"@alice\",showOnLeaderboards:true}}){{wallet username xHandle}}}}"
         )
         };
+        let mut ids = std::collections::HashMap::new();
+        for wallet in [&alice, &bob] {
+            let id: String =
+                sqlx::query_scalar("SELECT id::text FROM users WHERE wallet_address=$1")
+                    .bind(wallet)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            ids.insert(wallet.clone(), id);
+        }
         let user = |wallet: &str| {
             Some(User {
-                id: "id".into(),
-                wallet: wallet.into(),
+                id: ids[wallet].clone(),
+                wallet: Some(wallet.into()),
+                parties: vec![],
             })
         };
 
@@ -620,5 +631,49 @@ mod profiles_and_leaderboards {
         )
         .await;
         assert_eq!(many["profiles"].as_array().unwrap().len(), 1);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn a_canton_only_user_has_a_profile_found_by_party(pool: PgPool) {
+        let party = "carol::1220aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899";
+        let id: String = sqlx::query_scalar(
+            "INSERT INTO users(wallet_address,verified_at) VALUES(NULL,NOW()) RETURNING id::text",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO canton_accounts(network,party,user_id) VALUES('canton:testnet',$1,$2::uuid)")
+            .bind(party)
+            .bind(&id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema = schema(&pool);
+        let saved = schema
+            .execute(
+                async_graphql::Request::new(
+                    "mutation{updateProfile(input:{username:\"carol\",displayName:\"Carol\",bio:\"\",avatarHue:5,showOnLeaderboards:true}){wallet username cantonParties}}",
+                )
+                .data(Some(User { id, wallet: None, parties: vec![party.into()] }))
+                .data(SameOrigin(true)),
+            )
+            .await;
+        assert!(saved.errors.is_empty(), "{:?}", saved.errors);
+        let saved = saved.data.into_json().unwrap();
+        assert_eq!(saved["updateProfile"]["wallet"], serde_json::Value::Null);
+        assert_eq!(saved["updateProfile"]["cantonParties"][0], party);
+        let found = run(
+            &schema,
+            format!("{{profile(party:\"{party}\"){{username}}}}"),
+        )
+        .await;
+        assert_eq!(found["profile"]["username"], "carol");
+        let missing = run(
+            &schema,
+            "{profile(party:\"nobody::12345678\"){username}}".into(),
+        )
+        .await;
+        assert_eq!(missing["profile"], serde_json::Value::Null);
     }
 }
