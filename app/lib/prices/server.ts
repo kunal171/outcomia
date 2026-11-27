@@ -25,7 +25,7 @@ export async function usdPrices(
   if (feeds.size && !key)
     for (const assets of feeds.values()) unavailable.push(...assets);
   else if (feeds.size) {
-    const url = new URL(env.PYTH_HERMES_URL ?? HERMES);
+    const url = new URL(env.PYTH_HERMES_URL?.trim() || HERMES);
     for (const id of feeds.keys()) url.searchParams.append("ids[]", id);
     url.searchParams.set("parsed", "true");
     try {
