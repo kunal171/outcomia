@@ -1,5 +1,17 @@
 /** Pure helpers for multi-outcome Canton markets (2–8 named outcomes). */
-import { amount, integer, list, raw, scale, type Contract } from "./model.ts";
+import {
+  amount,
+  finalRecord,
+  integer,
+  list,
+  marketKey,
+  multiResult,
+  obj,
+  raw,
+  scale,
+  text,
+  type Contract,
+} from "./model.ts";
 
 /** Per-outcome totals of a holder's lots. */
 export function lotTotals(lots: Contract[], outcomes: number): bigint[] {
@@ -86,6 +98,78 @@ export function outcomeQuotes(
       impliedAsk: implied(bids, i),
       impliedBid: implied(asks, i),
       last: last?.price ? amount(raw(last.price)) : undefined,
+    };
+  });
+}
+
+export type MultiPosition = {
+  key: string;
+  lots: Contract[];
+  /** Collateral instrument id, from the market's terms ("" if unknown). */
+  collateral: string;
+  /** Outcome labels with the holder's count of each, in outcome order. */
+  holdings: { label: string; count: bigint }[];
+  /** Present once the market is settled: what redeeming pays and where. */
+  claim?: { value: string; settled: string };
+};
+
+/** A holder's multi-outcome lots grouped by market, labelled from the market's
+ * terms, with the claim value once its settled reserve exists. The latest
+ * market record (final over proposal over market) supplies the labels. */
+export function multiPositions(
+  contracts: Contract[],
+  owned: Contract[],
+  party: string | undefined,
+): MultiPosition[] {
+  if (!party) return [];
+  const groups = new Map<string, Contract[]>();
+  for (const lot of owned)
+    if (lot.kind === "MultiLot" && lot.data.owner === party) {
+      const key = marketKey(lot.data);
+      groups.set(key, [...(groups.get(key) ?? []), lot]);
+    }
+  const keyOf = (c: Contract) => {
+    try {
+      return marketKey(finalRecord(c));
+    } catch {
+      return undefined;
+    }
+  };
+  const rank = { MultiMarket: 1, MultiProposal: 2, MultiFinal: 3 } as const;
+  return [...groups].map(([key, lots]) => {
+    const record = contracts
+      .filter((c) => c.kind in rank && keyOf(c) === key)
+      .sort(
+        (a, b) =>
+          rank[b.kind as keyof typeof rank] - rank[a.kind as keyof typeof rank],
+      )[0];
+    const terms = record ? obj(finalRecord(record).terms) : undefined;
+    const labels = terms ? list(terms.outcomes).map(text) : [];
+    const collateral = terms ? text(obj(terms.collateral).id) : "";
+    const n = labels.length || list(lots[0].data.counts).length;
+    const totals = lotTotals(lots, n);
+    const settled = contracts.find(
+      (c) => c.kind === "MultiSettledReserve" && keyOf(c) === key,
+    );
+    // Redemption takes at most 16 lots per transaction, as the command does.
+    const claim = settled
+      ? {
+          value: multiClaim(
+            lotTotals(lots.slice(0, 16), n),
+            multiResult(settled.data.result).winner,
+          ),
+          settled: settled.id,
+        }
+      : undefined;
+    return {
+      key,
+      lots,
+      collateral,
+      holdings: totals.map((count, i) => ({
+        label: labels[i] ?? `Outcome ${i + 1}`,
+        count,
+      })),
+      claim,
     };
   });
 }

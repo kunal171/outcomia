@@ -11,6 +11,7 @@ import { decodeContracts, multiResult } from "../lib/canton/model.ts";
 import {
   lotTotals,
   multiClaim,
+  multiPositions,
   outcomeQuotes,
   parseOutcomes,
 } from "../lib/canton/multi.ts";
@@ -551,4 +552,54 @@ test("full sets match one head per outcome and quotes show implied prices", () =
     last: "0.41",
   });
   assert.equal(q[0].impliedAsk, undefined);
+});
+
+test("positions group multi-outcome lots by market with labels and claims", () => {
+  const second = c("MultiLot", "mlot2", {
+    ...lot.data,
+    counts: ["1", "0", "0", "0"],
+  });
+  const other = c("MultiLot", "mlot3", { ...lot.data, owner: "bob" });
+  const [open] = multiPositions(
+    snapshot().contracts,
+    [lot, second, other],
+    "alice",
+  );
+  assert.deepEqual(
+    open.holdings.map((h) => [h.label, h.count]),
+    [
+      ["Red", 3n],
+      ["Blue", 2n],
+      ["Green", 0n],
+      ["Gold", 2n],
+    ],
+  );
+  assert.equal(open.lots.length, 2);
+  assert.equal(open.collateral, instrument.id);
+  assert.equal(open.claim, undefined);
+  assert.deepEqual(multiPositions(snapshot().contracts, [lot], undefined), []);
+  // Once settled for Gold, redeeming pays Gold's count; invalid pays 1/4 each.
+  const settled = (result) =>
+    c("MultiSettledReserve", "msettled", {
+      key,
+      vault: d.vault,
+      terms,
+      factory: "factory",
+      assetDecimals: "6",
+      result,
+      outstanding: ["3", "2", "0", "2"],
+      cash: "cash",
+    });
+  const [won] = multiPositions(
+    [...snapshot().contracts, settled({ tag: "Winner", value: "3" })],
+    [lot, second],
+    "alice",
+  );
+  assert.deepEqual(won.claim, { value: "2", settled: "msettled" });
+  const [invalid] = multiPositions(
+    [...snapshot().contracts, settled({ tag: "InvalidResult", value: {} })],
+    [lot, second],
+    "alice",
+  );
+  assert.equal(invalid.claim.value, "1.75");
 });
