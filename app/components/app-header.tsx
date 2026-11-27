@@ -161,7 +161,7 @@ export function AppHeader() {
             href: `/u/${owner}`,
             label: "My profile",
             icon: "profile" as const,
-            active: pathname === `/u/${owner}`,
+            active: pathname.startsWith(`/u/${owner}`),
           },
         ]
       : []),
