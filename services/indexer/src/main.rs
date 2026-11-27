@@ -6,6 +6,8 @@
 
 mod api;
 mod auth;
+mod canton;
+mod canton_auth;
 mod config;
 mod health;
 mod ingestion;
@@ -143,8 +145,19 @@ async fn main() -> Result<(), BoxError> {
     sqlx::query("UPDATE history_sync SET ready=FALSE WHERE singleton")
         .execute(&pool)
         .await?;
+    let canton = canton::CantonConfig::from_env()
+        .and_then(|config| {
+            config
+                .map(|config| {
+                    canton::LedgerClaims::new(config.clone())
+                        .map(|claims| canton_auth::CantonAuth { config, claims })
+                })
+                .transpose()
+        })
+        .map_err(io::Error::other)?;
     let auth = auth::state(pool.clone(), &config.app_origin)
         .and_then(|state| state.with_proxy_secret(config.proxy_secret.clone()))
+        .map(|state| auth::AuthState { canton, ..state })
         .map_err(io::Error::other)?;
     let api_listener = TcpListener::bind(&config.api_address).await?;
     let router = api::router(pool.clone(), auth);

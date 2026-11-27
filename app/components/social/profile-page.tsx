@@ -15,6 +15,8 @@ import {
   type TraderStats,
 } from "../../lib/graphql/social";
 import { ProfileLinks } from "./profile-links";
+import { isAddress, isParty, owns } from "./profile-identity";
+import { shortParty } from "./linked-accounts";
 import {
   formatAtoms,
   shortAddress,
@@ -24,31 +26,35 @@ import {
   walletHue,
 } from "./social-ui";
 
-export function isAddress(value: string) {
-  try {
-    new PublicKey(value);
-    return value.length >= 32;
-  } catch {
-    return false;
-  }
-}
+/** What the profile body shows: Solana stats when the profile has a wallet;
+ * a Canton-only profile has none yet (Canton history needs its indexer). */
+type ProfileView = Pick<TraderStats, "profile" | "perMint"> & {
+  wallet: string | null;
+};
 
-/** `/u/<username | wallet>`: who the trader is and how they have done.
+/** `/u/<username | wallet | party>`: who the trader is and how they have done.
  * Orders, positions, clubs and balances live on their own pages. */
 export function ProfilePage({ id }: { id: string }) {
   const { t } = useI18n();
   const session = useWalletSession();
   const lookup = decodeURIComponent(id);
   const result = useQuietData(async () => {
-    const wallet = isAddress(lookup)
-      ? lookup
-      : (await getProfile({ username: lookup }))?.wallet;
-    if (!wallet) return null;
+    const profile = isAddress(lookup)
+      ? null
+      : await getProfile(
+          isParty(lookup) ? { party: lookup } : { username: lookup },
+        );
+    const wallet = isAddress(lookup) ? lookup : profile?.wallet;
+    if (!wallet) {
+      if (!profile) return null;
+      const view: ProfileView = { wallet: null, profile, perMint: [] };
+      return { stats: view, mints: [] };
+    }
     const [stats, mints] = await Promise.all([
       getTraderStats(wallet),
       getLeaderboardMints(),
     ]);
-    return { stats, mints: mints.leaderboardMints };
+    return { stats: stats as ProfileView, mints: mints.leaderboardMints };
   }, [lookup]);
 
   return (
@@ -78,7 +84,10 @@ export function ProfilePage({ id }: { id: string }) {
             symbols={Object.fromEntries(
               result.data.mints.map((m) => [m.mint, m.symbol]),
             )}
-            own={session?.user?.wallet === result.data.stats.wallet}
+            own={owns(session?.user, {
+              wallet: result.data.stats.wallet ?? undefined,
+              profile: result.data.stats.profile,
+            })}
           />
         )}
       </main>
@@ -96,12 +105,14 @@ function ProfileBody({
   symbols,
   own,
 }: {
-  stats: TraderStats;
+  stats: ProfileView;
   symbols: Record<string, string | null>;
   own: boolean;
 }) {
   const { t, locale } = useI18n();
-  const { profile, wallet } = stats;
+  const { profile } = stats;
+  // Avatar seed and fallback name: the Solana wallet, else the first party.
+  const wallet = stats.wallet ?? profile?.cantonParties[0] ?? "";
   const [mint, setMint] = useState(stats.perMint[0]?.mint ?? null);
   const current =
     stats.perMint.find((m) => m.mint === mint) ?? stats.perMint[0];
@@ -140,13 +151,20 @@ function ProfileBody({
                   })}
                 </span>
               )}
-              <a
-                href={accountExplorerUrl(new PublicKey(wallet))}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <code>{shortAddress(wallet)}</code> ↗
-              </a>
+              {stats.wallet && (
+                <a
+                  href={accountExplorerUrl(new PublicKey(stats.wallet))}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <code>{shortAddress(stats.wallet)}</code> ↗
+                </a>
+              )}
+              {profile?.cantonParties.map((p) => (
+                <span key={p} title={p}>
+                  Canton <code>{shortParty(p)}</code>
+                </span>
+              ))}
             </p>
             {profile && <ProfileLinks profile={profile} />}
           </div>
@@ -190,6 +208,13 @@ function ProfileBody({
         )}{" "}
         <Link href="/leaderboard">{t("See the leaderboard →")}</Link>
       </p>
+      {!!profile?.cantonParties.length && (
+        <p className="profile-footnote">
+          {t(
+            "Canton trading is not included yet; it is added once Canton history is indexed.",
+          )}
+        </p>
+      )}
     </>
   );
 }

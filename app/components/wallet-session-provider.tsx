@@ -25,6 +25,10 @@ type Session = {
   error: string | null;
   deferred: boolean;
   signIn: () => Promise<void>;
+  /** Adopts a user returned by a Canton sign-in, link or unlink. */
+  setUser: (user: User | null) => void;
+  /** Adds the connected Solana wallet to a Canton-only user, by signature. */
+  linkSolana: () => Promise<void>;
 };
 const Context = createContext<Session | null>(null);
 /** A wallet connection permits reads/trades; the login signature owns a profile. */
@@ -66,7 +70,8 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
       assertCurrent();
       const session = await call<User | null>("me", undefined, request.signal);
       assertCurrent();
-      if (session?.wallet === address) {
+      // A Canton-only session stays; the profile page offers to link this wallet.
+      if (session && (session.wallet === address || session.wallet === null)) {
         setUser(session);
         return;
       }
@@ -120,6 +125,32 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
       if (generation.current === current) setBusy(false);
     }
   }, [address]);
+  const linkSolana = useCallback(async () => {
+    if (!INDEXER_ENABLED || !address || !signer.current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const challenge = await call<{ nonce: string; message: string }>(
+        "challenge",
+        { wallet: address },
+      );
+      const signature = await signer.current(
+        new TextEncoder().encode(challenge.message),
+      );
+      if (live.current !== address) throw new Error("Wallet changed");
+      const linked = await call<User>("solana/link", {
+        wallet: address,
+        nonce: challenge.nonce,
+        signature: btoa(String.fromCharCode(...signature)),
+      });
+      setUser(linked);
+      window.dispatchEvent(new CustomEvent("outcomia:indexed-update"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Linking failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [address]);
   useEffect(() => {
     setUser(null);
     setDeferred(false);
@@ -129,6 +160,18 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
     if (previous.current && previous.current !== address)
       logout.current = call("logout", {}).catch(() => {});
     previous.current = address;
+    // Without a Solana wallet, a session can still come from a Canton sign-in.
+    if (!address) {
+      const request = new AbortController();
+      void logout.current
+        .then(() => call<User | null>("me", undefined, request.signal))
+        .then((session) => {
+          if (!request.signal.aborted && live.current === "" && session)
+            setUser(session);
+        })
+        .catch(() => {});
+      return () => request.abort();
+    }
     // Defer the attempt so Strict Mode's discarded effect never opens a wallet prompt.
     const timer = address
       ? setTimeout(() => {
@@ -170,11 +213,18 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   return (
     <Context.Provider
       value={{
-        user: user?.wallet === address ? user : null,
+        // A session belongs to the connected Solana wallet, or came from a
+        // Canton sign-in (no Solana wallet connected, or none linked yet).
+        user:
+          user && (user.wallet === address || !address || user.wallet === null)
+            ? user
+            : null,
         busy,
         error,
         deferred,
         signIn,
+        setUser,
+        linkSolana,
       }}
     >
       {children}

@@ -1543,5 +1543,18 @@
   "Full sets minted": "पूरे सेट बनाए गए",
   "← Back to profile": "← प्रोफ़ाइल पर वापस",
   "Connect your wallet to edit your profile.": "अपनी प्रोफ़ाइल संपादित करने के लिए अपना वॉलेट कनेक्ट करें।",
-  "You can only edit your own profile.": "आप केवल अपनी प्रोफ़ाइल संपादित कर सकते हैं।"
+  "You can only edit your own profile.": "आप केवल अपनी प्रोफ़ाइल संपादित कर सकते हैं।",
+  "Linked accounts": "लिंक किए गए खाते",
+  "Linked accounts are public on your profile, so your Solana and Canton trading show under one name.": "लिंक किए गए खाते आपकी प्रोफ़ाइल पर सार्वजनिक हैं, ताकि आपकी Solana और Canton ट्रेडिंग एक ही नाम से दिखे।",
+  "Link connected Solana wallet": "कनेक्ट किया गया Solana वॉलेट लिंक करें",
+  "Connect a Solana wallet to link it.": "लिंक करने के लिए Solana वॉलेट कनेक्ट करें।",
+  "Unlink": "अनलिंक करें",
+  "Link connected Canton wallet": "कनेक्ट किया गया Canton वॉलेट लिंक करें",
+  "Link a Solana wallet first.": "पहले एक Solana वॉलेट लिंक करें।",
+  "Approve in your wallet…": "अपने वॉलेट में स्वीकृति दें…",
+  "Sign in to edit your profile.": "अपनी प्रोफ़ाइल संपादित करने के लिए साइन इन करें।",
+  "Use the Solana wallet or the Canton wallet this profile belongs to.": "वह Solana या Canton वॉलेट उपयोग करें जिससे यह प्रोफ़ाइल जुड़ी है।",
+  "Sign in with Solana": "Solana से साइन इन करें",
+  "Sign in with Canton": "Canton से साइन इन करें",
+  "Canton trading is not included yet; it is added once Canton history is indexed.": "Canton ट्रेडिंग अभी शामिल नहीं है; Canton इतिहास इंडेक्स होने पर जोड़ी जाएगी।"
 }

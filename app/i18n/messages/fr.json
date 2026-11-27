@@ -1543,5 +1543,18 @@
   "Full sets minted": "Lots complets créés",
   "← Back to profile": "← Retour au profil",
   "Connect your wallet to edit your profile.": "Connectez votre portefeuille pour modifier votre profil.",
-  "You can only edit your own profile.": "Vous ne pouvez modifier que votre propre profil."
+  "You can only edit your own profile.": "Vous ne pouvez modifier que votre propre profil.",
+  "Linked accounts": "Comptes liés",
+  "Linked accounts are public on your profile, so your Solana and Canton trading show under one name.": "Les comptes liés sont publics sur votre profil : vos échanges Solana et Canton apparaissent sous un seul nom.",
+  "Link connected Solana wallet": "Lier le portefeuille Solana connecté",
+  "Connect a Solana wallet to link it.": "Connectez un portefeuille Solana pour le lier.",
+  "Unlink": "Délier",
+  "Link connected Canton wallet": "Lier le portefeuille Canton connecté",
+  "Link a Solana wallet first.": "Liez d'abord un portefeuille Solana.",
+  "Approve in your wallet…": "Approuvez dans votre portefeuille…",
+  "Sign in to edit your profile.": "Connectez-vous pour modifier votre profil.",
+  "Use the Solana wallet or the Canton wallet this profile belongs to.": "Utilisez le portefeuille Solana ou Canton auquel appartient ce profil.",
+  "Sign in with Solana": "Se connecter avec Solana",
+  "Sign in with Canton": "Se connecter avec Canton",
+  "Canton trading is not included yet; it is added once Canton history is indexed.": "Les échanges Canton ne sont pas encore inclus ; ils seront ajoutés une fois l'historique Canton indexé."
 }

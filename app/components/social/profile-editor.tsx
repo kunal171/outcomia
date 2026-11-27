@@ -12,6 +12,7 @@ import {
 import { walletHue, WalletAvatar } from "./social-ui";
 import { PROFILE_LINKS } from "./profile-links";
 import type { Profile } from "../../lib/graphql/social";
+import type { WalletUser } from "../../lib/auth/client";
 
 /** Form values for every social link, empty when unset. */
 function linkValues(p: Profile | null | undefined) {
@@ -20,12 +21,15 @@ function linkValues(p: Profile | null | undefined) {
   ) as Pick<ProfileInput, (typeof PROFILE_LINKS)[number]["key"]>;
 }
 
-/** `/u/<id>/edit` card: create or edit the connected wallet's public profile.
- * Saving needs a signed-in session, which proves the wallet owner is editing. */
-export function ProfileEditor({ wallet }: { wallet: string }) {
+/** `/u/<id>/edit` card: create or edit the signed-in user's public profile,
+ * whether they signed in with a Solana wallet or a Canton party. */
+export function ProfileEditor({ user }: { user: WalletUser }) {
   const { t } = useI18n();
   const session = useWalletSession();
-  const signedIn = session?.user?.wallet === wallet;
+  const signedIn = session?.user?.id === user.id;
+  // The avatar and lookup key: the Solana wallet, else the first Canton party.
+  const party = user.parties[0] ?? "";
+  const wallet = user.wallet ?? (party || user.id);
   const [form, setForm] = useState<ProfileInput | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [exists, setExists] = useState(false);
@@ -36,7 +40,7 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
     if (!INDEXER_ENABLED) return;
     let dead = false;
     setForm(null);
-    getProfile({ wallet })
+    getProfile(user.wallet ? { wallet: user.wallet } : { party })
       .then((p) => {
         if (dead) return;
         setExists(!!p);
@@ -59,7 +63,7 @@ export function ProfileEditor({ wallet }: { wallet: string }) {
     return () => {
       dead = true;
     };
-  }, [wallet]);
+  }, [wallet, user.wallet, party]);
 
   if (!INDEXER_ENABLED) return null;
   const set = <K extends keyof ProfileInput>(key: K, value: ProfileInput[K]) =>

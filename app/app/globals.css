@@ -2789,6 +2789,12 @@ body:has(.prediction-guide[open]) {
 .profile-stats small { color: var(--muted); }
 .profile-editor { width: min(100%, 640px); }
 .profile-editor h1 { margin: 0; font-size: 1.35rem; }
+.profile-accounts { width: min(100%, 640px); margin-top: 16px; }
+.profile-accounts h2 { margin: 0 0 6px; font-size: 1.1rem; }
+.profile-accounts ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+.profile-accounts li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.profile-accounts code { overflow-wrap: anywhere; }
+.profile-sign-in { display: grid; gap: 10px; justify-items: start; }
 .profile-editor form { display: grid; gap: 12px; margin-top: 12px; max-width: 520px; }
 .profile-editor label { display: grid; gap: 6px; font-weight: 600; }
 .profile-editor label small, .profile-editor-note { color: var(--muted); font-weight: 400; }
