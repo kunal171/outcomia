@@ -1527,5 +1527,6 @@
   "Trading individual outcomes on an order book is coming next.": "Trading individual outcomes on an order book is coming next.",
   "YES / NO": "YES / NO",
   "Multiple outcomes": "Multiple outcomes",
-  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Outcomes: one per line, as Label: how it wins (2 to 8)"
+  "Outcomes: one per line, as Label: how it wins (2 to 8)": "Outcomes: one per line, as Label: how it wins (2 to 8)",
+  "Place order": "Place order"
 }
