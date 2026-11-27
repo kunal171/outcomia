@@ -1556,5 +1556,8 @@
   "Use the Solana wallet or the Canton wallet this profile belongs to.": "वह Solana या Canton वॉलेट उपयोग करें जिससे यह प्रोफ़ाइल जुड़ी है।",
   "Sign in with Solana": "Solana से साइन इन करें",
   "Sign in with Canton": "Canton से साइन इन करें",
-  "Canton trading is not included yet; it is added once Canton history is indexed.": "Canton ट्रेडिंग अभी शामिल नहीं है; Canton इतिहास इंडेक्स होने पर जोड़ी जाएगी।"
+  "Canton trading is not included yet; it is added once Canton history is indexed.": "Canton ट्रेडिंग अभी शामिल नहीं है; Canton इतिहास इंडेक्स होने पर जोड़ी जाएगी।",
+  "Create or link a profile →": "प्रोफ़ाइल बनाएँ या लिंक करें →",
+  "Not priced, left out: {value0}": "मूल्य नहीं, शामिल नहीं: {value0}",
+  "Realized plus unrealized P&L at current USD prices (Pyth); test stablecoins count as one dollar.": "वर्तमान USD मूल्यों (Pyth) पर प्राप्त और अप्राप्त P&L; टेस्ट स्टेबलकॉइन एक डॉलर माने जाते हैं।"
 }

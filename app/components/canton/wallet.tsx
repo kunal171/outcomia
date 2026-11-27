@@ -1,4 +1,7 @@
 "use client";
+import Link from "next/link";
+import { usePartyProfile } from "../social/party-name";
+import { WalletAvatar } from "../social/social-ui";
 
 import { useEffect, useState } from "react";
 import { useCantonWallet } from "../canton-wallet-provider";
@@ -92,6 +95,7 @@ function CantonWalletView({ session }: { session: CantonSession }) {
             {session.wallet === "loop" ? "Loop Wallet" : "Console Wallet"}
           </span>
           <code>{session.partyId}</code>
+          <PartyProfileLine party={session.partyId} />
         </div>
         <button
           type="button"
@@ -189,5 +193,27 @@ function CantonWalletView({ session }: { session: CantonSession }) {
         )}
       </section>
     </>
+  );
+}
+
+/** The connected party's linked profile, or a pointer to create or link one. */
+function PartyProfileLine({ party }: { party: string }) {
+  const { t } = useI18n();
+  const profile = usePartyProfile(party);
+  return profile ? (
+    <Link className="trader-name party-name" href={`/u/${profile.username}`}>
+      <WalletAvatar
+        wallet={profile.wallet ?? party}
+        hue={profile.avatarHue}
+        size={22}
+      />
+      <span>
+        <strong>{profile.displayName || `@${profile.username}`}</strong>
+      </span>
+    </Link>
+  ) : (
+    <Link href={`/u/${encodeURIComponent(party)}/edit`}>
+      {t("Create or link a profile →")}
+    </Link>
   );
 }

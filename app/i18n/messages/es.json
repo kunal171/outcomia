@@ -1421,7 +1421,7 @@
   "Realized P&L counts settled markets. Unrealized P&L values open positions at each outcome’s last traded price.": "Las G&P realizadas cuentan los mercados liquidados. Las G&P no realizadas valoran las posiciones abiertas al último precio negociado de cada resultado.",
   "See the leaderboard →": "Ver la clasificación →",
   "of volume as the resting order": "del volumen como orden en el libro",
-  "Total P&L": "G&P total",
+  "Total P&L": "P&L total",
   "Realized": "Realizado",
   "Unrealized": "No realizado",
   "Open markets": "Mercados abiertos",
@@ -1556,5 +1556,8 @@
   "Use the Solana wallet or the Canton wallet this profile belongs to.": "Usa la billetera Solana o Canton a la que pertenece este perfil.",
   "Sign in with Solana": "Iniciar sesión con Solana",
   "Sign in with Canton": "Iniciar sesión con Canton",
-  "Canton trading is not included yet; it is added once Canton history is indexed.": "La actividad en Canton aún no se incluye; se añadirá cuando se indexe el historial de Canton."
+  "Canton trading is not included yet; it is added once Canton history is indexed.": "La actividad en Canton aún no se incluye; se añadirá cuando se indexe el historial de Canton.",
+  "Create or link a profile →": "Crea o vincula un perfil →",
+  "Not priced, left out: {value0}": "Sin precio, excluido: {value0}",
+  "Realized plus unrealized P&L at current USD prices (Pyth); test stablecoins count as one dollar.": "P&L realizado más no realizado a precios actuales en USD (Pyth); las stablecoins de prueba cuentan como un dólar."
 }

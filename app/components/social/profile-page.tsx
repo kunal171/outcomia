@@ -15,6 +15,7 @@ import {
   type TraderStats,
 } from "../../lib/graphql/social";
 import { ProfileLinks } from "./profile-links";
+import { CombinedPnl } from "./combined-pnl";
 import { isAddress, isParty, owns } from "./profile-identity";
 import { shortParty } from "./linked-accounts";
 import {
@@ -179,6 +180,18 @@ function ProfileBody({
         </div>
       </section>
 
+      <CombinedPnl
+        rows={stats.perMint
+          .filter((m) => m.decimals !== null)
+          .map((m) => ({
+            chain: "solana" as const,
+            asset: `solana:${m.mint}`,
+            label: label(m.mint),
+            decimals: m.decimals ?? 0,
+            realized: m.profit,
+            unrealized: m.unrealized,
+          }))}
+      />
       {stats.perMint.length > 1 && (
         <div
           className="lb-chips profile-tokens"

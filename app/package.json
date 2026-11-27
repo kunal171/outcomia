@@ -19,13 +19,13 @@
     "test:rpc-proxy": "node scripts/rpc-proxy.test.mjs",
     "test:theme": "node scripts/theme.test.mjs",
     "test:i18n": "node scripts/i18n.test.mjs",
-    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-cip103.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs && node scripts/canton-factory.test.mjs && node scripts/canton-clubs.test.mjs && node scripts/canton-multi.test.mjs && node scripts/canton-profile-claims.test.mjs",
+    "test:canton": "node scripts/canton-session.test.mjs && node scripts/canton-cip103.test.mjs && node scripts/canton-display.test.mjs && node scripts/canton-trading.test.mjs && node scripts/canton-factory.test.mjs && node scripts/canton-clubs.test.mjs && node scripts/canton-multi.test.mjs && node scripts/canton-profile-claims.test.mjs && node scripts/party-profiles.test.mjs",
     "test:canton:browser": "node scripts/canton-browser.test.mjs",
     "test:multi-outcome": "node scripts/multi-outcome.test.mjs",
     "idl:sync": "node scripts/sync-idl.mjs",
     "test:multi-outcome:browser": "node scripts/multi-outcome-browser.test.mjs",
     "idl:check": "node scripts/sync-idl.mjs --check",
-    "test:indexer": "node scripts/generate-indexer-fixtures.mjs && node scripts/indexer-client.test.mjs && node scripts/indexer-proxy.test.mjs"
+    "test:indexer": "node scripts/generate-indexer-fixtures.mjs && node scripts/indexer-client.test.mjs && node scripts/indexer-proxy.test.mjs && node scripts/combined-pnl.test.mjs"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

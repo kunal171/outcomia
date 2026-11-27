@@ -142,5 +142,31 @@ deployed DAR that contains `Outcomia.Profiles` (the package id changes, so the
 app's `CANTON_PACKAGE_ID` and the indexer's `CANTON_PROFILES_PACKAGE_ID` must
 both point at the new DAR) and the indexer's `CANTON_*` settings.
 
-**Next:** milestone 2 (names and avatars for parties on Canton pages), then 3–4
-once the Canton indexer is deployed.
+**Milestone 2 — built (2026-11-27):** indexer `partyProfiles(parties:)`; the app
+batches and caches party lookups (`lib/party-profiles.ts`) and shows `PartyName`
+(avatar, name, link) for club members, invitees and requesters, the Canton wallet
+page (with "Create or link a profile" when unlinked) and the header (`@username`).
+
+**Milestone 4 — built for Solana (2026-11-27):** `lib/prices` maps assets to fixed
+or Pyth prices; `/api/prices` serves them; `combinePnl` adds per-asset realized and
+unrealized P&L in exact USD; the profile page shows the total, the per-asset split
+and any unpriced assets. Pyth Hermes needs an API key since August 2026
+(`PYTH_API_KEY`); without it SOL- and BTC-collateral P&L is listed as unpriced.
+Canton rows plug into the same `PnlRow` list once milestone 3 exists.
+
+**Milestone 3 (Canton P&L) — blocked, and not only on deployment.** The Canton
+indexer today has fills (buyer, seller, price, quantity, fee) and current lots. An
+exact per-party P&L also needs:
+1. **Receipts for cash that does not go through a fill:** redemptions (payout per
+   party), complete-set splits and merges (binary and multi-outcome). These leave no
+   contract today, so a Daml change must add receipt templates.
+2. **Complementary fills** (`ComplementFill`) indexed.
+3. **Full-set legs per party:** `MultiFullSetFill` keeps owners and prices in lists,
+   which the engine cannot project; one receipt per leg (a Daml change) avoids that.
+4. **Room for more models:** CantonGrid 0.4.0 allows 16 models and the indexer uses
+   all 16. Raising the cap is a CantonGrid change.
+5. **Deployment:** remote/TestNet sources in CantonGrid and an operator bearer for
+   the app server's full-scope reads.
+
+Order: Daml receipts (1, 3) → CantonGrid model cap (4) → indexer models (1–3) →
+app server route that turns them into `PnlRow`s → deployment (5).
