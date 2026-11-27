@@ -146,6 +146,18 @@ and an HttpOnly, SameSite=Strict session. Only credential hashes are stored.
 `GET /auth/me` reuses the session; `POST /auth/logout` revokes it, including an
 in-flight challenge. Only signature-verified profiles can have authenticated
 sessions; a chain-discovered profile alone never grants a session. Challenge issuance is rate limited per client (10/minute), per wallet (5/minute) and by a global ceiling (600/minute), so one client cycling wallet addresses cannot block sign-in for others. Behind the app, the same-origin proxy forwards the browser IP with `INDEXER_PROXY_SECRET`; the indexer trusts that IP only when the secret matches and otherwise keys limits on the TCP peer. Only a digest of the client identity is stored. The Next same-origin
+
+**Canton sign-in and linking.** With the five `CANTON_*` variables set (see
+`.env.example`), a Canton party signs in or joins a profile by creating an
+`Outcomia.Profiles:ProfileClaim` that carries a one-time nonce from
+`POST /auth/canton/challenge`; `POST /auth/canton/verify` reads the claim from the
+Ledger JSON API as the operator and checks operator, party, purpose, nonce, the
+linked Solana wallet and the ledger's creation time. `POST /auth/solana/link`
+adds a Solana wallet to a Canton-only user by the usual signed challenge, and
+`POST /auth/canton/unlink` removes a party (never the last way to sign in). A
+Canton-only user merges into an existing user only when at most one of them has
+a profile. Profiles are owned by users; `profile(party:)` finds one by a linked
+party.
 proxy forwards cookies without exposing session credentials to JavaScript.
 
 Signing programs retain direct account checks, transaction sending and chain

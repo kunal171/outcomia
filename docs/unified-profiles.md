@@ -1,6 +1,6 @@
 # One profile for Solana and Canton, with combined PnL
 
-Status: agreed (2026-11-27). Not built yet.
+Status: agreed (2026-11-27). Milestone 1 built (see Progress).
 
 **Decisions (2026-11-27):**
 - **Either chain:** a trader can sign in and create a profile with a Solana wallet
@@ -122,3 +122,25 @@ logic stays in one place. Without that config, Canton sign-in and linking are of
 4. **Combined PnL:** price config and the merged USD total on the profile page.
 
 Milestones 1–2 work today. Milestones 3–4 need the Canton indexer to be deployed.
+
+## Progress
+
+**Milestone 1 — built (2026-11-27):**
+- outcomia-canton `Outcomia.Profiles`: `ProfileClaim` and 3 Daml tests.
+- Indexer: migration `20261127090000_canton_accounts` (`canton_accounts`,
+  `canton_challenges`, profiles owned by `user_id`); `/auth/canton/challenge`,
+  `/auth/canton/verify`, `/auth/canton/unlink`, `/auth/solana/link`; claims read by
+  `canton::LedgerClaims`; `profile(party:)` and `Profile.cantonParties`. Tests cover
+  bad claims, sign-in, link, merge and unlink against PostgreSQL with a fake ledger.
+- App: `lib/canton/profile-claim.ts` (challenge → `prepareExecute` create → find the
+  claim → verify); the session provider keeps Canton sessions and links Solana
+  wallets; `/u/<party>` and Canton-only profiles; sign-in with Solana or Canton on
+  `/u/<id>/edit`; a linked-accounts card.
+
+**Not verified yet:** a real Canton wallet creating a claim end to end. It needs a
+deployed DAR that contains `Outcomia.Profiles` (the package id changes, so the
+app's `CANTON_PACKAGE_ID` and the indexer's `CANTON_PROFILES_PACKAGE_ID` must
+both point at the new DAR) and the indexer's `CANTON_*` settings.
+
+**Next:** milestone 2 (names and avatars for parties on Canton pages), then 3–4
+once the Canton indexer is deployed.
