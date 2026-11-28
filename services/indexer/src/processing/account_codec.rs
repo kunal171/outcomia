@@ -9,6 +9,7 @@ pub const IDL_BYTES: &str = include_str!("../../../../app/idl/outcomia.json");
 /// Each entry must stay byte-identical to the IDL it records, because its
 /// hash also lets a database bound to it move to the current IDL.
 pub const IDL_HISTORY: &[&str] = &[
+    include_str!("../../../../app/idl/history/outcomia-2026-11-28.json"),
     include_str!("../../../../app/idl/history/outcomia-2026-11-27.json"),
     include_str!("../../../../app/idl/history/outcomia-2026-11-23.json"),
 ];

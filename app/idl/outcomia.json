@@ -16845,6 +16845,471 @@
           "type": "u32"
         }
       ]
+    },
+    {
+      "name": "close_club",
+      "docs": [
+        "Lets the club owner close a club with every market settled, refunding the deposit."
+      ],
+      "discriminator": [
+        238,
+        21,
+        72,
+        126,
+        220,
+        240,
+        41,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "owner_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  111,
+                  119,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_member",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  101,
+                  109,
+                  98,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "deposit_vault",
+          "docs": [
+            "USDC refund accounts; required when the deposit is USDC."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "optional": true,
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_club_kind",
+      "docs": [
+        "Lets the club owner switch the club between private and public."
+      ],
+      "discriminator": [
+        59,
+        217,
+        103,
+        84,
+        121,
+        100,
+        105,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "club"
+          ]
+        },
+        {
+          "name": "club",
+          "writable": true
+        },
+        {
+          "name": "club_rules",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  114,
+                  117,
+                  108,
+                  101,
+                  115,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "listing",
+          "docs": [
+            "becomes private."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_update",
+          "docs": [
+            "Fresh Pyth SOL/USD price; required for a club whose deposit is SOL."
+          ],
+          "optional": true
+        },
+        {
+          "name": "deposit_vault",
+          "docs": [
+            "USDC refund accounts; required when a USDC club becomes private."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "optional": true,
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "ClubKind"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "settle_club_market",
+      "docs": [
+        "Lets anyone settle a finished club market so it no longer blocks closing."
+      ],
+      "discriminator": [
+        68,
+        218,
+        246,
+        122,
+        28,
+        207,
+        184,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "club",
+          "writable": true,
+          "relations": [
+            "club_market"
+          ]
+        },
+        {
+          "name": "club_market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "PredictionMarket"
+              }
+            ]
+          },
+          "relations": [
+            "club_market"
+          ]
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "club_market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -17262,6 +17727,19 @@
         15,
         194,
         255
+      ]
+    },
+    {
+      "name": "ClubMarketSettlement",
+      "discriminator": [
+        68,
+        106,
+        100,
+        58,
+        14,
+        255,
+        130,
+        229
       ]
     }
   ],
@@ -18697,6 +19175,41 @@
       "code": 6207,
       "name": "ClubMarketCountNotSet",
       "msg": "This club's market count must be recorded by the platform before it creates markets"
+    },
+    {
+      "code": 6208,
+      "name": "ClubClosed",
+      "msg": "This club is closed"
+    },
+    {
+      "code": 6209,
+      "name": "ClubHasLiveMarkets",
+      "msg": "Every club market must be settled before the club closes"
+    },
+    {
+      "code": 6210,
+      "name": "ClubMarketNotFinished",
+      "msg": "Only a resolved club market, or an unopened draft past its close time, can be settled"
+    },
+    {
+      "code": 6211,
+      "name": "ClubFeesNotWithdrawn",
+      "msg": "Withdraw this market's club fees before settling it"
+    },
+    {
+      "code": 6212,
+      "name": "ClubTooLargeForPrivate",
+      "msg": "The club has more members than a private club allows"
+    },
+    {
+      "code": 6213,
+      "name": "ClubKindUnchanged",
+      "msg": "The club is already of this type"
+    },
+    {
+      "code": 6214,
+      "name": "ClubRefundAccountsMissing",
+      "msg": "The deposit vault, owner token account and token program are required for a USDC deposit"
     }
   ],
   "types": [
@@ -18967,6 +19480,15 @@
             "type": "bool"
           },
           {
+            "name": "closed",
+            "docs": [
+              "Closed by its owner: the deposit is refunded and nothing can join or",
+              "change. The account stays so its id is never reused and existing member",
+              "records can only be closed, never revived."
+            ],
+            "type": "bool"
+          },
+          {
             "name": "reserved",
             "docs": [
               "Zeroed space for later club settings."
@@ -18974,7 +19496,7 @@
             "type": {
               "array": [
                 "u8",
-                82
+                81
               ]
             }
           }
@@ -22815,6 +23337,32 @@
           }
         ]
       }
+    },
+    {
+      "name": "ClubMarketSettlement",
+      "docs": [
+        "Marks a club market as settled: finished, with its club fees withdrawn,",
+        "so it no longer counts against closing the club. It exists at most once.",
+        "",
+        "PDA: [\"club_market_settled\", club_market]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club_market",
+            "type": "pubkey"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -23167,6 +23715,14 @@
       ],
       "type": "bytes",
       "value": "[99, 108, 117, 98, 95, 100, 101, 112, 111, 115, 105, 116, 95, 118, 97, 117, 108, 116]"
+    },
+    {
+      "name": "CLUB_MARKET_SETTLED_SEED",
+      "docs": [
+        "Settlement marker of a club market: [\"club_market_settled\", club_market]."
+      ],
+      "type": "bytes",
+      "value": "[99, 108, 117, 98, 95, 109, 97, 114, 107, 101, 116, 95, 115, 101, 116, 116, 108, 101, 100]"
     }
   ]
 }

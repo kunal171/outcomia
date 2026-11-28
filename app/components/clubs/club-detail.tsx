@@ -54,6 +54,11 @@ import { ClubFeedback, shortKey, useClubTransaction } from "./club-transaction";
 import { roleLabel } from "./clubs-home";
 import { STATUS_LABELS } from "./club-market";
 import { ClubDeposit } from "./club-deposit";
+import { ClubLifecycle } from "./club-lifecycle";
+import {
+  settleClubMarketInstruction,
+  settleState,
+} from "../../lib/club-lifecycle";
 
 export function ClubDetail({ address }: { address: string }) {
   const { t } = useI18n();
@@ -112,8 +117,9 @@ export function ClubDetail({ address }: { address: string }) {
     ? snapshot?.members.find((m) => m.wallet.equals(wallet))
     : undefined;
   const role = snapshot ? clubRole(snapshot.club, me) : null;
-  const owner = role === "owner";
-  const admin = owner || role === "admin";
+  const closed = !!snapshot?.club.closed;
+  const owner = role === "owner" && !closed;
+  const admin = (owner || role === "admin") && !closed;
   const now = Math.floor(Date.now() / 1000);
 
   const listing = snapshot?.listing ?? null;
@@ -283,7 +289,10 @@ export function ClubDetail({ address }: { address: string }) {
                     {t(roleLabel(role))}
                   </span>
                 )}
-                {canCreateClubMarket(snapshot.club, me) && (
+                {closed && (
+                  <span className="ui-badge ui-badge-warn">{t("Closed")}</span>
+                )}
+                {!closed && canCreateClubMarket(snapshot.club, me) && (
                   <Link
                     className="ui-btn ui-btn-primary"
                     href={`/clubs/${address}/markets/new`}
@@ -402,13 +411,29 @@ export function ClubDetail({ address }: { address: string }) {
               }
             >
               <div className="club-main">
-                <ClubDeposit
-                  club={club}
-                  account={snapshot.club}
-                  rules={rules}
-                  owner={owner}
-                  tx={tx}
-                />
+                {closed ? (
+                  <div className="ui-notice" role="status">
+                    {t(
+                      "This club is closed. Its deposit was refunded to the owner. Members keep their positions and can leave the club.",
+                    )}
+                  </div>
+                ) : (
+                  <ClubDeposit
+                    club={club}
+                    account={snapshot.club}
+                    rules={rules}
+                    owner={owner}
+                    tx={tx}
+                  />
+                )}
+                {owner && (
+                  <ClubLifecycle
+                    club={club}
+                    snapshot={snapshot}
+                    rules={rules}
+                    tx={tx}
+                  />
+                )}
                 <section className="ui-card">
                   <div className="club-card-head">
                     <h2 className="ui-h3">{t("Club markets")}</h2>
@@ -485,6 +510,45 @@ export function ClubDetail({ address }: { address: string }) {
                               })}
                             </button>
                           )}
+                          {(() => {
+                            const state = settleState(
+                              row.market,
+                              row.binding.accruedClubFees,
+                              row.settled,
+                              now,
+                            );
+                            if (state === "settled")
+                              return (
+                                <span className="ui-badge">{t("Settled")}</span>
+                              );
+                            if (state === "fees")
+                              return (
+                                <span className="ui-badge ui-badge-warn">
+                                  {t("Withdraw club fees to settle")}
+                                </span>
+                              );
+                            if (state === "ready" && wallet)
+                              return (
+                                <button
+                                  type="button"
+                                  className="ui-btn ui-btn-sm"
+                                  disabled={tx.pending}
+                                  onClick={() =>
+                                    run(async (p, signer) => [
+                                      await settleClubMarketInstruction(
+                                        p,
+                                        signer,
+                                        club,
+                                        row.address,
+                                      ),
+                                    ])
+                                  }
+                                >
+                                  {t("Settle")}
+                                </button>
+                              );
+                            return null;
+                          })()}
                           <span className="club-row-arrow" aria-hidden="true">
                             →
                           </span>

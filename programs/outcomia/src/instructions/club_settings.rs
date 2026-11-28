@@ -97,7 +97,8 @@ pub fn handle_create_club(
         deposit_amount: 0,
         live_markets: 0,
         live_markets_ready: true,
-        reserved: [0; 82],
+        closed: false,
+        reserved: [0; 81],
     });
     ctx.accounts.owner_member.set_inner(ClubMember {
         club: club_key,
@@ -121,6 +122,7 @@ pub fn handle_set_club_market_policy(
     ctx: Context<ManageClub>,
     policy: ClubMarketPolicy,
 ) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     ctx.accounts.club.market_policy = policy;
     Ok(())
 }

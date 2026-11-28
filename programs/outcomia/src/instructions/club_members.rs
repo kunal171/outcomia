@@ -14,8 +14,15 @@ use crate::{
 };
 
 impl Club {
+    /// Rejects any change to a closed club. Leaving and removal stay open.
+    pub(crate) fn require_open(&self) -> Result<()> {
+        require!(!self.closed, club::ClubClosed);
+        Ok(())
+    }
+
     /// Counts one more member, within the club type's member cap.
     pub(crate) fn admit(&mut self, rules: &ClubRulesConfig) -> Result<()> {
+        self.require_open()?;
         require!(
             self.member_count < rules.member_cap(self.kind),
             club::ClubMemberCapReached
@@ -34,6 +41,7 @@ impl Club {
         role: ClubRole,
         rules: &ClubRulesConfig,
     ) -> Result<()> {
+        self.require_open()?;
         if member.role == ClubRole::Member && role == ClubRole::Admin {
             require!(
                 self.admin_count < u32::from(rules.max_club_admins),

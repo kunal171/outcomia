@@ -81,6 +81,7 @@ pub struct CloseClubInvite<'info> {
 /// # Returns
 /// An invitation that the wallet can accept for `CLUB_INVITE_TTL_SECONDS`.
 pub fn handle_invite_club_member(ctx: Context<InviteClubMember>, wallet: Pubkey) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     let expires_at = Clock::get()?
         .unix_timestamp
         .checked_add(CLUB_INVITE_TTL_SECONDS)

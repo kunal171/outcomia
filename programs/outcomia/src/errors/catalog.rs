@@ -556,4 +556,21 @@ pub enum OutcomiaError {
     ClubDepositOverflow = 206,
     #[msg("This club's market count must be recorded by the platform before it creates markets")]
     ClubMarketCountNotSet = 207,
+
+    #[msg("This club is closed")]
+    ClubClosed = 208,
+    #[msg("Every club market must be settled before the club closes")]
+    ClubHasLiveMarkets = 209,
+    #[msg("Only a resolved club market, or an unopened draft past its close time, can be settled")]
+    ClubMarketNotFinished = 210,
+    #[msg("Withdraw this market's club fees before settling it")]
+    ClubFeesNotWithdrawn = 211,
+    #[msg("The club has more members than a private club allows")]
+    ClubTooLargeForPrivate = 212,
+    #[msg("The club is already of this type")]
+    ClubKindUnchanged = 213,
+    #[msg(
+        "The deposit vault, owner token account and token program are required for a USDC deposit"
+    )]
+    ClubRefundAccountsMissing = 214,
 }

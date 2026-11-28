@@ -51,6 +51,7 @@ pub struct AcceptClubOwnership<'info> {
 /// # Returns
 /// `Ok(())` with `pending_owner` set (or cleared).
 pub fn handle_nominate_club_owner(ctx: Context<NominateClubOwner>) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     let candidate = ctx.accounts.candidate_member.wallet;
     ctx.accounts.club.pending_owner = (candidate != ctx.accounts.owner.key()).then_some(candidate);
     Ok(())
@@ -66,6 +67,7 @@ pub fn handle_nominate_club_owner(ctx: Context<NominateClubOwner>) -> Result<()>
 /// # Returns
 /// `Ok(())` with the candidate as owner and admin; the previous owner remains an admin.
 pub fn handle_accept_club_ownership(ctx: Context<AcceptClubOwnership>) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     let bump = ctx.bumps.candidate_record;
     let accounts = ctx.accounts;
     let max = accounts.club_rules.max_owned_clubs;

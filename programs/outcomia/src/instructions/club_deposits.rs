@@ -117,6 +117,7 @@ pub struct DepositClubUsdc<'info> {
 /// # Returns
 /// `Ok(())` with the tokens in the vault and the club's balance increased.
 pub fn handle_deposit_club_usdc(ctx: Context<DepositClubUsdc>, amount: u64) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     let rules = &ctx.accounts.club_rules;
     require!(rules.deposits_configured(), club::ClubDepositRulesNotSet);
     require!(amount > 0, club::ClubDepositTooLow);
@@ -179,6 +180,7 @@ pub struct DepositClubSol<'info> {
 /// # Returns
 /// `Ok(())` with the lamports in the club account and its balance increased.
 pub fn handle_deposit_club_sol(ctx: Context<DepositClubSol>, lamports: u64) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     let rules = &ctx.accounts.club_rules;
     require!(rules.deposits_configured(), club::ClubDepositRulesNotSet);
     require!(lamports > 0, club::ClubDepositTooLow);
@@ -259,6 +261,7 @@ pub(crate) fn require_club_funded(
     rules: &ClubRulesConfig,
     price_update: Option<&PriceUpdateV2>,
 ) -> Result<()> {
+    club.require_open()?;
     require!(rules.deposits_configured(), club::ClubDepositRulesNotSet);
     let minimum = rules.min_deposit_usd(club.kind);
     let funded = match club.deposit_asset {
@@ -285,7 +288,10 @@ pub(crate) struct UsdPrice {
 
 /// Reads a fully verified, fresh, positive SOL/USD price within the
 /// configured confidence band.
-fn read_sol_usd_price(update: &PriceUpdateV2, rules: &ClubRulesConfig) -> Result<UsdPrice> {
+pub(crate) fn read_sol_usd_price(
+    update: &PriceUpdateV2,
+    rules: &ClubRulesConfig,
+) -> Result<UsdPrice> {
     let price = update
         .get_price_no_older_than(
             &Clock::get()?,
@@ -339,6 +345,35 @@ pub(crate) fn lamports_to_usd(lamports: u64, price: &UsdPrice) -> Result<u128> {
     }
 }
 
+/// Lamports a club of `kind` must hold when paying in SOL: the dollar minimum
+/// times the SOL buffer at `price`, rounded up.
+pub(crate) fn sol_payment_minimum(
+    rules: &ClubRulesConfig,
+    kind: ClubKind,
+    price: &UsdPrice,
+) -> Result<u64> {
+    // usd = ceil(minimum * buffer / 10_000); lamports = ceil(usd * 10^9 / (price * 10^exponent * 10^6))
+    let usd = (rules.min_deposit_usd(kind) as u128)
+        .checked_mul(rules.sol_buffer_bps as u128)
+        .ok_or(club::ClubDepositOverflow)?
+        .div_ceil(10_000);
+    let shift = price.exponent + USD_DECIMALS as i32 - SOL_DECIMALS;
+    let power = 10u128
+        .checked_pow(shift.unsigned_abs())
+        .ok_or(club::ClubDepositOverflow)?;
+    let lamports = if shift >= 0 {
+        let unit = (price.price as u128)
+            .checked_mul(power)
+            .ok_or(club::ClubDepositOverflow)?;
+        usd.div_ceil(unit)
+    } else {
+        usd.checked_mul(power)
+            .ok_or(club::ClubDepositOverflow)?
+            .div_ceil(price.price as u128)
+    };
+    u64::try_from(lamports).map_err(|_| error!(club::ClubDepositOverflow))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,6 +383,44 @@ mod tests {
         assert_eq!(usd_to_token_units(100_000_000, 6).unwrap(), 100_000_000);
         assert_eq!(usd_to_token_units(100_000_000, 9).unwrap(), 100_000_000_000);
         assert_eq!(usd_to_token_units(100_000_001, 2).unwrap(), 10_001);
+    }
+
+    #[test]
+    fn sol_payment_minimum_is_the_smallest_accepted_deposit() {
+        let mut rules = ClubRulesConfig {
+            public_member_cap: 0,
+            private_member_cap: 0,
+            max_owned_clubs: 0,
+            max_club_admins: 0,
+            bump: 0,
+            deposit_mint: Pubkey::default(),
+            deposit_mint_decimals: 6,
+            private_min_deposit_usd: 100_000_000,
+            public_min_deposit_usd: 200_000_000,
+            sol_buffer_bps: 12_000,
+            sol_usd_feed_id: [0; 32],
+            max_price_age_seconds: 60,
+            max_price_conf_bps: 100,
+            reserved: [0; 39],
+        };
+        let price = UsdPrice {
+            price: 15_000_000_000,
+            exponent: -8,
+        };
+        assert_eq!(
+            sol_payment_minimum(&rules, ClubKind::Public, &price).unwrap(),
+            1_600_000_000
+        );
+        // An awkward price: the result is accepted, one lamport less is not.
+        let odd = UsdPrice {
+            price: 13_333_333_333,
+            exponent: -8,
+        };
+        rules.private_min_deposit_usd = 100_000_001;
+        let lamports = sol_payment_minimum(&rules, ClubKind::Private, &odd).unwrap();
+        let need = 100_000_001u128 * 12_000;
+        assert!(lamports_to_usd(lamports, &odd).unwrap() * 10_000 >= need);
+        assert!(lamports_to_usd(lamports - 1, &odd).unwrap() * 10_000 < need);
     }
 
     #[test]

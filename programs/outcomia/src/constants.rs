@@ -199,3 +199,7 @@ pub const MIN_SOL_BUFFER_BPS: u16 = 10_000;
 pub const MAX_SOL_BUFFER_BPS: u16 = 30_000;
 pub const MAX_PRICE_AGE_LIMIT_SECONDS: u32 = 300;
 pub const MAX_PRICE_CONF_LIMIT_BPS: u16 = 1_000;
+
+/// Settlement marker of a club market: ["club_market_settled", club_market].
+#[constant]
+pub const CLUB_MARKET_SETTLED_SEED: &[u8] = b"club_market_settled";
