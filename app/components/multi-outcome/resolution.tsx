@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Transaction, SystemProgram } from "@solana/web3.js";
 import { deriveAdminRecordPda } from "../../lib/outcomia";
+import { disputeConfigPda, marketDisputePda } from "../../lib/disputes";
+import { MarketDispute, useFinalizeGate } from "../market-dispute";
 import { multiBookPda } from "../../lib/multi-outcome";
 import { useProtocolRole } from "../protocol-role-provider";
 import { resolutionAvailability } from "../../lib/multi-outcome-lifecycle";
@@ -16,6 +18,12 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
     { t } = useI18n();
   const { role } = useProtocolRole(),
     d = s.data;
+  const gate = useFinalizeGate(
+    d?.key ?? null,
+    d?.market.proposal,
+    d?.market.terms.resolutionDelaySeconds,
+    d?.market.status,
+  );
   if (!d) return null;
   const ready = !!s.wallet && !!s.signed && !s.busy && !s.loading,
     admin = role === "admin" || role === "super-admin";
@@ -35,7 +43,7 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
       return new Transaction().add(
         await s.signed.methods
           .advanceMultiOutcome(action)
-          .accountsStrict({ market: d.key })
+          .accountsStrict({ market: d.key, dispute: marketDisputePda(d.key) })
           .instruction(),
       );
     });
@@ -87,7 +95,7 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
           <p>
             {t("Proposed: {outcome}. Review ends {time}.", {
               outcome: outcomeText(proposed.outcome),
-              time: new Date(readyAt! * 1000).toLocaleString(),
+              time: new Date((gate.at ?? readyAt!) * 1000).toLocaleString(),
             })}
           </p>
           <p>
@@ -114,7 +122,10 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
           </button>
         )}
         {availability.canFinalize && (
-          <button disabled={!ready} onClick={() => advance(2)}>
+          <button
+            disabled={!ready || gate.open || (gate.at !== null && now < gate.at)}
+            onClick={() => advance(2)}
+          >
             {t("Finalize outcome")}
           </button>
         )}
@@ -154,6 +165,9 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
                     resolver: s.wallet.publicKey,
                     market: d.key,
                     adminRecord: deriveAdminRecordPda(s.wallet.publicKey),
+                    disputeConfig: disputeConfigPda(),
+                    dispute: marketDisputePda(d.key),
+                    systemProgram: SystemProgram.programId,
                   })
                   .instruction(),
               );
@@ -223,6 +237,25 @@ export function MultiResolution({ session: s }: { session: MultiSession }) {
           </div>
         </details>
       )}
+      <MarketDispute
+        family="multi"
+        address={d.key}
+        market={{
+          status: d.market.status as Record<string, object>,
+          proposal: d.market.proposal,
+          resolutionDelaySeconds: d.market.terms.resolutionDelaySeconds,
+          creator: d.market.authority,
+          resolver: d.market.terms.resolver,
+          fallback: d.market.terms.fallback,
+          mint: d.market.collateralMint,
+          outcomes: d.market.terms.outcomeLabels
+            .map((label, value) => ({ value, label }))
+            .filter((o) => proposed?.outcome.winner?.[0][0] !== o.value),
+          proposedLabel: proposed ? outcomeText(proposed.outcome) : null,
+        }}
+        club={null}
+        onChanged={() => void s.refresh(true)}
+      />
     </section>
   );
 }

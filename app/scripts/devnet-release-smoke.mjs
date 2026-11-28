@@ -150,6 +150,8 @@ const idl = JSON.parse(
 );
 const p = new Program(idl, new AnchorProvider(conn, new Wallet(admin), {}));
 const programId = new PublicKey(idl.address);
+const pda = (seed, ...parts) =>
+  PublicKey.findProgramAddressSync([Buffer.from(seed), ...parts], programId)[0];
 const previous = fs.existsSync(reportFile)
   ? JSON.parse(fs.readFileSync(reportFile, "utf8"))
   : null;
@@ -601,12 +603,16 @@ async function main() {
         resolver: admin.publicKey,
         market,
         adminRecord: o.deriveAdminRecordPda(admin.publicKey),
+        disputeConfig: pda("dispute_config"),
+        dispute: pda("market_dispute", market.toBuffer()),
+        systemProgram: SystemProgram.programId,
       })
       .instruction();
+  // Finalization also waits for the dispute window (docs/club-rules-and-disputes.md).
   const advance = async (action) =>
     p.methods
       .advanceMultiOutcome(action)
-      .accountsStrict({ market })
+      .accountsStrict({ market, dispute: pda("market_dispute", market.toBuffer()) })
       .instruction();
 
   console.log(`waiting for close at ${new Date(closeTs * 1000).toISOString()}`);
