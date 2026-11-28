@@ -22,6 +22,36 @@ fn pda(seed: &[u8], parts: &[&[u8]]) -> Pubkey {
     seeds.extend_from_slice(parts);
     Pubkey::find_program_address(&seeds, &outcomia::ID).0
 }
+
+/// Installs dispute settings with 1-second windows, so finalization keeps
+/// waiting only for each market's review delay.
+fn install_dispute_config(svm: &mut LiteSVM) {
+    let (address, bump) = Pubkey::find_program_address(&[DISPUTE_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    DisputeConfig {
+        club_window_seconds: 1,
+        regular_window_seconds: 1,
+        bond_tokens: 1,
+        ruling_deadline_seconds: 7 * 24 * 60 * 60,
+        treasury: Pubkey::new_unique(),
+        bump,
+        reserved: [0; 64],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
 fn store<T: AccountSerialize>(svm: &mut LiteSVM, key: Pubkey, value: &T) {
     let mut data = Vec::new();
     value.try_serialize(&mut data).expect("serialize fixture");
@@ -76,6 +106,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM).expect("program");
+        install_dispute_config(&mut svm);
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 10_000_000_000).expect("rent");
         let mint = Pubkey::new_unique();
@@ -794,10 +825,13 @@ fn propose(
     correction: bool,
 ) -> Instruction {
     ix(
-        outcomia::accounts::ResolvePrediction {
+        outcomia::accounts::ProposePrediction {
             resolver: f.owner.pubkey(),
             market,
             admin_record: pda(ADMIN_SEED, &[f.owner.pubkey().as_ref()]),
+            dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+            dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+            system_program: system_program::ID,
         },
         outcomia::instruction::ProposePrediction {
             outcome,
@@ -809,7 +843,10 @@ fn propose(
 }
 fn advance(market: Pubkey, action: u8) -> Instruction {
     ix(
-        outcomia::accounts::AdvancePrediction { market },
+        outcomia::accounts::AdvancePrediction {
+            market,
+            dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+        },
         outcomia::instruction::AdvancePrediction { action },
     )
 }
@@ -1116,10 +1153,13 @@ fn resolution_rejects_disabled_or_foreign_admin_bad_evidence_and_unconfigured_ti
         ("ar://evidence", [0; 32]),
     ] {
         assert!(!f.send(&[ix(
-            outcomia::accounts::ResolvePrediction {
+            outcomia::accounts::ProposePrediction {
                 resolver: f.owner.pubkey(),
                 market,
-                admin_record: admin
+                admin_record: admin,
+                dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+                dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+                system_program: system_program::ID,
             },
             outcomia::instruction::ProposePrediction {
                 outcome: PredictionResolution::Yes,
@@ -1655,10 +1695,13 @@ fn active_fallback_resolver_can_propose_no_and_deadline_cannot_override_it() {
     clock(&mut f, 120);
     assert!(f.send(&[advance(market, 1)]));
     let instruction = ix(
-        outcomia::accounts::ResolvePrediction {
+        outcomia::accounts::ProposePrediction {
             resolver: fallback.pubkey(),
             market,
             admin_record: admin,
+            dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+            dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+            system_program: system_program::ID,
         },
         outcomia::instruction::ProposePrediction {
             outcome: PredictionResolution::No,
@@ -2197,4 +2240,101 @@ fn complement_rejects_noncrossing_self_wrong_side_closed_and_crossing_placement(
         false
     ),));
     assert_complement_conserved(&f, market, book, tq);
+}
+
+/// A public market's dispute (club rules milestone 3): the proposal records the
+/// regular window, a holder disputes with a one-token bond, a second admin
+/// rules it invalid, and holders redeem at the invalid payout.
+#[test]
+fn public_market_dispute_ruled_invalid_pays_the_invalid_payout() {
+    let mut f = Fixture::new();
+    clock(&mut f, 1);
+    assert!(f.send(&[f.init(), f.transfer(10_000_000, false)]));
+    let (market, pos) = prediction(&mut f);
+    assert!(f.send(&[ix(
+        pred_custody(&f, market, pos),
+        outcomia::instruction::SharedCompleteSet {
+            quantity: 4,
+            split: true
+        }
+    )]));
+    clock(&mut f, 100);
+    assert!(f.send(&[propose(&f, market, PredictionResolution::Yes, false)]));
+    let record = pda(MARKET_DISPUTE_SEED, &[market.as_ref()]);
+    let dispute: MarketDispute = load(&f, record);
+    assert!(!dispute.club_market);
+    assert_eq!(dispute.window_seconds, 1);
+
+    let vault = pda(DISPUTE_BOND_SEED, &[market.as_ref()]);
+    let owner = f.owner.pubkey();
+    let before = f.tokens(f.wallet_token);
+    assert!(f.send(&[ix(
+        outcomia::accounts::OpenPredictionDispute {
+            disputer: owner,
+            market,
+            dispute: record,
+            position: pos,
+            dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+            mint: f.mint,
+            disputer_token: f.wallet_token,
+            bond_vault: vault,
+            token_program: anchor_spl::token::ID,
+            system_program: system_program::ID,
+        },
+        outcomia::instruction::OpenPredictionDispute {},
+    )]));
+    assert_eq!(f.tokens(vault), 1_000_000);
+
+    // A second admin, with no role in this market, rules.
+    let ruler = Keypair::new();
+    f.svm.airdrop(&ruler.pubkey(), 1_000_000_000).unwrap();
+    let (admin_record, bump) =
+        Pubkey::find_program_address(&[ADMIN_SEED, ruler.pubkey().as_ref()], &outcomia::ID);
+    store(
+        &mut f.svm,
+        admin_record,
+        &AdminRecord {
+            authority: ruler.pubkey(),
+            added_by: owner,
+            status: AdminStatus::Active,
+            bump,
+        },
+    );
+    let rule = ix(
+        outcomia::accounts::RulePredictionDispute {
+            admin: ruler.pubkey(),
+            admin_record,
+            market,
+            dispute: record,
+            dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+            // Public market: no club binding, so the membership is not read.
+            club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+            admin_club_member: Pubkey::new_unique(),
+            bond_vault: vault,
+            recipient: f.wallet_token,
+            disputer: owner,
+            token_program: anchor_spl::token::ID,
+        },
+        outcomia::instruction::RulePredictionDispute {
+            ruling: PredictionRuling::Invalid,
+        },
+    );
+    f.svm.expire_blockhash();
+    let msg =
+        Message::new_with_blockhash(&[rule], Some(&ruler.pubkey()), &f.svm.latest_blockhash());
+    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&ruler]).unwrap();
+    f.svm.send_transaction(tx).expect("rule invalid");
+    assert_eq!(f.tokens(f.wallet_token), before);
+    let m: PredictionMarket = load(&f, market);
+    assert_eq!(m.final_outcome, Some(PredictionResolution::Invalid));
+    let dispute: MarketDispute = load(&f, record);
+    assert_eq!(dispute.state, DisputeState::Invalidated);
+    assert!(!dispute.club_penalty_due);
+
+    // Invalid pays half a contract each: 4 YES + 4 NO return the 4 tokens.
+    assert!(f.send(&[ix(
+        pred_custody(&f, market, pos),
+        outcomia::instruction::RedeemPrediction { yes: 4, no: 4 },
+    )]));
+    assert_eq!(f.ledger().free, 10_000_000);
 }

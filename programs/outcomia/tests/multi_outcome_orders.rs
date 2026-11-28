@@ -84,6 +84,36 @@ fn pda(seed: &[u8], parts: &[&[u8]]) -> Pubkey {
     Pubkey::find_program_address(&seeds, &outcomia::ID).0
 }
 
+/// Installs dispute settings with 1-second windows, so finalization keeps
+/// waiting only for each market's review delay.
+fn install_dispute_config(svm: &mut LiteSVM) {
+    let (address, bump) = Pubkey::find_program_address(&[DISPUTE_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    DisputeConfig {
+        club_window_seconds: 1,
+        regular_window_seconds: 1,
+        bond_tokens: 1,
+        ruling_deadline_seconds: 7 * 24 * 60 * 60,
+        treasury: Pubkey::new_unique(),
+        bump,
+        reserved: [0; 64],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
+
 /// Serializes and stores an Anchor account directly into the LiteSVM state database.
 fn store<T: AccountSerialize>(svm: &mut LiteSVM, key: Pubkey, value: &T) {
     let mut data = Vec::new();
@@ -139,6 +169,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM).expect("program");
+        install_dispute_config(&mut svm);
         let admin = Keypair::new();
         let fallback_admin = Keypair::new();
         let owner = Keypair::new();
@@ -635,6 +666,9 @@ impl Fixture {
                 resolver: *resolver,
                 market: self.market_key(),
                 admin_record: pda(ADMIN_SEED, &[resolver.as_ref()]),
+                dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+                dispute: pda(MARKET_DISPUTE_SEED, &[self.market_key().as_ref()]),
+                system_program: anchor_lang::solana_program::system_program::ID,
             }
             .to_account_metas(None),
         )
@@ -651,6 +685,7 @@ impl Fixture {
             &outcomia::instruction::AdvanceMultiOutcome { action }.data(),
             outcomia::accounts::AdvanceMultiOutcome {
                 market: self.market_key(),
+                dispute: pda(MARKET_DISPUTE_SEED, &[self.market_key().as_ref()]),
             }
             .to_account_metas(None),
         )
@@ -2049,4 +2084,131 @@ fn eight_way_mint_fits_the_default_compute_budget() {
         8
     );
     assert_full_sets_conserved(&f);
+}
+
+/// Tests outcome disputes on a multi-outcome market (club rules milestone 3):
+/// - a holder disputes inside the window with a one-token bond;
+/// - finalization waits for the ruling;
+/// - the market's creator, resolver and fallback resolver cannot rule;
+/// - an overturn must name another outcome, and the bond returns to the disputer.
+#[test]
+fn multi_outcome_dispute_is_overturned_by_an_eligible_admin() {
+    let mut f = Fixture::new();
+    f.setup_active_market(3);
+    let owner_key = f.owner.pubkey();
+    f.send(f.complete(&owner_key, 6, true)).expect("split");
+    let mut clock = f.svm.get_sysvar::<Clock>();
+    clock.unix_timestamp = 205;
+    f.svm.set_sysvar(&clock);
+    let one = OutcomeId::new(1, 3).unwrap();
+    let two = OutcomeId::new(2, 3).unwrap();
+    let admin_key = f.admin.pubkey();
+    f.send(f.propose(
+        &admin_key,
+        MultiOutcomeResolution::Winner(one),
+        "ar://evidence".into(),
+        [9; 32],
+        false,
+    ))
+    .expect("propose");
+
+    let market = f.market_key();
+    let record = pda(MARKET_DISPUTE_SEED, &[market.as_ref()]);
+    let vault = pda(DISPUTE_BOND_SEED, &[market.as_ref()]);
+    let wallet_owner = f.wallet_owner;
+    let before = f.tokens(wallet_owner);
+    let open = Instruction::new_with_bytes(
+        outcomia::ID,
+        &outcomia::instruction::OpenMultiOutcomeDispute {}.data(),
+        outcomia::accounts::OpenMultiOutcomeDispute {
+            disputer: owner_key,
+            market,
+            dispute: record,
+            position: f.position_key(&owner_key),
+            dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+            mint: f.mint,
+            disputer_token: wallet_owner,
+            bond_vault: vault,
+            token_program: anchor_spl::token::ID,
+            system_program: anchor_lang::solana_program::system_program::ID,
+        }
+        .to_account_metas(None),
+    );
+    f.send(open).expect("open dispute");
+    assert_eq!(f.tokens(vault), 1_000_000);
+    assert_eq!(f.tokens(wallet_owner), before - 1_000_000);
+
+    clock.unix_timestamp = 300;
+    f.svm.set_sysvar(&clock);
+    f.reject(f.advance(2), Some("DisputeOpen"));
+
+    // The taker becomes an admin with no role in this market.
+    let taker_key = f.taker.pubkey();
+    let (taker_record, bump) =
+        Pubkey::find_program_address(&[ADMIN_SEED, taker_key.as_ref()], &outcomia::ID);
+    store(
+        &mut f.svm,
+        taker_record,
+        &AdminRecord {
+            authority: taker_key,
+            added_by: admin_key,
+            status: AdminStatus::Active,
+            bump,
+        },
+    );
+    let rule = |ruler: Pubkey, ruling: MultiOutcomeRuling| {
+        Instruction::new_with_bytes(
+            outcomia::ID,
+            &outcomia::instruction::RuleMultiOutcomeDispute { ruling }.data(),
+            outcomia::accounts::RuleMultiOutcomeDispute {
+                admin: ruler,
+                admin_record: pda(ADMIN_SEED, &[ruler.as_ref()]),
+                market,
+                dispute: record,
+                dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+                bond_vault: vault,
+                recipient: wallet_owner,
+                disputer: owner_key,
+                token_program: anchor_spl::token::ID,
+            }
+            .to_account_metas(None),
+        )
+    };
+    // The creator and primary resolver, then the fallback resolver.
+    f.reject(
+        rule(admin_key, MultiOutcomeRuling::Invalid),
+        Some("IneligibleDisputeRuler"),
+    );
+    let fallback_key = f.fallback_admin.pubkey();
+    let (fallback_record, bump) =
+        Pubkey::find_program_address(&[ADMIN_SEED, fallback_key.as_ref()], &outcomia::ID);
+    store(
+        &mut f.svm,
+        fallback_record,
+        &AdminRecord {
+            authority: fallback_key,
+            added_by: admin_key,
+            status: AdminStatus::Active,
+            bump,
+        },
+    );
+    f.reject(
+        rule(fallback_key, MultiOutcomeRuling::Invalid),
+        Some("IneligibleDisputeRuler"),
+    );
+    f.reject(
+        rule(taker_key, MultiOutcomeRuling::Overturn(one)),
+        Some("InvalidDisputeRuling"),
+    );
+    f.send(rule(taker_key, MultiOutcomeRuling::Overturn(two)))
+        .expect("overturn");
+
+    let m = f.market();
+    assert_eq!(m.status, PredictionStatus::Resolved);
+    assert_eq!(m.final_outcome, Some(MultiOutcomeResolution::Winner(two)));
+    assert_eq!(f.tokens(wallet_owner), before);
+    let dispute: MarketDispute = f.read(record);
+    assert_eq!(dispute.state, DisputeState::Overturned);
+    assert!(!dispute.club_market && !dispute.club_penalty_due);
+    assert_eq!(dispute.window_seconds, 1);
 }
