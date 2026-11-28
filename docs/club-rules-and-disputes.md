@@ -1,6 +1,6 @@
 # Club rules, security deposits and outcome disputes
 
-Status: agreed plan (2026-11-25). Solana implementation in progress; Canton is tracked below and not started.
+Status: agreed plan (2026-11-25). Solana: M1 merged; M2a (deposits) built; M2b (switch type, close club) next. Canton is tracked below and not started.
 
 Every contract change ships with its matching UI in the same milestone.
 Canton clubs get the same rules after Solana. The super admin can change every
@@ -203,3 +203,66 @@ instructions. The app's club forms need the new program. So:
    it cannot accept members.
 5. **App.** Vercel deploys from `master`. If the app deploys before step 2,
    creating or joining a club fails until the program is upgraded.
+
+## 11. Milestone 2a: deposits (built)
+
+M2 ships in two parts. **M2a** adds the deposit; **M2b** adds switching type,
+settling markets and closing a club with its refund.
+
+**Program**
+- `set_club_deposit_rules` (super admin) stores these in `ClubRulesConfig`:
+  - the USDC mint;
+  - the $100 / $200 minimums;
+  - the SOL buffer (120%);
+  - the Pyth SOL/USD feed id;
+  - the price age (60 s) and confidence (1%) limits.
+
+  Until it is set, no club market can be created or opened.
+- `deposit_club_usdc` and `deposit_club_sol` (club owner) pay or top up the deposit:
+  - USDC goes to the club's vault (`["club_deposit_vault", club]`).
+  - SOL is held in the club account above its rent.
+  - The first deposit fixes the token.
+  - Every deposit must leave the balance at the payment minimum. For SOL, that is
+    the minimum times the buffer at the current price.
+- **Market gate.** `create_club_prediction_market` and
+  `open_club_prediction_market` require the club to be at its dollar minimum.
+  SOL is valued at the current price, which the caller passes as a Pyth price
+  account.
+- **Accepted prices.** Any fully verified Pyth `PriceUpdateV2` for the feed works.
+  The app uses Pyth's shared SOL/USD account (`7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE`,
+  updated every few seconds). If that account is stale, the app waits for the
+  next update instead of posting a price.
+- **Market counter.** Clubs count unsettled markets (`live_markets`) for
+  closing in M2b.
+  - Clubs created before this release are uncounted.
+  - The super admin records each count once with `set_club_live_markets`.
+  - Until then the club cannot create markets, so the count stays exact.
+- New fields use the accounts' reserved space, so account sizes are unchanged.
+
+**App**
+- **Club page:** a deposit card shows the deposit, its USD value and the minimum.
+  The owner pays or tops up from the card.
+- **Club creation:** the owner can pay the deposit in the same transaction, in
+  USDC or SOL, or later.
+- **Market creation:** the form checks the deposit before the paid rules upload,
+  and again with a fresh price before sending.
+- **Admin → Platform config:**
+  - deposit rules;
+  - a list of clubs whose market count still needs recording.
+
+## 12. Milestone 2a deployment order (devnet)
+
+1. **Indexer first.** Merge, then rebuild the Northflank indexer from
+   `master`. It keeps the previous IDL as history and decodes both programs.
+2. **Extend the program account.** The new program is 81,200 bytes larger than
+   the deployed one (2,484,392 vs 2,403,192). With the upgrade authority:
+   `solana program extend AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL 90000 -u devnet`
+   (about 0.63 SOL of rent).
+3. **Program upgrade.** `anchor build`, then upgrade the program on devnet.
+4. **Deposit rules.** As super admin: Admin → Platform config → Set deposit
+   rules. The defaults are outcomia-tUSDC, $100 / $200, 120%, the Pyth SOL/USD
+   feed, 60 s and 1%.
+5. **Record market counts.** In the same tab, record the count for every club
+   under "Club market counts".
+6. **App.** Vercel deploys from `master`. Until club owners pay deposits, their
+   clubs cannot create new markets. Existing markets keep trading.
