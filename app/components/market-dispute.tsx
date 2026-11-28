@@ -1,7 +1,7 @@
 "use client";
 /** A prediction market's dispute: the window, opening a dispute (holders),
  * ruling (eligible protocol admins) and expiry (anyone). Shared by binary,
- * club and multi-outcome market pages (docs/club-rules-and-disputes.md §3).
+ * club and multi-outcome market pages (docs/clubs.md, Disputes).
  * The program enforces every rule; this card explains and builds. */
 import { useEffect, useMemo, useState } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";

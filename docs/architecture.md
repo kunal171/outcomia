@@ -1,1160 +1,209 @@
-# Outcomia Architecture
+# Architecture
 
-## Browser RPC
-
-Browsers call `/api/solana` on the same deployment. The server forwards allowed
-RPC methods to Helius using private environment variables. Keys stay out of the
-client bundle and error responses. HTTP reads retain bounded public-devnet
-failover; signed broadcasts are not replayed. Public devnet WebSockets are
-configured separately. The proxy has request/response limits and a soft
-per-instance request allowance, not a distributed rate-limit store.
-
-## Prediction market page
-
-The detail page has three public sections:
-
-- **Trade:** choose YES or NO, buy or sell, then enter price and contract count.
-  The limit-value estimate excludes fees. The order book sits beside the ticket
-  on desktop and below it on mobile. Funding expands when needed. The book
-  groups open orders by price without treating a midpoint as an execution price.
-- **Your position:** free and locked contracts, open-order cancellation, and
-  redemption after final resolution. Pair creation/merging and older deposits
-  are kept in expandable sections. Shared cash is managed from Wallet.
-- **Rules & outcome:** payout terms, published rules, proposal evidence and
-  permissionless finalization. Addresses and hashes are under technical details.
-
-**Manage market** is shown only to an active-admin creator or configured resolver.
-The program still checks every instruction's actual authority and timing.
-Expired drafts show why trading cannot start. Closing trading does not remove
-order cancellation or claims. Refresh keeps the selected section and entered
-amounts; inactive sections are loaded on first visit.
-See [UI design](ui-design.md) for layout rules and component ownership.
-
-## Shared custody update
-
-The new execution path uses `AssetBalance(owner, mint)` and one SPL vault per
-mint. `SharedBook` owns price heads and fees; `SharedOrder` and
-`SharedPriceLevel` keep price/FIFO priority. Spot balances are shared for both
-mints. Prediction buys use shared collateral; prediction sells lock per-question
-YES/NO positions. Existing market layouts, queues and cash recovery stay intact.
-See [shared balances and settlement](shared-balances-resolution.md) for exact
-invariants, instructions, limitations and deployment steps. The sections below
-describe the original per-market path where marked by `TraderBalance`.
-
-Resolution checks the published resolver, active admin record and time window.
-Finalization is permissionless after the review delay. Redemption burns only
-free contracts and transfers their reserve into shared custody. No administrative
-instruction can pick a different outcome during finalization.
-
-## 1. Purpose and current scope
-
-`outcomia` is an Anchor program being developed as a research study of an
-on-chain central limit order book.
-
-The current implementation establishes the account and authorization foundation:
-
-- initialize protocol governance from the program upgrade authority;
-- manage deterministic, independently removable administrator records;
-- create one deterministic market for a distinct SPL base/quote mint pair;
-- pause, unpause, and close a market under authority control;
-- create canonical trader ledgers, deposit and withdraw vault-backed balances,
-  and atomically move order collateral between free and locked balances;
-- create canonical price levels at the best, middle, or worst position on each
-  side, append same-price orders behind a validated FIFO tail, and unlink
-  canceled orders and empty levels atomically;
-- settle against up to three best-price FIFO makers per client transaction,
-  preserving partial makers or atomically removing complete makers and
-  repairing their queues and levels;
-- charge a configurable quote-denominated taker fee, track each market's
-  protocol claim, and permit super-admin treasury withdrawal;
-- optionally transfer fresh, zero-supply test-mint authorities to a canonical
-  market faucet PDA and let any connected devnet wallet claim fixed amounts;
-- accept human-readable decimal amounts in the client while preserving exact
-  integer arithmetic at the program boundary;
-- validate behavior with in-process LiteSVM integration tests.
-
-Each on-chain instruction settles one best FIFO maker. The client may compose
-up to three sequential instructions into one atomic Solana transaction, across
-same-price FIFO successors or multiple price levels. When the path proves that
-no crossing liquidity remains, the client atomically rests a valid taker
-remainder at its limit price. Deposited tokens remain in market vaults while
-`TraderBalance` PDAs track each owner's free and locked claims; matching is
-purely an atomic ledger and order-book update.
-
-## 2. System context
-
-The program has three external roles:
-
-| Role             | Current capabilities                                                                                                                                                        |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Super-admin      | Manage administrator records, set the global taker-fee rate, withdraw accrued market fees, and opt fresh valueless mints into a public test faucet                          |
-| Market authority | Initialize a market, pause it, unpause it, and close it while paused                                                                                                        |
-| Trader           | Claim enabled test assets, initialize a market balance, deposit/withdraw, place or cancel orders, and atomically settle against a bounded best-price FIFO path while active |
-
-The program invokes the Token Program only at custody boundaries: deposit,
-withdrawal, protocol-fee withdrawal, market-vault initialization, and safe closure. Placement reserves
-already-deposited internal balance: asks lock base quantity and bids lock their
-calculated quote notional.
-
-### Companion web application
-
-The `app/` workspace is a Next.js App Router, React, and TypeScript client. It
-connects browser wallets to devnet and uses a checked-in copy of the generated
-Anchor IDL at `app/idl/outcomia.json`.
-
-The shared role provider reads the protocol config and the connected wallet's
-admin-record PDA. The header shows a `Super admin` or `Admin` badge only for an
-active on-chain record. Role-aware routes are:
-
-| Route                | UI access                                                                             | Purpose                                                                                                                                                               |
-| -------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/markets`           | Public                                                                                | Discover active and paused on-chain markets without connecting a wallet                                                                                               |
-| `/markets/[address]` | Public viewing; connected wallet for trading; market authority for lifecycle controls | Inspect one market, match up to three crossing FIFO makers atomically or place a resting order while active, and pause, unpause, or safely close an authorized market |
-| `/admin`             | Super-admin                                                                           | Initialize governance and add, disable, enable, or remove admins                                                                                                      |
-| `/markets/new`       | Public chooser; creation requires an active admin                                     | Choose Spot or Prediction before entering the corresponding form                                                                                                      |
-| `/markets/new/spot`  | Active admin or super-admin                                                           | Create a Spot market for two SPL mints                                                                                                                                |
-| `/predictions/new`   | Active admin or super-admin; deployment gate                                          | Create a single-collateral prediction draft                                                                                                                           |
-| `/wallet`            | Any connected wallet                                                                  | Read native SOL, held/deposited Outcomia-listed assets, per-market balances and YES/NO positions; open market funding controls                                        |
-| `/orders`            | Any connected wallet                                                                  | List wallet-owned orders and cancel orders whose status is `Open`                                                                                                     |
-
-The browser uses the configured Helius devnet RPC first, with verified public
-HTTP read fallbacks. The shared transport verifies genesis, coalesces in-flight
-duplicates, paces requests and cools down throttled providers. Account reads are
-not TTL-cached; discovery and transaction history have short caches. Writes are
-not automatically replayed after network failure. WebSockets use the primary.
-
-Market labels come from metadata or the documented devnet test-mint registry.
-Display prices use quote decimals and quantities use base decimals. Forward and
-inverse quotes identify their source: a recent fill, or an indicative book price.
-Recent fills are decoded using Anchor's camel-cased event name and at most six
-sequential transaction reads. No external/global price is implied.
-
-The market page derives the connected wallet's canonical `TraderBalance` PDA.
-It can initialize the ledger, deposit or withdraw either asset, and displays
-wallet, free, and locked amounts. Price, quantity, deposit, withdrawal, and
-faucet-configuration fields use human token units. The client converts decimal
-strings to exact atomic `BN` values without JavaScript floating-point math;
-price uses quote decimals and quantity uses base decimals. Tick and lot checks
-still operate on the resulting integers, which remain the only representation
-accepted on-chain. Order placement passes only that ledger, not token
-accounts or vaults. When the target price level already exists, the client appends
-behind its FIFO tail. Otherwise, it walks
-from the market's best price through `worse_price` links to find the exact
-better/worse insertion gap. The walk checks for cycles, broken reciprocal links,
-wrong markets or sides, and invalid price ordering before submitting.
-
-For a crossing order, `matching-plan.ts` walks the opposing price-level and
-FIFO links, rejecting cycles, broken ordering, self-trades, and inconsistent
-aggregates. It collects at most three makers and records each resting execution
-price plus the optional accounts required by that transition. The page builds
-one matching instruction per step. If the path ends because the opposing book
-is exhausted or the next price no longer crosses, it appends an insert-or-append
-instruction for any valid remainder and sends the complete sequence atomically.
-If crossing liquidity remains beyond the cap, the remainder stays free and in
-the form for an explicit retry. A non-crossing order follows the same reusable
-insert-or-append builder.
-
-This RPC traversal is only an advisory transaction-building step. The linked
-book can change between reads and confirmation, so the on-chain instruction
-derives every PDA and revalidates the neighboring prices and reciprocal links
-atomically. A stale client transaction fails safely and can be retried after a
-refresh. The browser walk is O(number of price levels); a production indexer
-can replace it later without changing the program's neighbor-account contract.
-
-The Orders page filters shared orders by owner, provides Open/History/All
-views, and refreshes after confirmed cancellation. Legacy order readers mount
-only when their disclosure is opened. Closed-book history stays visible, with
-unavailable spot precision shown as a dash instead of guessed units. Cancellation releases locked collateral to
-the owner's free balance without a token transfer. It fetches the live level,
-supplies the order FIFO neighbors, and, only for a final-order removal, derives
-the better/worse level PDAs and supplies the recorded rent payer. These accounts
-are transaction-building hints; the program revalidates every link atomically.
-
-Route visibility is a user-interface concern, not an authorization boundary.
-Every privileged action must also be constrained by the Anchor program because
-any client can submit an instruction directly.
-
-The root layout and route pages are Server Components. Wallet Adapter, RPC
-context, browser state, and transaction signing are isolated behind
-client-component boundaries. Routes can therefore share layouts and
-loading/error boundaries without forcing the entire application into the client
-bundle.
-
-The client keeps network and program identity in `app/lib/solana.ts`.
-The program address must remain synchronized with `declare_id!`, `Anchor.toml`,
-and the deployment keypair.
-
-### Companion indexer service
-
-`services/indexer/` is an independent Rust workspace whose dependency graph can
-advance without changing the Anchor program and LiteSVM test stack. It reads
-only successful finalized transactions, scopes Anchor `Program data:` to the
-active Outcomia invocation, strictly decodes all emitted event families, and
-stores replayable source records in PostgreSQL.
+Outcomia is an Anchor 1.2 program with an on-chain central limit order book for
+spot pairs and prediction markets, a Next.js app and a Rust indexer. Everything
+runs on devnet with test tokens.
 
 ```text
-Solana finalized RPC
-        |
-        v
-bounded backfill -> transaction processor -> strict event decoder
-        |                    |                       |
-        v                    +-----------------------+
-durable cursor                       |
-                                     v
-                       chain_transactions + chain_events
+browser ──► app (Next.js) ──► /api/solana proxy ──► Helius RPC ──► outcomia program
+                 │                                                   │ events
+                 └──────── GraphQL ◄──── indexer (Rust, Postgres) ◄──┘ finalized logs
 ```
 
-Solana returns each signature page newest-first. The RPC layer takes the final
-raw entry as the next `before` cursor before discarding failed transactions,
-then reverses successful records for oldest-first processing within that page.
-Source tables are append-only and order-independent; future projections must
-replay stored history explicitly in their required deterministic order.
+Editable diagrams: [outcomia-architecture.drawio](diagrams/outcomia-architecture.drawio)
+and [prediction-market-architecture.drawio](diagrams/prediction-market-architecture.drawio)
+(open them in [draw.io](https://app.diagrams.net/)).
 
-Every transaction and its decoded events commit atomically. Exact replay is a
-no-op success, while conflicting source data rolls back. A page checkpoint is
-updated only after all successful records commit. If RPC, decoding, or storage
-fails, the old cursor remains durable and the incomplete page is retried. A
-terminal empty page marks the historical backfill complete while preserving
-the final cursor for auditability.
+## Roles
 
-The current checkpoint walks backward through historical pages. Live sync will
-need a separate newest-signature or finalized-slot high-water mark so reconnect
-recovery cannot confuse historical progress with forward ingestion.
+| Role | Can do |
+| --- | --- |
+| Super admin | Manage admin records, set the taker fee, withdraw fees, configure clubs, deposits and disputes, enable test faucets |
+| Admin | Create and run markets while the admin record is active |
+| Market creator / resolver | Open, close trading, propose and correct outcomes |
+| Trader | Deposit, withdraw, place, cancel and match orders, split, merge and redeem |
+| Anyone | Finalize a result after review, expire stale disputes, freeze markets past close |
 
-The editable system diagram is available at
-[`diagrams/outcomia-architecture.drawio`](diagrams/outcomia-architecture.drawio).
+The protocol config is initialized by the program upgrade authority. Admin
+records are separate PDAs, so each can be disabled or removed on its own.
 
-## 3. On-chain account model
+## Accounts
 
-### Protocol config PDA
+**Protocol**
+- **`ProtocolConfig`** `["protocol_config"]`: the super admin and the taker fee rate.
+- **`AdminRecord`** `["admin", wallet]`: an admin and whether they're active.
+- **`TestFaucet`**: opt-in for fresh, zero-supply test mints, with fixed claim
+  amounts. The app also has a server-backed faucet.
+
+**Shared custody (current path)**
+- **`AssetBalance`** `(owner, mint)`: available and locked atoms for one asset
+  across every shared book. One SPL vault per mint holds the tokens. Depositing
+  once funds every market that uses that mint.
+- **`SharedBook`**: one per market. It holds the bid and ask heads and the fees
+  that market earned.
+- **`SharedPriceLevel`** and **`SharedOrder`**: sorted price levels with a FIFO
+  queue at each level.
+- **Prediction positions**: buys spend shared collateral; sells lock YES/NO
+  contracts held per question.
+
+**Legacy per-market path (still on devnet)**
+- **`Market`** and **`TraderBalance`** `["trader_balance", market, trader]`:
+  per-market vaults and free/locked claims, with their own `PriceLevel` and
+  order PDAs.
+- **Migration:** users can cancel legacy orders and then move free cash into
+  `AssetBalance` with `migrate_spot_asset` / `migrate_prediction_asset`.
+- **Never reinterpreted:** legacy locks are never read as global money.
+
+**Feature accounts** are described in [prediction markets](prediction-markets.md),
+[clubs](clubs.md) and [profiles](profiles.md).
+
+## Conservation
+
+For each mint:
 
 ```text
-seeds = ["protocol_config"]
+shared vault  = Σ(available + locked) + Σ(shared-book fees)
+question vault = backing reserve        (YES supply × payout = NO supply × payout)
 ```
 
-The singleton config stores the immutable super-admin authority selected during
-protocol initialization and the global `taker_fee_bps`. Initialization verifies
-that the signer is the program's current upgrade authority. The super-admin can
-later change the rate from 0 through 1,000 basis points.
-
-### Admin record PDA
-
-```text
-seeds = ["admin", authority]
-```
-
-Each administrator has an independent account containing its authority,
-provenance, status, and bump. This avoids an unbounded vector in one account and
-allows records to be queried or closed independently.
-
-### Market PDA
-
-```text
-seeds = ["market", base_mint, quote_mint]
-```
-
-There can be at most one market PDA for an ordered base/quote pair under this
-program ID. Reversing the pair produces a different address.
-
-| Field               | Meaning                                                                        |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `authority`         | Signer allowed to manage the market lifecycle                                  |
-| `base_mint`         | Validated SPL Token mint used as the traded asset                              |
-| `quote_mint`        | Validated, distinct SPL Token mint used to price the base asset                |
-| `status`            | `Active` or `Paused`                                                           |
-| `next_order_id`     | Monotonic identifier assigned to the next order; begins at `1`                 |
-| `open_order_count`  | Number of orders still eligible for matching or cancellation                   |
-| `base_decimals`     | Decimal precision read from the base SPL mint during initialization            |
-| `quote_decimals`    | Decimal precision read from the quote SPL mint during initialization           |
-| `price_tick_size`   | Smallest permitted price increment, expressed in raw price units               |
-| `quantity_lot_size` | Smallest permitted quantity increment, expressed in base-mint atoms            |
-
-Tick and lot must satisfy `price_tick_size × quantity_lot_size ≥ 10^base_decimals`.
-Every fill uses an on-tick price of at least one tick and a lot-multiple quantity of
-at least one lot, so this guarantees every fill moves at least one quote atom. Without
-it, a partial fill could leave a remainder worth zero quote at the FIFO head; no taker
-could fill it, freezing that price level and every worse one until the maker cancels.
-Opening a shared book over an older spot market applies the same rule.
-| `best_bid`          | Price of the first bid level, or `None`; advances when a level is removed |
-| `best_ask`          | Price of the first ask level, or `None`; advances when a level is removed |
-| `bump`              | Canonical market PDA bump                                                      |
-
-### Market-metadata PDA
-
-```text
-seeds = ["market_metadata", market]
-```
-
-Market labels live outside the matching account so existing markets can add a
-name without reallocating `Market`. The account stores the market address,
-base and quote symbols, a display name, an immutable `MarketKind`, and its bump.
-
-`Spot` is the normal base/quote model. `Other` is available for explicit
-experiments. Spot metadata initialization rejects `Prediction`; the separate
-prediction draft initializer creates that kind atomically with its collateral
-vault and immutable rules. Active
-administrators may initialize metadata and update its three labels; no update
-instruction accepts `kind`. The market authority closes metadata before closing
-a paused market so the separate PDA does not retain orphaned rent.
-
-### Prediction collateral and complete sets
-
-Prediction creation includes an editable rules template and custom text/JSON
-fields. The browser validates and serializes one document, uploads it to Arweave
-through Turbo with the creator's message signature, and fetches it back for an
-exact-byte comparison. Only then does it build the market transaction with that
-URI and hash. Uploads and Solana transactions are separate: an accepted upload
-cannot be undone by cancelling creation. A retained, downloadable receipt lets
-same-document retries reuse the upload. See the prediction design for storage
-limits, timing policies, fees and deployment gates.
-
-Prediction markets use a separate `PredictionMarket` and per-wallet
-`PredictionPosition`, plus one collateral vault. Spot account layouts do not
-change. Deposits credit free collateral; withdrawals debit only that cash and
-remain available in every status. The vault-authority PDA signs outgoing SPL
-transfers, and account seeds bind each claim to its market and wallet.
-
-Splitting in an Open market before close moves one payout per whole contract
-from free cash to backing reserve and creates equal YES/NO claims. Merging in
-Open, Frozen or Proposed burns a free pair and releases its backing. Locked
-balances cannot be used. Neither conversion moves SPL tokens; checked ledger
-and aggregate updates preserve `vault = cash claims + backing + fees`.
-Writable aggregate totals serialize conversions in one market. The stored market
-authority must still be an active admin to open a canonical Draft strictly before
-close; only status changes. Creation and opening bind the primary resolver to
-that creator wallet. Administrative closure requires that creator and active admin status. Primary
-proposals require the configured creator-resolver and active admin status;
-fallback proposals use the predeclared fallback resolver and active admin status.
-Matching, delayed resolution and owner redemption are implemented. The shared
-custody path is the deployed default; these per-market ledgers remain available
-for legacy recovery. See [prediction design](prediction-market-design.md).
-
-Prediction order layouts are now defined separately in
-`state/prediction_book.rs`. A `PredictionOrderBook` root holds the four YES/NO
-bid/ask heads and one monotonic order-ID counter. `PredictionPriceLevel` holds
-sorted price links and FIFO head/tail pointers; `PredictionOrder` holds one
-submission and its collateral claim. Their payload sizes are 77, 175 and 206
-bytes. The root adds rent and a shared write lock but preserves existing market
-layouts. Rust and browser helpers use identical textual outcome/side seeds and
-eight-byte little-endian numeric seeds. Draft creation initializes the book root
-atomically, with next ID 1 and four absent best-price heads. Its Anchor `init`
-constraint prevents counter resets, and any failure rolls back all five created
-accounts. The generated IDL and frontend reader expose the root; older drafts
-without one are identified explicitly. `place_prediction_order` creates the first
-resting order on an empty outcome/side, rejects crossing prices and locks only
-the signing trader's free collateral or outcome contracts. It atomically updates
-the canonical order, level, head, next ID and market count. No vault transfer,
-reserve change or fee accrual occurs. `append_prediction_order` adds at an existing
-price's verified FIFO tail, preserving its first order, neighbors and rent payer.
-The old tail may belong to another trader and needs no signature; only its next
-link changes. `insert_prediction_order` splices a new price between canonical,
-reciprocal adjacent levels, or at the best/worst edge. Funding, level/order
-creation and neighbor rewiring are atomic; only a new best changes the head.
-Common validation/funding helpers keep all three paths consistent.
-The client selects a path from actual account reads and revalidates before
-signing. Insertion discovers neighbors by following at most 128 levels; errors
-or stale links stop submission. On-chain insertion touches at most two neighbors
-without traversal. `cancel_prediction_order` requires the order owner's signature
-and Open status, with no market-status or close-time gate. It repairs canonical
-reciprocal FIFO links, refunds only the recorded remaining lock and decreases
-counts atomically. Final-order removal also unlinks the level and returns its
-rent to the original payer. Canceled order accounts remain as history; empty
-levels close, allowing price reuse with a new ID. Cancellation moves no vault
-tokens, reserves or fees. The wallet-scoped order list refreshes after confirmation.
-Its deployment flag is independent of new-order entry.
-`match_prediction_order` settles one best opposing FIFO maker at its resting
-price, using only existing claims in the same collateral vault. It rejects
-self-trades, non-crossing limits and trading at/after close. The global taker fee
-is credited to this market's collateral-denominated accumulator: buys pay
-notional plus fee, sells receive notional minus fee. Supply and payout reserve
-stay unchanged. Partial makers retain priority; full fills promote their FIFO
-successor or remove the empty best level and return rent to its original payer.
-The primitive creates no taker order. The Buy/Sell form uses
-`prediction-matching-plan.ts` to compose up to three
-existing matching instructions atomically. A read-only overlay simulates FIFO
-and price promotion, cumulative trader claims and per-fill rounded fees without
-changing caller snapshots. The plan distinguishes filled, exhausted,
-non-crossing and match-cap outcomes. In limit mode, positive exhausted or
-non-crossing remainders use the final simulated market/book/position to select
-and validate place/append/insert. The placement runs after all fills in the same
-transaction. Cap-blocked remainders stay unposted. Immediate-only mode never
-posts. Post-fill fees reduce the funds available to back a resting buy. The builder
-sets a 600,000-CU ceiling and checks the complete legacy packet before signing.
-Third-step failure rolls back earlier fills, fees and rent refunds. The UI
-refreshes the whole plan before signing and balances/book after confirmation.
-Public depth follows canonical price links and shows up to 20 aggregated levels
-per side, best first. It validates identity and reciprocal ordering; missing or
-changed accounts produce a refresh error, not an empty book. YES and NO books
-are separate. Depth is an account snapshot, not a last-trade price.
-Deployment flags default false. Prediction fee withdrawal, events/indexer
-support and resolution remain planned.
-
-### Market vault topology
-
-Each market is created with one PDA authority and two canonical SPL Token
-accounts. The authority PDA stores no account data; the program signs with its
-seeds for withdrawals and vault closure. Deposits are signed by the trader;
-placement and cancellation do not invoke the Token Program.
-
-```text
-vault authority = ["vault-authority", market]
-base vault      = ["vault", market, base_mint]
-quote vault     = ["vault", market, quote_mint]
-```
-
-The base vault's token mint is the market's base mint, and the quote vault's
-token mint is the market's quote mint. Both token accounts use the same vault
-authority and begin with a zero balance. Market and vault creation occur in one
-transaction together with the market fee accumulator, so a failed validation
-or account initialization leaves none of them behind.
-
-### Market-fees PDA
-
-```text
-seeds = ["market_fees", market]
-```
-
-Each market has one quote-denominated fee accumulator containing the market,
-quote mint, unwithdrawn `accrued_quote_fees`, and bump. The number is an
-accounting claim, not a second token balance: the corresponding SPL tokens stay
-inside the canonical quote vault until withdrawal. Consequently:
-
-```text
-base vault  = sum(base_free + base_locked)
-quote vault = sum(quote_free + quote_locked) + accrued_quote_fees
-```
-
-Only the super-admin may transfer that claim to a treasury token account. The
-destination owner is deliberately unrestricted so governance can use a
-multisig or dedicated treasury, but its mint must equal the market quote mint.
-
-### Order PDA
-
-```text
-seeds = ["order", market, order_id.to_le_bytes()]
-```
-
-| Field                | Meaning                                                                                                        |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `owner`              | Trader that created the order                                                                                  |
-| `market`             | Market to which the order belongs                                                                              |
-| `order_id`           | Market-local monotonic order number                                                                            |
-| `side`               | `Bid` or `Ask`                                                                                                 |
-| `price`              | Quote-mint atoms per one whole base token; must be nonzero and aligned to the market tick size                 |
-| `price_level`        | Canonical market/side/price level containing this order                                                        |
-| `previous_order`     | Older order at the same price, if present                                                                      |
-| `next_order`         | Newer order at the same price, if present                                                                      |
-| `quantity`           | Base-mint atoms; must be nonzero and aligned to the market lot size                                            |
-| `remaining_quantity` | Unfilled quantity; initially equals `quantity`                                                                 |
-| `locked_collateral`  | Base atoms for asks or quote atoms for bids currently held in the market vault                                 |
-| `status`             | Initially `Open`; cancellation transitions it to `Canceled`, while a complete match transitions it to `Filled` |
-| `bump`               | Canonical order PDA bump                                                                                       |
-
-Each successful order placement increments `Market.next_order_id`. The order PDA
-therefore also provides insertion order that can later support FIFO priority.
-
-### Trader-balance PDA
-
-```text
-seeds = ["trader_balance", market, owner]
-```
-
-Each owner has at most one ledger per market. `base_free` and `quote_free` may
-be withdrawn or reserved by a new order; `base_locked` and `quote_locked` back
-open asks and bids respectively. All four fields use checked arithmetic. The
-market vaults physically custody the tokens represented by these claims.
-
-### Test-faucet PDA
-
-```text
-faucet config    = ["test_faucet", market]
-faucet authority = ["test_faucet_authority", faucet config]
-```
-
-`TestFaucet` stores the market and mint bindings, fixed base and quote claim
-amounts, and both PDA bumps. Initialization is super-admin-only and succeeds
-only when both market mints have zero supply and the super-admin currently owns
-both mint authorities. The instruction atomically transfers those authorities
-to the stateless faucet-authority PDA. Any signer may then mint one fixed claim
-of each asset to token accounts they own.
-
-This is deliberately test infrastructure, not production tokenomics. A Solana
-program cannot determine whether it is running on devnet or mainnet, so the
-cluster boundary cannot be enforced on-chain. Safety comes from explicit
-governance opt-in plus the zero-supply and authority checks. The current
-research faucet has no cooldown, per-wallet allowance, or global cap; callers
-may claim repeatedly and the tokens must never carry economic value.
-
-An enabled faucet must be closed before its market. The web client composes
-`close_test_faucet` immediately before `close_market` in one transaction. The
-first instruction returns the config rent; the second requires the canonical
-faucet PDA to be empty, preventing a direct client from omitting and orphaning
-it. The authority PDA cannot sign independently, so closing the config freezes
-both test-mint supplies permanently.
-
-### Price-level PDA
-
-```text
-seeds = ["price_level", market, side_seed, price.to_le_bytes()]
-```
-
-A level stores its market, side, price, optional better/worse price links,
-FIFO head and tail orders, aggregate remaining quantity, order count, rent
-payer, and canonical bump. Insertion splices a new level at the empty, best,
-middle, or worst position. Append validates the current tail before extending
-the same-price FIFO queue. Cancellation removes an order in O(1) from supplied
-reciprocal neighbors; when it removes the final order, the program repairs the
-level list, advances the market best pointer when required, returns rent to the
-stored payer, and closes the level. Complete matching performs the corresponding
-FIFO-head and best-level removal, while a partial maker remains at the head.
-
-## 4. Instruction architecture
-
-| Instruction                  | Required signer           | Important checks                                                                                                                                                                                                               | State transition                                                                                                                                                                          |
-| ---------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initialize_protocol`        | Program upgrade authority | Program-data relationship and upgrade authority match; singleton PDAs are canonical                                                                                                                                            | Creates protocol config and an active deployer admin record                                                                                                                               |
-| `add_admin`                  | Super-admin               | Signer matches config; target is valid; admin PDA is canonical                                                                                                                                                                 | Creates an active admin record                                                                                                                                                            |
-| `disable_admin`              | Super-admin               | Signer matches config; target is active and is not the super-admin                                                                                                                                                             | `Active -> Disabled`                                                                                                                                                                      |
-| `enable_admin`               | Super-admin               | Signer matches config; target is disabled                                                                                                                                                                                      | `Disabled -> Active`                                                                                                                                                                      |
-| `remove_admin`               | Super-admin               | Signer matches config; target is disabled                                                                                                                                                                                      | Closes the admin record                                                                                                                                                                   |
-| `set_taker_fee`              | Super-admin               | Signer matches config; rate is at most 1,000 bps                                                                                                                                                                               | Updates the global fee rate used by subsequent fills                                                                                                                                      |
-| `initialize_market`          | Active admin              | Admin record belongs to signer, is canonical and active; both accounts deserialize as SPL mints; base and quote differ; tick and lot sizes are nonzero and their product is at least `10^base_decimals`; market, fee accumulator, vault authority, and vault PDAs are canonical | Atomically creates an active market, zeroed fee accumulator, and empty base/quote SPL Token vaults                                                                                        |
-| `initialize_market_metadata` | Active admin              | Admin record is canonical and active; metadata PDA belongs to the supplied market; labels use bounded printable ASCII; kind is not `Prediction`                                                                                | Creates the market's canonical metadata account with immutable classification                                                                                                             |
-| `update_market_metadata`     | Active admin              | Admin record is canonical and active; metadata belongs to the supplied market; labels remain valid                                                                                                                             | Updates base symbol, quote symbol, and display name without changing kind                                                                                                                 |
-| `close_market_metadata`      | Market authority          | Market authority matches; market is paused; metadata PDA belongs to the market                                                                                                                                                 | Closes metadata and returns its rent before market shutdown                                                                                                                               |
-| `pause_market`               | Market authority          | `has_one = authority`; market is active                                                                                                                                                                                        | `Active -> Paused`                                                                                                                                                                        |
-| `unpause_market`             | Market authority          | `has_one = authority`; market is paused                                                                                                                                                                                        | `Paused -> Active`                                                                                                                                                                        |
-| `close_market`               | Market authority          | Market is paused; `open_order_count` and accrued fees are zero; both canonical vaults are empty; canonical faucet PDA has no data                                                                                              | Closes both vaults, the fee accumulator, and market atomically, returning their rent to the authority                                                                                     |
-| `initialize_test_faucet`     | Super-admin               | Config signer matches; both market mints have zero supply and are controlled by the signer; faucet and authority PDAs are canonical; claim amounts are nonzero                                                                 | Transfers both mint authorities to the faucet PDA and stores fixed claim amounts                                                                                                          |
-| `claim_test_tokens`          | Any signer                | Faucet belongs to market; mints match; destination token accounts belong to signer and use the correct mints                                                                                                                   | Mints the configured base and quote test amounts to the claimant atomically                                                                                                               |
-| `close_test_faucet`          | Market authority          | `has_one = authority`; faucet, stored market, and mint bindings are canonical                                                                                                                                                  | Closes the faucet config, returns its rent, and permanently disables further minting                                                                                                      |
-| `initialize_trader_balance`  | Trader                    | Market exists; canonical market/owner ledger does not exist                                                                                                                                                                    | Creates a zeroed `TraderBalance` PDA                                                                                                                                                      |
-| `deposit`                    | Balance owner             | Mint belongs to market; source belongs to owner; ledger and vault are canonical; amount and arithmetic are valid                                                                                                               | Transfers tokens into the vault and credits the matching free balance atomically, including while paused                                                                                  |
-| `withdraw`                   | Balance owner             | Mint belongs to market; destination belongs to owner; sufficient free balance and vault backing exist                                                                                                                          | Debits free balance and transfers tokens out of the vault atomically, including while paused                                                                                              |
-| `insert_limit_order`         | Trader                    | Market is active; canonical ledger has sufficient free balance; grid checks pass; optional neighbors are canonical, ordered, and reciprocal                                                                                    | Moves free to locked balance, creates a new level and first order, splices the level, and increments counters atomically                                                                  |
-| `append_limit_order`         | Trader                    | Existing level is canonical for market/side/price; previous order is its open tail; canonical ledger has sufficient free balance                                                                                               | Moves free to locked balance, creates an order behind the tail, and updates aggregates and counters atomically                                                                            |
-| `match_limit_order`          | Taker                     | Market is active; maker is the best opposing FIFO head; prices cross; config, fee accumulator, accounts, optional removal neighbors, rent recipient, and ledgers are canonical; taker is not maker                             | Settles one maker-price fill and accrues the taker fee; leaves a partial maker in place or marks a full maker `Filled`, promotes its successor, and closes an empty best level atomically |
-| `cancel_limit_order`         | Order owner               | Order, ledger, level, FIFO neighbors, and optional level neighbors are canonical and reciprocal; status is `Open`                                                                                                              | Moves locked to free balance and unlinks the order; final removal repairs levels, closes the empty level, and transitions `Open -> Canceled` even while paused                            |
-| `withdraw_protocol_fees`     | Super-admin               | Config, market, fee accumulator, quote mint, vault authority, and quote vault are canonical; destination uses the quote mint; amount is nonzero and accrued                                                                    | Transfers quote tokens to the selected treasury and reduces accrued fees atomically, while active or paused                                                                               |
-
-### Event architecture
-
-Every successful state-changing instruction emits an Anchor event after its
-validated mutations and CPIs complete:
-
-| Transition                                       | Event                                                                                          |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Protocol bootstrap                               | `ProtocolInitializedEvent`                                                                     |
-| Add, enable, disable, or remove an administrator | `AdminAddedEvent`, `AdminStatusChangedEvent`, or `AdminRemovedEvent`                           |
-| Change the global taker fee                      | `TakerFeeUpdatedEvent`                                                                         |
-| Initialize, pause, unpause, or close a market    | `MarketInitializedEvent`, `MarketStatusChangedEvent`, or `MarketClosedEvent`                   |
-| Initialize, update, or close market metadata     | `MarketMetadataInitializedEvent`, `MarketMetadataUpdatedEvent`, or `MarketMetadataClosedEvent` |
-| Initialize a trader ledger, deposit, or withdraw | `TraderBalanceInitializedEvent`, `DepositEvent`, or `WithdrawalEvent`                          |
-| Insert or append an order                        | `OrderPlacedEvent`                                                                             |
-| Cancel an order                                  | `OrderCanceledEvent`                                                                           |
-| Settle one maker                                 | `FillEvent`                                                                                    |
-| Withdraw protocol fees                           | `ProtocolFeesWithdrawnEvent`                                                                   |
-| Enable a market test faucet                      | `TestFaucetInitializedEvent`                                                                   |
-| Claim public test assets                         | `TestFaucetClaimedEvent`                                                                       |
-| Disable a market test faucet                     | `TestFaucetClosedEvent`                                                                        |
-
-Equivalent economic transitions intentionally share a schema: both placement
-paths emit `OrderPlacedEvent`, and both lifecycle directions emit
-`MarketStatusChangedEvent` with the resulting status. Balance events include
-the selected asset's post-transition free balance. Order and fill events include
-the authoritative remaining quantity or released collateral needed by indexers.
-
-Events are an observation and indexing interface, not protocol state or deferred
-settlement work. Transaction logs from a failed transaction can contain events
-emitted by an earlier instruction even though Solana rolls back all account
-mutations. Consumers must therefore ingest events only when transaction metadata
-reports success. On-chain accounts remain the source of truth and the protocol
-does not depend on an indexer being available.
-
-### Market initialization flow
-
-```text
-Active administrator
-   |
-   | initialize_market(base mint, quote mint, tick size, lot size)
-   v
-Anchor account validation
-   |-- base account is an SPL Mint
-   |-- quote account is an SPL Mint
-   |-- base mint != quote mint
-   |-- tick size > 0
-   |-- lot size > 0
-   |-- tick size × lot size >= 10^base decimals
-   |-- market PDA matches the ordered pair
-   |-- vault authority matches ["vault-authority", market]
-   |-- vaults match ["vault", market, mint]
-   v
-Create Market PDA as Active
-   |
-   |-- create zeroed MarketFees PDA
-   |-- create empty base SPL Token vault
-   |-- create empty quote SPL Token vault
-   `-- set both token-account authorities to the vault-authority PDA
-
-The web client normally appends `initialize_market_metadata` to the same
-transaction. Both the market and its human-readable identity therefore succeed
-or fail together. Existing markets can initialize metadata later from their
-detail page.
-```
-
-### Test-faucet flow
-
-```text
-Super-admin
-   |
-   | initialize_test_faucet(base claim, quote claim)
-   v
-Validate canonical market and faucet PDAs
-   |-- both claim amounts > 0
-   |-- both mints belong to the market
-   |-- both mint supplies == 0
-   `-- both mint authorities == super-admin
-   v
-Transfer both mint authorities to faucet-authority PDA
-   |
-   `-- store immutable fixed claim amounts
-
-Any connected wallet
-   |
-   | claim_test_tokens
-   v
-Validate owned base and quote destination accounts
-   |
-   `-- faucet PDA signs both mint-to CPIs atomically
-```
-
-### Server-backed web faucet
-
-The active shared devnet pair uses a separate operational path:
-
-```text
-Connected wallet
-   |
-   | POST /api/faucet { wallet }
-   v
-Next.js server
-   |-- validates the wallet public key
-   |-- atomically checks wallet + hashed-IP counters
-   |-- verifies both configured mint authorities
-   |-- creates missing associated token accounts
-   `-- signs one transaction that mints both fixed claims
-   v
-Claimant wallet receives valueless devnet assets
-```
-
-The private key exists only in server environment configuration. Vercel must
-use shared Upstash counters and fails closed when they are absent. Local
-development may explicitly opt into an in-memory counter. The server route and
-the on-chain PDA faucet are alternative authority models: the same mint cannot
-be controlled by both simultaneously.
-
-This design makes rate limiting and faucet changes easy to deploy, but it is
-custodial. The server operator can mint outside the public route, server
-availability becomes required, and wallet/IP limits are not Sybil-proof. It is
-therefore restricted to valueless devnet tokens.
-
-### New-level insertion flow
-
-```text
-Trader
-   |
-   | insert_limit_order(side, price, quantity)
-   v
-Validate active Market + nonzero values
-   |-- empty side requires better = None and worse = None
-   |-- new best: worse is the canonical current best
-   |-- middle: better and worse link reciprocally
-   |-- new worst: better has no worse successor
-   |-- bid prices descend; ask prices ascend
-   |-- price % price_tick_size == 0
-   |-- quantity % quantity_lot_size == 0
-   |-- checked quote notional > 0
-   |-- ask selects base quantity
-   |-- bid selects quote notional
-   |-- canonical TraderBalance belongs to market and trader
-   |-- matching free balance covers the collateral
-   |
-   | derive ["order", market, next_order_id]
-   v
-Move collateral from free to locked internal balance
-   |
-   v
-Initialize PriceLevel PDA; splice both supplied neighbors
-   |
-   v
-Create Order PDA as Open and record locked_collateral
-   |
-   v
-Increment Market.next_order_id
-```
-
-This operation is atomic: if account creation or validation fails, the market
-counter and order state are not committed.
-
-### Existing-level FIFO append flow
-
-```text
-Trader
-   |
-   | append_limit_order(side, price, quantity)
-   v
-Validate canonical existing PriceLevel
-   |-- level belongs to market, side, and price
-   |-- supplied previous order equals level.last_order
-   |-- previous order belongs to the level and is Open
-   |-- previous order has no next_order
-   |-- price, quantity, ledger owner, and free balance are valid
-   v
-Compute checked next quantities and counters
-   |
-   v
-Move collateral from free to locked internal balance
-   |
-   |-- previous_order.next_order = new order
-   |-- new_order.previous_order = previous order
-   |-- price_level.last_order = new order
-   |-- add level quantity and order count
-   `-- increment market order ID and open-order count
-```
-
-The level's `first_order` and the market's best-price pointer remain unchanged.
-Every transfer, link, aggregate, and counter succeeds or rolls back together.
-
-### Bounded multi-maker transaction flow
-
-```text
-Taker
-   |
-   | match_limit_order(side, limit price, quantity)
-   v
-Validate active canonical market and both TraderBalance PDAs
-   |-- maker is Open and belongs to this market
-   |-- maker is the FIFO head at the current best opposing price
-   |-- maker and taker are different owners and opposite sides
-   |-- taker limit crosses the maker price
-   v
-Calculate one fill at the resting maker price
-   |
-   |-- calculate ceil(gross quote * taker_fee_bps / 10,000)
-   |-- bid taker: quote_free pays maker gross + protocol fee
-   |               maker base_locked -> taker base_free
-   |-- ask taker: base_free -> maker base_free
-   |               taker receives maker gross - protocol fee
-   `-- add fee to MarketFees.accrued_quote_fees
-   v
-Reduce maker remaining quantity, maker locked collateral,
-and price-level aggregate quantity
-   |
-   |-- partial maker: preserve FIFO links and counters
-   |-- full maker: mark Filled and decrement counters
-   |-- full FIFO head with successor: promote successor
-   `-- final order at level: promote worse level and close empty level
-```
-
-A partial maker remains `Open` at the FIFO head with positive remaining
-quantity, so links and counters remain unchanged. A complete maker becomes
-`Filled` with zero remaining quantity and collateral. Its exact stored
-successor becomes the new head, or its empty level is closed to the recorded
-rent payer and the next worse price becomes best. All arithmetic and topology
-validation occur before mutations; any failure rolls back settlement and index
-maintenance together.
-
-The program deliberately keeps one maker per instruction, while the client
-places up to three sequential instructions in one Solana transaction. Later
-instructions observe the queue and level mutations made by earlier ones. If any
-step sees stale links, insufficient balance, or invalid arithmetic, Solana rolls
-back every preceding fill in that transaction.
-
-This composition avoids an unbounded on-chain loop and a variable account
-parser, at the cost of more client-side discovery, transaction account metadata,
-and retry work under contention.
-
-### Order cancellation flow
-
-```text
-Order owner
-   |
-   | cancel_limit_order(order_id)
-   v
-Validate ownership + Open status + canonical level
-   |-- supplied FIFO neighbors exactly match and link back
-   |-- canonical TraderBalance belongs to market and owner
-   |-- bid releases quote; ask releases base
-   v
-Compute checked market and level aggregate decrements
-   |
-   |-- level remains non-empty: splice previous <-> next
-   `-- final order: validate better/worse levels + rent payer
-                     repair adjacent links and market best
-                     close the empty level
-   v
-Move remaining collateral from locked to free internal balance
-   |
-   v
-Clear order links, quantity, and collateral; set Canceled
-```
-
-Cancellation deliberately has no active-market requirement, preserving the
-owner's exit path while a market is paused. Balance release, queue repair,
-aggregate updates, best-pointer update, and conditional level closure are one
-transaction; any failed validation rolls the complete transition back. Tokens
-remain in the vault until the owner submits `withdraw`.
-
-### Safe market shutdown flow
-
-```text
-Market authority
-   |
-   | close_market
-   v
-Validate paused Market
-   |-- open_order_count == 0
-   |-- base vault amount == 0
-   |-- quote vault amount == 0
-   |-- both vault addresses and authority are canonical
-   v
-Vault-authority PDA closes base and quote vaults
-   |
-   v
-Anchor closes the Market account
-```
-
-All three accounts close atomically. A failed vault closure leaves the market
-and both vaults intact.
-
-### Fixed-point price model
-
-Outcomia does not use floating-point values on-chain. An order price represents
-quote-mint atoms per one whole base token, while quantity represents base-mint
-atoms. Their human-readable forms are:
-
-```text
-human_price    = price / 10^quote_decimals
-human_quantity = quantity / 10^base_decimals
-```
-
-The quote notional used for validation is calculated with checked `u128`
-arithmetic:
-
-```text
-quote_notional_atoms = price * quantity / 10^base_decimals
-```
-
-Integer division rounds down. Orders that round below one quote-mint atom are
-rejected. For a base mint with 9 decimals and quote mint with 6 decimals, a
-price of `100_000_000` represents `100.000000` quote tokens per base token, and
-a quantity of `5_000_000` represents `0.005000000` base tokens. Their notional
-is `500_000` quote atoms, or `0.500000` quote tokens.
-
-## 5. Current invariants
-
-The program currently enforces:
-
-1. A market is identified by its ordered pair of mint addresses.
-2. Both market assets are initialized SPL Token mint accounts.
-3. Base and quote mint addresses must be different.
-4. Only the stored authority can pause, unpause, or close the market.
-5. A market must be active to accept a new order.
-6. A market must be paused before it can be closed.
-7. Price and quantity must both be nonzero.
-8. Market tick and lot sizes must both be nonzero, and their product must be at
-   least one whole base token (`10^base_decimals`) so no fill rounds to zero quote.
-9. Order prices must be exact multiples of the market tick size.
-10. Order quantities must be exact multiples of the market lot size.
-11. Checked order notional must be at least one quote-mint atom.
-12. An order ID is allocated only by incrementing its market's counter.
-13. Only the configured super-admin can manage administrator records.
-14. The super-admin cannot disable its own admin record.
-15. An administrator must be disabled before its record can be removed.
-16. Only a signer with its canonical active admin record can initialize a market.
-17. Only the stored order owner can cancel an order.
-18. Only an `Open` order can transition to `Canceled`.
-19. Every market is initialized atomically with its canonical base and quote vaults.
-20. Each vault is bound to the correct market mint and the shared vault-authority PDA.
-21. Newly initialized market vaults have zero token balances.
-22. Ask orders lock their quantity in base-mint atoms.
-23. Bid orders lock their checked quote notional in quote-mint atoms.
-24. Every trader ledger is the canonical PDA for its market and owner.
-25. Deposits and withdrawals atomically couple token movement with free-balance accounting.
-26. Placement moves only deposited free balance to locked balance; it performs no token transfer.
-27. Only an open order can release collateral, preventing duplicate balance credit.
-28. Balance release, collateral clearing, and cancellation status update are atomic.
-29. Order placement increments and cancellation decrements `open_order_count`.
-30. A market can close only while paused with no open orders or vault balances.
-31. Successful shutdown closes both canonical vaults and the market atomically.
-32. A first level is derived canonically from market, side, and price and is
-    created atomically with its first order.
-33. Empty-side insertion requires no neighbors; new-best insertion on a non-empty
-    side requires the canonical previous best as its worse neighbor.
-34. Middle insertion requires reciprocal adjacent neighbors and strict price
-    ordering; new-worst insertion requires the terminal better level.
-35. An existing-level append accepts only the level's open tail with no newer
-    successor.
-36. FIFO tail linking, level aggregates, free-to-locked movement, and market
-    counters are updated atomically.
-37. Cancellation accepts only the exact stored FIFO neighbors with reciprocal
-    links to the removed order.
-38. Cancellation decrements level quantity/count and market open-order count
-    with checked arithmetic in the same transaction as the collateral release.
-39. A final-order cancellation accepts only canonical reciprocal level
-    neighbors, repairs them, and closes the now-empty level to its rent payer.
-40. Removing a best level advances `best_bid` or `best_ask` to its worse
-    neighbor; removing the only level clears the corresponding pointer.
-41. Empty price levels never remain in the active sorted index.
-42. Matching executes only against the current best opposing price level and
-    its FIFO head order.
-43. Matching executes at the resting maker price, not the taker's limit price.
-44. Self-trading and same-side matching are rejected.
-45. Successful partial matching changes no FIFO link, order count, open-order
-    count, or best-price pointer.
-46. A completely filled maker has zero remaining quantity, zero locked
-    collateral, cleared FIFO links, and status `Filled`.
-47. Removing a filled FIFO head requires its exact reciprocal successor and
-    promotes that successor without changing same-price priority.
-48. Removing the final maker at the best price requires the canonical worse
-    level and recorded rent recipient, advances or clears the market best
-    pointer, and closes the empty level.
-49. A taker quantity larger than the bounded crossing path settles only the
-    planned fills; a remainder is never discarded.
-50. Base and quote ledger changes, maker-order changes, and the price-level
-    aggregate update succeed or roll back atomically.
-51. A client transaction may sequence at most three one-maker instructions;
-    each receives the taker quantity remaining before its own fill.
-52. Failure of any later matching instruction rolls back every earlier fill,
-    queue mutation, level closure, and balance change in the transaction.
-53. A valid remainder is posted only after the planner proves that the opposing
-    book is exhausted or the next opposing price no longer crosses.
-54. Matching and remainder insertion or append succeed or roll back together; a
-    cap-blocked or zero-notional remainder stays in free balance.
-55. The fee charged for each fill is ceiling-divided from its gross quote
-    quantity using the canonical global rate.
-56. A bid taker pays gross plus fee; an ask taker receives gross minus fee;
-    makers receive or spend the full gross maker-price amount.
-57. Every accrued quote fee remains backed by the quote vault until an
-    authorized withdrawal reduces both the token balance and protocol claim.
-58. Fee withdrawal requires the super-admin and a destination using the market
-    quote mint; it is allowed for both active and paused markets.
-59. Market closure requires zero accrued fees and closes the canonical
-    `MarketFees` account with the market and vaults.
-60. Faucet initialization requires the super-admin, nonzero claim amounts,
-    zero supplies, matching market mints, and current authority over both mints.
-61. Faucet claims accept any signer but mint only to that signer's correctly
-    typed base and quote token accounts.
-62. Both faucet mint operations succeed or roll back together.
-63. A live faucet blocks direct market closure; the market authority must close
-    the canonical config first.
-64. Faucet and market closure can be composed atomically in one transaction.
-
-## 6. Known architectural gaps
-
-These are known limitations, not defects in the current research milestone:
-
-- The fee rate is global rather than per-market or tiered, and there are no
-  maker rebates.
-- Fee calculation rounds upward per fill; this prevents fragmentation-based
-  fee avoidance but can overcharge economically tiny fills.
-- Canceled order accounts are retained as history and their rent is not yet
-  reclaimed.
-- The on-chain faucet intentionally has no cooldown, wallet quota, or maximum
-  supply. It is suitable only for freely mintable devnet assets.
-- The server-backed web faucet adds wallet/IP limits but introduces a custodial
-  hot key and centralized availability. Its limits deter casual abuse rather
-  than providing Sybil resistance. Neither faucet model is suitable for
-  valuable assets.
-- Orders created by the earlier direct-vault-transfer design do not have a
-  corresponding locked `TraderBalance` claim. This research milestone requires
-  a clean devnet redeploy/state reset; upgrading a program with live legacy
-  orders would require an explicit migration before those orders can cancel.
-
-## 7. Test architecture
-
-Integration tests run against LiteSVM in
-`programs/outcomia/tests/admin_flow.rs`,
-`programs/outcomia/tests/cancel_order.rs`,
-`programs/outcomia/tests/market_close.rs`,
-`programs/outcomia/tests/order_flow.rs`,
-`programs/outcomia/tests/test_faucet.rs`, and
-`programs/outcomia/tests/trader_balance.rs`.
-
-The test harness:
-
-1. loads the compiled SBF program into an in-process VM;
-2. funds a generated payer;
-3. inserts rent-exempt SPL Mint fixtures with valid packed mint state;
-4. constructs Anchor instructions and versioned transactions;
-5. sends transactions through LiteSVM;
-6. deserializes resulting Anchor accounts and checks state.
-
-The 193-test suite currently covers:
-
-- upgrade-authority-only, one-time protocol initialization;
-- creation of the deployer's config and active admin record;
-- super-admin-only add, disable, enable, and remove operations;
-- protection against disabling the super-admin or removing an active admin;
-- removal and re-creation of a disabled admin record;
-- rejection of market creation by non-admin and disabled-admin wallets;
-- market initialization followed by order placement;
-- market pause and unpause;
-- rejection of order placement while paused;
-- acceptance of two valid mint accounts;
-- rejection of a non-mint account;
-- rejection of identical base and quote mints;
-- persistence of the selected mint addresses;
-- owner-only cancellation of open orders;
-- rejection of repeated cancellation and mismatched markets;
-- cancellation while the market is paused;
-- persistence of mint decimals, tick size, and lot size;
-- rejection of zero tick and lot sizes;
-- rejection of tick × lot below one whole base token, at market and shared-book creation;
-- rejection of off-tick prices and off-lot quantities;
-- rejection of orders whose notional rounds below one quote atom;
-- canonical base/quote vault mints, shared authority, and zero balances;
-- atomic rollback when market initialization fails;
-- rejection of noncanonical vault accounts and duplicate market initialization;
-- canonical trader-balance initialization and owner/market isolation;
-- atomic base and quote deposits and withdrawals, including while paused;
-- withdrawal of free balance only and rejection of insufficient vault backing;
-- end-to-end deposit, placement, cancellation, and full withdrawal with vault backing preserved;
-- base balance locking for asks and quote balance locking for bids;
-- persistence of the exact locked collateral amount;
-- rejection of corrupted trader-balance owner or market data;
-- rejection of insufficient free balance and locked-balance overflow;
-- rollback of order state, counters, and token balances on failed placement;
-- exact base and quote release to free balance on cancellation;
-- releases while a market is paused;
-- rejection of balance underflow, overflow, and wrong ledger ownership;
-- atomic preservation of locked collateral after failed cancellation;
-- prevention of repeated cancellation and duplicate refunds;
-- head, middle, tail, and only-order FIFO removal with reciprocal-link repair;
-- checked level count and aggregate quantity decrements;
-- best, middle, and worst price-level unlinking with best-pointer advancement;
-- empty-level closure and rent return to the recorded payer;
-- atomic rejection when a required FIFO or price-level neighbor is omitted;
-- rejection of market closure while active or controlled by another signer;
-- rejection of shutdown with open bids, open asks, or residual vault balances;
-- rejection of noncanonical base and quote vaults during shutdown;
-- open-order counter transitions across placement and cancellation;
-- atomic closure of an empty paused market and both token vaults;
-- deterministic price-level derivation, side separation, and account sizing;
-- first bid and first ask price-level creation and best-pointer initialization;
-- empty-side bid and ask insertion with no neighbors, plus atomic rejection of an unexpected neighbor;
-- new-best, middle, and new-worst insertion for bids and asks;
-- atomic rejection of nonadjacent, nonterminal, wrongly ordered, wrong-side,
-  wrong-market, stale-best, and noncanonical neighbor hints;
-- rejection of a missing current-best neighbor on a non-empty side;
-- same-price bid and ask FIFO append, reciprocal links, aggregates, and market
-  counters;
-- three-order FIFO chaining;
-- atomic rejection of stale tails, opposite-side levels, paused-market append,
-  and insufficient append collateral;
-- deterministic crossing, maker-price execution, fill sizing, overflow
-  protection, and final-bid rounding-dust planning;
-- atomic bid-taker and ask-taker settlement against a partially filled maker;
-- preservation of FIFO links, best pointers, order counts, and market counters
-  across partial-maker settlement;
-- full maker settlement, `Filled` lifecycle state, FIFO-head promotion,
-  best-price advancement or clearing, and empty-level closure;
-- a larger taker quantity that debits only the actual fill, plus final-bid
-  fixed-point rounding-dust refund;
-- atomic rejection of missing FIFO successors, missing worse levels, and an
-  incorrect price-level rent recipient;
-- atomic same-price batching that fills the FIFO head and continues into its
-  successor;
-- atomic multi-level batching that closes the best level and continues at its
-  worse neighbor;
-- complete transaction rollback when a later batch instruction fails;
-- atomic new-level insertion and same-level FIFO append of safe taker
-  remainders;
-- rollback of preceding fills when remainder placement fails;
-- cap-boundary behavior that leaves later crossing makers and the taker
-  remainder untouched;
-- global base and quote conservation across deposits, free-to-locked placement,
-  cancellation, withdrawal, partial and complete fills, rounding-dust refunds,
-  same-level and cross-level batches, remainder posting, capped matching, and
-  failed-transaction rollback;
-- rejection without mutation of non-crossing, same-side, self-trading,
-  underfunded, paused, non-head, and non-best match attempts.
-- fee calculation boundaries, maximum-rate governance, authorization, and
-  fee-aware bid/ask settlement;
-- per-fill fee rounding and multi-fill accrual with quote-vault conservation;
-- partial and full protocol-fee withdrawals to a quote-mint treasury;
-- rejection of non-super-admin, zero, excessive, wrong-mint, and underfunded
-  fee withdrawals without state mutation;
-- prevention of market closure until accrued fees are fully withdrawn;
-- super-admin-only faucet initialization, zero-claim rejection, zero-supply
-  enforcement, and transfer of both mint authorities to the canonical PDA;
-- permissionless fixed base/quote claims and rejection of token destinations
-  owned by another wallet;
-- rejection of direct market closure while a live faucet exists, plus atomic
-  faucet-and-market closure and event validation.
-
-## 8. Error architecture
-
-Anchor 1.2 permits only one `#[error_code]` enum in a generated program IDL.
-Outcomia therefore keeps its canonical on-chain error ABI in
-`programs/outcomia/src/errors/catalog.rs`. The `admin`, `market`, `order`,
-`balance`, and `matching` modules re-export only the variants used by their
-domain, so instruction code can use focused names such as
-`order::PriceNotOnTick` without defining incompatible independent Anchor error
-enums.
-
-Every catalog variant has an explicit discriminant. This preserves the existing
-public codes `6000` through `6077`, as well as their names and messages, even
-though the Rust source is now organized by domain. Existing discriminants must
-never be changed or reused; a new error receives the next unused discriminant
-and is then re-exported from the appropriate domain module.
-
-This design deliberately separates two concerns:
-
-- `catalog.rs` is the stable external ABI consumed by clients and the IDL;
-- domain modules are the internal organization used by program call sites.
-
-The tradeoff is that a new variant must be added in two places: once to the
-catalog and once to its domain re-export. In return, Outcomia keeps a single
-Anchor-compatible error definition while avoiding one undifferentiated error
-namespace throughout the instruction code.
-
-## 9. Dependency boundary
-
-The program uses Anchor `1.2.0`. Tests use LiteSVM `0.16.0` and its compatible
-Solana SDK type family. The direct SDK dependencies are pinned because LiteSVM's
-public APIs exchange concrete `Address`, `Message`, `Transaction`, `Signer`, and
-`Keypair` types with the test code.
-
-## 10. Planned evolution
-
-The proposed account model and its alternatives are documented in
-[`price-level-fifo-design.md`](price-level-fifo-design.md).
-The matching and balance model is documented separately in
-[`crankless-settlement-design.md`](crankless-settlement-design.md).
-
-The selected direction is bounded crankless PDA matching. The client supplies a
-limited sequence of program-maintained price levels, FIFO orders, and canonical
-maker balance PDAs. Each instruction validates its current best FIFO step, and
-the Solana transaction atomically applies or rolls back the complete bounded
-path. Informational events will not represent deferred settlement work.
-
-The recommended implementation order is:
-
-1. ~~Add sorted multi-price insertion.~~
-2. <del>Add indexed cancellation/removal.</del>
-3. ~~Add canonical per-market trader balances and atomic deposit/withdrawal.~~
-4. ~~Route order collateral through free and locked balance accounting.~~
-5. ~~Add partial and full one-maker settlement with FIFO and level removal.~~
-6. ~~Add bounded client-planned multi-maker traversal with atomic rollback.~~
-7. ~~Add automatic non-crossing remainder posting with atomic rollback.~~
-8. ~~Add informational events for every successful state transition.~~
-9. Add order cleanup and rent-reclamation rules.
-10. ~~Add broader asset-conservation assertions across every balance
-    and matching transition.~~
-11. ~~Add fee accounting and extend conservation with protocol-fee claims.~~
-12. ~~Add super-admin fee-rate control and accrued-fee withdrawal.~~
-13. **Next:** benchmark account count, compute use, contention, and retry rate.
-
-Each phase should add its invariants and failure-path tests before the next
-state transition is introduced.
+Every deposit, withdrawal, fill, split, merge, cancellation and redemption keeps
+both equations. Arithmetic uses checked `u128` intermediates. Fees belong to the
+book that earned them and can never be withdrawn as user cash.
+
+## Order book
+
+**Price-time priority.**
+- **Order:** higher bids first, then lower asks, then first in, first out at the
+  same price.
+- **Levels:** each active `(book, side, price)` has a deterministic level PDA,
+  linked to its better and worse neighbours. Each level stores its first and last
+  order.
+- **Why PDAs:** a growing vector in the market account would need a capacity
+  limit and would make one hot account, so it was rejected. The PDA design costs
+  rent per active price, and clients have to pass neighbouring accounts.
+
+**Client-supplied neighbours.**
+- **Why the client supplies them:** a program can't scan for PDAs.
+- **Untrusted:** the program re-derives every address and checks prices and
+  reciprocal links before changing anything.
+- **Shapes covered:** insertion handles an empty side, a new best, a middle and a
+  new worst level. Cancellation handles head, middle, tail and only-order removal,
+  and closes empty levels in the same instruction.
+
+**Bounded crankless matching.**
+- **No crank:** Outcomia doesn't use an OpenBook-style event queue and crank.
+- **One maker per instruction:** each match instruction settles one best FIFO
+  maker, partially or fully, against the taker's free balance.
+- **Up to three per transaction:** the client plans up to three such
+  instructions in one transaction, following same-level successors or later
+  levels.
+- **Remainder:** if the path proves no crossing liquidity is left, the client
+  rests the remainder at its limit price.
+- **Atomic:** a stale step rolls back the whole transaction.
+- **Price:** the taker pays the maker's price, so a bid at 105 that fills against
+  an ask at 100 pays 100.
+- **Balances only:** settlement moves claims between balances and never moves
+  tokens. Tokens move only on deposit, withdrawal and fee withdrawal.
+
+**Complementary matching (binary).**
+- **Separate queues:** YES and NO keep separate queues, but orders on the same
+  side across the two outcomes also trade through the complete set:
+
+  | Taker | Maker | Crosses when | Effect |
+  | --- | --- | --- | --- |
+  | Buy YES at `L` | Buy NO at `q` | `L + q ≥ P` | Mint a YES+NO pair into the reserve |
+  | Sell YES at `L` | Sell NO at `q` | `L + q ≤ P` | Merge a pair out of the reserve |
+
+- **Instruction:** `match_shared_complement`. The multi-outcome version is in
+  [prediction markets](prediction-markets.md#trading).
+
+**Limits.**
+- **Hot account:** the book account is writable on every placement, so it is a
+  write-contention point.
+- **Shared balances contend:** a trader's same-mint balance is shared by all
+  markets, so their transactions on different markets can contend.
+
+## Fees
+
+- **Taker fee:** a global rate set by the super admin and charged in quote or
+  collateral.
+- **Fee quote:** multi-outcome matches carry the fee rate the taker accepted and
+  fail with `MultiOutcomeFeeQuoteChanged` if the rate changed in the meantime.
+- **Club markets:** they split fees between the protocol and the club; see
+  [clubs](clubs.md#fees).
+- **Withdrawal:** `withdraw_shared_fees` (super admin) withdraws only the fees a
+  book has accrued.
+
+## Events and errors
+
+- **Events:** every successful state change emits an Anchor event after its
+  mutations, for example `OrderPlacedEvent`, `FillEvent` and `DepositEvent`.
+  - **Contents:** balance and order events carry post-transition values that
+    indexers need.
+  - **Not settlement:** events don't carry deferred settlement work.
+  - **Successful transactions only:** a failed transaction can still log events
+    from earlier instructions, so consumers must only ingest events from
+    successful transactions.
+- **Errors:** Anchor allows one `#[error_code]` enum, so the stable error ABI is
+  `programs/outcomia/src/errors/catalog.rs`, with explicit discriminants from 6000
+  upwards.
+  - **Re-exports:** domain modules (`admin`, `market`, `order`, `balance`,
+    `matching`) re-export the variants they use.
+  - **Append-only:** codes are never reused or renumbered. A new error takes the
+    next number and is re-exported from its domain module.
+
+## Account layout changes
+
+- **Reserved bytes:** new fields go into reserved bytes at the end of an
+  existing account (for example `Club`), so deployed accounts keep decoding.
+- **Enums:** existing enums (`PredictionOutcome`, `SharedOutcome`) are never
+  reordered or extended to mean something new. New features get new account
+  types and PDA namespaces.
+- **PDA checks:** they use the stored canonical bump (`pda::address_with_bump`)
+  instead of `find_program_address`, so compute cost stays constant.
+- **Lamports:** move them by hand only after any token CPI that names the same
+  account.
+
+## App
+
+- **Stack:** Next.js with wallet adapters and the Anchor TS client generated from
+  the IDL in `app/idl`.
+- **RPC proxy:** browsers call `/api/solana`, which forwards allowed methods to
+  Helius using server-side keys.
+  - **Failover:** reads fail over to public devnet; signed broadcasts are never
+    replayed.
+  - **Limits:** the proxy limits request size and has a soft per-instance request
+    allowance.
+- **Planner:** the browser checks every reachable link, PDA and priority before
+  it builds a transaction. The program checks again.
+- **Feature flags:** for example `NEXT_PUBLIC_SHARED_BALANCES_ENABLED` and
+  `NEXT_PUBLIC_MULTI_OUTCOME_ENABLED`, so unverified deployments stay off.
+
+See [frontend](frontend.md) and [`app/README.md`](../app/README.md).
+
+## Indexer
+
+- **Source:** `services/indexer` ingests finalized, successful transactions,
+  decodes events and accounts and stores them in PostgreSQL.
+- **API:** GraphQL.
+- **IDL history:** account layouts are decoded against an IDL history
+  (`account_codec.rs`), so older layouts still decode.
+- **Optional:** the protocol never depends on the indexer. Screens fall back to
+  RPC reads when no indexer is configured.
+
+See [`services/indexer/README.md`](../services/indexer/README.md).
+
+## Tests
+
+- **Program:** LiteSVM integration tests in `programs/outcomia/tests` cover
+  custody, matching, resolution, clubs and disputes.
+  - **Compute:** they assert compute budgets for the heaviest paths, such as
+    eight-outcome minting.
+  - **Faults:** they check conservation, replay, stale hints, authorization and
+    rollback.
+- **App:** unit suites for the planners, encodings, wallet, RPC proxy, i18n and
+  theme, plus local and devnet end-to-end scripts in `app/scripts`.
+- **Not covered:** throughput on a public network, and wallet UX beyond the
+  smoke tests.
+
+Commands are in the [README](../README.md#checks).

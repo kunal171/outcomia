@@ -23,7 +23,7 @@ const type = [
   ["--text-small", "Labels and meta", 400],
 ] as const;
 
-/** Living reference for docs/design-system.md: every token and primitive. */
+/** Living reference for the design system in docs/frontend.md: every token and primitive. */
 export default function DesignPage() {
   return (
     <main className="ui-page ui-standalone">
@@ -33,7 +33,7 @@ export default function DesignPage() {
           <h1 className="ui-title">Outcomia, dark first</h1>
           <p className="ui-lead">
             Tokens and primitives every page composes. Source of truth:
-            docs/design-system.md.
+            docs/frontend.md.
           </p>
         </div>
         <div className="ui-actions">

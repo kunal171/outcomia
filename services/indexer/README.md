@@ -1,297 +1,154 @@
 # Outcomia indexer
 
-Rust service for Solana devnet account state, finalized execution history,
-wallet holdings and wallet-authenticated profiles. PostgreSQL serves GraphQL
-reads and revision notifications; resolvers never scan Solana per browser request.
-This is a separate Cargo workspace from the Anchor program.
+A Rust service that indexes the Outcomia program into PostgreSQL. It stores
+account state, finalized transaction history, wallet holdings and profiles, and
+serves them over GraphQL. Resolvers never call Solana per request. It is a
+separate Cargo workspace from the program.
 
-## Code structure
+## Code
 
-| Folder | Responsibility |
+| Path | What it does |
 | --- | --- |
-| `src/ingestion/` | RPC/WebSocket reads, account reconciliation, wallet holdings, transaction recovery and backfill. |
-| `src/processing/` | Account/event decoding, account projections, instruction replay, mint precision and candles. |
-| `src/api/graphql/` | Separate account, market, wallet, chart, receipt and subscription resolvers. |
-| `src/api/mod.rs` | HTTP transport, schema composition and notification listener. |
-| `src/auth.rs` | Wallet challenges, signature verification, users and sessions. |
-| `src/storage/` and `migrations/` | Durable source records, checkpoints and schema. |
-| `../../app/lib/graphql/` | Frontend operations grouped by the same domains; `client.ts` is shared transport and `proxy.ts` is server-only forwarding. |
-| `../../app/lib/indexed-accounts.ts` | Exact JSON-to-Anchor hydration and account reader adapter. |
+| `src/ingestion/` | RPC/WebSocket reads, account reconciliation, holdings, backfill, recovery |
+| `src/processing/` | Account and event decoding (`account_codec.rs`), projections, instruction replay, candles, wallet discovery |
+| `src/api/graphql/` | Resolvers for accounts, markets, wallets, charts, receipts, subscriptions |
+| `src/auth.rs`, `src/canton/` | Wallet challenges, sessions, Canton ledger claims |
+| `src/storage/`, `migrations/` | Source records, checkpoints, schema (SQLx, applied at startup) |
+| `schema.graphql` | The GraphQL contract |
+| `../../app/lib/graphql/`, `../../app/lib/indexed-accounts.ts` | Frontend operations and account hydration |
 
-## Coverage and consistency
+## How it works
 
-All 23 program account layouts and 30 event types are decoded against the
-checked-in IDL. Account snapshots include spot, binary and multi-outcome markets,
-books, orders, balances, positions, proposals, roles and recovery accounts.
-A complete, validated contextual scan atomically publishes one revision per
-commitment; only such a scan can mark missing accounts deleted. Confirmed state
-can change on a fork; finalized state cannot regress.
+```text
+confirmed account subscription → contextual scans → atomic account revisions
+finalized backfill / live recovery → source transactions and events → ordered replay
+verified wallets → holdings worker → wallet revisions
+PostgreSQL → GraphQL queries and SSE → app readers and charts
+```
 
-One confirmed program subscription coalesces account refreshes, with periodic
-confirmed/finalized reconciliation. Independent workers cache mint precision and
-refresh tracked wallets' SOL/SPL holdings. Wallet tracking follows verified login
-or finalized chain discovery;
-profiles never accept financial balances from clients. The API rejects stale/warming
-reads. The frontend automatically falls back to confirmed RPC for live accounts,
-books and holdings, and visibly labels the source. Unavailable data never becomes
-an apparently empty book or a fabricated zero balance.
-
-Finalized logs and retained transaction bodies support ordered execution replay.
-Spot/multi-outcome fill events and legacy/shared spot/binary instruction replay
-feed bounded OHLCV queries. A complementary YES/NO fill (`match_shared_complement`)
-records two trades: the taker's outcome at payout minus the maker price, with the
-fee, and the maker's outcome at its own price. Missing execution order, timestamps,
-initialization provenance or historical coverage produce `INCOMPLETE`, not invented prices.
-Charts currently use finalized executions; provisional candles, depth charts,
-P&L and USD valuation remain later work. These changes do not upgrade the program
-or establish a live deployment.
+- **Decoding:** every account and event is decoded against the IDL.
+  - **IDL history:** `IDL_HISTORY` keeps earlier IDLs, newest first, so the
+    indexer decodes both the deployed program and the next one during an upgrade.
+  - **Fixtures:** regenerate them with
+    `node app/scripts/generate-indexer-fixtures.mjs --write`.
+- **Revisions:** each commitment publishes one revision per complete scan, and
+  only a complete scan can mark accounts deleted.
+  - **Confirmed:** confirmed state can change on a fork.
+  - **Finalized:** finalized state never regresses.
+- **Charts:** finalized fills and replayed instructions feed OHLCV candles.
+  - **Complementary fills:** a complementary YES/NO fill records two trades.
+  - **Gaps:** missing history returns `INCOMPLETE` rather than invented prices.
+- **Binding:** the database is bound to the devnet genesis, program and IDL hash
+  before workers start. Run one indexer per program and database.
 
 ## Run locally
 
-Run these commands from the repository root. Copy the example only on first
-setup; preserve an existing `.env`.
+From the repository root:
 
 ```bash
-cp services/indexer/.env.example services/indexer/.env
-```
-
-For an existing pre-rename Compose database, add
-`-f services/indexer/compose.legacy.yaml` after `-f services/indexer/compose.yaml`
-to **every** Compose command below. Keep the existing `.env` database URL. The
-override reuses the existing volume and credentials; omitting it selects a new,
-empty Outcomia database. Neither setup deletes the other volume.
-
-Choose one runtime:
-
-**Docker Compose** runs both the database and the indexer:
-
-```bash
+cp services/indexer/.env.example services/indexer/.env   # first time only
 docker compose -f services/indexer/compose.yaml up -d --build
-docker compose -f services/indexer/compose.yaml logs --tail=50 indexer
-curl --fail http://127.0.0.1:8080/health/live
 curl --fail http://127.0.0.1:8080/health/ready
 ```
 
-Compose supplies the container's database URL. RPC/program settings can be
-supplied through the shell or Compose's explicit `--env-file` option. Do not
-expect the running containers to read the Rust process's environment file.
-
-**Host Rust process** uses only the Compose database:
+Or run only the database in Docker, with the indexer on the host (Rust 1.97.1):
 
 ```bash
 docker compose -f services/indexer/compose.yaml up -d postgres
-set -a
-source services/indexer/.env
-set +a
+set -a; source services/indexer/.env; set +a
 cargo run --manifest-path services/indexer/Cargo.toml
 ```
 
-Stop an existing Compose indexer before using the host process; both would
-otherwise compete for port `8080` and write the same checkpoints. Run one
-indexer per program/database configuration.
+- **Ports:**
+  - **Postgres:** `127.0.0.1:5434`.
+  - **Health:** `:8080`, with `/health/live` and `/health/ready`. Ready means
+    caught up with a reachable database.
+  - **API:** `:8081`.
+- **Defaults:** devnet and program `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`.
+- **Pre-rename databases:** add `-f services/indexer/compose.legacy.yaml` to
+  every Compose command.
+- **Other runtimes:** [Kind/Kubernetes](infra/kubernetes/README.md) and
+  [Northflank](infra/northflank/README.md).
 
-New Compose setups use the Outcomia database, user and volume. Existing setups
-use the compatibility override above; see [rename notes](../../docs/rebranding.md).
+## App connection
 
-The database is exposed on loopback port `5434`; containers use `postgres:5432`.
-`DATABASE_URL` is required. RPC, WebSocket and program settings default to devnet
-and `AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`. SQLx migrations run at startup.
-The host process needs Rust `1.97.1`; Docker uses the pinned builder image.
+- **Build flag:** set `NEXT_PUBLIC_INDEXER_ENABLED=true` at build time.
+- **Server settings:** `INDEXER_API_URL` and `INDEXER_PROXY_SECRET`.
+- **Indexer origin:** set `APP_ORIGIN` on the indexer to the browser origin.
+- **Proxy:** the app proxies requests from the same origin and forwards cookies,
+  but scripts never see session credentials.
 
-For [Kind/Kubernetes](infra/kubernetes/README.md), use the separate manifest
-setup. These local runtimes do not establish a cloud deployment.
+**Endpoints.**
+- **Queries:** `POST /graphql` serves account pages pinned to a revision, raw
+  accounts, sync status, wallet assets, trader stats, candles, receipts and
+  profiles. Amounts and slots are decimal strings.
+- **Subscriptions:** `POST /graphql/stream` serves subscriptions over SSE. Clients
+  resync after a reconnect.
 
-## GraphQL and sign-in
+**Fallback.**
+- **When:** network errors, a 5 s timeout, HTTP 408/429/5xx or warming/stale
+  responses make the app fall back to confirmed RPC.
+- **Scope:** it falls back only for the dataset that failed.
+- **Recovery:** it retries GraphQL every 15 s, and a source badge shows which
+  source is in use.
+- **No substitutes:** history and charts never fall back to made-up data.
+- **Sending:** transactions are sent once. A guarded provider stores the
+  signature before broadcast, so a reload or a lost reply never causes a
+  duplicate.
 
-The API defaults to `127.0.0.1:8081`; operational health remains on `8080`.
-Set `APP_ORIGIN` to the exact browser origin (HTTPS outside loopback).
-In the frontend, enable `NEXT_PUBLIC_INDEXER_ENABLED=true` at build time and set
-the server-only `INDEXER_API_URL=http://127.0.0.1:8081`. The frontend flag defaults
-to false so an unconfigured deployment retains its existing data source.
+## Sign-in
 
-`POST /graphql` serves account pages, individual/raw accounts, sync status,
-wallet assets, the current user, latest trade, finalized candles and transaction
-receipts. See [schema.graphql](schema.graphql) for the exact contract. Account
-pages pin a revision and cursor; concurrent revisions require a fresh first page.
-Amounts and slots are decimal strings, preserving full integer precision.
-Example:
+**Solana.**
+- **Challenge:** `POST /auth/challenge` issues a single-use message that is
+  bound to the origin, network and address.
+- **Verify:** `POST /auth/verify` checks the Ed25519 signature and sets an
+  HttpOnly, SameSite=Strict session. Only hashes of credentials are stored.
+- **Session:** `GET /auth/me` returns the current user and `POST /auth/logout`
+  ends the session.
+- **Expiry:** a session ends after 2 h idle or 24 h in total.
+- **Rate limits:** 10 per minute per client, 5 per minute per wallet, and 600 per
+  minute overall.
 
-```graphql
-query Market($address: String!) {
-  account(address: $address, commitment: "confirmed") {
-    address
-    accountType
-    data
-    slot
-    revision
-  }
-  syncStatus(commitment: "confirmed") {
-    ready
-    slot
-    observedAt
-  }
-}
-```
+**Canton.**
+- **Settings:** needs the `CANTON_*` variables.
+- **Endpoints:** `/auth/canton/challenge`, `/auth/canton/verify`,
+  `/auth/canton/unlink` and `/auth/solana/link`. They use `ProfileClaim`
+  contracts; see [profiles](../../docs/profiles.md).
 
-`POST /graphql/stream` accepts a GraphQL subscription and returns SSE. One
-PostgreSQL listener fans out committed revision notifications; clients resync on
-reconnect or lag. Confirmed receipts become `CONFIRMED_INDEXED` only when the
-account snapshot has caught up; finalized receipts also require finalized source
-history. An indexed receipt establishes snapshot convergence, not optimistic
-financial credit.
+**During an outage.**
+- **Without a session:** a wallet can still read, trade and settle.
+- **Discovery:** wallets that funded the protocol meanwhile are found later from
+  finalized accounts and deposit history, as unverified `registration_source=chain`
+  users.
+- **No sessions or balances:** discovery never creates a session or writes a
+  balance.
+- **Signing in later:** a later sign-in keeps the same user ID.
 
-`POST /auth/challenge` issues an expiring, single-use, origin/network/address-bound
-message. `POST /auth/verify` verifies its Ed25519 signature before creating a user
-and an HttpOnly, SameSite=Strict session. Only credential hashes are stored.
-`GET /auth/me` reuses the session and reports how it was proven
-(`signedInWith`: `solana` or `canton`); `POST /auth/logout` revokes it, including an
-in-flight challenge. A session ends after 2 hours without a request and 24 hours
-after sign-in, so a returning user signs again with their wallet. The app also
-reconnects a remembered wallet on reload only if it was in use within 2 hours. Only signature-verified profiles can have authenticated
-sessions; a chain-discovered profile alone never grants a session. Challenge issuance is rate limited per client (10/minute), per wallet (5/minute) and by a global ceiling (600/minute), so one client cycling wallet addresses cannot block sign-in for others. Behind the app, the same-origin proxy forwards the browser IP with `INDEXER_PROXY_SECRET`; the indexer trusts that IP only when the secret matches and otherwise keys limits on the TCP peer. Only a digest of the client identity is stored. The Next same-origin
-
-**Canton sign-in and linking.** With the five `CANTON_*` variables set (see
-`.env.example`), a Canton party signs in or joins a profile by creating an
-`Outcomia.Profiles:ProfileClaim` that carries a one-time nonce from
-`POST /auth/canton/challenge`; `POST /auth/canton/verify` reads the claim from the
-Ledger JSON API as the operator and checks operator, party, purpose, nonce, the
-linked Solana wallet and the ledger's creation time. `POST /auth/solana/link`
-adds a Solana wallet to a Canton-only user by the usual signed challenge, and
-`POST /auth/canton/unlink` removes a party (never the last way to sign in). A
-Canton-only user merges into an existing user only when at most one of them has
-a profile. Profiles are owned by users; `profile(party:)` finds one by a linked
-party.
-proxy forwards cookies without exposing session credentials to JavaScript.
-
-Signing programs retain direct account checks, transaction sending and chain
-confirmation. Indexed readers serve normal screen rendering; no secret key is
-required by the indexer or login.
-
-## Connecting during a sign-in outage
-
-A connected wallet can read, deposit, trade and settle without a website session.
-If the auth API is unavailable, the frontend shows `Wallet connected` and an
-optional `Retry sign-in`. It does not collect or queue a registration signature.
-On recovery it only checks for an existing session; it never opens a wallet
-message prompt automatically. New verification remains an explicit user action.
-
-`processing/wallet_registry.rs` recovers user records in bounded batches from
-finalized balance/position accounts (including tombstones), retained legacy
-deposit/initialization events and decoded deposit/initialization instructions.
-This covers wallets that funded the protocol while the backend was offline,
-including closed accounts found through available backfill history. Event
-normalization has a durable source-key marker and replay is idempotent.
-
-Discovered users have `registration_source=chain`, an observed slot, null
-`last_login_at` and null `verified_at`. Discovery starts wallet tracking but
-creates no cookie/session and writes no financial balances. Public holdings reads
-refresh tracking for an existing wallet at most once per minute, so an active
-chain-discovered user does not need a website session to stay tracked. Unknown
-addresses cannot use that read to register a new wallet. Later successful
-message verification preserves the profile ID and fills verification/login
-metadata. Existing verified users retain their identity through migration.
-
-## Automatic frontend fallback
-
-With indexed reads enabled, live reads prefer GraphQL. Network failures, a
-five-second request timeout, HTTP 408/429/5xx, malformed responses and explicit
-warming/stale errors use the existing confirmed RPC readers. Database failures
-return HTTP 503. Invalid filters, account schema/type errors and cancelled
-requests remain errors rather than triggering fallback.
-
-Fallback is scoped to accounts or an owner's holdings dataset. A failing wallet
-view does not force unrelated markets onto RPC. During a fallback, queries skip
-the failing indexed dataset for 15 seconds; the active workspace refreshes every
-15 seconds and retries GraphQL automatically. One recovery probe runs per scope;
-successful recovery refreshes panels and changes the source badge back to
-`GraphQL live`. Pagination failure discards the partial indexed page sequence
-before reading the complete RPC result.
-
-Transaction sends still happen once. When receipts are unavailable, the guarded
-signing provider checks the existing signature through RPC. Only confirmed or
-finalized success clears the pending receipt; processed, missing and failed RPC
-reads never authorize a duplicate send. Reload protection remains in session
-storage. The guarded provider saves the signed identifier before broadcast, so a
-lost RPC reply or confirmation timeout remains protected after a reload. A
-confirmation retry reuses the existing broadcast result. Definitive preflight
-rejection releases an unsent attempt. An absent signature can be released after
-its known recent-blockhash expiry is passed at finalized commitment and a second
-status read remains absent; processed-only failures and unknown expiry never
-clear the guard. A previously pending receipt that completes or expires requires
-review before another send. The RPC holdings worker independently retries a
-transient connection/read failure once, without retrying RPC rejections or writes.
-
-Historical OHLCV and shared-fill replay cannot be reconstructed from current
-account snapshots. Those charts/history queries show an indexer error until
-recovery; they never manufacture candles or substitute legacy fills for shared
-fills. Wallet authentication also still requires the indexer. Normal public
-reads and signed chain actions can continue through RPC without a new login.
-
-## Processing flow
-
-```text
-confirmed account subscription -> contextual scans -> atomic account revisions
-finalized backfill/live recovery -> source transactions/events -> ordered replay
-verified wallet tracking -> shared holdings worker -> wallet revisions
-PostgreSQL projections -> GraphQL queries / SSE -> frontend readers and charts
-```
-
-Source transactions/events commit together with replay conflict checks and
-durable recovery checkpoints. Reconnects recover gaps through HTTP. History
-failures retry independently of the API and current-state workers. The database
-is bound to the devnet genesis, configured program and IDL hash before workers
-start. Run one indexer per program/database configuration.
-
-## Verification status
-
-See the [branch audit](../../docs/indexer-branch-verification.md) for completed
-checks, fixes found during review and open items from the broader design.
-Current account/chart freshness is separate from history-ingestion freshness;
-complete chart coverage requires healthy finalized source recovery. If older
-instructions arrive behind the replay cursor, instruction-derived history is
-rebuilt deterministically before it is considered ready again.
-
-## Health and checks
-
-`/health/live` reports process liveness. `/health/ready` also requires successful
-catch-up and a reachable database. Readiness is not a time-based lag metric.
+## Checks
 
 ```bash
 cargo fmt --manifest-path services/indexer/Cargo.toml --all --check
-cargo test --manifest-path services/indexer/Cargo.toml
 cargo clippy --manifest-path services/indexer/Cargo.toml --all-targets -- -D warnings
-```
-
-Run the isolated PostgreSQL integration tests against a local test database
-(the example uses fresh-install credentials; use the existing credentials with
-the compatibility override):
-
-```bash
+cargo test --manifest-path services/indexer/Cargo.toml
 DATABASE_URL=postgres://outcomia:outcomia_dev@127.0.0.1:5434/postgres \
   cargo test --manifest-path services/indexer/Cargo.toml -- --ignored
-```
-
-Frontend codec/receipt checks and all-account fixture verification:
-
-```bash
 npm --prefix app run test:indexer
 ```
 
-For the browser → Next proxy → Rust API → PostgreSQL test, first build/start the
-frontend on `127.0.0.1:3024` with the indexer, shared-balance and multi-outcome
-public flags enabled and `INDEXER_API_URL=http://127.0.0.1:8084`. Then run:
+**Browser end-to-end test** (browser → Next proxy → API → Postgres, against a
+fake Solana upstream).
+1. Start the app on `127.0.0.1:3024`, with the indexer flags and
+   `INDEXER_API_URL=http://127.0.0.1:8084`.
+2. Run
+   `INDEXER_BROWSER_TEST=1 cargo test ... browser_through_real_api -- --ignored`,
+   with `PLAYWRIGHT_MODULE` set.
 
-```bash
-INDEXER_BROWSER_TEST=1 DATABASE_URL=postgres://USER@127.0.0.1:PORT/postgres \
-  cargo test --manifest-path services/indexer/Cargo.toml browser_through_real_api -- --ignored --nocapture
-```
+## Not done
 
-The test creates an isolated migrated database, runs the API on `8084`, and uses
-a local fake Solana upstream. Set `PLAYWRIGHT_MODULE` to your installed
-Playwright entry point. The default is the local test setup under
-`/tmp/outcomia-browser/node_modules/playwright/index.mjs`. No chain transactions
-are sent. Screenshots are written to ignored `app/target/indexer-browser-artifacts/`.
-
-Production capacity, provider/archive coverage and RPC/latency benchmarks remain
-to be measured against the real deployment. Yellowstone is a later option if
-measured RPC limits justify it.
+- **Typed views:** typed, joined market, book and wallet responses. Today the app
+  assembles views from account envelopes.
+- **Server-side queries:** search, discovery filtering, and paginated trade
+  history.
+- **More data:** provisional candles, depth charts, and P&L across every chain.
+- **Not measured:** production capacity, archive coverage and latency.
+  Yellowstone is an option if RPC limits require it.

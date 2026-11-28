@@ -2,7 +2,7 @@
  * Pyth SOL/USD price and instruction builders.
  *
  * Money is exact: USD amounts use 6 decimals and every calculation is in
- * bigint, mirroring the program's rounding (docs/club-rules-and-disputes.md).
+ * bigint, mirroring the program's rounding (docs/clubs.md, Security deposit).
  * SOL is valued with Pyth's shared SOL/USD price account. When it is older
  * than the program accepts, the app waits for the next update instead of
  * posting a price itself. */

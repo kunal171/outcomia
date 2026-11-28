@@ -1,6 +1,6 @@
 "use client";
 /** Admin queue of disputes waiting for a ruling, soonest deadline first
- * (docs/club-rules-and-disputes.md §3). Rulings happen on each market's page,
+ * (docs/clubs.md, Disputes). Rulings happen on each market's page,
  * where eligibility is checked. */
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";

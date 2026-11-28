@@ -1,7 +1,7 @@
 "use client";
 /** Super-admin platform settings, kept apart from administrator management.
  * Club rules and deposits today; disputes and penalties join in later
- * milestones (docs/club-rules-and-disputes.md). */
+ * milestones (docs/clubs.md). */
 import {
   useCallback,
   useEffect,

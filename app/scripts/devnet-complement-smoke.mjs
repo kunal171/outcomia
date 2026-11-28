@@ -15,6 +15,7 @@
  * amounts and signatures. The temporary wallet's cash and SOL are returned.
  * Re-running after a failure resumes from the recorded steps.
  */
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -238,7 +239,13 @@ async function main() {
     hash: crypto
       .createHash("sha256")
       .update(
-        fs.readFileSync(path.join(root, "docs/complementary-matching.md")),
+        // The rules document is pinned to the commit in `uri`.
+        execFileSync("git", [
+          "-C",
+          root,
+          "show",
+          "ce636ba:docs/complementary-matching.md",
+        ]),
       )
       .digest(),
   };

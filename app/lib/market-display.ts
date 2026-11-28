@@ -4,7 +4,7 @@ import { BN } from "@anchor-lang/core";
 import type { MarketAccount, MarketMetadataAccount } from "./outcomia";
 import { formatAtomicAmount } from "./outcomia";
 
-// Valueless test assets recorded in docs/devnet-addresses.md. Do not label an
+// Valueless test assets recorded in docs/deployment.md. Do not label an
 // unknown mint BTC/USDT just because somebody chose similar market symbols.
 const DEVNET_TOKENS: Record<string, string> = {
   FggaZG7eJ5tpr2vmpNMbMCHkWkcw9n2Nhmf54g3wQwGk: "tBTC",

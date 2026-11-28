@@ -2,7 +2,7 @@
  *
  * "Private" means restricted participation, not confidential data: every club
  * account is publicly readable. Hiding a market in the app is never a
- * permission check; the program enforces membership (docs/clubs-private-markets.md). */
+ * permission check; the program enforces membership (docs/clubs.md). */
 import { BN, type Program } from "@anchor-lang/core";
 import {
   PublicKey,
@@ -62,7 +62,7 @@ export type ClubKind = "public" | "private";
 /** A club's type, or null for a club awaiting the one-time upgrade. */
 export const clubKind = (club: Pick<ClubAccount, "kind">): ClubKind | null =>
   club.kind ? ("public" in club.kind ? "public" : "private") : null;
-/** Platform limits set by the super-admin (docs/club-rules-and-disputes.md). */
+/** Platform limits set by the super-admin (docs/clubs.md). */
 export interface ClubRulesAccount {
   publicMemberCap: number;
   privateMemberCap: number;

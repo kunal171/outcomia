@@ -1,5 +1,5 @@
 /** Club rules milestone 2b: switching a club's type, settling finished club
- * markets and closing a club (docs/club-rules-and-disputes.md, sections 1 and 5).
+ * markets and closing a club (docs/clubs.md, Security deposit).
  * The program enforces every rule; these helpers explain and build. */
 import type { Program } from "@anchor-lang/core";
 import { PublicKey, type TransactionInstruction } from "@solana/web3.js";
