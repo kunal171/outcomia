@@ -302,3 +302,25 @@
 .club-page li.ui-row:last-child {
   border-bottom: 0;
 }
+
+/* Security deposit card. */
+.club-deposit-facts {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 var(--space-3);
+}
+.club-deposit-facts dt {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.club-deposit-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.club-deposit-form {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  max-width: 420px;
+}

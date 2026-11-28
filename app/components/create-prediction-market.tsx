@@ -46,10 +46,13 @@ import {
 } from "../lib/outcomia";
 import {
   canCreateClubMarket,
+  clubAccounts,
   clubMarketHref,
   createClubMarketInstructions,
   readClub,
+  readClubRules,
 } from "../lib/clubs";
+import { clubMarketPriceAccount } from "../lib/club-deposits";
 
 /** Public markets need an active protocol admin. With `club`, any member the
  * club's policy allows creates a club market instead; club admins resolve it. */
@@ -73,6 +76,29 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
     allowed: boolean;
   } | null>(null);
   const [publicAccess, setPublicAccess] = useState(false);
+  // Why the club cannot create markets right now (deposit), if anything.
+  const [depositIssue, setDepositIssue] = useState<string | null>(null);
+  useEffect(() => {
+    if (!clubKey) return;
+    let dead = false;
+    const reader = getOutcomiaReadProgram(connection);
+    void Promise.all([
+      clubAccounts(reader).club.fetchNullable(clubKey),
+      readClubRules(reader),
+    ])
+      .then(([account, clubRules]) =>
+        account ? clubMarketPriceAccount(connection, account, clubRules) : null,
+      )
+      .then(() => !dead && setDepositIssue(null))
+      .catch(
+        (cause) =>
+          !dead &&
+          setDepositIssue(cause instanceof Error ? cause.message : String(cause)),
+      );
+    return () => {
+      dead = true;
+    };
+  }, [clubKey, connection]);
   useEffect(() => {
     if (!clubKey || !wallet) return;
     let dead = false;
@@ -134,6 +160,18 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
     signature: string;
   } | null>(null);
 
+  /** The price account a club market needs now (null for USDC deposits),
+   * or an error explaining why the club cannot create markets. */
+  async function clubPrice(key: PublicKey) {
+    const reader = getOutcomiaReadProgram(connection);
+    const [account, clubRules] = await Promise.all([
+      clubAccounts(reader).club.fetchNullable(key),
+      readClubRules(reader),
+    ]);
+    if (!account) throw new Error("This club was not found on this network.");
+    return clubMarketPriceAccount(connection, account, clubRules);
+  }
+
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
@@ -188,6 +226,8 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
             "An active administrator record is required before uploading rules",
           );
       }
+      // Check the club's deposit before the paid rules upload.
+      if (clubKey) await clubPrice(clubKey);
       const collateralMint = new PublicKey(mint.trim());
       const mintAccount = await getMint(
         connection,
@@ -247,6 +287,8 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
       // New random IDs permit multiple independent questions for one mint.
       const marketId = crypto.getRandomValues(new Uint8Array(32));
       if (clubKey) {
+        // Re-check with a fresh SOL price just before sending.
+        const priceUpdate = await clubPrice(clubKey);
         const { market, instructions } = await createClubMarketInstructions(
           program,
           wallet.publicKey,
@@ -267,6 +309,7 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
           name,
           symbol,
           publicAccess,
+          priceUpdate,
           marketId,
         );
         setStage("Approve market creation in your wallet…");
@@ -368,6 +411,11 @@ export function CreatePredictionMarket({ club }: { club?: string } = {}) {
                 : t("An active administrator role is required.")}
             </div>
           )
+        )}
+        {clubKey && isAdmin && depositIssue && (
+          <div className="access-card access-denied" role="alert">
+            {t(depositIssue)}
+          </div>
         )}
         {roleError && (
           <div className="access-card access-denied" role="alert">
