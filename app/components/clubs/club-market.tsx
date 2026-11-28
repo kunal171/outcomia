@@ -38,6 +38,11 @@ import {
   type ClubSnapshot,
 } from "../../lib/clubs";
 import { ClubFeedback, useClubTransaction } from "./club-transaction";
+import {
+  MarketDispute,
+  binaryDisputedMarket,
+  useFinalizeGate,
+} from "../market-dispute";
 
 export const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -97,6 +102,12 @@ export function ClubMarket({
   }, [program, club, market, wallet, revision]);
 
   const row = snapshot?.markets.find((m) => m.address.equals(market));
+  const gate = useFinalizeGate(
+    row ? market : null,
+    row?.market.proposal,
+    row?.market.resolutionDelaySeconds,
+    revision,
+  );
   // Stable per snapshot, so the trading view does not refetch on every render.
   const trading = useMemo(
     () => (snapshot && row ? clubTrading(snapshot, row.binding) : null),
@@ -362,7 +373,8 @@ export function ClubMarket({
                     ? "YES"
                     : "NO",
               )}{" "}
-              · {t("Finalizes after")}: {predictionTime(maturity)}
+              · {t("Finalizes after")}:{" "}
+              {predictionTime(gate.at === null ? maturity : new BN(gate.at))}
             </p>
           )}
           <p>
@@ -401,8 +413,9 @@ export function ClubMarket({
             )}
             {wallet &&
               status === "proposed" &&
-              maturity &&
-              maturity.lten(now) && (
+              gate.at !== null &&
+              !gate.open &&
+              gate.at <= now && (
                 <button
                   type="button"
                   className="ui-btn ui-btn-primary"
@@ -492,6 +505,13 @@ export function ClubMarket({
             </div>
           )}
         </section>
+        <MarketDispute
+          family="binary"
+          address={market}
+          market={binaryDisputedMarket(m)}
+          club={club}
+          onChanged={() => setRevision((v) => v + 1)}
+        />
         <ClubFeedback issue={tx.issue} signature={tx.signature} />
       </div>
       <p className="club-muted club-market-foot">

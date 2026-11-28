@@ -204,6 +204,16 @@ export function AppHeader() {
     ...(canCreateMarket
       ? [
           {
+            href: "/disputes",
+            label: "Disputes",
+            icon: "orders" as const,
+            active: pathname === "/disputes",
+          },
+        ]
+      : []),
+    ...(canCreateMarket
+      ? [
+          {
             href: "/markets/new",
             label: "Create market",
             icon: "create" as const,

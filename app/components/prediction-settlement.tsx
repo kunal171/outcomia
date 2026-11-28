@@ -37,6 +37,11 @@ import {
 } from "./prediction/position-actions";
 import { PredictionResolutionSummary } from "./prediction/resolution-summary";
 import { ResolutionPolicy } from "./resolution-policy";
+import {
+  MarketDispute,
+  binaryDisputedMarket,
+  useFinalizeGate,
+} from "./market-dispute";
 import { predictionCloseLabel } from "../lib/prediction-display";
 import { correctionOpen } from "../lib/correction-window";
 import { useProtocolRole } from "./protocol-role-provider";
@@ -73,6 +78,12 @@ function Settlement({
     { connection } = useConnection(),
     role = useProtocolRole();
   const p = useMemo(() => getOutcomiaReadProgram(connection), [connection]);
+  const gate = useFinalizeGate(
+    address,
+    market.proposal,
+    market.resolutionDelaySeconds,
+    market.status,
+  );
   const [position, setPosition] = useState<PredictionPositionAccount | null>(
       null,
     ),
@@ -302,6 +313,15 @@ function Settlement({
         </p>
       )}
       {view !== "position" && <PredictionResolutionSummary market={market} />}
+      {view !== "position" && (
+        <MarketDispute
+          family="binary"
+          address={address}
+          market={binaryDisputedMarket(market)}
+          club={null}
+          onChanged={onChanged}
+        />
+      )}
       {view !== "position" && <ResolutionPolicy chain="solana" />}
       {wallet && (
         <>
@@ -368,10 +388,15 @@ function Settlement({
                 )}
               {status === "proposed" && (
                 <button
-                  disabled={pending || !maturity || now.lt(maturity)}
+                  disabled={
+                    pending ||
+                    gate.open ||
+                    gate.at === null ||
+                    now.ltn(gate.at)
+                  }
                   onClick={() => void act("finalize")}
                 >
-                  {t("Finalize after review delay")}
+                  {t("Finalize after review and dispute window")}
                 </button>
               )}
             </div>
