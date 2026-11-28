@@ -446,6 +446,39 @@
               }
             ]
           }
+        },
+        {
+          "name": "dispute",
+          "docs": [
+            "before disputes existed, which keep the old finalization rule."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -497,6 +530,39 @@
                 "kind": "account",
                 "path": "market.market_id",
                 "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "docs": [
+            "before disputes existed, which keep the old finalization rule."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
               }
             ]
           }
@@ -557,6 +623,39 @@
                 "kind": "account",
                 "path": "market.market_id",
                 "account": "PredictionMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "docs": [
+            "before disputes existed, which keep the old finalization rule."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
               }
             ]
           }
@@ -12290,6 +12389,7 @@
       "accounts": [
         {
           "name": "admin",
+          "writable": true,
           "signer": true
         },
         {
@@ -12393,6 +12493,67 @@
               }
             ]
           }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -12441,6 +12602,7 @@
       "accounts": [
         {
           "name": "resolver",
+          "writable": true,
           "signer": true
         },
         {
@@ -12493,6 +12655,67 @@
               }
             ]
           }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -12542,6 +12765,7 @@
       "accounts": [
         {
           "name": "resolver",
+          "writable": true,
           "signer": true
         },
         {
@@ -12599,6 +12823,67 @@
               }
             ]
           }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -17310,6 +17595,1061 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "expire_multi_outcome_dispute",
+      "docs": [
+        "Lets anyone make a multi-outcome market invalid when its dispute was not ruled in time."
+      ],
+      "discriminator": [
+        12,
+        228,
+        203,
+        9,
+        68,
+        187,
+        208,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "docs": [
+            "The disputer's token account for the bond mint (checked in the handler)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "disputer",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "expire_prediction_dispute",
+      "docs": [
+        "Lets anyone make a binary market invalid when its dispute was not ruled in time."
+      ],
+      "discriminator": [
+        137,
+        101,
+        178,
+        71,
+        57,
+        83,
+        160,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "docs": [
+            "The disputer's token account for the bond mint (checked in the handler)."
+          ],
+          "writable": true
+        },
+        {
+          "name": "disputer",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_multi_outcome_dispute",
+      "docs": [
+        "Lets a holder dispute a multi-outcome market's proposal during its window, with a bond."
+      ],
+      "discriminator": [
+        177,
+        55,
+        50,
+        61,
+        120,
+        136,
+        141,
+        253
+      ],
+      "accounts": [
+        {
+          "name": "disputer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "disputer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "disputer_token",
+          "writable": true
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_prediction_dispute",
+      "docs": [
+        "Lets a holder dispute a binary market's proposal during its window, with a bond."
+      ],
+      "discriminator": [
+        10,
+        80,
+        140,
+        204,
+        251,
+        102,
+        243,
+        74
+      ],
+      "accounts": [
+        {
+          "name": "disputer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "docs": [
+            "A public or club binary market; the record and position derive from it."
+          ]
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  101,
+                  100,
+                  105,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "disputer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "disputer_token",
+          "writable": true
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "rule_multi_outcome_dispute",
+      "docs": [
+        "Lets an eligible protocol admin rule on a multi-outcome market's dispute; the ruling is final."
+      ],
+      "discriminator": [
+        25,
+        175,
+        208,
+        45,
+        191,
+        60,
+        217,
+        220
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  117,
+                  108,
+                  116,
+                  105,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.market_id",
+                "account": "MultiOutcomeMarket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "disputer",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "ruling",
+          "type": {
+            "defined": {
+              "name": "MultiOutcomeRuling"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "rule_prediction_dispute",
+      "docs": [
+        "Lets an eligible protocol admin rule on a binary market's dispute; the ruling is final."
+      ],
+      "discriminator": [
+        92,
+        144,
+        147,
+        228,
+        55,
+        236,
+        58,
+        127
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "admin_record",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true
+        },
+        {
+          "name": "dispute",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "club_market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  117,
+                  98,
+                  95,
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_club_member",
+          "docs": [
+            "handler); empty or a plain member, never a club admin."
+          ]
+        },
+        {
+          "name": "bond_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  98,
+                  111,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recipient",
+          "writable": true
+        },
+        {
+          "name": "disputer",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "ruling",
+          "type": {
+            "defined": {
+              "name": "PredictionRuling"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_dispute_config",
+      "docs": [
+        "Lets the super-admin set dispute windows, the bond, the ruling deadline and the treasury."
+      ],
+      "discriminator": [
+        140,
+        9,
+        117,
+        207,
+        15,
+        127,
+        158,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "super_admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol_config"
+          ]
+        },
+        {
+          "name": "protocol_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "club_window_seconds",
+          "type": "u64"
+        },
+        {
+          "name": "regular_window_seconds",
+          "type": "u64"
+        },
+        {
+          "name": "bond_tokens",
+          "type": "u64"
+        },
+        {
+          "name": "ruling_deadline_seconds",
+          "type": "u64"
+        },
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -17740,6 +19080,32 @@
         255,
         130,
         229
+      ]
+    },
+    {
+      "name": "DisputeConfig",
+      "discriminator": [
+        230,
+        88,
+        200,
+        99,
+        12,
+        93,
+        56,
+        156
+      ]
+    },
+    {
+      "name": "MarketDispute",
+      "discriminator": [
+        195,
+        154,
+        226,
+        51,
+        160,
+        133,
+        246,
+        159
       ]
     }
   ],
@@ -19210,6 +20576,61 @@
       "code": 6214,
       "name": "ClubRefundAccountsMissing",
       "msg": "The deposit vault, owner token account and token program are required for a USDC deposit"
+    },
+    {
+      "code": 6215,
+      "name": "InvalidDisputeConfig",
+      "msg": "Dispute settings must have windows and a ruling deadline of 1 second to 30 days, a bond of at least 1 token and a treasury"
+    },
+    {
+      "code": 6216,
+      "name": "DisputeUnavailable",
+      "msg": "This market cannot be disputed now: it needs a pending proposal inside its dispute window and no earlier dispute"
+    },
+    {
+      "code": 6217,
+      "name": "DisputerHoldsNothing",
+      "msg": "Only wallets holding contracts in this market can dispute it"
+    },
+    {
+      "code": 6218,
+      "name": "DisputeOpen",
+      "msg": "A dispute is open on this market; wait for the ruling"
+    },
+    {
+      "code": 6219,
+      "name": "NoOpenDispute",
+      "msg": "There is no open dispute on this market"
+    },
+    {
+      "code": 6220,
+      "name": "IneligibleDisputeRuler",
+      "msg": "This admin cannot rule: the market's creator, resolvers and club admins are excluded"
+    },
+    {
+      "code": 6221,
+      "name": "InvalidDisputeRuling",
+      "msg": "An overturn must choose a different, valid outcome; use the invalid ruling for invalid"
+    },
+    {
+      "code": 6222,
+      "name": "DisputeRulingNotExpired",
+      "msg": "The ruling deadline has not passed yet"
+    },
+    {
+      "code": 6223,
+      "name": "DisputeRulingExpired",
+      "msg": "The ruling deadline has passed; the market can only become invalid"
+    },
+    {
+      "code": 6224,
+      "name": "DisputeWindowOpen",
+      "msg": "The dispute window has not ended yet"
+    },
+    {
+      "code": 6225,
+      "name": "InvalidBondRecipient",
+      "msg": "The bond account does not belong to the treasury or the disputer"
     }
   ],
   "types": [
@@ -23363,6 +24784,246 @@
           }
         ]
       }
+    },
+    {
+      "name": "DisputeConfig",
+      "docs": [
+        "Platform dispute settings, set by the super-admin.",
+        "",
+        "PDA: [\"dispute_config\"]. Proposals require it, so every new proposal records",
+        "the window it runs under."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "club_window_seconds",
+            "docs": [
+              "Dispute window after a club market's proposal, in seconds (5 days)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "regular_window_seconds",
+            "docs": [
+              "Dispute window after any other market's proposal, in seconds (3 days)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bond_tokens",
+            "docs": [
+              "Bond in whole collateral tokens (1 = 1 USDC)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "ruling_deadline_seconds",
+            "docs": [
+              "Time an admin has to rule before the market becomes invalid (7 days)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "Wallet receiving upheld bonds (and, from M4, penalty shares)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Zeroed space for M4 penalty settings."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeState",
+      "docs": [
+        "Where a market's dispute stands."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Upheld"
+          },
+          {
+            "name": "Overturned"
+          },
+          {
+            "name": "Invalidated"
+          },
+          {
+            "name": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketDispute",
+      "docs": [
+        "Per-market dispute record, created with the market's first proposal.",
+        "",
+        "PDA: [\"market_dispute\", market]. Its bond sits in the token account",
+        "[\"dispute_bond\", market], whose authority is this record."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "window_seconds",
+            "docs": [
+              "Window length fixed at the first proposal; corrections restart it."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "club_market",
+            "type": "bool"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "DisputeState"
+              }
+            }
+          },
+          {
+            "name": "disputer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bond_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "bond_amount",
+            "type": "u64"
+          },
+          {
+            "name": "opened_at",
+            "type": "i64"
+          },
+          {
+            "name": "ruling_deadline",
+            "docs": [
+              "Last instant (exclusive) for a ruling; fixed when the dispute opens."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "ruled_by",
+            "docs": [
+              "Admin who ruled, if any."
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "club_penalty_due",
+            "docs": [
+              "A club market was overturned or ruled invalid; M4 deducts the penalty."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "docs": [
+              "Zeroed space for later dispute data."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultiOutcomeRuling",
+      "docs": [
+        "An admin's ruling on a multi-outcome market's dispute."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Uphold"
+          },
+          {
+            "name": "Overturn",
+            "fields": [
+              {
+                "defined": {
+                  "name": "OutcomeId"
+                }
+              }
+            ]
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PredictionRuling",
+      "docs": [
+        "An admin's ruling on a binary market's dispute."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Uphold"
+          },
+          {
+            "name": "Overturn",
+            "fields": [
+              {
+                "defined": {
+                  "name": "PredictionResolution"
+                }
+              }
+            ]
+          },
+          {
+            "name": "Invalid"
+          }
+        ]
+      }
     }
   ],
   "constants": [
@@ -23723,6 +25384,30 @@
       ],
       "type": "bytes",
       "value": "[99, 108, 117, 98, 95, 109, 97, 114, 107, 101, 116, 95, 115, 101, 116, 116, 108, 101, 100]"
+    },
+    {
+      "name": "DISPUTE_BOND_SEED",
+      "docs": [
+        "Token account holding a dispute bond: [\"dispute_bond\", market]."
+      ],
+      "type": "bytes",
+      "value": "[100, 105, 115, 112, 117, 116, 101, 95, 98, 111, 110, 100]"
+    },
+    {
+      "name": "DISPUTE_CONFIG_SEED",
+      "docs": [
+        "Platform dispute settings: [\"dispute_config\"]."
+      ],
+      "type": "bytes",
+      "value": "[100, 105, 115, 112, 117, 116, 101, 95, 99, 111, 110, 102, 105, 103]"
+    },
+    {
+      "name": "MARKET_DISPUTE_SEED",
+      "docs": [
+        "Per-market dispute record: [\"market_dispute\", market]."
+      ],
+      "type": "bytes",
+      "value": "[109, 97, 114, 107, 101, 116, 95, 100, 105, 115, 112, 117, 116, 101]"
     }
   ]
 }
