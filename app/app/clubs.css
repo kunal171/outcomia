@@ -324,3 +324,13 @@
   margin-top: var(--space-4);
   max-width: 420px;
 }
+
+/* Club type and closing card. */
+.club-subhead {
+  font-size: var(--text-small);
+  font-weight: 600;
+  margin: var(--space-4) 0 var(--space-2);
+}
+.club-subhead:first-of-type {
+  margin-top: 0;
+}

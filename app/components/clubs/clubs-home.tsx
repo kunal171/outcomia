@@ -367,7 +367,9 @@ export function ClubsHome() {
                           <div>
                             <p className="ui-row-title">{club.name}</p>
                             <p className="ui-row-meta">
-                              {expired
+                              {club?.closed
+                                ? t("Club closed")
+                                : expired
                                 ? t("Expired")
                                 : t("Expires {value0}", {
                                     value0: new Date(
@@ -377,7 +379,7 @@ export function ClubsHome() {
                             </p>
                           </div>
                           <div className="club-row-actions">
-                            {!expired && (
+                            {!expired && !club?.closed && (
                               <button
                                 type="button"
                                 className="ui-btn ui-btn-sm ui-btn-primary"
