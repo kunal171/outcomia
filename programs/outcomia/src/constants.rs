@@ -203,3 +203,18 @@ pub const MAX_PRICE_CONF_LIMIT_BPS: u16 = 1_000;
 /// Settlement marker of a club market: ["club_market_settled", club_market].
 #[constant]
 pub const CLUB_MARKET_SETTLED_SEED: &[u8] = b"club_market_settled";
+
+/// Platform dispute settings: ["dispute_config"].
+#[constant]
+pub const DISPUTE_CONFIG_SEED: &[u8] = b"dispute_config";
+
+/// Per-market dispute record: ["market_dispute", market].
+#[constant]
+pub const MARKET_DISPUTE_SEED: &[u8] = b"market_dispute";
+
+/// Token account holding a dispute bond: ["dispute_bond", market].
+#[constant]
+pub const DISPUTE_BOND_SEED: &[u8] = b"dispute_bond";
+
+/// Longest dispute window or ruling deadline the super-admin may set (30 days).
+pub const MAX_DISPUTE_PERIOD_SECONDS: u64 = 30 * 24 * 60 * 60;

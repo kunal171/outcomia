@@ -94,6 +94,61 @@ pub mod outcomia {
         crate::instructions::club_deposits::handle_set_club_live_markets(ctx, count)
     }
 
+    /// Lets the super-admin set dispute windows, the bond, the ruling deadline and the treasury.
+    pub fn set_dispute_config(
+        ctx: Context<SetDisputeConfig>,
+        club_window_seconds: u64,
+        regular_window_seconds: u64,
+        bond_tokens: u64,
+        ruling_deadline_seconds: u64,
+        treasury: Pubkey,
+    ) -> Result<()> {
+        crate::instructions::disputes::handle_set_dispute_config(
+            ctx,
+            club_window_seconds,
+            regular_window_seconds,
+            bond_tokens,
+            ruling_deadline_seconds,
+            treasury,
+        )
+    }
+
+    /// Lets a holder dispute a binary market's proposal during its window, with a bond.
+    pub fn open_prediction_dispute(ctx: Context<OpenPredictionDispute>) -> Result<()> {
+        crate::instructions::disputes::handle_open_prediction_dispute(ctx)
+    }
+
+    /// Lets a holder dispute a multi-outcome market's proposal during its window, with a bond.
+    pub fn open_multi_outcome_dispute(ctx: Context<OpenMultiOutcomeDispute>) -> Result<()> {
+        crate::instructions::disputes::handle_open_multi_outcome_dispute(ctx)
+    }
+
+    /// Lets an eligible protocol admin rule on a binary market's dispute; the ruling is final.
+    pub fn rule_prediction_dispute(
+        ctx: Context<RulePredictionDispute>,
+        ruling: PredictionRuling,
+    ) -> Result<()> {
+        crate::instructions::disputes::handle_rule_prediction_dispute(ctx, ruling)
+    }
+
+    /// Lets an eligible protocol admin rule on a multi-outcome market's dispute; the ruling is final.
+    pub fn rule_multi_outcome_dispute(
+        ctx: Context<RuleMultiOutcomeDispute>,
+        ruling: MultiOutcomeRuling,
+    ) -> Result<()> {
+        crate::instructions::disputes::handle_rule_multi_outcome_dispute(ctx, ruling)
+    }
+
+    /// Lets anyone make a binary market invalid when its dispute was not ruled in time.
+    pub fn expire_prediction_dispute(ctx: Context<ExpirePredictionDispute>) -> Result<()> {
+        crate::instructions::disputes::handle_expire_prediction_dispute(ctx)
+    }
+
+    /// Lets anyone make a multi-outcome market invalid when its dispute was not ruled in time.
+    pub fn expire_multi_outcome_dispute(ctx: Context<ExpireMultiOutcomeDispute>) -> Result<()> {
+        crate::instructions::disputes::handle_expire_multi_outcome_dispute(ctx)
+    }
+
     /// Lets the club owner switch the club between private and public.
     pub fn set_club_kind(ctx: Context<SetClubKind>, kind: ClubKind) -> Result<()> {
         crate::instructions::club_lifecycle::handle_set_club_kind(ctx, kind)
@@ -534,7 +589,7 @@ pub mod outcomia {
     /// Proposes/corrects a published outcome. Inputs: active resolver, outcome and evidence.
     /// Errors: role, timing, state or evidence. Returns: restarted delayed proposal, no payout yet.
     pub fn propose_prediction(
-        ctx: Context<ResolvePrediction>,
+        ctx: Context<ProposePrediction>,
         outcome: PredictionResolution,
         evidence_uri: String,
         evidence_hash: [u8; 32],

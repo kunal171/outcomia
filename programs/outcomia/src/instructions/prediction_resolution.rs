@@ -19,20 +19,45 @@ pub struct ResolvePrediction<'info> {
     pub admin_record: Account<'info, AdminRecord>,
 }
 #[derive(Accounts)]
+pub struct ProposePrediction<'info> {
+    #[account(mut)]
+    pub resolver: Signer<'info>,
+    #[account(mut, seeds = [PREDICTION_MARKET_SEED, market.market_id.as_ref()], bump = market.bump)]
+    pub market: Box<Account<'info, PredictionMarket>>,
+    #[account(seeds = [ADMIN_SEED, resolver.key().as_ref()], bump = admin_record.bump,
+        constraint = admin_record.authority == resolver.key() @ admin::UnauthorizedAdmin,
+        constraint = admin_record.status == AdminStatus::Active @ admin::AdminDisabled)]
+    pub admin_record: Account<'info, AdminRecord>,
+    #[account(seeds = [DISPUTE_CONFIG_SEED], bump = dispute_config.bump)]
+    pub dispute_config: Box<Account<'info, DisputeConfig>>,
+    #[account(init_if_needed, payer = resolver, space = 8 + MarketDispute::INIT_SPACE,
+        seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: Box<Account<'info, MarketDispute>>,
+    pub system_program: Program<'info, System>,
+}
+#[derive(Accounts)]
 pub struct AdvancePrediction<'info> {
     #[account(mut, seeds = [PREDICTION_MARKET_SEED, market.market_id.as_ref()], bump = market.bump)]
     pub market: Box<Account<'info, PredictionMarket>>,
+    /// CHECK: The market's dispute record PDA; empty for proposals made
+    /// before disputes existed, which keep the old finalization rule.
+    #[account(seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: UncheckedAccount<'info>,
 }
 
-/// Publishes or corrects an evidence-backed outcome; corrections restart the entire delay.
+/// Publishes or corrects an evidence-backed outcome; corrections restart the
+/// entire delay and the dispute window.
 /// # Inputs
-/// Active admin/resolver, market, outcome, bounded evidence URI/hash, correction flag.
+/// Active admin/resolver, market, outcome, bounded evidence URI/hash, correction
+/// flag, the dispute settings and the market's dispute record (created on the
+/// first proposal, fixing the regular dispute window).
 /// # Errors
-/// Wrong resolver/window/state, matured proposal, invalid evidence or timestamp overflow.
+/// Wrong resolver/window/state, matured proposal, invalid evidence, timestamp
+/// overflow, or an open dispute.
 /// # Returns
 /// Proposed state with one complete replacement proposal; no funds move.
 pub fn handle_propose_prediction(
-    ctx: Context<ResolvePrediction>,
+    ctx: Context<ProposePrediction>,
     outcome: PredictionResolution,
     evidence_uri: String,
     evidence_hash: [u8; 32],
@@ -40,6 +65,14 @@ pub fn handle_propose_prediction(
 ) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let resolver = ctx.accounts.resolver.key();
+    let key = ctx.accounts.market.key();
+    super::disputes::prepare_proposal(
+        &mut ctx.accounts.dispute,
+        key,
+        false,
+        &ctx.accounts.dispute_config,
+        ctx.bumps.dispute,
+    )?;
     let m: &mut PredictionMarket = &mut ctx.accounts.market;
     resolution::resolver_window(m, resolver, now)?;
     resolution::check_proposal_state(m, now, correction)?;
@@ -83,6 +116,7 @@ pub fn handle_close_prediction_trading(ctx: Context<ResolvePrediction>) -> Resul
 /// One monotonic lifecycle transition; no SPL transfer and no admin override.
 pub fn handle_advance_prediction(ctx: Context<AdvancePrediction>, action: u8) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
+    let gate = super::disputes::gate(&ctx.accounts.dispute)?;
     let m: &mut PredictionMarket = &mut ctx.accounts.market;
-    resolution::advance(m, action, now)
+    resolution::advance(m, action, now, gate)
 }
