@@ -69,8 +69,24 @@ pub struct Club {
     /// Whether `live_markets` is trustworthy. Clubs created before the counter
     /// existed stay `false` until the super-admin backfills it.
     pub live_markets_ready: bool,
+    /// Closed by its owner: the deposit is refunded and nothing can join or
+    /// change. The account stays so its id is never reused and existing member
+    /// records can only be closed, never revived.
+    pub closed: bool,
     /// Zeroed space for later club settings.
-    pub reserved: [u8; 82],
+    pub reserved: [u8; 81],
+}
+
+/// Marks a club market as settled: finished, with its club fees withdrawn,
+/// so it no longer counts against closing the club. It exists at most once.
+///
+/// PDA: ["club_market_settled", club_market]
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct ClubMarketSettlement {
+    pub club_market: Pubkey,
+    pub settled_at: i64,
+    pub bump: u8,
 }
 
 /// Proof of active membership. It exists only while the wallet is a member;

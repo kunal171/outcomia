@@ -162,7 +162,8 @@ pub fn handle_migrate_club(ctx: Context<MigrateClub>, kind: ClubKind, owner: Pub
         live_markets: 0,
         // Its existing markets are uncounted until the super-admin backfills them.
         live_markets_ready: false,
-        reserved: [0; 82],
+        closed: false,
+        reserved: [0; 81],
     };
     let mut data = info.try_borrow_mut_data()?;
     let mut cursor: &mut [u8] = &mut data;

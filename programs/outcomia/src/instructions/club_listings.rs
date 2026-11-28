@@ -153,6 +153,7 @@ pub fn handle_set_club_listing(
     topic: String,
     description: String,
 ) -> Result<()> {
+    ctx.accounts.club.require_open()?;
     require!(
         ctx.accounts.club.kind == ClubKind::Public,
         club::PrivateClubCannotList

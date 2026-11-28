@@ -94,6 +94,21 @@ pub mod outcomia {
         crate::instructions::club_deposits::handle_set_club_live_markets(ctx, count)
     }
 
+    /// Lets the club owner switch the club between private and public.
+    pub fn set_club_kind(ctx: Context<SetClubKind>, kind: ClubKind) -> Result<()> {
+        crate::instructions::club_lifecycle::handle_set_club_kind(ctx, kind)
+    }
+
+    /// Lets anyone settle a finished club market so it no longer blocks closing.
+    pub fn settle_club_market(ctx: Context<SettleClubMarket>) -> Result<()> {
+        crate::instructions::club_lifecycle::handle_settle_club_market(ctx)
+    }
+
+    /// Lets the club owner close a club with every market settled, refunding the deposit.
+    pub fn close_club(ctx: Context<CloseClub>) -> Result<()> {
+        crate::instructions::club_lifecycle::handle_close_club(ctx)
+    }
+
     /// Lets the super-admin upgrade a club created before club types.
     pub fn migrate_club(ctx: Context<MigrateClub>, kind: ClubKind, owner: Pubkey) -> Result<()> {
         crate::instructions::club_rules::handle_migrate_club(ctx, kind, owner)
