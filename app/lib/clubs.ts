@@ -55,6 +55,8 @@ export interface ClubAccount extends ClubDepositAccount {
   createdAt: BN;
   /** Missing on clubs created before club types until they are upgraded. */
   kind?: { private?: object; public?: object };
+  /** Closed by its owner (milestone 2b); absent before that upgrade. */
+  closed?: boolean;
 }
 export type ClubKind = "public" | "private";
 /** A club's type, or null for a club awaiting the one-time upgrade. */
@@ -133,6 +135,7 @@ export function clubAccounts(p: Program) {
     clubJoinRequest: Reader<ClubJoinRequestAccount>;
     clubRulesConfig: Reader<ClubRulesConfigAccount>;
     clubOwnerRecord: Reader<ClubOwnerRecordAccount>;
+    clubMarketSettlement: Reader<{ clubMarket: PublicKey }>;
     predictionMarket: Reader<PredictionMarketAccount>;
     marketMetadata: Reader<MarketMetadata>;
   };
@@ -268,6 +271,8 @@ export interface ClubMarketRow {
   binding: ClubMarketAccount;
   market: PredictionMarketAccount;
   metadata: MarketMetadata | null;
+  /** Settled (milestone 2b): it no longer blocks closing the club. */
+  settled: boolean;
 }
 /** One club with its members, pending invitations and markets. */
 export async function readClub(p: Program, club: PublicKey) {
@@ -290,11 +295,20 @@ export async function readClub(p: Program, club: PublicKey) {
     const market = await a.predictionMarket.fetchNullable(binding.market);
     if (!market || !isClubPredictionMarket(binding.market, market.marketId))
       continue;
+    const [metadata, settlement] = await Promise.all([
+      a.marketMetadata.fetchNullable(market.metadata),
+      a.clubMarketSettlement
+        .fetchNullable(
+          address("club_market_settled", clubMarketPda(binding.market).toBytes()),
+        )
+        .catch(() => null),
+    ]);
     markets.push({
       address: binding.market,
       binding,
       market,
-      metadata: await a.marketMetadata.fetchNullable(market.metadata),
+      metadata,
+      settled: !!settlement,
     });
   }
   return {
