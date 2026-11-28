@@ -14,11 +14,23 @@ pub enum ClubMarketPolicy {
 }
 
 /// Whether a club may be listed publicly. Fixed at creation; the type sets
-/// its member cap and (from milestone 2) its security deposit.
+/// its member cap and its minimum security deposit.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
 pub enum ClubKind {
     Private,
     Public,
+}
+
+/// Token a club's security deposit is held in. Fixed by the first deposit.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum ClubDepositAsset {
+    /// No deposit yet. Zeroed reserved space decodes to this.
+    None,
+    /// The configured deposit mint (USDC; outcomia-tUSDC on devnet), held in
+    /// the club's deposit vault.
+    Usdc,
+    /// Lamports held in the club account itself, above its rent.
+    Sol,
 }
 
 /// Role of an active member. The owner always holds `Admin`.
@@ -48,9 +60,17 @@ pub struct Club {
     pub created_at: i64,
     pub bump: u8,
     pub kind: ClubKind,
-    /// Zeroed space for the security deposit (milestone 2), so adding it
-    /// needs no second account migration.
-    pub reserved: [u8; 96],
+    /// Token of the security deposit; `None` until the first deposit.
+    pub deposit_asset: ClubDepositAsset,
+    /// Deposit balance in the asset's base units (token units or lamports).
+    pub deposit_amount: u64,
+    /// Club markets created and not yet settled. Closing a club needs zero.
+    pub live_markets: u32,
+    /// Whether `live_markets` is trustworthy. Clubs created before the counter
+    /// existed stay `false` until the super-admin backfills it.
+    pub live_markets_ready: bool,
+    /// Zeroed space for later club settings.
+    pub reserved: [u8; 82],
 }
 
 /// Proof of active membership. It exists only while the wallet is a member;
@@ -176,8 +196,23 @@ pub struct ClubRulesConfig {
     /// Admins per club, the owner included.
     pub max_club_admins: u16,
     pub bump: u8,
-    /// Zeroed space for later platform settings (deposits, disputes).
-    pub reserved: [u8; 128],
+    /// Mint of USDC deposits. The default key means deposit rules are not set,
+    /// and no club market can be created or opened.
+    pub deposit_mint: Pubkey,
+    pub deposit_mint_decimals: u8,
+    /// Minimum deposit value in USD with 6 decimals ($100 = 100_000_000).
+    pub private_min_deposit_usd: u64,
+    pub public_min_deposit_usd: u64,
+    /// SOL deposits must be worth this share of the minimum when paid (12_000 = 120%).
+    pub sol_buffer_bps: u16,
+    /// Pyth SOL/USD price feed id.
+    pub sol_usd_feed_id: [u8; 32],
+    /// Oldest accepted Pyth price, in seconds.
+    pub max_price_age_seconds: u32,
+    /// Widest accepted Pyth confidence band, in basis points of the price.
+    pub max_price_conf_bps: u16,
+    /// Zeroed space for later platform settings.
+    pub reserved: [u8; 39],
 }
 
 impl ClubRulesConfig {
@@ -186,6 +221,16 @@ impl ClubRulesConfig {
             ClubKind::Public => self.public_member_cap,
             ClubKind::Private => self.private_member_cap,
         }
+    }
+    /// Minimum deposit value for a club type, in USD with 6 decimals.
+    pub fn min_deposit_usd(&self, kind: ClubKind) -> u64 {
+        match kind {
+            ClubKind::Public => self.public_min_deposit_usd,
+            ClubKind::Private => self.private_min_deposit_usd,
+        }
+    }
+    pub fn deposits_configured(&self) -> bool {
+        self.deposit_mint != Pubkey::default()
     }
 }
 

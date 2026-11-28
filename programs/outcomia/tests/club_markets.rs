@@ -33,8 +33,9 @@ fn club_rules_pda() -> Pubkey {
 fn owner_record_pda(wallet: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[CLUB_OWNER_SEED, wallet.as_ref()], &outcomia::ID).0
 }
-/// Writes the platform club rules directly, as the super-admin would set them.
-fn install_club_rules(svm: &mut LiteSVM) {
+/// Writes the platform club rules directly, as the super-admin would set them,
+/// with USDC deposits in `mint`.
+fn install_club_rules(svm: &mut LiteSVM, mint: Pubkey) {
     let (address, bump) = Pubkey::find_program_address(&[CLUB_RULES_CONFIG_SEED], &outcomia::ID);
     let mut data = Vec::new();
     ClubRulesConfig {
@@ -43,7 +44,15 @@ fn install_club_rules(svm: &mut LiteSVM) {
         max_owned_clubs: 2,
         max_club_admins: 5,
         bump,
-        reserved: [0; 128],
+        deposit_mint: mint,
+        deposit_mint_decimals: 6,
+        private_min_deposit_usd: 100_000_000,
+        public_min_deposit_usd: 200_000_000,
+        sol_buffer_bps: 12_000,
+        sol_usd_feed_id: [7; 32],
+        max_price_age_seconds: 60,
+        max_price_conf_bps: 100,
+        reserved: [0; 39],
     }
     .try_serialize(&mut data)
     .unwrap();
@@ -80,7 +89,6 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM_BYTES).unwrap();
-        install_club_rules(&mut svm);
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 10_000_000_000).unwrap();
         let mint = Pubkey::new_unique();
@@ -108,6 +116,7 @@ impl Fixture {
             },
         )
         .unwrap();
+        install_club_rules(&mut svm, mint);
         let mut f = Fixture {
             svm,
             owner,
@@ -134,7 +143,20 @@ impl Fixture {
                 },
             ),
         );
+        f.fund_club();
         f
+    }
+    /// Records a paid public-club deposit, so club markets may be created.
+    /// The deposit instructions themselves are covered in `club_deposits.rs`.
+    fn fund_club(&mut self) {
+        let mut club: Club = self.load(&self.club).unwrap();
+        club.deposit_asset = ClubDepositAsset::Usdc;
+        club.deposit_amount = 200_000_000;
+        let mut account = self.svm.get_account(&self.club).unwrap();
+        let mut data = Vec::new();
+        club.try_serialize(&mut data).unwrap();
+        account.data = data;
+        self.svm.set_account(self.club, account).unwrap();
     }
     fn wallet(&mut self) -> Keypair {
         let k = Keypair::new();
@@ -760,6 +782,8 @@ impl Fixture {
                 market_metadata: pda(MARKET_METADATA_SEED, &[market.as_ref()]),
                 token_program: anchor_spl::token::ID,
                 system_program: system_program::ID,
+                club_rules: club_rules_pda(),
+                price_update: None,
             },
             outcomia::instruction::CreateClubPredictionMarket {
                 market_id,
@@ -772,15 +796,24 @@ impl Fixture {
     }
     fn manage(&self, actor: &Pubkey, open: bool) -> Instruction {
         let market = market_pda(&MARKET_ID);
-        let accounts = outcomia::accounts::ManageClubPredictionMarket {
-            actor: *actor,
-            club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
-            market,
-            actor_member: self.member_pda(actor),
-        };
         if open {
+            let accounts = outcomia::accounts::OpenClubPredictionMarket {
+                actor: *actor,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                actor_member: self.member_pda(actor),
+                club: self.club,
+                club_rules: club_rules_pda(),
+                price_update: None,
+            };
             ix(accounts, outcomia::instruction::OpenClubPredictionMarket {})
         } else {
+            let accounts = outcomia::accounts::ManageClubPredictionMarket {
+                actor: *actor,
+                club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
+                market,
+                actor_member: self.member_pda(actor),
+            };
             ix(accounts, outcomia::instruction::CloseClubTrading {})
         }
     }

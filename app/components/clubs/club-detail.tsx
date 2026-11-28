@@ -45,7 +45,7 @@ import {
   clubKind,
   memberCap,
   readClubRules,
-  type ClubRulesAccount,
+  type ClubRulesConfigAccount,
   verifyClubListingInstruction,
   type ClubSnapshot,
 } from "../../lib/clubs";
@@ -53,6 +53,7 @@ import { useProtocolRole } from "../protocol-role-provider";
 import { ClubFeedback, shortKey, useClubTransaction } from "./club-transaction";
 import { roleLabel } from "./clubs-home";
 import { STATUS_LABELS } from "./club-market";
+import { ClubDeposit } from "./club-deposit";
 
 export function ClubDetail({ address }: { address: string }) {
   const { t } = useI18n();
@@ -79,7 +80,7 @@ export function ClubDetail({ address }: { address: string }) {
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
   const wallet = tx.wallet?.publicKey;
 
-  const [rules, setRules] = useState<ClubRulesAccount | null>(null);
+  const [rules, setRules] = useState<ClubRulesConfigAccount | null>(null);
   useEffect(() => {
     if (!CLUBS_ENABLED) return;
     let dead = false;
@@ -401,6 +402,13 @@ export function ClubDetail({ address }: { address: string }) {
               }
             >
               <div className="club-main">
+                <ClubDeposit
+                  club={club}
+                  account={snapshot.club}
+                  rules={rules}
+                  owner={owner}
+                  tx={tx}
+                />
                 <section className="ui-card">
                   <div className="club-card-head">
                     <h2 className="ui-h3">{t("Club markets")}</h2>

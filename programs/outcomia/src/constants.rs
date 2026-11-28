@@ -185,3 +185,17 @@ pub const CLUB_MARKET_SEED: &[u8] = b"club_market";
 /// shared order/level seeds under this book's address.
 #[constant]
 pub const CLUB_BOOK_SEED: &[u8] = b"club_book";
+
+/// Token vault of a club's USDC security deposit: ["club_deposit_vault", club].
+/// Its token authority is the club account.
+#[constant]
+pub const CLUB_DEPOSIT_VAULT_SEED: &[u8] = b"club_deposit_vault";
+
+/// Decimals of USD amounts in deposit rules ($1 = 1_000_000).
+pub const USD_DECIMALS: u32 = 6;
+
+/// Bounds the super-admin may set for deposit rules.
+pub const MIN_SOL_BUFFER_BPS: u16 = 10_000;
+pub const MAX_SOL_BUFFER_BPS: u16 = 30_000;
+pub const MAX_PRICE_AGE_LIMIT_SECONDS: u32 = 300;
+pub const MAX_PRICE_CONF_LIMIT_BPS: u16 = 1_000;

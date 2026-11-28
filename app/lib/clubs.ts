@@ -29,6 +29,10 @@ import {
   deriveVaultPda,
 } from "./outcomia";
 import type { PredictionMarketAccount } from "./prediction";
+import type {
+  ClubDepositAccount,
+  ClubDepositRulesAccount,
+} from "./club-deposits";
 
 /** Keep off until the program with club instructions is deployed. */
 export const CLUBS_ENABLED =
@@ -40,7 +44,7 @@ export const CLUB_TOPIC_MAX_BYTES = 32;
 export const CLUB_DESCRIPTION_MAX_BYTES = 280;
 export const CLUB_REQUEST_NOTE_MAX_BYTES = 140;
 
-export interface ClubAccount {
+export interface ClubAccount extends ClubDepositAccount {
   clubId: number[];
   owner: PublicKey;
   pendingOwner: PublicKey | null;
@@ -63,6 +67,10 @@ export interface ClubRulesAccount {
   maxOwnedClubs: number;
   maxClubAdmins: number;
 }
+/** ClubRulesConfig as stored: member limits plus deposit rules, whose fields
+ * are absent before the deposit upgrade and zero until the super-admin sets them. */
+export type ClubRulesConfigAccount = ClubRulesAccount &
+  Partial<ClubDepositRulesAccount>;
 export interface ClubOwnerRecordAccount {
   wallet: PublicKey;
   owned: number;
@@ -123,7 +131,7 @@ export function clubAccounts(p: Program) {
     clubMarket: Reader<ClubMarketAccount>;
     clubListing: Reader<ClubListingAccount>;
     clubJoinRequest: Reader<ClubJoinRequestAccount>;
-    clubRulesConfig: Reader<ClubRulesAccount>;
+    clubRulesConfig: Reader<ClubRulesConfigAccount>;
     clubOwnerRecord: Reader<ClubOwnerRecordAccount>;
     predictionMarket: Reader<PredictionMarketAccount>;
     marketMetadata: Reader<MarketMetadata>;
@@ -547,7 +555,8 @@ export interface ClubMarketTerms {
   rulesHash: number[];
 }
 /** Creates the draft, opens it and creates its book in one transaction, so a
- * club market is tradable as soon as it exists. */
+ * club market is tradable as soon as it exists. A club whose deposit is SOL
+ * passes a fresh Pyth SOL/USD price account (`priceUpdate`); otherwise null. */
 export async function createClubMarketInstructions(
   p: Program,
   creator: PublicKey,
@@ -557,6 +566,7 @@ export async function createClubMarketInstructions(
   displayName: string,
   collateralSymbol: string,
   publicAccess: boolean,
+  priceUpdate: PublicKey | null,
   marketId: Uint8Array = crypto.getRandomValues(new Uint8Array(32)),
 ) {
   const market = clubPredictionMarketPda(marketId);
@@ -588,11 +598,16 @@ export async function createClubMarketInstructions(
         marketMetadata: deriveMarketMetadataPda(market),
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
+        ...optionalAccounts({ clubRules: clubRulesPda(), priceUpdate }),
       })
       .instruction(),
     await p.methods
       .openClubPredictionMarket()
-      .accountsPartial(manage)
+      .accountsPartial({
+        ...manage,
+        club,
+        ...optionalAccounts({ clubRules: clubRulesPda(), priceUpdate }),
+      })
       .instruction(),
     await p.methods
       .initializeClubBook()

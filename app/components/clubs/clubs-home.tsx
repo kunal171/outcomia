@@ -23,9 +23,19 @@ import {
   readOwnedClubCount,
   readWalletClubs,
   type ClubKind,
-  type ClubRulesAccount,
+  type ClubRulesConfigAccount,
   requestClubMembershipInstruction,
 } from "../../lib/clubs";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  depositClubSolInstruction,
+  depositClubUsdcInstruction,
+  depositShortfall,
+  depositsConfigured,
+  formatUsd,
+  freshSolUsdPrice,
+  minimumDepositUsd,
+} from "../../lib/club-deposits";
 import { ClubFeedback, useClubTransaction } from "./club-transaction";
 
 type WalletClubs = Awaited<ReturnType<typeof readWalletClubs>>;
@@ -44,9 +54,10 @@ export function ClubsHome() {
     [revision, setRevision] = useState(0),
     [name, setName] = useState(""),
     [kind, setKind] = useState<ClubKind>("private"),
-    [rules, setRules] = useState<ClubRulesAccount | null | undefined>(
+    [rules, setRules] = useState<ClubRulesConfigAccount | null | undefined>(
       undefined,
     ),
+    [payWith, setPayWith] = useState<"usdc" | "sol" | "later">("usdc"),
     [owned, setOwned] = useState<number | null>(null),
     [listings, setListings] = useState<Listings | null>(null);
   const tx = useClubTransaction(() => setRevision((v) => v + 1));
@@ -98,6 +109,7 @@ export function ClubsHome() {
     const issue = clubNameIssue(name);
     if (issue) return tx.setIssue(issue);
     let created: string | null = null;
+    const deposit = depositsConfigured(rules) ? rules : null;
     const done = await tx.run(async (p, signer) => {
       const { club, instruction } = await createClubInstruction(
         p,
@@ -106,7 +118,31 @@ export function ClubsHome() {
         kind,
       );
       created = club.toBase58();
-      return [instruction];
+      // The deposit rides in the same transaction, sized to the minimum.
+      if (!deposit || payWith === "later") return [instruction];
+      if (payWith === "usdc")
+        return [
+          instruction,
+          await depositClubUsdcInstruction(
+            p,
+            signer,
+            club,
+            deposit.depositMint,
+            getAssociatedTokenAddressSync(deposit.depositMint, signer),
+            depositShortfall(deposit, kind, "usdc", BigInt(0)),
+          ),
+        ];
+      const read = await freshSolUsdPrice(connection, deposit);
+      // 1% above the minimum, so a small price move before signing still passes.
+      const lamports =
+        (depositShortfall(deposit, kind, "sol", BigInt(0), read.price) *
+          BigInt(101) +
+          BigInt(99)) /
+        BigInt(100);
+      return [
+        instruction,
+        await depositClubSolInstruction(p, signer, club, read.address, lamports),
+      ];
     });
     if (done && created) router.push(`/clubs/${created}`);
   }
@@ -433,6 +469,46 @@ export function ClubsHome() {
                       </label>
                     ))}
                   </fieldset>
+                  {depositsConfigured(rules) && (
+                    <fieldset className="club-kind" disabled={tx.pending}>
+                      <legend>
+                        {t("Security deposit: {value0} minimum", {
+                          value0: formatUsd(minimumDepositUsd(rules, kind)),
+                        })}
+                      </legend>
+                      {(["usdc", "sol", "later"] as const).map((value) => (
+                        <label key={value} className="club-kind-option">
+                          <input
+                            type="radio"
+                            name="club-deposit"
+                            checked={payWith === value}
+                            onChange={() => setPayWith(value)}
+                          />
+                          <span>
+                            <strong>
+                              {value === "usdc"
+                                ? t("Pay now in USDC")
+                                : value === "sol"
+                                  ? t("Pay now in SOL")
+                                  : t("Pay later")}
+                            </strong>
+                            <small>
+                              {value === "usdc"
+                                ? t("Exactly the minimum, from your USDC account.")
+                                : value === "sol"
+                                  ? t(
+                                      "Worth {value0} of the minimum at the current SOL price, plus 1%.",
+                                      { value0: `${rules.solBufferBps / 100}%` },
+                                    )
+                                  : t(
+                                      "The club cannot create markets until the deposit is paid.",
+                                    )}
+                            </small>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
                   <p className="club-help">
                     {t(
                       "You become the owner and pay the account rent. Your wallet's club roles never grant protocol administration.",

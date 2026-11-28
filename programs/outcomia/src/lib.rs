@@ -71,6 +71,29 @@ pub mod outcomia {
         )
     }
 
+    /// Lets the super-admin set the deposit mint, minimums and SOL price limits.
+    pub fn set_club_deposit_rules(
+        ctx: Context<SetClubDepositRules>,
+        rules: ClubDepositRules,
+    ) -> Result<()> {
+        crate::instructions::club_deposits::handle_set_club_deposit_rules(ctx, rules)
+    }
+
+    /// Lets the club owner pay or top up the club's deposit in USDC.
+    pub fn deposit_club_usdc(ctx: Context<DepositClubUsdc>, amount: u64) -> Result<()> {
+        crate::instructions::club_deposits::handle_deposit_club_usdc(ctx, amount)
+    }
+
+    /// Lets the club owner pay or top up the club's deposit in SOL.
+    pub fn deposit_club_sol(ctx: Context<DepositClubSol>, lamports: u64) -> Result<()> {
+        crate::instructions::club_deposits::handle_deposit_club_sol(ctx, lamports)
+    }
+
+    /// Lets the super-admin backfill the market count of a club created before it existed.
+    pub fn set_club_live_markets(ctx: Context<SetClubLiveMarkets>, count: u32) -> Result<()> {
+        crate::instructions::club_deposits::handle_set_club_live_markets(ctx, count)
+    }
+
     /// Lets the super-admin upgrade a club created before club types.
     pub fn migrate_club(ctx: Context<MigrateClub>, kind: ClubKind, owner: Pubkey) -> Result<()> {
         crate::instructions::club_rules::handle_migrate_club(ctx, kind, owner)
@@ -198,7 +221,7 @@ pub mod outcomia {
     }
 
     /// Opens a draft club market (club admin or its creator-member).
-    pub fn open_club_prediction_market(ctx: Context<ManageClubPredictionMarket>) -> Result<()> {
+    pub fn open_club_prediction_market(ctx: Context<OpenClubPredictionMarket>) -> Result<()> {
         crate::instructions::club_markets::handle_open_club_prediction_market(ctx)
     }
 

@@ -157,7 +157,12 @@ pub fn handle_migrate_club(ctx: Context<MigrateClub>, kind: ClubKind, owner: Pub
         created_at: legacy.created_at,
         bump: legacy.bump,
         kind,
-        reserved: [0; 96],
+        deposit_asset: ClubDepositAsset::None,
+        deposit_amount: 0,
+        live_markets: 0,
+        // Its existing markets are uncounted until the super-admin backfills them.
+        live_markets_ready: false,
+        reserved: [0; 82],
     };
     let mut data = info.try_borrow_mut_data()?;
     let mut cursor: &mut [u8] = &mut data;
