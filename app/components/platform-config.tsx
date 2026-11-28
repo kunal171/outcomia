@@ -1,7 +1,7 @@
 "use client";
 /** Super-admin platform settings, kept apart from administrator management.
- * Club rules today; deposits, disputes and penalties join in later milestones
- * (docs/club-rules-and-disputes.md). */
+ * Club rules and deposits today; disputes and penalties join in later
+ * milestones (docs/club-rules-and-disputes.md). */
 import {
   useCallback,
   useEffect,
@@ -10,7 +10,8 @@ import {
   type FormEvent,
 } from "react";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { Transaction, type PublicKey } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
+import { BN } from "@anchor-lang/core";
 import type { AnchorProvider } from "@anchor-lang/core";
 import { useI18n } from "./preferences-provider";
 import { TransactionToast } from "./transaction-toast";
@@ -25,7 +26,91 @@ import {
   type ClubAccount,
   type ClubKind,
   type ClubRulesAccount,
+  type ClubRulesConfigAccount,
 } from "../lib/clubs";
+import {
+  SOL_USD_FEED_ID,
+  depositsConfigured,
+  parseUnits,
+  setClubDepositRulesInstruction,
+  setClubLiveMarketsInstruction,
+} from "../lib/club-deposits";
+import { TEST_USDC_MINT } from "../lib/collateral-display";
+
+/** Deposit-rule form, as typed: dollars, percent and seconds. */
+type DepositForm = {
+  mint: string;
+  privateMin: string;
+  publicMin: string;
+  buffer: string;
+  feed: string;
+  maxAge: string;
+  maxConf: string;
+};
+const DEPOSIT_DEFAULTS: DepositForm = {
+  mint: TEST_USDC_MINT,
+  privateMin: "100",
+  publicMin: "200",
+  buffer: "120",
+  feed: SOL_USD_FEED_ID,
+  maxAge: "60",
+  maxConf: "1",
+};
+const DEPOSIT_FIELDS: { key: keyof DepositForm; label: string }[] = [
+  { key: "mint", label: "USDC mint" },
+  { key: "privateMin", label: "Private club minimum (USD)" },
+  { key: "publicMin", label: "Public club minimum (USD)" },
+  { key: "buffer", label: "SOL buffer (% of the minimum)" },
+  { key: "feed", label: "Pyth SOL/USD feed id" },
+  { key: "maxAge", label: "Oldest SOL price accepted (seconds)" },
+  { key: "maxConf", label: "Widest SOL price confidence (% of price)" },
+];
+/** The form values as program rules, or null when any is invalid. */
+function parseDepositForm(form: DepositForm) {
+  let mint: PublicKey;
+  try {
+    mint = new PublicKey(form.mint.trim());
+  } catch {
+    return null;
+  }
+  const privateMin = parseUnits(form.privateMin, 6);
+  const publicMin = parseUnits(form.publicMin, 6);
+  const buffer = parseUnits(form.buffer, 2);
+  const conf = parseUnits(form.maxConf, 2);
+  const maxAge = Number(form.maxAge);
+  const feed = form.feed.trim().replace(/^0x/, "").toLowerCase();
+  if (
+    !privateMin ||
+    !publicMin ||
+    buffer === null ||
+    buffer < BigInt(10_000) ||
+    buffer > BigInt(30_000) ||
+    conf === null ||
+    conf > BigInt(1_000) ||
+    !Number.isInteger(maxAge) ||
+    maxAge < 1 ||
+    maxAge > 300 ||
+    !/^[0-9a-f]{64}$/.test(feed) ||
+    /^0+$/.test(feed)
+  )
+    return null;
+  return {
+    mint,
+    rules: {
+      privateMinDepositUsd: new BN(privateMin.toString()),
+      publicMinDepositUsd: new BN(publicMin.toString()),
+      solBufferBps: Number(buffer),
+      solUsdFeedId: Array.from(Buffer.from(feed, "hex")),
+      maxPriceAgeSeconds: maxAge,
+      maxPriceConfBps: Number(conf),
+    },
+  };
+}
+const usdText = (value: { toString(): string }) =>
+  (Number(value.toString()) / 1_000_000).toString();
+const pctText = (bps: number) => (bps / 100).toString();
+
+type UncountedClub = { address: PublicKey; club: ClubAccount; markets: number };
 
 const DEFAULTS: ClubRulesAccount = {
   publicMemberCap: 100_000,
@@ -66,9 +151,11 @@ export function PlatformConfig() {
     () => getOutcomiaReadProgram(connection),
     [connection],
   );
-  const [rules, setRules] = useState<ClubRulesAccount | null | undefined>(
+  const [rules, setRules] = useState<ClubRulesConfigAccount | null | undefined>(
     undefined,
   );
+  const [depositForm, setDepositForm] = useState<DepositForm>(DEPOSIT_DEFAULTS);
+  const [uncounted, setUncounted] = useState<UncountedClub[] | null>(null);
   const [form, setForm] = useState<Record<keyof ClubRulesAccount, string>>(
     () =>
       Object.fromEntries(
@@ -95,11 +182,42 @@ export function PlatformConfig() {
               FIELDS.map((f) => [f.key, String(value[f.key])]),
             ) as Record<keyof ClubRulesAccount, string>,
           );
+        if (depositsConfigured(value))
+          setDepositForm({
+            mint: value.depositMint.toBase58(),
+            privateMin: usdText(value.privateMinDepositUsd),
+            publicMin: usdText(value.publicMinDepositUsd),
+            buffer: pctText(value.solBufferBps),
+            feed: Buffer.from(value.solUsdFeedId).toString("hex"),
+            maxAge: String(value.maxPriceAgeSeconds),
+            maxConf: pctText(value.maxPriceConfBps),
+          });
       })
       .catch(() => !dead && setRules(null));
     void clubAccounts(reader)
       .club.all()
       .then(async (clubs) => {
+        // Upgraded clubs whose market count predates the counter.
+        const pending = clubs.filter(
+          (c) => clubKind(c.account) && c.account.liveMarketsReady === false,
+        );
+        const counts = await Promise.all(
+          pending.map((c) =>
+            clubAccounts(reader)
+              .clubMarket.all([
+                { memcmp: { offset: 8, bytes: c.publicKey.toBase58() } },
+              ])
+              .then((rows) => rows.filter((r) => r.account.club.equals(c.publicKey)).length),
+          ),
+        );
+        if (!dead)
+          setUncounted(
+            pending.map((c, i) => ({
+              address: c.publicKey,
+              club: c.account,
+              markets: counts[i],
+            })),
+          );
         const old = clubs.filter((c) => !clubKind(c.account));
         const listings = await Promise.all(
           old.map((c) =>
@@ -174,6 +292,19 @@ export function PlatformConfig() {
     };
     void send("rules", (p, signer) => setClubRulesInstruction(p, signer, next));
   }
+  const deposit = parseDepositForm(depositForm);
+  function saveDeposits(event: FormEvent) {
+    event.preventDefault();
+    if (!deposit) return;
+    void send("deposits", (p, signer) =>
+      setClubDepositRulesInstruction(p, signer, deposit.mint, deposit.rules),
+    );
+  }
+  function count(item: UncountedClub) {
+    void send(`count-${item.address.toBase58()}`, (p, signer) =>
+      setClubLiveMarketsInstruction(p, signer, item.address, item.markets),
+    );
+  }
   function upgrade(item: LegacyClub, kind: ClubKind) {
     void send(item.address.toBase58(), (p, signer) =>
       migrateClubInstruction(p, signer, item.address, item.club.owner, kind),
@@ -223,6 +354,87 @@ export function PlatformConfig() {
                 : t("Set club rules")}
           </button>
         </form>
+      </section>
+
+      <section className="admin-card">
+        <div className="card-label">{t("Clubs")}</div>
+        <h2>{t("Club deposits")}</h2>
+        <p>
+          {depositsConfigured(rules)
+            ? t(
+                "Applies to new deposits and market checks. Deposits already paid are unchanged.",
+              )
+            : t(
+                "Not set yet. No club can create or open markets until you save these rules.",
+              )}
+        </p>
+        <form className="admin-form" onSubmit={saveDeposits}>
+          {DEPOSIT_FIELDS.map((f) => (
+            <label key={f.key}>
+              {t(f.label)}
+              <input
+                value={depositForm[f.key]}
+                onChange={(e) =>
+                  setDepositForm((v) => ({ ...v, [f.key]: e.target.value.trim() }))
+                }
+                aria-invalid={!deposit}
+                disabled={pending !== null}
+              />
+            </label>
+          ))}
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={!deposit || !rules || pending !== null}
+          >
+            {pending === "deposits"
+              ? t("Saving…")
+              : depositsConfigured(rules)
+                ? t("Save deposit rules")
+                : t("Set deposit rules")}
+          </button>
+        </form>
+        {!rules && <p className="club-help">{t("Save the club rules first.")}</p>}
+      </section>
+
+      <section className="admin-card">
+        <div className="card-label">{t("Clubs")}</div>
+        <h2>{t("Club market counts")}</h2>
+        <p>
+          {t(
+            "Clubs created before deposits need their existing markets counted once, so they can be closed safely later. Each count is the club's markets on chain now.",
+          )}
+        </p>
+        {uncounted === null ? (
+          <p role="status">{t("Loading…")}</p>
+        ) : uncounted.length === 0 ? (
+          <p className="lb-empty">{t("Every club is counted.")}</p>
+        ) : (
+          <div className="admin-list">
+            {uncounted.map((item) => (
+              <article className="admin-row" key={item.address.toBase58()}>
+                <div>
+                  <strong>{item.club.name}</strong>
+                  <p>
+                    {t("{value0} markets", { value0: String(item.markets) })}
+                  </p>
+                </div>
+                <div className="admin-actions">
+                  <button
+                    type="button"
+                    className="admin-action-button"
+                    disabled={pending !== null}
+                    onClick={() => count(item)}
+                  >
+                    {pending === `count-${item.address.toBase58()}`
+                      ? t("Saving…")
+                      : t("Record count")}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="admin-card">
