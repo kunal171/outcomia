@@ -1,5 +1,5 @@
 /** Outcome disputes on prediction markets (club rules milestone 3,
- * docs/club-rules-and-disputes.md section 3): addresses, readers, the window
+ * docs/clubs.md, Disputes): addresses, readers, the window
  * and ruling rules mirrored from the program, and instruction builders for
  * binary and multi-outcome markets. The program enforces every rule. */
 import { BN, type Program } from "@anchor-lang/core";

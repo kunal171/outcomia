@@ -608,7 +608,7 @@ async function main() {
         systemProgram: SystemProgram.programId,
       })
       .instruction();
-  // Finalization also waits for the dispute window (docs/club-rules-and-disputes.md).
+  // Finalization also waits for the dispute window (docs/clubs.md).
   const advance = async (action) =>
     p.methods
       .advanceMultiOutcome(action)

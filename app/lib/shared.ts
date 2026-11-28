@@ -125,7 +125,7 @@ export const sharedLevelPda = (
     Buffer.from(side),
     price.toArrayLike(Buffer, "le", 8),
   );
-/** Club markets trade on a separate book namespace; see docs/clubs-private-markets.md. */
+/** Club markets trade on a separate book namespace; see docs/clubs.md. */
 export const clubBookPda = (market: PublicKey) =>
   address("club_book", market.toBytes());
 export const clubMemberPda = (club: PublicKey, wallet: PublicKey) =>

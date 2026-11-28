@@ -1,6 +1,6 @@
 "use client";
 /** A club's security deposit: its status for everyone, and paying or topping
- * it up for the owner (docs/club-rules-and-disputes.md, section 2). The program
+ * it up for the owner (docs/clubs.md, Security deposit). The program
  * enforces every rule; this card only explains and prefills. */
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useConnection } from "@solana/wallet-adapter-react";
