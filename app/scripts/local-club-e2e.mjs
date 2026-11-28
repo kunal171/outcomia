@@ -7,11 +7,15 @@
  *     $(solana-keygen pubkey /tmp/authority.json)
  *   node scripts/local-club-e2e.mjs /tmp/authority.json
  *
- * Creates a club, invites and admits two members, creates a members-only
- * market (create, open and book in one transaction), trades between members
- * with the club fee split, removes a member and clears their order as an
- * outsider, resolves as a club admin, redeems as the removed member and
- * withdraws the club's fees. Uses only the local validator by default.
+ * Creates a club and pays its security deposit, invites and admits two
+ * members, creates a members-only market (create, open and book in one
+ * transaction), trades between members with the club fee split, removes a
+ * member and clears their order as an outsider, proposes as a club admin, has
+ * a holder dispute and a protocol admin uphold the outcome, redeems as the
+ * removed member, withdraws the club's fees, settles the market and closes
+ * the club with its deposit refunded. Uses only the local validator by default:
+ * locally it also sets the club rules, USDC deposit rules (the test mint) and
+ * short dispute windows. On devnet the deposit is paid in SOL at Pyth's price.
  *
  * Devnet smoke (RPC=<url> RESULT=<json path> node scripts/local-club-e2e.mjs
  * <authority.json>): uses the deployed protocol as configured (no fee or
@@ -33,6 +37,9 @@ const { Connection, Keypair, PublicKey, SystemProgram, Transaction } = web3;
 const c = loadTypeScript(new URL(`file://${APP}/lib/clubs.ts`));
 const sh = loadTypeScript(new URL(`file://${APP}/lib/shared.ts`));
 const o = loadTypeScript(new URL(`file://${APP}/lib/outcomia.ts`));
+const dep = loadTypeScript(new URL(`file://${APP}/lib/club-deposits.ts`));
+const life = loadTypeScript(new URL(`file://${APP}/lib/club-lifecycle.ts`));
+const dis = loadTypeScript(new URL(`file://${APP}/lib/disputes.ts`));
 const idl = JSON.parse(fs.readFileSync(`${APP}/idl/outcomia.json`, "utf8"));
 const DEVNET = !!process.env.RPC;
 /** Retries network failures of any JSON-RPC call. Safe: resending the same
@@ -213,12 +220,46 @@ if (DEVNET) {
       .instruction(),
   ]);
   log("protocol initialized: 1% taker fee, 25% club share");
+  await send(admin, [
+    await c.setClubRulesInstruction(P, admin.publicKey, {
+      publicMemberCap: 100_000,
+      privateMemberCap: 1_000,
+      maxOwnedClubs: 2,
+      maxClubAdmins: 5,
+    }),
+    // Short windows so the local run finishes quickly.
+    await dis.setDisputeConfigInstruction(P, admin.publicKey, {
+      clubWindowSeconds: new BN(3),
+      regularWindowSeconds: new BN(3),
+      bondTokens: new BN(1),
+      rulingDeadlineSeconds: new BN(600),
+      treasury: admin.publicKey,
+    }),
+  ]);
+  log("club rules and 3-second dispute windows set");
 }
 const fee = Math.ceil((600_000 * takerFeeBps) / 10_000),
   clubFee = Math.floor((fee * clubShareBps) / 10_000);
 const usd = await retry(() =>
   spl.createMint(conn, admin, admin.publicKey, null, 6),
 );
+if (!DEVNET) {
+  await send(admin, [
+    await dep.setClubDepositRulesInstruction(P, admin.publicKey, usd, {
+      privateMinDepositUsd: new BN(100_000_000),
+      publicMinDepositUsd: new BN(200_000_000),
+      solBufferBps: 12_000,
+      solUsdFeedId: Array.from(Buffer.from(dep.SOL_USD_FEED_ID, "hex")),
+      maxPriceAgeSeconds: 60,
+      maxPriceConfBps: 100,
+    }),
+  ]);
+  log("USDC deposit rules set with the test mint ($100 private minimum)");
+}
+const depositRules = await c.readClubRules(P);
+assert(dep.depositsConfigured(depositRules), "club deposit rules are not set");
+/** Pyth's shared SOL/USD account when it is fresh (devnet SOL deposits). */
+const solPrice = () => dep.freshSolUsdPrice(conn, depositRules);
 // Persist temporary keypairs before funding them, so an interrupted devnet
 // run can be swept instead of stranding SOL (WALLETS=<private json path>).
 const walletFile = process.env.WALLETS;
@@ -271,9 +312,39 @@ const created = await c.createClubInstruction(
   program(owner),
   owner.publicKey,
   DEVNET ? "Smoke test - club" : "Local chess club",
+  "private",
 );
 const club = created.club;
 await send(owner, [created.instruction]);
+// The security deposit: USDC (the test mint) locally, SOL on devnet, where the
+// deposit mint is the real tUSDC. Closing the club refunds it at the end.
+let ownerDeposit;
+if (DEVNET) {
+  const read = await solPrice();
+  const lamports =
+    (dep.depositShortfall(depositRules, "private", "sol", 0n, read.price) * 101n) / 100n;
+  await send(admin, [
+    SystemProgram.transfer({
+      fromPubkey: admin.publicKey,
+      toPubkey: owner.publicKey,
+      lamports: lamports + 10_000_000n,
+    }),
+  ]);
+  await send(owner, [
+    await dep.depositClubSolInstruction(P, owner.publicKey, club, read.address, lamports),
+  ]);
+  ownerDeposit = { asset: "sol", amount: lamports };
+} else {
+  const ata = spl.getAssociatedTokenAddressSync(usd, owner.publicKey);
+  await retry(() => spl.mintTo(conn, admin, usd, ata, admin, 100_000_000));
+  await send(owner, [
+    await dep.depositClubUsdcInstruction(P, owner.publicKey, club, usd, ata, 100_000_000n),
+  ]);
+  ownerDeposit = { asset: "usdc", amount: 100_000_000n };
+}
+const paid = (await c.clubAccounts(P).club.fetchNullable(club)).depositAmount;
+assert.equal(paid.toString(), ownerDeposit.amount.toString());
+log(`club deposit paid in ${ownerDeposit.asset.toUpperCase()}`);
 for (const kp of [alice, bob])
   await send(owner, [
     await c.inviteClubMemberInstruction(P, owner.publicKey, club, kp.publicKey),
@@ -319,6 +390,7 @@ const { market, instructions } = await c.createClubMarketInstructions(
     : "Will the local club market resolve YES?",
   "USD",
   false,
+  DEVNET ? (await solPrice()).address : null,
 );
 await send(owner, instructions);
 snapshot = await c.readClub(P, club);
@@ -480,8 +552,43 @@ await send(owner, [
 const proposedAt = (
   await o.getOutcomiaAccounts(P).predictionMarket.fetch(market)
 ).proposal.proposedAt.toNumber();
+// Alice (holding 2 YES) disputes with a one-token bond; finalization then
+// waits for a ruling, and the protocol admin (not the creator, resolver or a
+// club admin) upholds YES, which resolves the market at once.
+const aliceToken = spl.getAssociatedTokenAddressSync(usd, alice.publicKey);
+await retry(() => spl.mintTo(conn, admin, usd, aliceToken, admin, 1_000_000));
+await send(alice, [
+  await dis.openDisputeInstruction(P, "binary", alice.publicKey, market, usd, aliceToken),
+]);
 while ((await chainNow()) < proposedAt + 4) await sleep(1000);
-await send(carol, [await c.advanceClubPredictionInstruction(P, market, 2)]);
+await rejects(
+  send(carol, [await c.advanceClubPredictionInstruction(P, market, 2)]),
+  /DisputeOpen|0x184a/,
+);
+const disputeConfig = await dis.readDisputeConfig(P);
+const treasuryToken = spl.getAssociatedTokenAddressSync(usd, disputeConfig.treasury, true);
+await send(admin, [
+  spl.createAssociatedTokenAccountIdempotentInstruction(
+    admin.publicKey,
+    treasuryToken,
+    disputeConfig.treasury,
+    usd,
+  ),
+  await dis.ruleDisputeInstruction(
+    P,
+    "binary",
+    admin.publicKey,
+    market,
+    "uphold",
+    treasuryToken,
+    alice.publicKey,
+    club,
+  ),
+]);
+assert.equal((await spl.getAccount(conn, treasuryToken)).amount, 1_000_000n);
+const dispute = await dis.readMarketDispute(P, market);
+assert.equal(dis.disputeState(dispute), "upheld");
+log("alice disputed; the protocol admin upheld YES and the bond went to the treasury");
 const aliceCash = (
   await sh
     .sharedAccounts(P)
@@ -528,6 +635,32 @@ if (clubFee > 0) {
   );
   log(`owner withdrew the club's ${clubFee} fee share`);
 } else log("no club fee share is configured, so there is nothing to withdraw");
+
+// ----- Settle the market and close the club with its deposit refunded -----
+await send(carol, [await life.settleClubMarketInstruction(P, carol.publicKey, club, market)]);
+assert.equal((await c.clubAccounts(P).club.fetchNullable(club)).liveMarkets, 0);
+const usdcRefund =
+  ownerDeposit.asset === "usdc"
+    ? { ownerToken: spl.getAssociatedTokenAddressSync(usd, owner.publicKey) }
+    : null;
+const before = usdcRefund
+  ? (await spl.getAccount(conn, usdcRefund.ownerToken)).amount
+  : BigInt(await conn.getBalance(owner.publicKey, "confirmed"));
+await send(owner, [await life.closeClubInstruction(P, owner.publicKey, club, usdcRefund)]);
+const after = usdcRefund
+  ? (await spl.getAccount(conn, usdcRefund.ownerToken)).amount
+  : BigInt(await conn.getBalance(owner.publicKey, "confirmed"));
+// SOL: the refund plus the listing and membership rent, less the fee.
+assert(after - before >= ownerDeposit.amount - (usdcRefund ? 0n : 10_000n));
+const closed = await c.clubAccounts(P).club.fetchNullable(club);
+assert(closed.closed && closed.depositAmount.isZero());
+await rejects(
+  send(owner, [
+    await c.inviteClubMemberInstruction(P, owner.publicKey, club, carol.publicKey),
+  ]),
+  /./,
+);
+log("market settled; club closed and its deposit refunded to the owner");
 
 report.club = club.toBase58();
 report.market = market.toBase58();
