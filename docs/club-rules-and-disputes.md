@@ -1,6 +1,6 @@
 # Club rules, security deposits and outcome disputes
 
-Status: agreed plan (2026-11-25). Solana: M1 merged; M2a (deposits) built; M2b (switch type, close club) next. Canton is tracked below and not started.
+Status: agreed plan (2026-11-25). Solana: M1 and M2a (deposits) merged; M2b (switch type, settle, close club) built. Canton is tracked below and not started.
 
 Every contract change ships with its matching UI in the same milestone.
 Canton clubs get the same rules after Solana. The super admin can change every
@@ -254,10 +254,12 @@ settling markets and closing a club with its refund.
 
 1. **Indexer first.** Merge, then rebuild the Northflank indexer from
    `master`. It keeps the previous IDL as history and decodes both programs.
-2. **Extend the program account.** The new program is 81,200 bytes larger than
-   the deployed one (2,484,392 vs 2,403,192). With the upgrade authority:
-   `solana program extend AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL 90000 -u devnet`
-   (about 0.63 SOL of rent).
+2. **Extend the program account.** With M2b, the new program is 142,376 bytes
+   larger than the deployed one (2,545,568 vs 2,403,192). With the upgrade
+   authority:
+   `solana program extend AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL 150000 -u devnet`
+   (about 1.04 SOL of rent). Check `solana program show` first; rebuild sizes
+   can differ slightly.
 3. **Program upgrade.** `anchor build`, then upgrade the program on devnet.
 4. **Deposit rules.** As super admin: Admin → Platform config → Set deposit
    rules. The defaults are outcomia-tUSDC, $100 / $200, 120%, the Pyth SOL/USD
@@ -266,3 +268,52 @@ settling markets and closing a club with its refund.
    under "Club market counts".
 6. **App.** Vercel deploys from `master`. Until club owners pay deposits, their
    clubs cannot create new markets. Existing markets keep trading.
+
+## 13. Milestone 2b: switching type, settling and closing (built)
+
+**Program**
+- `set_club_kind` (owner):
+  - **Private → public** needs the deposit at the public payment minimum
+    (for SOL, with the buffer at the current price). The app adds any missing
+    top-up to the same transaction.
+  - **Public → private** needs at most the private member cap. It closes the
+    listing (rent to the owner) and refunds the deposit above the private
+    payment minimum.
+- `settle_club_market` (anyone):
+  - A market qualifies when it is resolved, or is an empty draft past its
+    close time, and its club fees are withdrawn.
+  - Settling creates a small record (`["club_market_settled", club_market]`),
+    so a market settles once, and lowers the club's `live_markets`.
+  - Holders still redeem as before.
+  - From M3, settling will also require the dispute window to have ended with
+    no open dispute.
+- `close_club` (owner), once `live_markets` is 0:
+  - refunds the whole deposit (USDC vault emptied and closed, or SOL returned);
+  - closes the listing and the owner's membership;
+  - frees the owner's club slot.
+- **Closed clubs are kept on chain.** `close_club` keeps the club account and
+  marks it `closed`:
+  - its id can never be reused, so existing member records can never be
+    revived by a new club with the same id;
+  - its markets stay redeemable;
+  - nothing can join it, be invited, change roles or ownership, be listed,
+    deposit or create markets;
+  - members can still leave and get their rent back.
+- **Order of refunds.** Rent moved by hand (the listing) moves after token
+  transfers, so the token program's balance check holds.
+
+**App**
+- **Owner settings card on the club page:**
+  - switch type, with the needed top-up or the refund;
+  - close the club, after a confirmation step, with what still blocks closing.
+- **Club markets list:** "Settle" for anyone on finished markets, plus
+  "Settled" and "Withdraw club fees to settle" badges.
+- **Closed clubs:** a notice replaces the deposit card, management is hidden,
+  and invitations to closed clubs show "Club closed".
+
+## 14. Milestones 2a + 2b deployment order (devnet)
+
+M2a and M2b deploy as one program upgrade. Follow section 12. Two changes:
+- Step 2 above already uses the M2b size (extend by 150,000 bytes).
+- The indexer keeps the M2a IDL as history too, so either order of upgrades
+  decodes correctly.
