@@ -74,6 +74,36 @@ fn pda(seed: &[u8], parts: &[&[u8]]) -> Pubkey {
     seeds.extend_from_slice(parts);
     Pubkey::find_program_address(&seeds, &outcomia::ID).0
 }
+
+/// Installs dispute settings with 1-second windows, so finalization keeps
+/// waiting only for each market's review delay.
+fn install_dispute_config(svm: &mut LiteSVM) {
+    let (address, bump) = Pubkey::find_program_address(&[DISPUTE_CONFIG_SEED], &outcomia::ID);
+    let mut data = Vec::new();
+    DisputeConfig {
+        club_window_seconds: 1,
+        regular_window_seconds: 1,
+        bond_tokens: 1,
+        ruling_deadline_seconds: 7 * 24 * 60 * 60,
+        treasury: Pubkey::new_unique(),
+        bump,
+        reserved: [0; 64],
+    }
+    .try_serialize(&mut data)
+    .unwrap();
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        Account {
+            lamports,
+            data,
+            owner: outcomia::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+}
 fn ix(accounts: impl ToAccountMetas, data: impl InstructionData) -> Instruction {
     Instruction::new_with_bytes(outcomia::ID, &data.data(), accounts.to_account_metas(None))
 }
@@ -89,6 +119,7 @@ impl Fixture {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(outcomia::ID, PROGRAM_BYTES).unwrap();
+        install_dispute_config(&mut svm);
         let owner = Keypair::new();
         svm.airdrop(&owner.pubkey(), 10_000_000_000).unwrap();
         let mint = Pubkey::new_unique();
@@ -423,6 +454,9 @@ impl Fixture {
                 club_market: pda(CLUB_MARKET_SEED, &[market.as_ref()]),
                 market,
                 admin_member: self.member_pda(admin),
+                dispute_config: pda(DISPUTE_CONFIG_SEED, &[]),
+                dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+                system_program: system_program::ID,
             },
             outcomia::instruction::ProposeClubPrediction {
                 outcome,
@@ -436,6 +470,7 @@ impl Fixture {
         ix(
             outcomia::accounts::AdvanceClubPrediction {
                 market: market_pda(&MARKET_ID),
+                dispute: pda(MARKET_DISPUTE_SEED, &[market_pda(&MARKET_ID).as_ref()]),
             },
             outcomia::instruction::AdvanceClubPrediction { action },
         )
@@ -1108,7 +1143,10 @@ fn anyone_holds_a_club_position_but_public_instructions_cannot_reach_club_market
     // So does public resolution, even for the market's own creator.
     let owner = f.owner.insecure_clone();
     let public_freeze = ix(
-        outcomia::accounts::AdvancePrediction { market },
+        outcomia::accounts::AdvancePrediction {
+            market,
+            dispute: pda(MARKET_DISPUTE_SEED, &[market.as_ref()]),
+        },
         outcomia::instruction::AdvancePrediction { action: 0 },
     );
     f.set_clock(200);

@@ -6,6 +6,7 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct ResolveMultiOutcome<'info> {
+    #[account(mut)]
     pub resolver: Signer<'info>,
     #[account(mut, seeds = [MULTI_OUTCOME_MARKET_SEED, market.market_id.as_ref()], bump = market.bump)]
     pub market: Box<Account<'info, MultiOutcomeMarket>>,
@@ -13,11 +14,21 @@ pub struct ResolveMultiOutcome<'info> {
         constraint = admin_record.authority == resolver.key() @ admin::UnauthorizedAdmin,
         constraint = admin_record.status == AdminStatus::Active @ admin::AdminDisabled)]
     pub admin_record: Account<'info, AdminRecord>,
+    #[account(seeds = [DISPUTE_CONFIG_SEED], bump = dispute_config.bump)]
+    pub dispute_config: Box<Account<'info, DisputeConfig>>,
+    #[account(init_if_needed, payer = resolver, space = 8 + MarketDispute::INIT_SPACE,
+        seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: Box<Account<'info, MarketDispute>>,
+    pub system_program: Program<'info, System>,
 }
 #[derive(Accounts)]
 pub struct AdvanceMultiOutcome<'info> {
     #[account(mut, seeds = [MULTI_OUTCOME_MARKET_SEED, market.market_id.as_ref()], bump = market.bump)]
     pub market: Box<Account<'info, MultiOutcomeMarket>>,
+    /// CHECK: The market's dispute record PDA; empty for proposals made
+    /// before disputes existed, which keep the old finalization rule.
+    #[account(seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: UncheckedAccount<'info>,
 }
 
 /// Publishes or corrects an evidence-backed outcome; corrections restart the entire delay.
@@ -38,6 +49,13 @@ pub fn handle_propose_multi_outcome(
     let now = Clock::get()?.unix_timestamp;
     let resolver = ctx.accounts.resolver.key();
     let key = ctx.accounts.market.key();
+    super::disputes::prepare_proposal(
+        &mut ctx.accounts.dispute,
+        key,
+        false,
+        &ctx.accounts.dispute_config,
+        ctx.bumps.dispute,
+    )?;
     let m: &mut MultiOutcomeMarket = &mut ctx.accounts.market;
     resolution::resolver_window(m, resolver, now)?;
     let count = crate::multi_outcome::MultiOutcomeEconomics::from_terms(&m.terms)?.outcome_count;
@@ -72,8 +90,9 @@ pub fn handle_propose_multi_outcome(
 pub fn handle_advance_multi_outcome(ctx: Context<AdvanceMultiOutcome>, action: u8) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let key = ctx.accounts.market.key();
+    let gate = super::disputes::gate(&ctx.accounts.dispute)?;
     let m: &mut MultiOutcomeMarket = &mut ctx.accounts.market;
-    resolution::advance(m, action, now)?;
+    resolution::advance(m, action, now, gate)?;
     emit!(crate::MultiOutcomeResolutionEvent {
         market: key,
         outcome: m.final_outcome,

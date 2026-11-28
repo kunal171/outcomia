@@ -36,6 +36,61 @@ import {
   setClubLiveMarketsInstruction,
 } from "../lib/club-deposits";
 import { TEST_USDC_MINT } from "../lib/collateral-display";
+import {
+  readDisputeConfig,
+  setDisputeConfigInstruction,
+  type DisputeConfigAccount,
+} from "../lib/disputes";
+
+/** Dispute settings form, as typed: days, whole tokens and a wallet. */
+type DisputeForm = {
+  clubDays: string;
+  regularDays: string;
+  bond: string;
+  deadlineDays: string;
+  treasury: string;
+};
+const DISPUTE_DEFAULTS: DisputeForm = {
+  clubDays: "5",
+  regularDays: "3",
+  bond: "1",
+  deadlineDays: "7",
+  treasury: "",
+};
+const DISPUTE_FIELDS: { key: keyof DisputeForm; label: string }[] = [
+  { key: "clubDays", label: "Club market dispute window (days)" },
+  { key: "regularDays", label: "Other markets' dispute window (days)" },
+  { key: "bond", label: "Dispute bond (whole collateral tokens)" },
+  { key: "deadlineDays", label: "Time to rule before the market becomes invalid (days)" },
+  { key: "treasury", label: "Treasury wallet" },
+];
+const DAY = 86_400;
+/** The form as program values, or null when any is invalid. */
+function parseDisputeForm(form: DisputeForm): DisputeConfigAccount | null {
+  const seconds = (days: string) => {
+    const value = Math.round(Number(days) * DAY);
+    return Number.isFinite(value) && value >= 1 && value <= 30 * DAY ? value : null;
+  };
+  const club = seconds(form.clubDays);
+  const regular = seconds(form.regularDays);
+  const deadline = seconds(form.deadlineDays);
+  const bond = Number(form.bond);
+  let treasury: PublicKey;
+  try {
+    treasury = new PublicKey(form.treasury.trim());
+  } catch {
+    return null;
+  }
+  if (!club || !regular || !deadline || !Number.isInteger(bond) || bond < 1) return null;
+  return {
+    clubWindowSeconds: new BN(club),
+    regularWindowSeconds: new BN(regular),
+    bondTokens: new BN(bond),
+    rulingDeadlineSeconds: new BN(deadline),
+    treasury,
+  };
+}
+const daysText = (seconds: BN) => String(seconds.toNumber() / DAY);
 
 /** Deposit-rule form, as typed: dollars, percent and seconds. */
 type DepositForm = {
@@ -156,6 +211,8 @@ export function PlatformConfig() {
   );
   const [depositForm, setDepositForm] = useState<DepositForm>(DEPOSIT_DEFAULTS);
   const [uncounted, setUncounted] = useState<UncountedClub[] | null>(null);
+  const [disputes, setDisputes] = useState<DisputeConfigAccount | null>(null);
+  const [disputeForm, setDisputeForm] = useState<DisputeForm>(DISPUTE_DEFAULTS);
   const [form, setForm] = useState<Record<keyof ClubRulesAccount, string>>(
     () =>
       Object.fromEntries(
@@ -194,6 +251,18 @@ export function PlatformConfig() {
           });
       })
       .catch(() => !dead && setRules(null));
+    void readDisputeConfig(reader).then((value) => {
+      if (dead) return;
+      setDisputes(value);
+      if (value)
+        setDisputeForm({
+          clubDays: daysText(value.clubWindowSeconds),
+          regularDays: daysText(value.regularWindowSeconds),
+          bond: value.bondTokens.toString(),
+          deadlineDays: daysText(value.rulingDeadlineSeconds),
+          treasury: value.treasury.toBase58(),
+        });
+    });
     void clubAccounts(reader)
       .club.all()
       .then(async (clubs) => {
@@ -300,6 +369,14 @@ export function PlatformConfig() {
       setClubDepositRulesInstruction(p, signer, deposit.mint, deposit.rules),
     );
   }
+  const disputeConfig = parseDisputeForm(disputeForm);
+  function saveDisputes(event: FormEvent) {
+    event.preventDefault();
+    if (!disputeConfig) return;
+    void send("disputes", (p, signer) =>
+      setDisputeConfigInstruction(p, signer, disputeConfig),
+    );
+  }
   function count(item: UncountedClub) {
     void send(`count-${item.address.toBase58()}`, (p, signer) =>
       setClubLiveMarketsInstruction(p, signer, item.address, item.markets),
@@ -395,6 +472,46 @@ export function PlatformConfig() {
           </button>
         </form>
         {!rules && <p className="club-help">{t("Save the club rules first.")}</p>}
+      </section>
+
+      <section className="admin-card">
+        <div className="card-label">{t("Markets")}</div>
+        <h2>{t("Outcome disputes")}</h2>
+        <p>
+          {disputes
+            ? t(
+                "Applies to new proposals and disputes. Windows and deadlines already running keep their length.",
+              )
+            : t(
+                "Not set yet. No market can receive a proposal until you save these settings.",
+              )}
+        </p>
+        <form className="admin-form" onSubmit={saveDisputes}>
+          {DISPUTE_FIELDS.map((f) => (
+            <label key={f.key}>
+              {t(f.label)}
+              <input
+                value={disputeForm[f.key]}
+                onChange={(e) =>
+                  setDisputeForm((v) => ({ ...v, [f.key]: e.target.value.trim() }))
+                }
+                aria-invalid={!disputeConfig}
+                disabled={pending !== null}
+              />
+            </label>
+          ))}
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={!disputeConfig || pending !== null}
+          >
+            {pending === "disputes"
+              ? t("Saving…")
+              : disputes
+                ? t("Save dispute settings")
+                : t("Set dispute settings")}
+          </button>
+        </form>
       </section>
 
       <section className="admin-card">

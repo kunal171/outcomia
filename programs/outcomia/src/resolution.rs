@@ -173,6 +173,28 @@ pub fn validate_evidence(evidence_uri: &str, evidence_hash: &[u8; 32]) -> Result
     Ok(())
 }
 
+/// First second the pending proposal may be finalized under a dispute
+/// record: after both the review delay and the dispute window.
+/// # Errors
+/// Missing proposal, or timestamp overflow.
+pub fn dispute_window_end<M: ResolutionMarket>(m: &M, window_seconds: u64) -> Result<i64> {
+    let (_, proposed_at) = m.proposal().ok_or(shared::PredictionProposalUnavailable)?;
+    let window = i64::try_from(window_seconds)
+        .map_err(|_| error!(prediction::PredictionTimestampOverflow))?;
+    Ok(maturity(m)?.max(
+        proposed_at
+            .checked_add(window)
+            .ok_or_else(|| error!(prediction::PredictionTimestampOverflow))?,
+    ))
+}
+
+/// Finalization limits from a market's dispute record, if it has one.
+/// Markets proposed before disputes existed have none and keep the old rule.
+pub struct DisputeGate {
+    pub window_seconds: u64,
+    pub open: bool,
+}
+
 /// Moves a market with a freshly stored proposal into the Proposed state.
 /// # Errors
 /// Timestamp overflow: an unrepresentable maturity is rejected before the
@@ -186,13 +208,19 @@ pub fn mark_proposed<M: ResolutionMarket>(m: &mut M) -> Result<()> {
 /// Advances a published clock without choosing an arbitrary outcome.
 /// # Inputs
 /// Market, action (0 freeze at cutoff, 1 activate fallback, 2 finalize mature
-/// proposal, 3 finalize the precommitted Invalid timeout) and current Unix seconds.
+/// proposal, 3 finalize the precommitted Invalid timeout), current Unix seconds
+/// and the market's dispute limits, if it has a dispute record.
 /// # Errors
-/// Already final, wrong phase/status, missing proposal/fallback, immature delay
-/// or missing/early deadline.
+/// Already final, wrong phase/status, missing proposal/fallback, immature delay,
+/// missing/early deadline, an open dispute or an unfinished dispute window.
 /// # Returns
 /// One monotonic lifecycle transition; no SPL transfer and no admin override.
-pub fn advance<M: ResolutionMarket>(m: &mut M, action: u8, now: i64) -> Result<()> {
+pub fn advance<M: ResolutionMarket>(
+    m: &mut M,
+    action: u8,
+    now: i64,
+    dispute: Option<DisputeGate>,
+) -> Result<()> {
     require!(
         m.final_outcome().is_none(),
         shared::PredictionResolutionUnavailable
@@ -225,6 +253,13 @@ pub fn advance<M: ResolutionMarket>(m: &mut M, action: u8, now: i64) -> Result<(
                 m.status() == PredictionStatus::Proposed && now >= maturity(m)?,
                 shared::PredictionProposalUnavailable
             );
+            if let Some(gate) = dispute {
+                require!(!gate.open, crate::errors::dispute::DisputeOpen);
+                require!(
+                    now >= dispute_window_end(m, gate.window_seconds)?,
+                    crate::errors::dispute::DisputeWindowOpen
+                );
+            }
             let (outcome, _) = m.proposal().ok_or(shared::PredictionProposalUnavailable)?;
             m.set_final_outcome(outcome);
             m.set_status(PredictionStatus::Resolved);
@@ -494,40 +529,54 @@ mod tests {
     {
         // 0: freeze only at the cutoff.
         let mut m = M::build(None);
-        assert!(advance(&mut m, 0, CLOSE - 1).is_err());
-        advance(&mut m, 0, CLOSE).unwrap();
+        assert!(advance(&mut m, 0, CLOSE - 1, None).is_err());
+        advance(&mut m, 0, CLOSE, None).unwrap();
         assert_eq!(m.status(), PredictionStatus::Frozen);
 
         // 2: finalize exactly the proposed outcome, only at maturity.
         m.propose(M::sample(), EARLIEST);
         let mature = EARLIEST + DELAY as i64;
-        assert!(advance(&mut m, 2, mature - 1).is_err());
-        advance(&mut m, 2, mature).unwrap();
+        assert!(advance(&mut m, 2, mature - 1, None).is_err());
+        // A dispute record holds finalization for its window and while open.
+        let gate = |window, open| {
+            Some(DisputeGate {
+                window_seconds: window,
+                open,
+            })
+        };
+        let (_, proposed_at) = m.proposal().unwrap();
+        let end = proposed_at + 1_000_000;
+        assert!(end > mature);
+        assert!(advance(&mut m, 2, end - 1, gate(1_000_000, false)).is_err());
+        assert!(advance(&mut m, 2, end, gate(1_000_000, true)).is_err());
+        // A window shorter than the review delay changes nothing.
+        assert!(advance(&mut m, 2, mature - 1, gate(1, false)).is_err());
+        advance(&mut m, 2, mature, None).unwrap();
         assert_eq!(m.final_outcome(), Some(M::sample()));
         assert_eq!(m.status(), PredictionStatus::Resolved);
         for action in 0..=3 {
-            assert!(advance(&mut m, action, i64::MAX).is_err()); // final is final
+            assert!(advance(&mut m, action, i64::MAX, None).is_err()); // final is final
         }
 
         // 1: activate fallback inside its window.
         let mut m = M::build(Some(fallback(Some(DEADLINE))));
-        assert!(advance(&mut m, 1, AVAILABLE - 1).is_err());
-        advance(&mut m, 1, AVAILABLE).unwrap();
+        assert!(advance(&mut m, 1, AVAILABLE - 1, None).is_err());
+        advance(&mut m, 1, AVAILABLE, None).unwrap();
         assert_eq!(m.resolution_phase(), PredictionResolutionPhase::Fallback);
-        assert!(advance(&mut m, 1, AVAILABLE).is_err()); // once only
+        assert!(advance(&mut m, 1, AVAILABLE, None).is_err()); // once only
 
         // 3: Invalid after an unproposed deadline, never over a proposal.
         let mut m = M::build(Some(fallback(Some(DEADLINE))));
-        assert!(advance(&mut m, 3, DEADLINE - 1).is_err());
-        advance(&mut m, 3, DEADLINE).unwrap();
+        assert!(advance(&mut m, 3, DEADLINE - 1, None).is_err());
+        advance(&mut m, 3, DEADLINE, None).unwrap();
         assert_eq!(m.final_outcome(), Some(M::INVALID));
         let mut m = M::build(Some(fallback(Some(DEADLINE))));
         m.propose(M::sample(), EARLIEST);
-        assert!(advance(&mut m, 3, DEADLINE).is_err());
+        assert!(advance(&mut m, 3, DEADLINE, None).is_err());
         let mut m = M::build(Some(fallback(None)));
-        assert!(advance(&mut m, 3, i64::MAX).is_err()); // no deadline, no timeout
+        assert!(advance(&mut m, 3, i64::MAX, None).is_err()); // no deadline, no timeout
 
-        assert!(advance(&mut M::build(None), 4, i64::MAX).is_err());
+        assert!(advance(&mut M::build(None), 4, i64::MAX, None).is_err());
     }
 
     fn corrections_stop_at_the_phase_deadline<M: Fixture>() {
@@ -567,7 +616,7 @@ mod tests {
         }
         let mature = maturity(&m).unwrap();
         assert!(mature <= correction_deadline(&m) + DELAY as i64);
-        advance(&mut m, 2, mature).unwrap();
+        advance(&mut m, 2, mature, None).unwrap();
         assert_eq!(m.status(), PredictionStatus::Resolved);
     }
 

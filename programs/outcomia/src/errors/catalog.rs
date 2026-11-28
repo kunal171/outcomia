@@ -573,4 +573,29 @@ pub enum OutcomiaError {
         "The deposit vault, owner token account and token program are required for a USDC deposit"
     )]
     ClubRefundAccountsMissing = 214,
+
+    #[msg("Dispute settings must have windows and a ruling deadline of 1 second to 30 days, a bond of at least 1 token and a treasury")]
+    InvalidDisputeConfig = 215,
+    #[msg("This market cannot be disputed now: it needs a pending proposal inside its dispute window and no earlier dispute")]
+    DisputeUnavailable = 216,
+    #[msg("Only wallets holding contracts in this market can dispute it")]
+    DisputerHoldsNothing = 217,
+    #[msg("A dispute is open on this market; wait for the ruling")]
+    DisputeOpen = 218,
+    #[msg("There is no open dispute on this market")]
+    NoOpenDispute = 219,
+    #[msg("This admin cannot rule: the market's creator, resolvers and club admins are excluded")]
+    IneligibleDisputeRuler = 220,
+    #[msg(
+        "An overturn must choose a different, valid outcome; use the invalid ruling for invalid"
+    )]
+    InvalidDisputeRuling = 221,
+    #[msg("The ruling deadline has not passed yet")]
+    DisputeRulingNotExpired = 222,
+    #[msg("The ruling deadline has passed; the market can only become invalid")]
+    DisputeRulingExpired = 223,
+    #[msg("The dispute window has not ended yet")]
+    DisputeWindowOpen = 224,
+    #[msg("The bond account does not belong to the treasury or the disputer")]
+    InvalidBondRecipient = 225,
 }

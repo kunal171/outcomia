@@ -12,6 +12,7 @@ use crate::{constants::*, errors::club, resolution, state::*};
 
 #[derive(Accounts)]
 pub struct ProposeClubPrediction<'info> {
+    #[account(mut)]
     pub admin: Signer<'info>,
     #[account(seeds = [CLUB_MARKET_SEED, market.key().as_ref()], bump = club_market.bump,
         has_one = market @ club::InvalidClubMarket)]
@@ -23,6 +24,12 @@ pub struct ProposeClubPrediction<'info> {
         bump = admin_member.bump,
         constraint = admin_member.role == ClubRole::Admin @ club::UnauthorizedClubAdmin)]
     pub admin_member: Box<Account<'info, ClubMember>>,
+    #[account(seeds = [DISPUTE_CONFIG_SEED], bump = dispute_config.bump)]
+    pub dispute_config: Box<Account<'info, DisputeConfig>>,
+    #[account(init_if_needed, payer = admin, space = 8 + MarketDispute::INIT_SPACE,
+        seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: Box<Account<'info, MarketDispute>>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -30,6 +37,10 @@ pub struct AdvanceClubPrediction<'info> {
     #[account(mut, seeds = [CLUB_PREDICTION_MARKET_SEED, market.market_id.as_ref()],
         bump = market.bump)]
     pub market: Box<Account<'info, PredictionMarket>>,
+    /// CHECK: The market's dispute record PDA; empty for proposals made
+    /// before disputes existed, which keep the old finalization rule.
+    #[account(seeds = [MARKET_DISPUTE_SEED, market.key().as_ref()], bump)]
+    pub dispute: UncheckedAccount<'info>,
 }
 
 /// Publishes or corrects an evidence-backed outcome; corrections restart the delay.
@@ -49,6 +60,15 @@ pub fn handle_propose_club_prediction(
     correction: bool,
 ) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
+    let key = ctx.accounts.market.key();
+    // Club markets get the longer club dispute window.
+    super::disputes::prepare_proposal(
+        &mut ctx.accounts.dispute,
+        key,
+        true,
+        &ctx.accounts.dispute_config,
+        ctx.bumps.dispute,
+    )?;
     let m: &mut PredictionMarket = &mut ctx.accounts.market;
     // Authority comes from the admin record; the stored resolver is passed only
     // so the shared check applies the market's published timing.
@@ -77,6 +97,7 @@ pub fn handle_advance_club_prediction(
     action: u8,
 ) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
+    let gate = super::disputes::gate(&ctx.accounts.dispute)?;
     let m: &mut PredictionMarket = &mut ctx.accounts.market;
-    resolution::advance(m, action, now)
+    resolution::advance(m, action, now, gate)
 }

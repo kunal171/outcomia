@@ -7,6 +7,7 @@
 pub mod admin;
 pub mod balance;
 pub mod club;
+pub mod dispute;
 pub mod faucet;
 pub mod fee;
 pub mod market;

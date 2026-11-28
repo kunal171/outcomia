@@ -10,7 +10,7 @@
     "devnet:multi-maker": "node scripts/devnet-multi-maker-smoke.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test:prediction": "node scripts/prediction-series.test.mjs && node scripts/prediction-rules.test.mjs && node scripts/prediction-matching-plan.test.mjs && node scripts/arweave-rules.test.mjs && node scripts/correction-window.test.mjs",
+    "test:prediction": "node scripts/prediction-series.test.mjs && node scripts/prediction-rules.test.mjs && node scripts/prediction-matching-plan.test.mjs && node scripts/arweave-rules.test.mjs && node scripts/correction-window.test.mjs && node scripts/disputes.test.mjs",
     "test:wallet": "node scripts/wallet-overview.test.mjs",
     "test:shared": "node scripts/shared-trading.test.mjs",
     "test:clubs": "node scripts/clubs.test.mjs && node scripts/club-deposits.test.mjs && node scripts/club-lifecycle.test.mjs",

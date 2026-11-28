@@ -199,17 +199,15 @@ pub fn neighbor(
         o.market == market && o.book == book.key() && o.outcome == outcome && o.side == side,
         multi::InvalidMultiOutcomeBook
     );
-    require_keys_eq!(
-        o.key(),
-        Pubkey::find_program_address(
+    require!(
+        crate::pda::address_with_bump(
             &[
                 crate::constants::MULTI_OUTCOME_ORDER_SEED,
                 book.key().as_ref(),
                 &o.order_id.to_le_bytes()
             ],
-            &crate::ID
-        )
-        .0,
+            o.bump
+        ) == Some(o.key()),
         multi::InvalidMultiOutcomeBook
     );
     order_index(book, e, o.key(), o)
