@@ -10,6 +10,20 @@ use crate::{
     state::{OrderSide, PredictionOutcome},
 };
 
+/// The program address for `seeds` with a stored canonical `bump`, or `None`
+/// when it is not a valid program address.
+///
+/// Program-created accounts store the canonical bump found at creation, so
+/// checking a key with it costs one hash, while `find_program_address` tries
+/// bumps one by one and its cost depends on the key. Checks that run once per
+/// maker in a match use this to keep compute usage independent of wallets.
+pub fn address_with_bump(seeds: &[&[u8]], bump: u8) -> Option<Pubkey> {
+    let bump = [bump];
+    let mut all: Vec<&[u8]> = seeds.to_vec();
+    all.push(&bump);
+    Pubkey::create_program_address(&all, &crate::ID).ok()
+}
+
 /// Separate book root: no existing PredictionMarket layout changes are needed.
 ///
 /// # Inputs

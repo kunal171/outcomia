@@ -2075,7 +2075,9 @@ fn eight_way_mint_fits_the_default_compute_budget() {
         "eight-way mint compute units: {}",
         meta.compute_units_consumed
     );
-    assert!(meta.compute_units_consumed < 200_000);
+    // About 98k: per-maker address checks use stored bumps, so the cost no
+    // longer depends on the wallets (it used to range from 105k to 200k).
+    assert!(meta.compute_units_consumed < 150_000);
     assert_eq!(&f.market().supplies[..8], &[8; 8]);
     assert_eq!(f.position(&taker).free[0], 8);
     assert_eq!(f.book().open_order_count, 0);

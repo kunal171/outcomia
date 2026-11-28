@@ -221,13 +221,12 @@ pub fn asset(account: &Account<AssetBalance>, owner: Pubkey, mint: Pubkey) -> Re
         account.owner == owner && account.mint == mint,
         shared::InvalidAssetBalance
     );
-    require_keys_eq!(
-        account.key(),
-        Pubkey::find_program_address(
+    // The stored bump is the canonical one written at creation.
+    require!(
+        crate::pda::address_with_bump(
             &[ASSET_BALANCE_SEED, owner.as_ref(), mint.as_ref()],
-            &crate::ID
-        )
-        .0,
+            account.bump
+        ) == Some(account.key()),
         shared::InvalidAssetBalance
     );
     Ok(())
@@ -257,17 +256,15 @@ pub fn trader(
             p.owner == owner && p.market == book.market,
             shared::InvalidAssetBalance
         );
-        require_keys_eq!(
-            p.key(),
-            Pubkey::find_program_address(
+        require!(
+            crate::pda::address_with_bump(
                 &[
                     PREDICTION_POSITION_SEED,
                     book.market.as_ref(),
                     owner.as_ref()
                 ],
-                &crate::ID
-            )
-            .0,
+                p.bump
+            ) == Some(p.key()),
             shared::InvalidAssetBalance
         );
     }

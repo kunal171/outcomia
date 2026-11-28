@@ -146,31 +146,22 @@ pub fn handle_match_multi_outcome_complement<'info>(
         require!(order.owner != taker, matching::SelfTradeNotAllowed);
         let cash_info = &group[2];
         let position_info = &group[3];
-        require_keys_eq!(
-            cash_info.key(),
-            Pubkey::find_program_address(
-                &[ASSET_BALANCE_SEED, order.owner.as_ref(), mint.as_ref()],
-                &crate::ID
-            )
-            .0,
-            multi::InvalidMultiOutcomePosition
-        );
-        require_keys_eq!(
-            position_info.key(),
-            Pubkey::find_program_address(
+        // Load first (owner and type are checked), then bind each key to its
+        // stored canonical bump: a fixed cost per maker, whatever the wallet.
+        let c = intern(&mut cash, cash_info)?;
+        let p = intern(&mut positions, position_info)?;
+        asset(&cash[c], order.owner, mint)?;
+        require!(
+            crate::pda::address_with_bump(
                 &[
                     MULTI_OUTCOME_POSITION_SEED,
                     market_key.as_ref(),
                     order.owner.as_ref()
                 ],
-                &crate::ID
-            )
-            .0,
+                positions[p].bump
+            ) == Some(position_info.key()),
             multi::InvalidMultiOutcomePosition
         );
-        let c = intern(&mut cash, cash_info)?;
-        let p = intern(&mut positions, position_info)?;
-        asset(&cash[c], order.owner, mint)?;
         rules::position(&ctx.accounts.market, &positions[p], order.owner, market_key)?;
         legs.push(Leg {
             outcome: head.outcome,
