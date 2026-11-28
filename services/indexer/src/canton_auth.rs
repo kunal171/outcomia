@@ -314,7 +314,14 @@ async fn verify(
                     id
                 }
             };
-            let token = auth::start_session(&mut tx, &headers, &id, &challenge_hash).await?;
+            let token = auth::start_session(
+                &mut tx,
+                &headers,
+                &id,
+                &challenge_hash,
+                auth::SignInMethod::Canton,
+            )
+            .await?;
             let user = load_user(&mut *tx, &id).await?;
             tx.commit().await?;
             Ok(auth::session_response(&state, user, &token))

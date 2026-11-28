@@ -7,6 +7,8 @@ export type WalletUser = {
   wallet: string | null;
   /** Canton parties proven on the ledger. */
   parties: string[];
+  /** How this browser's session was proven (absent on sign-in responses). */
+  signedInWith?: "solana" | "canton";
 };
 
 export async function callWalletAuth<T>(

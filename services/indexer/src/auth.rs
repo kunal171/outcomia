@@ -278,13 +278,34 @@ async fn consume_solana_challenge(
     Ok(())
 }
 
-/// Starts a 7-day session for `user_id`, rotating the browser's previous one.
+/// Sessions end after 2 hours without a request and 24 hours after sign-in,
+/// however active (the SQL below spells out both intervals).
+const SESSION_MAX_SECONDS: u32 = 24 * 60 * 60;
+
+/// How a session was proven: a Solana message signature or a Canton claim.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SignInMethod {
+    Solana,
+    Canton,
+}
+impl SignInMethod {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Solana => "solana",
+            Self::Canton => "canton",
+        }
+    }
+}
+
+/// Starts a session for `user_id`, rotating the browser's previous one. It
+/// ends after 2 hours without activity or 24 hours after sign-in.
 /// Returns: the session token for the cookie; only its digest is stored.
 pub(crate) async fn start_session(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     headers: &HeaderMap,
     user_id: &str,
     challenge_hash: &str,
+    method: SignInMethod,
 ) -> Result<String> {
     if let Some(old) = cookie(headers, SESSION) {
         sqlx::query("DELETE FROM user_sessions WHERE token_hash=$1")
@@ -292,11 +313,19 @@ pub(crate) async fn start_session(
             .execute(&mut **tx)
             .await?;
     }
-    sqlx::query("DELETE FROM user_sessions WHERE expires_at<NOW()")
+    sqlx::query(
+        "DELETE FROM user_sessions WHERE expires_at<NOW() OR last_seen_at<NOW()-INTERVAL '2 hours'",
+    )
+    .execute(&mut **tx)
+    .await?;
+    let token = random();
+    sqlx::query("INSERT INTO user_sessions(token_hash,user_id,expires_at,challenge_hash,method) VALUES($1,$2::uuid,NOW()+INTERVAL '24 hours',$3,$4)")
+        .bind(hash(&token))
+        .bind(user_id)
+        .bind(challenge_hash)
+        .bind(method.as_str())
         .execute(&mut **tx)
         .await?;
-    let token = random();
-    sqlx::query("INSERT INTO user_sessions(token_hash,user_id,expires_at,challenge_hash) VALUES($1,$2::uuid,NOW()+INTERVAL '7 days',$3)").bind(hash(&token)).bind(user_id).bind(challenge_hash).execute(&mut **tx).await?;
     Ok(token)
 }
 
@@ -305,7 +334,7 @@ pub(crate) fn session_response(state: &AuthState, user: User, token: &str) -> Re
     let mut response = Json(user).into_response();
     response.headers_mut().append(
         header::SET_COOKIE,
-        set_cookie(SESSION, token, 604800, state.secure),
+        set_cookie(SESSION, token, SESSION_MAX_SECONDS, state.secure),
     );
     response.headers_mut().append(
         header::SET_COOKIE,
@@ -341,7 +370,14 @@ async fn verify(
     consume_solana_challenge(&state, &headers, &mut tx, &input).await?;
     let id:String=sqlx::query_scalar("INSERT INTO users(wallet_address,last_login_at,verified_at) VALUES($1,NOW(),NOW()) ON CONFLICT(wallet_address) DO UPDATE SET last_login_at=NOW(),verified_at=COALESCE(users.verified_at,NOW()) RETURNING id::text")
         .bind(&input.wallet).fetch_one(&mut *tx).await?;
-    let token = start_session(&mut tx, &headers, &id, &hash(&input.nonce)).await?;
+    let token = start_session(
+        &mut tx,
+        &headers,
+        &id,
+        &hash(&input.nonce),
+        SignInMethod::Solana,
+    )
+    .await?;
     sqlx::query("INSERT INTO tracked_wallets(owner) VALUES($1) ON CONFLICT(owner) DO UPDATE SET requested_at=NOW()").bind(&input.wallet).execute(&mut *tx).await?;
     let user = load_user(&mut *tx, &id).await?;
     tx.commit().await?;
@@ -474,25 +510,49 @@ pub(crate) fn signed_out() -> AuthError {
 }
 
 pub async fn current(pool: &PgPool, headers: &HeaderMap) -> Result<Option<User>> {
+    Ok(current_session(pool, headers).await?.map(|s| s.user))
+}
+
+/// The signed-in user with how the session was proven.
+#[derive(Clone, Debug, Serialize)]
+pub struct Session {
+    #[serde(flatten)]
+    pub user: User,
+    /// "solana" or "canton".
+    #[serde(rename = "signedInWith")]
+    pub method: String,
+}
+
+/// Loads the browser's session if it is unexpired and was used within
+/// the last 2 hours, and records this request as activity.
+pub async fn current_session(pool: &PgPool, headers: &HeaderMap) -> Result<Option<Session>> {
     let Some(token) = cookie(headers, SESSION) else {
         return Ok(None);
     };
     if token.len() > 64 {
         return Ok(None);
     }
-    let id: Option<String> = sqlx::query_scalar("SELECT u.id::text FROM users u JOIN user_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() AND u.verified_at IS NOT NULL")
-        .bind(hash(&token)).fetch_optional(pool).await?;
-    let Some(id) = id else {
+    let digest = hash(&token);
+    let row: Option<(String, String)> = sqlx::query_as(
+        "UPDATE user_sessions s SET last_seen_at=NOW() FROM users u
+          WHERE s.token_hash=$1 AND s.user_id=u.id AND u.verified_at IS NOT NULL
+            AND s.expires_at>NOW() AND s.last_seen_at>NOW()-INTERVAL '2 hours'
+          RETURNING u.id::text, s.method",
+    )
+    .bind(&digest)
+    .fetch_optional(pool)
+    .await?;
+    let Some((id, method)) = row else {
         return Ok(None);
     };
     let user = load_user(pool, &id).await?;
     if let Some(wallet) = &user.wallet {
         sqlx::query("UPDATE tracked_wallets SET requested_at=NOW() WHERE owner=$1 AND requested_at<NOW()-INTERVAL '1 minute'").bind(wallet).execute(pool).await?;
     }
-    Ok(Some(user))
+    Ok(Some(Session { user, method }))
 }
-async fn me(State(state): State<AuthState>, headers: HeaderMap) -> Result<Json<Option<User>>> {
-    Ok(Json(current(&state.pool, &headers).await?))
+async fn me(State(state): State<AuthState>, headers: HeaderMap) -> Result<Json<Option<Session>>> {
+    Ok(Json(current_session(&state.pool, &headers).await?))
 }
 
 async fn logout(State(state): State<AuthState>, headers: HeaderMap) -> Result<Response> {
@@ -637,6 +697,80 @@ mod tests {
         let other = app.clone().oneshot(ask("198.51.100.2", 100)).await.unwrap();
         assert_eq!(other.status(), StatusCode::OK);
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires isolated PostgreSQL"]
+    async fn sessions_end_when_idle_or_too_old_and_report_their_method(pool: PgPool) {
+        let user: String = sqlx::query_scalar(
+            "INSERT INTO users(wallet_address,verified_at) VALUES('W1',NOW()) RETURNING id::text",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // (token, method, last seen ago, expires in)
+        let rows = [
+            ("fresh", "solana", "1 minute", "23 hours"),
+            ("canton", "canton", "1 hour", "23 hours"),
+            ("idle", "solana", "3 hours", "20 hours"),
+            ("expired", "solana", "1 minute", "-1 minute"),
+        ];
+        for (token, method, seen, expires) in rows {
+            sqlx::query(
+                "INSERT INTO user_sessions(token_hash,user_id,expires_at,last_seen_at,method)
+                 VALUES($1,$2::uuid,NOW()+$3::interval,NOW()-$4::interval,$5)",
+            )
+            .bind(hash(token))
+            .bind(&user)
+            .bind(expires)
+            .bind(seen)
+            .bind(method)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let headers = |token: &str| {
+            let mut h = HeaderMap::new();
+            h.insert(
+                header::COOKIE,
+                format!("{SESSION}={token}").parse().unwrap(),
+            );
+            h
+        };
+        let fresh = current_session(&pool, &headers("fresh"))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (fresh.user.id.as_str(), fresh.method.as_str()),
+            (user.as_str(), "solana")
+        );
+        let json = serde_json::to_value(&fresh).unwrap();
+        assert_eq!(json["signedInWith"], "solana");
+        assert_eq!(json["wallet"], "W1");
+        let canton = current_session(&pool, &headers("canton"))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(canton.method, "canton");
+        // Activity moves the idle clock forward.
+        let recent: bool = sqlx::query_scalar(
+            "SELECT last_seen_at>NOW()-INTERVAL '5 seconds' FROM user_sessions WHERE token_hash=$1",
+        )
+        .bind(hash("canton"))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(recent);
+        assert!(current_session(&pool, &headers("idle"))
+            .await
+            .unwrap()
+            .is_none());
+        assert!(current_session(&pool, &headers("expired"))
+            .await
+            .unwrap()
+            .is_none());
+        assert!(current(&pool, &headers("missing")).await.unwrap().is_none());
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires isolated PostgreSQL"]
     async fn challenge_replay_origin_and_session_rotation(pool: PgPool) {

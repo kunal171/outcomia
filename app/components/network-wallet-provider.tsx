@@ -27,6 +27,16 @@ type Selection = {
 };
 const Context = createContext<Selection | null>(null);
 const key = "outcomia:active-chain";
+/** When the remembered wallet was last in use (ms since the epoch). */
+const seenKey = "outcomia:active-chain-seen";
+/** A remembered wallet reconnects on reload only if it was in use this
+ * recently, so returning after a long break asks to connect again. */
+export const RESTORE_WINDOW_MS = 2 * 60 * 60 * 1000;
+/** Whether a remembered wallet last seen at `seen` may reconnect at `now`. */
+export const restoreAllowed = (seen: string | null, now: number) => {
+  const at = Number(seen);
+  return Number.isFinite(at) && at > 0 && at <= now && now - at < RESTORE_WINDOW_MS;
+};
 
 /** Storage remembers intent only. Live wallet state, never the stored label,
  * determines the active chain. Clear intent before any asynchronous switch so
@@ -53,8 +63,13 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
   function remember(chain: Chain | null) {
     setIntent(chain);
     try {
-      if (chain) sessionStorage.setItem(key, chain);
-      else sessionStorage.removeItem(key);
+      if (chain) {
+        sessionStorage.setItem(key, chain);
+        sessionStorage.setItem(seenKey, String(Date.now()));
+      } else {
+        sessionStorage.removeItem(key);
+        sessionStorage.removeItem(seenKey);
+      }
     } catch {
       /* Browser storage is optional; verification is not. */
     }
@@ -62,6 +77,12 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(key);
+      // A tab restored after a long break starts disconnected.
+      if (saved && !restoreAllowed(sessionStorage.getItem(seenKey), Date.now())) {
+        remember(null);
+        setReady(true);
+        return;
+      }
       if (saved === "solana" || saved === "canton") setIntent(saved);
       if (saved === "solana") {
         const name: unknown = JSON.parse(
@@ -75,6 +96,26 @@ export function NetworkWalletProvider({ children }: { children: ReactNode }) {
     }
     setReady(true);
   }, []);
+
+  // While a wallet is in use, keep its "last seen" time current.
+  useEffect(() => {
+    if (!intent) return;
+    const touch = () => {
+      try {
+        if (document.visibilityState === "visible")
+          sessionStorage.setItem(seenKey, String(Date.now()));
+      } catch {
+        /* Browser storage is optional. */
+      }
+    };
+    touch();
+    const timer = setInterval(touch, 60_000);
+    document.addEventListener("visibilitychange", touch);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", touch);
+    };
+  }, [intent]);
 
   // Adapter selection updates React state asynchronously. Connect only once
   // the provider exposes the chosen adapter, including when restoring a hint.

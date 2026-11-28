@@ -143,8 +143,11 @@ financial credit.
 `POST /auth/challenge` issues an expiring, single-use, origin/network/address-bound
 message. `POST /auth/verify` verifies its Ed25519 signature before creating a user
 and an HttpOnly, SameSite=Strict session. Only credential hashes are stored.
-`GET /auth/me` reuses the session; `POST /auth/logout` revokes it, including an
-in-flight challenge. Only signature-verified profiles can have authenticated
+`GET /auth/me` reuses the session and reports how it was proven
+(`signedInWith`: `solana` or `canton`); `POST /auth/logout` revokes it, including an
+in-flight challenge. A session ends after 2 hours without a request and 24 hours
+after sign-in, so a returning user signs again with their wallet. The app also
+reconnects a remembered wallet on reload only if it was in use within 2 hours. Only signature-verified profiles can have authenticated
 sessions; a chain-discovered profile alone never grants a session. Challenge issuance is rate limited per client (10/minute), per wallet (5/minute) and by a global ceiling (600/minute), so one client cycling wallet addresses cannot block sign-in for others. Behind the app, the same-origin proxy forwards the browser IP with `INDEXER_PROXY_SECRET`; the indexer trusts that IP only when the secret matches and otherwise keys limits on the TCP peer. Only a digest of the client identity is stored. The Next same-origin
 
 **Canton sign-in and linking.** With the five `CANTON_*` variables set (see
