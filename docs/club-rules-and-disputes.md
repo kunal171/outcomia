@@ -1,6 +1,6 @@
 # Club rules, security deposits and outcome disputes
 
-Status: agreed plan (2026-11-25). Solana: M1 and M2a (deposits) merged; M2b (switch type, settle, close club) built. Canton is tracked below and not started.
+Status: agreed plan (2026-11-25). Solana: M1, M2a and M2b merged; M3 (disputes) built; M4 (penalties) next. Canton is tracked below and not started.
 
 Every contract change ships with its matching UI in the same milestone.
 Canton clubs get the same rules after Solana. The super admin can change every
@@ -254,11 +254,11 @@ settling markets and closing a club with its refund.
 
 1. **Indexer first.** Merge, then rebuild the Northflank indexer from
    `master`. It keeps the previous IDL as history and decodes both programs.
-2. **Extend the program account.** With M2b, the new program is 142,376 bytes
-   larger than the deployed one (2,545,568 vs 2,403,192). With the upgrade
+2. **Extend the program account.** With M3, the new program is 329,056 bytes
+   larger than the deployed one (2,732,248 vs 2,403,192). With the upgrade
    authority:
-   `solana program extend AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL 150000 -u devnet`
-   (about 1.04 SOL of rent). Check `solana program show` first; rebuild sizes
+   `solana program extend AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL 340000 -u devnet`
+   (about 2.37 SOL of rent). Check `solana program show` first; rebuild sizes
    can differ slightly.
 3. **Program upgrade.** `anchor build`, then upgrade the program on devnet.
 4. **Deposit rules.** As super admin: Admin → Platform config → Set deposit
@@ -314,6 +314,69 @@ settling markets and closing a club with its refund.
 ## 14. Milestones 2a + 2b deployment order (devnet)
 
 M2a and M2b deploy as one program upgrade. Follow section 12. Two changes:
-- Step 2 above already uses the M2b size (extend by 150,000 bytes).
+- Step 2 above already uses the M3 size (extend by 340,000 bytes).
 - The indexer keeps the M2a IDL as history too, so either order of upgrades
   decodes correctly.
+
+## 15. Milestone 3: outcome disputes (built)
+
+These rules apply to every prediction market: public binary, club binary and
+multi-outcome.
+
+**Decisions (2026-11-28)**
+- **One dispute per market.** Every ruling is final, so the "disputes per
+  market" setting is dropped.
+- **Bond.** The bond is a number of whole collateral tokens: 1 by default,
+  which is $1 for USDC and tUSDC.
+- **Treasury.** The treasury is a wallet in the dispute settings.
+
+**Program**
+- **`set_dispute_config` (super admin)** sets:
+  - the club window (5 days) and the window for other markets (3 days);
+  - the bond in whole tokens;
+  - the ruling deadline (7 days);
+  - the treasury wallet.
+
+  Proposals require these settings.
+- **Every proposal creates the market's dispute record**
+  (`["market_dispute", market]`), which fixes the market's window.
+  - Finalization waits for both the review delay and the window, and never
+    happens while a dispute is open.
+  - A correction restarts both, and is blocked while a dispute is open.
+  - Markets proposed before this release have no record and keep the old rule.
+- **Trading has already closed by the time an outcome is proposed.** So a
+  dispute only holds finalization, and with it redemption; orders, fills and
+  splits are already stopped.
+- **`open_*_dispute`:** a holder of the market's contracts opens it, inside the
+  window, once per market. The bond goes to `["dispute_bond", market]`.
+- **`rule_*_dispute`:** an active protocol admin rules before the deadline. The
+  admin must not be the market's creator, its resolver or fallback resolver,
+  or, for club markets, a club admin.
+  - **Uphold:** the proposed outcome stands and the bond goes to the treasury.
+  - **Overturn:** the admin picks another valid outcome (not Invalid) and the
+    bond is refunded.
+  - **Invalid:** the market resolves Invalid and the bond is refunded.
+  - Overturn and Invalid rulings on club markets set `club_penalty_due` for M4.
+- **`expire_*_dispute` (anyone),** after the deadline: the market becomes
+  Invalid and the bond is refunded, with no club penalty.
+- **Settling (M2b)** still requires a resolved market, which now implies the
+  window has passed and no dispute is open.
+
+**App**
+- **Dispute card on every market page:**
+  - the window and when payouts unlock;
+  - "Dispute this outcome" for holders, with a confirmation step and the bond;
+  - the ruling form for eligible admins;
+  - "Make the market invalid" after the deadline;
+  - the final ruling.
+- **Finalize buttons** wait for the window and any open dispute.
+- **The Disputes page** (`/disputes`, for admins) lists open disputes by
+  deadline.
+- **Admin → Platform config:** dispute settings.
+
+## 16. Milestone 3 deployment (devnet)
+
+Follow section 12, with one extra step right after the program upgrade:
+**set the dispute settings** (Admin → Platform config → Outcome disputes,
+including the treasury wallet). Until they are set, no market can receive a
+proposal.
