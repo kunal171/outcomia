@@ -554,4 +554,6 @@ pub enum OutcomiaError {
     ClubMarketCountAlreadySet = 205,
     #[msg("Deposit arithmetic overflowed")]
     ClubDepositOverflow = 206,
+    #[msg("This club's market count must be recorded by the platform before it creates markets")]
+    ClubMarketCountNotSet = 207,
 }

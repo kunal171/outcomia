@@ -650,6 +650,14 @@ fn the_super_admin_backfills_the_market_count_once() {
     account.data = data;
     f.svm.set_account(club, account).unwrap();
     let owner = f.owner.insecure_clone();
+    // Until it is counted the club cannot add markets, so the count stays exact.
+    f.configure();
+    f.fund_usdc(club, 100_000_000);
+    f.fails(
+        &owner,
+        f.create_market(club, 1, None),
+        "ClubMarketCountNotSet",
+    );
     f.fails(
         &owner,
         f.set_live_markets(&owner.pubkey(), club, 3),
@@ -664,4 +672,7 @@ fn the_super_admin_backfills_the_market_count_once() {
         f.set_live_markets(&sa.pubkey(), club, 4),
         "ClubMarketCountAlreadySet",
     );
+    // Counted clubs add to the recorded total.
+    f.ok(&owner, f.create_market(club, 1, None));
+    assert_eq!(f.club(1).live_markets, 4);
 }

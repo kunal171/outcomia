@@ -142,7 +142,8 @@ pub(crate) fn require_club_access(
 /// club rules and, for a SOL deposit, a fresh SOL/USD price.
 /// # Errors
 /// Policy forbids the creator, a fallback or foreign resolver, invalid terms, labels or payout,
-/// an id already in use, or the club's deposit below its minimum.
+/// an id already in use, the club's deposit below its minimum, or a club whose market count
+/// has not been recorded yet.
 /// # Returns
 /// A Draft market with empty supplies and its `ClubMarket` binding; the club counts it as live.
 pub fn handle_create_club_prediction_market(
@@ -174,6 +175,11 @@ pub fn handle_create_club_prediction_market(
         &ctx.accounts.club_rules,
         ctx.accounts.price_update.as_deref().map(|a| &**a),
     )?;
+    // An uncounted club's total would stay wrong; the super-admin counts it first.
+    require!(
+        ctx.accounts.club.live_markets_ready,
+        club::ClubMarketCountNotSet
+    );
     let club = &mut ctx.accounts.club;
     club.live_markets = club
         .live_markets

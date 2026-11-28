@@ -18692,6 +18692,11 @@
       "code": 6206,
       "name": "ClubDepositOverflow",
       "msg": "Deposit arithmetic overflowed"
+    },
+    {
+      "code": 6207,
+      "name": "ClubMarketCountNotSet",
+      "msg": "This club's market count must be recorded by the platform before it creates markets"
     }
   ],
   "types": [
