@@ -2,99 +2,83 @@
 
 **Every Outcome Has a Market.**
 
-Prediction markets on Solana, with YES/NO order books and one collateral asset
-per market. Outcomia also supports spot trading and includes a Rust indexer
-that stores finalized transactions in PostgreSQL.
+Outcomia runs prediction markets on Solana with a fully on-chain order book.
+- **Markets:** binary and multi-outcome (2–8) markets, plus spot pairs.
+- **Funding:** a shared wallet that funds every market.
+- **Clubs:** communities with security deposits, and outcome disputes.
+- **Indexer:** a Rust indexer with GraphQL.
 
-This is a devnet research project. Shared asset balances, prediction trading,
-delayed resolution and redemption are deployed and smoke-tested on devnet.
-Use test tokens only.
+The same Next.js app also serves the Canton version
+([`outcomia-canton`](https://github.com/kunal171/outcomia-canton)).
 
-See [shared balances and settlement](docs/shared-balances-resolution.md) for the
-new custody model, legacy recovery and rollout checks.
+Outcomia runs on devnet only, with test tokens.
 
-The shared [frontend](docs/shared-frontend.md) also connects Console Wallet for
-the Canton prediction workspace. Canton contracts and services are developed in
-[`outcomia-canton`](https://github.com/kunal171/outcomia-canton); market deployment
-is pending there. Solana functionality below remains available.
+## Features
 
-## What works
+- **Prediction markets:**
+  - **Types:** binary and multi-outcome markets.
+  - **Rules:** published as hashed documents.
+  - **Backing:** complete sets backed by one collateral asset.
+  - **Resolution:** delayed, with corrections, an optional fallback resolver and
+    permissionless finalization.
+- **Order book:**
+  - **Priority:** price-time priority with FIFO queues.
+  - **Matching:** up to three makers matched atomically per transaction, plus a
+    resting remainder.
+  - **Complete-set matching:** YES/NO pairs, and full sets across outcomes.
+- **Shared custody:** one balance per wallet and mint, usable in every market.
+- **Clubs:**
+  - **Membership:** private, request-to-join or open, with invitations and roles.
+  - **Markets:** members-only or public.
+  - **Economics:** a club share of fees, and USDC or SOL (Pyth) security
+    deposits.
+  - **Lifecycle:** switching type, settling markets and closing the club.
+- **Disputes:** a bonded dispute window on every market, ruled by an independent
+  admin.
+- **Profiles:** one profile across Solana and Canton, with combined USD P&L.
+- **Indexer:** finalized history, candles, sign-in and an RPC fallback in the app.
 
-- Admin-created prediction markets with named questions, published rules,
-  resolver keys, trading deadlines and optional fallback terms.
-- Wallet-owned positions, collateral deposits and withdrawals, and complete-set
-  split/merge: one collateral token backs one YES plus one NO contract.
-- 2–8-outcome markets, linked books, trading/claims UI and indexer events. The
-  program is deployed and smoke-tested on devnet, and the UI is enabled in
-  production. See [multi-outcome status](docs/multi-outcome-markets.md).
-- YES/NO limit orders, price-time priority, partial fills and owner cancellation.
-  The client can match up to three makers atomically and post a safe remainder.
-- Spot markets with base/quote vaults, internal balances, price ticks, quantity
-  lots, matching, cancellation and administrator controls.
-- Configurable taker fees, per-market accounting and spot fee withdrawal.
-- A Next.js UI with market discovery, order books, wallet balances, readable
-  prices, market metadata and prediction guides.
-- Finalized transaction ingestion with historical backfill, live recovery,
-  durable checkpoints and PostgreSQL storage.
+## Quick start
 
-Prediction trades settle internal balances immediately. Determining the final
-YES/NO outcome and paying winning positions are separate, implemented lifecycle steps.
-See the [rename compatibility notes](docs/rebranding.md) for existing environment
-variables, database identities and deployment keys.
+Toolchain: Rust 1.97.1 (pinned in `rust-toolchain.toml`), Anchor 1.2.0, Solana
+CLI 4.1.2, Node 20+.
 
-The indexer retains source transactions; it does not yet provide prediction
-trade projections or a public query API.
+```bash
+anchor build
+anchor test --skip-deploy        # LiteSVM, no validator
 
-## Run and verify
+cd app && npm ci && cp .env.example .env.local && npm run dev
+```
 
-The program uses Rust `1.97.1`, Anchor `1.2.0`, Solana CLI `4.1.2` and LiteSVM
-`0.16.0`. The Rust toolchain is pinned in `rust-toolchain.toml`.
+- **Tests:** bare `anchor test` deploys before testing, so use `--skip-deploy`.
+- **App:** set the Helius RPC and feature flags first; see
+  [app/README.md](app/README.md).
+
+## Checks
 
 ```bash
 anchor build
 anchor test --skip-deploy
+cargo clippy --all-targets -- -D warnings
+npm --prefix app run typecheck
+npm --prefix app run build
+npm --prefix app run test:prediction   # also: shared, wallet, clubs, spot, rpc-proxy,
+                                        # canton, multi-outcome, indexer, i18n, theme
 ```
 
-The test command runs LiteSVM without a local validator. Bare `anchor test`
-deploys to the configured cluster before running tests; use `--skip-deploy`
-for local verification.
+The indexer's checks are in its [README](services/indexer/README.md#checks).
 
-Start the web app:
+## Devnet
 
-```bash
-cd app
-npm ci
-cp .env.example .env.local  # First setup only; keep existing configuration.
-npm run dev
-```
+Program [`AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
+Addresses, settings and the upgrade procedure are in
+[deployment](docs/deployment.md).
 
-Fill in your Helius devnet configuration and review the prediction rollout
-flags before using the app. See the [app guide](app/README.md).
+## Layout
 
-## Devnet program
-
-`AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL`
-
-[View on Solana Explorer](https://explorer.solana.com/address/AG4ztZvcZjzFKjoXLzH8M6U3if9CwVFTXH2FHjqg7SdL?cluster=devnet).
-The address matches `declare_id!` and `Anchor.toml`.
-
-For a deliberate upgrade after building and testing:
-
-```bash
-anchor program deploy --no-idl
-```
-
-The app uses its checked-in IDL. Deployment details and the IDL-upload
-workaround are in the [deployment guide](docs/deployment.md).
-
-## Project layout
-
-| Directory                                        | Contents                                                    |
-| ------------------------------------------------ | ----------------------------------------------------------- |
-| [`programs/outcomia`](programs/outcomia)         | Anchor program and LiteSVM tests                            |
-| [`app`](app/README.md)                           | Next.js UI, wallet flows and transaction builders           |
-| [`services/indexer`](services/indexer/README.md) | Separate Rust workspace for ingestion and storage           |
-| [`docs`](docs/README.md)                         | Architecture, design decisions, diagrams and test addresses |
-
-The indexer has a local [Docker/Kind setup](services/indexer/infra/kubernetes/README.md).
-Cloud infrastructure and Terraform deployment remain separate work.
+| Path | Contents |
+| --- | --- |
+| [`programs/outcomia`](programs/outcomia) | Anchor program and LiteSVM tests |
+| [`app`](app/README.md) | Next.js app, wallet flows, transaction planners |
+| [`services/indexer`](services/indexer/README.md) | Rust indexer, PostgreSQL, GraphQL |
+| [`docs`](docs/README.md) | Design docs, diagrams, devnet evidence |
