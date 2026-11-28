@@ -193,8 +193,15 @@ test("club market creation opens the market and its book in one packet", async (
     "Will it rain tomorrow in the city centre?",
     "tUSDC",
     false,
+    null,
     id,
   );
+  // USDC-deposit clubs pass no price; the optional account is the program id.
+  for (const i of instructions.slice(0, 2)) {
+    assert(account(i, "club_rules").equals(derive("club_rules_config")));
+    assert(account(i, "price_update").equals(programId));
+  }
+  assert(account(instructions[1], "club").equals(club));
   assert.deepEqual(Array.from(instructions, name), [
     "createClubPredictionMarket",
     "openClubPredictionMarket",
